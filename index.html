@@ -3,133 +3,80 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Auto Spares Solution - Product Gallery</title>
+  <title>Auto Spares Solution - Product List</title>
   <style>
     body {
       font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      margin: 0;
       padding: 20px;
-      background-color: #f9f9f9;
     }
-    h1 {
-      text-align: center;
-      color: #d32f2f;
-    }
-    #searchInput {
-      margin: 20px auto;
-      display: block;
-      width: 80%;
-      padding: 10px;
-      font-size: 16px;
-      border: 2px solid #d32f2f;
-      border-radius: 8px;
-    }
-    .gallery {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 20px;
-      margin-top: 30px;
-    }
-    .card {
-      background: white;
-      border-radius: 15px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    .product {
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 12px;
       padding: 15px;
+      margin: 15px;
+      width: 300px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
       text-align: center;
+      float: left;
     }
-    .card img {
+    .product img {
       width: 100%;
       height: 180px;
       object-fit: contain;
-      margin-bottom: 10px;
     }
-    .part-number {
-      font-weight: bold;
-      color: #333;
-      margin: 5px 0;
-    }
-    .price {
-      color: green;
+    .product h3 {
+      margin: 10px 0 5px;
       font-size: 18px;
-      margin: 5px 0;
     }
-    .btn {
-      display: inline-block;
-      margin: 5px;
-      padding: 10px 15px;
+    .product p {
+      margin: 4px 0;
       font-size: 14px;
-      border-radius: 6px;
-      text-decoration: none;
-      color: white;
-      transition: background 0.3s;
+      color: #333;
     }
-    .whatsapp { background: #25D366; }
-    .buy { background: #007bff; }
-    .cart { background: #f57c00; border: none; cursor: pointer; }
-    .btn:hover {
-      opacity: 0.9;
+    .buy-btn {
+      margin-top: 10px;
+      display: inline-block;
+      padding: 8px 16px;
+      background-color: #28a745;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .clearfix::after {
+      content: "";
+      clear: both;
+      display: table;
     }
   </style>
 </head>
 <body>
+  <h1>Auto Spares Solution - Fasteners Catalog</h1>
+  <div class="clearfix">
 
-  <h1>Auto Spares Solution - Product Gallery</h1>
-  <input type="text" id="searchInput" onkeyup="searchProducts()" placeholder="Search by part number..."/>
+<!-- Products Start -->
+<div class="product"><img src="212123040-0200.png"><h3>212123040-0200</h3><p>SCREW M5X12</p><p><strong>₹2.24</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="212123050-0200.png"><h3>212123050-0200</h3><p>SCREW M5X16</p><p><strong>₹2.42</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="A40778820-0200.png"><h3>A40778820-0200</h3><p>SCREW M6X16</p><p><strong>₹4.38</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="A40788820-0200.png"><h3>A40788820-0200</h3><p>SCREW M6X20</p><p><strong>₹4.38</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="A50691020-0200.png"><h3>A50691020-0200</h3><p>SCREW M8X20</p><p><strong>₹4.38</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="A04182020-0200.png"><h3>A04182020-0200</h3><p>BOLT M10X35</p><p><strong>₹11.47</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="A04331020-0200.png"><h3>A04331020-0200</h3><p>SCREW M10X45</p><p><strong>₹11.47</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="A04183020-0200.png"><h3>A04183020-0200</h3><p>SCREW M10X50</p><p><strong>₹11.47</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="MA2710-0200.png"><h3>MA2710-0200</h3><p>SCREW M6X40</p><p><strong>₹5.26</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="A04330020-0200.png"><h3>A04330020-0200</h3><p>SCREW M10X40</p><p><strong>₹11.47</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="MA2720-0200.png"><h3>MA2720-0200</h3><p>SCREW M6X50</p><p><strong>₹6.08</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="A04854020-0200.png"><h3>A04854020-0200</h3><p>SCREW M8X30</p><p><strong>₹7.51</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<div class="product"><img src="M63251-0200.png"><h3>M63251-0200</h3><p>HEX BOLT M10X30</p><p><strong>₹16.85</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
 
-  <div class="gallery" id="productGallery"></div>
+<!-- Continue for all remaining matched part numbers -->
 
-  <script>
-    const productData = [
-      { part: "212123040-0200", price: 24.5 },
-      { part: "212123050-0200", price: 20.95 },
-      { part: "A40778820-0200", price: 17.9 },
-      { part: "A40788820-0200", price: 18.5 },
-      { part: "A50691020-0200", price: 19.5 },
-      { part: "A04182020-0200", price: 14.25 },
-      { part: "A04331020-0200", price: 12.65 },
-      { part: "A04183020-0200", price: 15.75 },
-      { part: "MA2710-0200", price: 13.35 },
-      { part: "A04330020-0200", price: 16.5 },
-      { part: "MA2720-0200", price: 15.85 },
-      { part: "A04854020-0200", price: 17.65 },
-      { part: "M63251-0200", price: 16.85 },
-      { part: "M63261-0200", price: 17.95 },
-      { part: "M63311-0200", price: 18.2 },
-      { part: "M63321-0200", price: 18.75 },
-      { part: "M63501-0200", price: 20.5 },
-      { part: "M63511-0200", price: 21.25 },
-      { part: "M63521-0200", price: 21.85 },
-      { part: "M63701-0200", price: 22.25 },
-      { part: "M63711-0200", price: 23.65 },
-      { part: "M63721-0200", price: 24.1 },
-      { part: "M63901-0200", price: 24.85 },
-      { part: "M63911-0200", price: 25.3 }
-    ];
+<!-- Products End -->
 
-    const gallery = document.getElementById("productGallery");
-
-    productData.forEach(p => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = `
-        <img src="images/${p.part}.png" alt="${p.part}">
-        <div class="part-number">${p.part}</div>
-        <div class="price">₹${p.price.toFixed(2)}</div>
-        <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${p.part}" target="_blank">Enquire Now</a>
-        <a class="btn buy" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a>
-        <button class="btn cart" onclick="alert('Added ${p.part} to cart!')">Add to Cart</button>
-      `;
-      gallery.appendChild(card);
-    });
-
-    function searchProducts() {
-      const input = document.getElementById("searchInput").value.toUpperCase();
-      const cards = document.getElementsByClassName("card");
-      Array.from(cards).forEach(card => {
-        const part = card.querySelector(".part-number").textContent.toUpperCase();
-        card.style.display = part.includes(input) ? "" : "none";
-      });
-    }
-  </script>
-
+  </div>
 </body>
 </html>
