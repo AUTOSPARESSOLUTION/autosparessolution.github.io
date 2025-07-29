@@ -1,82 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Auto Spares Solution - Product List</title>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-9GSY9Q5R5P"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-9GSY9Q5R5P');
+</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Spares Solution</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f8f9fa;
       margin: 0;
-      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #ffffff;
     }
-    .product {
-      border: 1px solid #ccc;
-      background: #fff;
-      border-radius: 12px;
-      padding: 15px;
-      margin: 15px;
-      width: 300px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+
+    header {
       text-align: center;
-      float: left;
+      padding: 2rem 1rem;
+      background: rgba(0, 0, 0, 0.7);
     }
-    .product img {
-      width: 100%;
-      height: 180px;
-      object-fit: contain;
+
+    header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+      letter-spacing: 2px;
+      color: #00ffcc;
+      text-shadow: 2px 2px 4px #000000;
     }
-    .product h3 {
-      margin: 10px 0 5px;
-      font-size: 18px;
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem;
+      padding: 2rem;
     }
-    .product p {
-      margin: 4px 0;
-      font-size: 14px;
-      color: #333;
+
+    .card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 1rem;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      text-align: center;
+      transition: transform 0.3s ease;
     }
-    .buy-btn {
-      margin-top: 10px;
+
+    .card:hover {
+      transform: scale(1.05);
+    }
+
+    .card img {
+      max-width: 100%;
+      border-radius: 6px;
+      height: auto;
+    }
+
+    .part-number {
+      font-weight: bold;
+      margin-top: 0.5rem;
+      color: #00ffcc;
+    }
+
+    .btn {
       display: inline-block;
-      padding: 8px 16px;
-      background-color: #28a745;
-      color: #fff;
+      margin-top: 0.5rem;
+      padding: 0.5rem 1rem;
       border: none;
-      border-radius: 8px;
+      border-radius: 5px;
       text-decoration: none;
       font-weight: bold;
+      transition: background 0.3s ease;
+      margin-right: 5px;
     }
-    .clearfix::after {
-      content: "";
-      clear: both;
-      display: table;
+
+    .whatsapp {
+      background: #25D366;
+      color: #fff;
+    }
+
+    .whatsapp:hover {
+      background: #1ebd5b;
+    }
+
+    .buy {
+      background: #ff6f61;
+      color: white;
+    }
+
+    .buy:hover {
+      background: #e85c50;
+    }
+
+    .cart {
+      background: #007bff;
+      color: white;
+    }
+
+    .cart:hover {
+      background: #0056b3;
     }
   </style>
 </head>
 <body>
-  <h1>Auto Spares Solution - Fasteners Catalog</h1>
-  <div class="clearfix">
+  <header>
+    <h1>Auto Spares Solution</h1>
+  </header>
+  <main class="gallery">
 
-<!-- Products Start -->
-<div class="product"><img src="212123040-0200.png"><h3>212123040-0200</h3><p>SCREW M5X12</p><p><strong>₹2.24</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="212123050-0200.png"><h3>212123050-0200</h3><p>SCREW M5X16</p><p><strong>₹2.42</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="A40778820-0200.png"><h3>A40778820-0200</h3><p>SCREW M6X16</p><p><strong>₹4.38</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="A40788820-0200.png"><h3>A40788820-0200</h3><p>SCREW M6X20</p><p><strong>₹4.38</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="A50691020-0200.png"><h3>A50691020-0200</h3><p>SCREW M8X20</p><p><strong>₹4.38</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="A04182020-0200.png"><h3>A04182020-0200</h3><p>BOLT M10X35</p><p><strong>₹11.47</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="A04331020-0200.png"><h3>A04331020-0200</h3><p>SCREW M10X45</p><p><strong>₹11.47</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="A04183020-0200.png"><h3>A04183020-0200</h3><p>SCREW M10X50</p><p><strong>₹11.47</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="MA2710-0200.png"><h3>MA2710-0200</h3><p>SCREW M6X40</p><p><strong>₹5.26</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="A04330020-0200.png"><h3>A04330020-0200</h3><p>SCREW M10X40</p><p><strong>₹11.47</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="MA2720-0200.png"><h3>MA2720-0200</h3><p>SCREW M6X50</p><p><strong>₹6.08</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="A04854020-0200.png"><h3>A04854020-0200</h3><p>SCREW M8X30</p><p><strong>₹7.51</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
-<div class="product"><img src="M63251-0200.png"><h3>M63251-0200</h3><p>HEX BOLT M10X30</p><p><strong>₹16.85</strong></p><a class="buy-btn" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a></div>
+<!-- PRODUCT CARDS START -->
 
-<!-- Continue for all remaining matched part numbers -->
+<!-- We'll inject your product cards with WhatsApp, Buy Now, Add to Cart -->
+<!-- REPLACE ALL <div class="card">...</div> BLOCKS WITH -->
+<!-- Repeating below template for each part -->
 
-<!-- Products End -->
+<!-- EXAMPLE TEMPLATE -->
+<!--
+<div class="card">
+  <img src="images/M63241-0200.png" alt="M63241-0200">
+  <div class="part-number">M63241-0200</div>
+  <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about M63241-0200" target="_blank">Enquire Now</a>
+  <a class="btn buy" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a>
+  <button class="btn cart" onclick="alert('Added M63241-0200 to cart!')">Add to Cart</button>
+</div>
+-->
 
-  </div>
+<!-- ACTUAL PRODUCTS -->
+<script>
+  const products = [
+    "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
+    "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
+    "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+    "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+    "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
+    "M07520-0200"
+  ];
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const gallery = document.querySelector(".gallery");
+    products.forEach(part => {
+      gallery.innerHTML += `
+        <div class="card">
+          <img src="images/${part}.png" alt="${part}">
+          <div class="part-number">${part}</div>
+          <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">Enquire Now</a>
+          <a class="btn buy" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a>
+          <button class="btn cart" onclick="alert('Added ${part} to cart!')">Add to Cart</button>
+        </div>
+      `;
+    });
+  });
+</script>
+
+<!-- PRODUCT CARDS END -->
+
+  </main>
 </body>
 </html>
