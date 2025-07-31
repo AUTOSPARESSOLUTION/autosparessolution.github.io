@@ -1,15 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-9GSY9Q5R5P"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-9GSY9Q5R5P');
-</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9GSY9Q5R5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-9GSY9Q5R5P');
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auto Spares Solution</title>
@@ -20,13 +18,11 @@
       background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
       color: #ffffff;
     }
-
     header {
       text-align: center;
       padding: 2rem 1rem;
       background: rgba(0, 0, 0, 0.7);
     }
-
     header h1 {
       margin: 0;
       font-size: 2.5rem;
@@ -34,14 +30,25 @@
       color: #00ffcc;
       text-shadow: 2px 2px 4px #000000;
     }
-
+    nav {
+      background: #000;
+      padding: 0.5rem 1rem;
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+    }
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin: 0.5rem;
+      font-weight: bold;
+    }
     .gallery {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 1rem;
       padding: 2rem;
     }
-
     .card {
       background: rgba(255, 255, 255, 0.1);
       border-radius: 10px;
@@ -50,23 +57,19 @@
       text-align: center;
       transition: transform 0.3s ease;
     }
-
     .card:hover {
       transform: scale(1.05);
     }
-
     .card img {
       max-width: 100%;
       border-radius: 6px;
       height: auto;
     }
-
     .part-number {
       font-weight: bold;
       margin-top: 0.5rem;
       color: #00ffcc;
     }
-
     .btn {
       display: inline-block;
       margin-top: 0.5rem;
@@ -78,32 +81,59 @@
       transition: background 0.3s ease;
       margin-right: 5px;
     }
-
     .whatsapp {
       background: #25D366;
       color: #fff;
     }
-
     .whatsapp:hover {
       background: #1ebd5b;
     }
-
     .buy {
       background: #ff6f61;
       color: white;
     }
-
     .buy:hover {
       background: #e85c50;
     }
-
     .cart {
       background: #007bff;
       color: white;
     }
-
     .cart:hover {
       background: #0056b3;
+    }
+    footer {
+      background: #000;
+      color: #ccc;
+      padding: 2rem;
+      text-align: center;
+    }
+    footer a {
+      color: #00ffcc;
+      text-decoration: none;
+      margin: 0 10px;
+    }
+    .contact-form {
+      padding: 2rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      margin: 2rem;
+    }
+    .contact-form input,
+    .contact-form textarea {
+      width: 100%;
+      padding: 1rem;
+      margin: 1rem 0;
+      border: none;
+      border-radius: 5px;
+    }
+    .contact-form button {
+      padding: 1rem 2rem;
+      background: #00ffcc;
+      border: none;
+      border-radius: 5px;
+      font-weight: bold;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -111,54 +141,66 @@
   <header>
     <h1>Auto Spares Solution</h1>
   </header>
-  <main class="gallery">
-
-<!-- PRODUCT CARDS START -->
-
-<!-- We'll inject your product cards with WhatsApp, Buy Now, Add to Cart -->
-<!-- REPLACE ALL <div class="card">...</div> BLOCKS WITH -->
-<!-- Repeating below template for each part -->
-
-<!-- EXAMPLE TEMPLATE -->
-<!--
-<div class="card">
-  <img src="images/M63241-0200.png" alt="M63241-0200">
-  <div class="part-number">M63241-0200</div>
-  <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about M63241-0200" target="_blank">Enquire Now</a>
-  <a class="btn buy" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a>
-  <button class="btn cart" onclick="alert('Added M63241-0200 to cart!')">Add to Cart</button>
-</div>
--->
-
-<!-- ACTUAL PRODUCTS -->
-<script>
-  const products = [
-    "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
-    "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-    "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
-    "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
-    "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
-    "M07520-0200"
-  ];
-
-  document.addEventListener("DOMContentLoaded", () => {
-    const gallery = document.querySelector(".gallery");
-    products.forEach(part => {
-      gallery.innerHTML += `
-        <div class="card">
-          <img src="images/${part}.png" alt="${part}">
-          <div class="part-number">${part}</div>
-          <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">Enquire Now</a>
-          <a class="btn buy" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a>
-          <button class="btn cart" onclick="alert('Added ${part} to cart!')">Add to Cart</button>
-        </div>
-      `;
-    });
+  <nav>
+    <a href="#home">Home</a>
+    <a href="#about">About Us</a>
+    <a href="#brands">Brands</a>
+    <a href="#reach">Our Reach</a>
+    <a href="#products">Products</a>
+    <a href="#contact">Contact Us</a>
+    <a href="https://razorpay.me/@autosparessolution" target="_blank">Pay</a>
+    <a href="#">Sign In</a>
+  </nav>
+  <section id="about" style="padding: 2rem;">
+    <h2>About Us</h2>
+    <p>Established in 2024, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We are specialist dealers of TVS & STL Fasteners (Nut & Bolt), and authorized distributors of Volume Rubber Products. Our operations span across multiple states in India and beyond, offering fast and reliable supply for all automotive needs.</p>
+  </section>
+  <section class="gallery" id="products"></section>
+  <section id="contact" class="contact-form">
+    <h2>Get In Touch</h2>
+    <form>
+      <input type="text" placeholder="Your Name" required>
+      <input type="email" placeholder="Email Id" required>
+      <input type="tel" placeholder="Phone no." required>
+      <input type="text" placeholder="City" required>
+      <textarea placeholder="How can we help you?" rows="4" required></textarea>
+      <div class="g-recaptcha" data-sitekey="YOUR_SITE_KEY"></div>
+      <br>
+      <button type="submit">Send</button>
+    </form>
+  </section>
+  <footer>
+    <p>&copy; 2024 Auto Spares Solution. All Rights Reserved.</p>
+    <div>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms & Conditions</a>
+      <a href="#">Return & Refund Policy</a>
+    </div>
+  </footer>
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+  <script>
+    const products = [
+      "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
+      "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
+      "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+      "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+      "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
+      "M07520-0200"
+    ];document.addEventListener("DOMContentLoaded", () => {
+  const gallery = document.querySelector(".gallery");
+  products.forEach(part => {
+    gallery.innerHTML += `
+      <div class="card">
+        <img src="images/${part}.png" alt="${part}">
+        <div class="part-number">${part}</div>
+        <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">Enquire Now</a>
+        <a class="btn buy" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a>
+        <button class="btn cart" onclick="alert('Added ${part} to cart!')">Add to Cart</button>
+      </div>
+    `;
   });
-</script>
+});
 
-<!-- PRODUCT CARDS END -->
-
-  </main>
+  </script>
 </body>
 </html>
