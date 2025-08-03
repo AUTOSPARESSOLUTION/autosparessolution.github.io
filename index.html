@@ -44,6 +44,7 @@
       margin: 0.5rem;
       font-weight: bold;
     }
+    /* Sticky Search Bar */
     .search-bar {
       position: sticky;
       top: 0;
@@ -82,30 +83,11 @@
       border-radius: 6px;
       height: auto;
     }
-    .part-number {
-      font-weight: bold;
-      margin-top: 0.5rem;
-      color: #00ffcc;
-    }
-    .description {
-      font-size: 0.9rem;
-      margin: 0.3rem 0;
-      color: #e0e0e0;
-    }
-    .list-price {
-      font-size: 0.85rem;
-      color: #ccc;
-      text-decoration: line-through;
-    }
-    .price {
-      font-size: 1rem;
-      margin: 0.3rem 0;
-      color: #ffd700;
-    }
-    .price.mismatch {
-      color: red;
-      font-weight: bold;
-    }
+    .part-number { font-weight: bold; margin-top: 0.5rem; color: #00ffcc; }
+    .description { font-size: 0.9rem; margin: 0.3rem 0; color: #e0e0e0; }
+    .list-price { font-size: 0.85rem; color: #ccc; text-decoration: line-through; }
+    .price { font-size: 1rem; margin: 0.3rem 0; color: #ffd700; }
+    .price.mismatch { color: red; font-weight: bold; }
     .btn {
       display: inline-block;
       margin-top: 0.5rem;
@@ -123,18 +105,37 @@
     .buy:hover { background: #e85c50; }
     .cart { background: #007bff; color: white; }
     .cart:hover { background: #0056b3; }
-    .note {
+    footer {
+      background: #000;
+      color: #ccc;
+      padding: 2rem;
       text-align: center;
-      font-size: 0.9rem;
-      margin-top: -1rem;
-      color: #ff9999;
     }
-    .no-results {
-      text-align: center;
-      font-size: 1rem;
-      color: #ff6666;
-      margin-top: 2rem;
+    footer a { color: #00ffcc; text-decoration: none; margin: 0 10px; }
+    .contact-form {
+      padding: 2rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      margin: 2rem;
     }
+    .contact-form input,
+    .contact-form textarea {
+      width: 100%;
+      padding: 1rem;
+      margin: 1rem 0;
+      border: none;
+      border-radius: 5px;
+    }
+    .contact-form button {
+      padding: 1rem 2rem;
+      background: #00ffcc;
+      border: none;
+      border-radius: 5px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .note { text-align: center; font-size: 0.9rem; color: #ff9999; }
+    .no-results { text-align: center; font-size: 1rem; color: #ff6666; margin-top: 2rem; }
   </style>
 </head>
 <body>
@@ -142,14 +143,55 @@
     <h1>Auto Spares Solution</h1>
   </header>
   
+  <nav>
+    <a href="#home">Home</a>
+    <a href="#about">About Us</a>
+    <a href="#brands">Brands</a>
+    <a href="#reach">Our Reach</a>
+    <a href="#products">Products</a>
+    <a href="#contact">Contact Us</a>
+    <a href="https://razorpay.me/@autosparessolution" target="_blank">Pay</a>
+    <a href="#">Sign In</a>
+  </nav>
+
+  <!-- Sticky Search -->
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="Search by Part Number or Description..." onkeyup="filterProducts()">
   </div>
+
+  <section id="about" style="padding: 2rem;">
+    <h2>About Us</h2>
+    <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We are specialist dealers of TVS & STL Fasteners (Nut & Bolt), and authorized distributors of Volume Rubber Products. Our operations span across multiple states in India and beyond, offering fast and reliable supply for all automotive needs.</p>
+  </section>
 
   <section class="gallery" id="products"></section>
   <p class="note">*Prices in red differ from sheet values*</p>
   <p class="no-results" id="noResults" style="display:none;">No products found</p>
 
+  <section id="contact" class="contact-form">
+    <h2>Get In Touch</h2>
+    <form>
+      <input type="text" placeholder="Your Name" required>
+      <input type="email" placeholder="Email Id" required>
+      <input type="tel" placeholder="Phone no." required>
+      <input type="text" placeholder="City" required>
+      <textarea placeholder="How can we help you?" rows="4" required></textarea>
+      <div class="g-recaptcha" data-sitekey="6LfzYpcrAAAAAGNTx-G5_MMbM9adcGOChnmaGQLz"></div>
+      <br>
+      <button type="submit">Send</button>
+    </form>
+  </section>
+
+  <footer>
+    <p>&copy; 2025 Auto Spares Solution. All Rights Reserved.</p>
+    <div>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms & Conditions</a>
+      <a href="#">Return & Refund Policy</a>
+    </div>
+  </footer>
+
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
   <script>
     const csvUrl = "https://autosparessolution.github.io/main/prices.csv";
     const productParts = [
