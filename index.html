@@ -23,7 +23,6 @@
       text-align: center;
       padding: 2rem 1rem;
       background: rgba(0, 0, 0, 0.7);
-      position: relative;
     }
     header h1 {
       margin: 0;
@@ -32,28 +31,30 @@
       color: #00ffcc;
       text-shadow: 2px 2px 4px #000000;
     }
-    .cart-icon {
-      position: absolute;
-      right: 20px;
-      top: 20px;
-      font-size: 1.5rem;
-      cursor: pointer;
-      background: #007bff;
-      padding: 8px 12px;
-      border-radius: 5px;
-    }
     nav {
       background: #000;
       padding: 0.5rem 1rem;
       display: flex;
       justify-content: space-around;
       flex-wrap: wrap;
+      align-items: center;
     }
     nav a {
       color: white;
       text-decoration: none;
       margin: 0.5rem;
       font-weight: bold;
+      position: relative;
+    }
+    #cart-count {
+      background: red;
+      color: white;
+      border-radius: 50%;
+      padding: 0 5px;
+      font-size: 0.8rem;
+      position: absolute;
+      top: -8px;
+      right: -10px;
     }
     .gallery {
       display: grid;
@@ -70,11 +71,21 @@
       transition: transform 0.3s ease;
     }
     .card:hover { transform: scale(1.05); }
-    .card img { max-width: 100%; border-radius: 6px; height: auto; }
-    .part-number { font-weight: bold; margin-top: 0.5rem; color: #00ffcc; }
-    .price { color: #ffd700; margin: 0.5rem 0; }
-    .stock { font-size: 0.9rem; margin-bottom: 0.5rem; }
-    .out-of-stock { color: red; font-weight: bold; }
+    .card img {
+      max-width: 100%;
+      border-radius: 6px;
+      height: auto;
+    }
+    .part-number {
+      font-weight: bold;
+      margin-top: 0.5rem;
+      color: #00ffcc;
+    }
+    .price { font-size: 1.1rem; color: #ffd700; }
+    .stock {
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
     .btn {
       display: inline-block;
       margin-top: 0.5rem;
@@ -85,40 +96,54 @@
       font-weight: bold;
       transition: background 0.3s ease;
       margin-right: 5px;
-      cursor: pointer;
     }
     .whatsapp { background: #25D366; color: #fff; }
     .whatsapp:hover { background: #1ebd5b; }
     .buy { background: #ff6f61; color: white; }
     .buy:hover { background: #e85c50; }
-    .cart-btn { background: #007bff; color: white; }
-    .cart-btn:hover { background: #0056b3; }
+    .cart { background: #007bff; color: white; }
+    .cart:hover { background: #0056b3; }
+    /* Cart Sidebar */
+    #cart-sidebar {
+      position: fixed;
+      top: 0; right: -400px;
+      width: 350px; height: 100%;
+      background: #222;
+      color: white;
+      box-shadow: -2px 0 5px rgba(0,0,0,0.5);
+      padding: 1rem;
+      transition: right 0.3s ease;
+      overflow-y: auto;
+      z-index: 999;
+    }
+    #cart-sidebar.active { right: 0; }
+    #cart-sidebar h2 { margin-top: 0; }
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #444;
+      padding-bottom: 0.5rem;
+    }
+    .qty-control button {
+      background: #555;
+      color: white;
+      border: none;
+      padding: 0.2rem 0.5rem;
+      cursor: pointer;
+    }
     footer {
-      background: #000; color: #ccc; padding: 2rem; text-align: center;
+      background: #000;
+      color: #ccc;
+      padding: 2rem;
+      text-align: center;
     }
     footer a { color: #00ffcc; text-decoration: none; margin: 0 10px; }
-    /* Cart modal */
-    .modal {
-      display: none; position: fixed; z-index: 1000; left: 0; top: 0;
-      width: 100%; height: 100%; background: rgba(0,0,0,0.6);
-    }
-    .modal-content {
-      background: #fff; color: #000; margin: 5% auto; padding: 20px;
-      border-radius: 8px; width: 90%; max-width: 500px;
-    }
-    .cart-item {
-      display: flex; justify-content: space-between; align-items: center; margin: 10px 0;
-    }
-    .qty-btn {
-      background: #007bff; color: white; border: none; padding: 2px 6px;
-      margin: 0 4px; border-radius: 4px; cursor: pointer;
-    }
   </style>
 </head>
 <body>
   <header>
     <h1>Auto Spares Solution</h1>
-    <div class="cart-icon" onclick="openCart()">🛒 <span id="cart-count">0</span></div>
   </header>
   <nav>
     <a href="#home">Home</a>
@@ -128,10 +153,37 @@
     <a href="#products">Products</a>
     <a href="#contact">Contact Us</a>
     <a href="https://razorpay.me/@autosparessolution" target="_blank">Pay</a>
+    <a href="#" id="cart-link">Cart <span id="cart-count">0</span></a>
     <a href="#">Sign In</a>
   </nav>
 
+  <section id="about" style="padding: 2rem;">
+    <h2>About Us</h2>
+    <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts...</p>
+  </section>
+
   <section class="gallery" id="products"></section>
+
+  <!-- Cart Sidebar -->
+  <div id="cart-sidebar">
+    <h2>Your Cart</h2>
+    <div id="cart-items"></div>
+    <h3>Total: ₹<span id="cart-total">0.00</span></h3>
+    <button class="buy" onclick="checkout()">Checkout</button>
+  </div>
+
+  <section id="contact" class="contact-form">
+    <h2>Get In Touch</h2>
+    <form>
+      <input type="text" placeholder="Your Name" required>
+      <input type="email" placeholder="Email Id" required>
+      <input type="tel" placeholder="Phone no." required>
+      <input type="text" placeholder="City" required>
+      <textarea placeholder="How can we help you?" rows="4" required></textarea>
+      <div class="g-recaptcha" data-sitekey="6LfzYpcrAAAAAGNTx-G5_MMbM9adcGOChnmaGQLz"></div>
+      <br><button type="submit">Send</button>
+    </form>
+  </section>
 
   <footer>
     <p>&copy; 2025 Auto Spares Solution. All Rights Reserved.</p>
@@ -142,141 +194,106 @@
     </div>
   </footer>
 
-  <!-- Cart Modal -->
-  <div id="cartModal" class="modal">
-    <div class="modal-content">
-      <h3>Your Cart</h3>
-      <div id="cart-items"></div>
-      <h4>Total: ₹<span id="cart-total">0.00</span></h4>
-      <button onclick="checkout()">Checkout</button>
-      <button onclick="closeCart()">Close</button>
-    </div>
-  </div>
-
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script>
-    const productList = [
-      "M63241-0200","M63251-0200","M64770-0200","212123040-0200","212123050-0200",
-      "A40778820-0200","A40788820-0200","A05691020-0200","A04182020-0200",
-      "A04331020-0200","A04183020-0200","MA2710-0200","A04330020-0200",
-      "MA2720-0200","A04854020-0200","M73710-0200","M73720-0200","A03121020-0200",
-      "M85060-0200","A0A509020-0200","M54760-0200","M87340-0200","M07500-0200","M07520-0200"
+    let cart = [];
+    const productsList = [
+      "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
+      "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
+      "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+      "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+      "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
+      "M07520-0200"
     ];
-    let prices = {};
-    let stock = {};
-    let cart = {};
 
-    async function loadPrices() {
-      const res = await fetch('https://autosparessolution.github.io/prices.csv');
-      const data = await res.text();
-      const rows = data.split('\n').map(r => r.split(','));
-      rows.forEach(r => {
-        const part = r[0]?.trim();
-        const price = parseFloat(r[6]);
-        const qty = r[7]?.trim().toLowerCase();
-        if (part && !isNaN(price)) {
-          prices[part] = price;
-          stock[part] = (qty === "nil" || qty === "" || parseInt(qty) <= 0) ? 0 : parseInt(qty);
-        }
+    document.getElementById("cart-link").addEventListener("click", () => {
+      document.getElementById("cart-sidebar").classList.toggle("active");
+    });
+
+    fetch("prices.csv")
+      .then(res => res.text())
+      .then(data => {
+        const rows = data.split("\n").map(r => r.split(","));
+        const headers = rows.shift();
+        const priceIndex = 6; // Column G
+        const stockIndex = 7; // Column H
+
+        productsList.forEach(part => {
+          const row = rows.find(r => r[0] && r[0].trim() === part);
+          if (!row) return;
+          const price = parseFloat(row[priceIndex]) || 0;
+          const stock = row[stockIndex] ? parseInt(row[stockIndex]) : 0;
+          if (stock <= 0 || isNaN(stock)) return; // Hide out of stock
+
+          document.getElementById("products").innerHTML += `
+            <div class="card">
+              <img src="images/${part}.png" alt="${part}">
+              <div class="part-number">${part}</div>
+              <div class="price">₹${price.toFixed(2)}</div>
+              <div class="stock" style="color:${stock > 5 ? 'lightgreen' : 'red'}">In Stock: ${stock}</div>
+              <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">Enquire Now</a>
+              <button class="btn cart" onclick="addToCart('${part}', ${price})">Add to Cart</button>
+            </div>
+          `;
+        });
       });
-      renderProducts();
-    }
 
-    function renderProducts() {
-      const gallery = document.getElementById("products");
-      gallery.innerHTML = "";
-      productList.forEach(part => {
-        const price = prices[part] || 0;
-        const qty = stock[part] ?? 0;
-        gallery.innerHTML += `
-          <div class="card">
-            <img src="images/${part}.png" alt="${part}">
-            <div class="part-number">${part}</div>
-            <div class="price">₹${price.toFixed(2)}</div>
-            <div class="stock">${qty > 0 ? 'Stock: ' + qty : '<span class="out-of-stock">Out of Stock</span>'}</div>
-            <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">Enquire Now</a>
-            <button class="btn buy" ${qty<=0?'disabled':''} onclick="buyNow('${part}', ${price})">Buy Now</button>
-            <button class="btn cart-btn" ${qty<=0?'disabled':''} onclick="addToCart('${part}')">Add to Cart</button>
-          </div>
-        `;
-      });
-    }
-
-    function addToCart(part) {
-      if (!cart[part]) cart[part] = 1;
-      else if (cart[part] < stock[part]) cart[part]++;
-      updateCartCount();
-    }
-
-    function updateCartCount() {
-      document.getElementById('cart-count').innerText = Object.values(cart).reduce((a,b)=>a+b,0);
-    }
-
-    function openCart() {
-      const cartItemsDiv = document.getElementById("cart-items");
-      cartItemsDiv.innerHTML = "";
-      let total = 0;
-      for (let part in cart) {
-        const qty = cart[part];
-        const price = prices[part] || 0;
-        total += qty * price;
-        cartItemsDiv.innerHTML += `
-          <div class="cart-item">
-            ${part} - ₹${price.toFixed(2)} x 
-            <button class="qty-btn" onclick="changeQty('${part}', -1)">-</button>
-            ${qty}
-            <button class="qty-btn" onclick="changeQty('${part}', 1)">+</button>
-          </div>
-        `;
+    function addToCart(part, price) {
+      const existing = cart.find(item => item.part === part);
+      if (existing) {
+        existing.qty++;
+      } else {
+        cart.push({ part, price, qty: 1 });
       }
-      document.getElementById("cart-total").innerText = total.toFixed(2);
-      document.getElementById("cartModal").style.display = "block";
+      updateCartUI();
     }
 
-    function closeCart() { document.getElementById("cartModal").style.display = "none"; }
+    function updateCartUI() {
+      document.getElementById("cart-count").textContent = cart.reduce((sum, i) => sum + i.qty, 0);
+      const itemsDiv = document.getElementById("cart-items");
+      itemsDiv.innerHTML = "";
+      let total = 0;
+      cart.forEach(item => {
+        total += item.price * item.qty;
+        itemsDiv.innerHTML += `
+          <div class="cart-item">
+            <span>${item.part}</span>
+            <div class="qty-control">
+              <button onclick="changeQty('${item.part}', -1)">-</button>
+              ${item.qty}
+              <button onclick="changeQty('${item.part}', 1)">+</button>
+              <span>₹${(item.price * item.qty).toFixed(2)}</span>
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById("cart-total").textContent = total.toFixed(2);
+    }
 
     function changeQty(part, delta) {
-      if (!cart[part]) return;
-      cart[part] += delta;
-      if (cart[part] <= 0) delete cart[part];
-      else if (cart[part] > stock[part]) cart[part] = stock[part];
-      updateCartCount();
-      openCart();
-    }
-
-    function buyNow(part, price) {
-      const options = {
-        key: "rzp_live_90iWxpNYThOpyE",
-        amount: price * 100,
-        currency: "INR",
-        name: "Auto Spares Solution",
-        description: part,
-        handler: function (response) {
-          alert("Payment successful. ID: " + response.razorpay_payment_id);
-        }
-      };
-      const rzp1 = new Razorpay(options);
-      rzp1.open();
+      const item = cart.find(i => i.part === part);
+      if (!item) return;
+      item.qty += delta;
+      if (item.qty <= 0) cart = cart.filter(i => i.part !== part);
+      updateCartUI();
     }
 
     function checkout() {
-      let total = Object.keys(cart).reduce((sum, part) => sum + (prices[part] * cart[part]), 0);
-      if (total <= 0) { alert("Cart is empty!"); return; }
+      const totalAmount = cart.reduce((sum, i) => sum + i.price * i.qty, 0) * 100;
+      if (totalAmount <= 0) return alert("Your cart is empty.");
       const options = {
         key: "rzp_live_90iWxpNYThOpyE",
-        amount: total * 100,
+        amount: totalAmount,
         currency: "INR",
         name: "Auto Spares Solution",
-        description: "Cart Checkout",
+        description: "Purchase",
         handler: function (response) {
-          alert("Payment successful. ID: " + response.razorpay_payment_id);
+          alert("Payment Successful. Payment ID: " + response.razorpay_payment_id);
         }
       };
-      const rzp1 = new Razorpay(options);
-      rzp1.open();
+      const rzp = new Razorpay(options);
+      rzp.open();
     }
-
-    loadPrices();
   </script>
 </body>
 </html>
