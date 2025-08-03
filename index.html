@@ -44,25 +44,6 @@
       margin: 0.5rem;
       font-weight: bold;
     }
-    /* Sticky Search Bar */
-    .search-bar {
-      position: sticky;
-      top: 0;
-      background: #102a33;
-      padding: 0.8rem;
-      text-align: center;
-      z-index: 1000;
-    }
-    .search-bar input {
-      padding: 0.5rem 1rem;
-      border-radius: 20px;
-      border: 1px solid #00ffcc;
-      background: #0f2027;
-      color: #fff;
-      width: 60%;
-      max-width: 400px;
-      font-size: 1rem;
-    }
     .gallery {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -77,17 +58,24 @@
       text-align: center;
       transition: transform 0.3s ease;
     }
-    .card:hover { transform: scale(1.05); }
+    .card:hover {
+      transform: scale(1.05);
+    }
     .card img {
       max-width: 100%;
       border-radius: 6px;
       height: auto;
     }
-    .part-number { font-weight: bold; margin-top: 0.5rem; color: #00ffcc; }
-    .description { font-size: 0.9rem; margin: 0.3rem 0; color: #e0e0e0; }
-    .list-price { font-size: 0.85rem; color: #ccc; text-decoration: line-through; }
-    .price { font-size: 1rem; margin: 0.3rem 0; color: #ffd700; }
-    .price.mismatch { color: red; font-weight: bold; }
+    .part-number {
+      font-weight: bold;
+      margin-top: 0.5rem;
+      color: #00ffcc;
+    }
+    .price {
+      margin-top: 0.3rem;
+      font-size: 1rem;
+      color: #ffd700;
+    }
     .btn {
       display: inline-block;
       margin-top: 0.5rem;
@@ -99,19 +87,38 @@
       transition: background 0.3s ease;
       margin-right: 5px;
     }
-    .whatsapp { background: #25D366; color: #fff; }
-    .whatsapp:hover { background: #1ebd5b; }
-    .buy { background: #ff6f61; color: white; }
-    .buy:hover { background: #e85c50; }
-    .cart { background: #007bff; color: white; }
-    .cart:hover { background: #0056b3; }
+    .whatsapp {
+      background: #25D366;
+      color: #fff;
+    }
+    .whatsapp:hover {
+      background: #1ebd5b;
+    }
+    .buy {
+      background: #ff6f61;
+      color: white;
+    }
+    .buy:hover {
+      background: #e85c50;
+    }
+    .cart {
+      background: #007bff;
+      color: white;
+    }
+    .cart:hover {
+      background: #0056b3;
+    }
     footer {
       background: #000;
       color: #ccc;
       padding: 2rem;
       text-align: center;
     }
-    footer a { color: #00ffcc; text-decoration: none; margin: 0 10px; }
+    footer a {
+      color: #00ffcc;
+      text-decoration: none;
+      margin: 0 10px;
+    }
     .contact-form {
       padding: 2rem;
       background: rgba(255, 255, 255, 0.1);
@@ -134,15 +141,12 @@
       font-weight: bold;
       cursor: pointer;
     }
-    .note { text-align: center; font-size: 0.9rem; color: #ff9999; }
-    .no-results { text-align: center; font-size: 1rem; color: #ff6666; margin-top: 2rem; }
   </style>
 </head>
 <body>
   <header>
     <h1>Auto Spares Solution</h1>
   </header>
-  
   <nav>
     <a href="#home">Home</a>
     <a href="#about">About Us</a>
@@ -153,21 +157,11 @@
     <a href="https://razorpay.me/@autosparessolution" target="_blank">Pay</a>
     <a href="#">Sign In</a>
   </nav>
-
-  <!-- Sticky Search -->
-  <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="Search by Part Number or Description..." onkeyup="filterProducts()">
-  </div>
-
   <section id="about" style="padding: 2rem;">
     <h2>About Us</h2>
     <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We are specialist dealers of TVS & STL Fasteners (Nut & Bolt), and authorized distributors of Volume Rubber Products. Our operations span across multiple states in India and beyond, offering fast and reliable supply for all automotive needs.</p>
   </section>
-
   <section class="gallery" id="products"></section>
-  <p class="note">*Prices in red differ from sheet values*</p>
-  <p class="no-results" id="noResults" style="display:none;">No products found</p>
-
   <section id="contact" class="contact-form">
     <h2>Get In Touch</h2>
     <form>
@@ -181,7 +175,6 @@
       <button type="submit">Send</button>
     </form>
   </section>
-
   <footer>
     <p>&copy; 2025 Auto Spares Solution. All Rights Reserved.</p>
     <div>
@@ -190,95 +183,44 @@
       <a href="#">Return & Refund Policy</a>
     </div>
   </footer>
-
   <script src="https://www.google.com/recaptcha/api.js" async defer></script>
   <script>
-    const csvUrl = "https://autosparessolution.github.io/main/prices.csv";
     const productParts = [
-      "M63241-0200","M63251-0200","M64770-0200","212123040-0200","212123050-0200",
-      "A40778820-0200","A40788820-0200","A05691020-0200","A04182020-0200",
-      "A04331020-0200","A04183020-0200","MA2710-0200","A04330020-0200",
-      "MA2720-0200","A04854020-0200","M73710-0200","M73720-0200","A03121020-0200",
-      "M85060-0200","A0A509020-0200","M54760-0200","M87340-0200","M07500-0200","M07520-0200"
-    ];
-    const discount37Parts = [
-      "A05691020-0200","A15979020-0200","A23009020-0200","A22479020-0200",
-      "A23579020-0200","MA2710M02920000200","MA2720M02920000200","A57849020-0200",
-      "A40759020-0200","A02309020-0200","A03121020-0200","A04331020-0200","A0A410020-0200"
+      "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
+      "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
+      "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+      "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+      "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
+      "M07520-0200"
     ];
 
-    let allProductsData = [];
+    document.addEventListener("DOMContentLoaded", () => {
+      fetch("prices.csv")
+        .then(res => res.text())
+        .then(csv => {
+          const rows = csv.split("\n").map(r => r.split(","));
+          const gallery = document.querySelector(".gallery");
 
-    fetch(csvUrl)
-      .then(res => res.text())
-      .then(data => {
-        const rows = data.split("\n").map(r => r.split(","));
-        const gallery = document.getElementById("products");
+          productParts.forEach(part => {
+            let price = "";
+            const match = rows.find(r => r[0]?.trim() === part.trim());
+            if (match && match[6]) {
+              price = `₹${parseFloat(match[6]).toFixed(2)}`;
+            }
 
-        rows.slice(1).forEach(row => {
-          const partNo = row[0]?.trim();
-          if (!productParts.includes(partNo)) return;
-
-          const description = row[1]?.trim();
-          const basePrice = parseFloat(row[2]);
-          const sheetBillingPrice = parseFloat(row[6]);
-
-          if (!partNo || isNaN(basePrice)) return;
-
-          let finalPrice;
-          if (discount37Parts.includes(partNo)) {
-            finalPrice = (basePrice * 0.63) * 1.18;
-          } else {
-            finalPrice = (basePrice * 0.73) * 1.18;
-          }
-          finalPrice = parseFloat(finalPrice.toFixed(2));
-
-          let mismatch = false;
-          if (!isNaN(sheetBillingPrice) && finalPrice !== parseFloat(sheetBillingPrice.toFixed(2))) {
-            mismatch = true;
-          }
-
-          const productHTML = `
-            <div class="card">
-              <img src="images/${partNo}.png" alt="${partNo}">
-              <div class="part-number">${partNo}</div>
-              <div class="description">${description || ""}</div>
-              <div class="list-price">List Price: ₹${basePrice.toFixed(2)}</div>
-              <div class="price ${mismatch ? "mismatch" : ""}">₹${finalPrice}</div>
-              <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${partNo}" target="_blank">Enquire Now</a>
-              <a class="btn buy" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a>
-              <button class="btn cart" onclick="alert('Added ${partNo} to cart!')">Add to Cart</button>
-            </div>
-          `;
-
-          allProductsData.push({
-            partNo,
-            description: description || "",
-            html: productHTML
+            gallery.innerHTML += `
+              <div class="card">
+                <img src="images/${part}.png" alt="${part}">
+                <div class="part-number">${part}</div>
+                <div class="price">${price}</div>
+                <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">Enquire Now</a>
+                <a class="btn buy" href="https://razorpay.me/@autosparessolution" target="_blank">Buy Now</a>
+                <button class="btn cart" onclick="alert('Added ${part} to cart!')">Add to Cart</button>
+              </div>
+            `;
           });
-
-          gallery.innerHTML += productHTML;
         });
-      });
-
-    function filterProducts() {
-      const query = document.getElementById("searchInput").value.toLowerCase();
-      const gallery = document.getElementById("products");
-      const noResults = document.getElementById("noResults");
-      gallery.innerHTML = "";
-
-      const filtered = allProductsData.filter(p =>
-        p.partNo.toLowerCase().includes(query) ||
-        p.description.toLowerCase().includes(query)
-      );
-
-      if (filtered.length === 0) {
-        noResults.style.display = "block";
-      } else {
-        noResults.style.display = "none";
-        filtered.forEach(p => gallery.innerHTML += p.html);
-      }
-    }
+    });
   </script>
 </body>
 </html>
