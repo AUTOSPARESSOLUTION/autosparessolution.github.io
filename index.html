@@ -287,60 +287,159 @@
   }
 
   function removeItem(index){
-    cart.splice(index, 1);
-    renderCart();
-  }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9GSY9Q5R5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-9GSY9Q5R5P');
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Spares Solution</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+  <style>
+    body { margin: 0; font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #fff; }
+    header { text-align: center; padding: 2rem 1rem; background: rgba(0, 0, 0, 0.7); }
+    header h1 { margin: 0; font-size: 2.5rem; letter-spacing: 2px; color: #00ffcc; }
+    nav { background: #000; padding: 0.5rem 1rem; display: flex; justify-content: space-around; flex-wrap: wrap; }
+    nav a { color: white; text-decoration: none; margin: 0.5rem; font-weight: bold; }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; padding: 2rem; }
+    .card { background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 1rem; text-align: center; }
+    .btn { padding: 0.5rem 1rem; border: none; border-radius: 5px; text-decoration: none; font-weight: bold; margin: 5px; }
+    .whatsapp { background: #25D366; color: #fff; }
+    .buy { background: #ff6f61; color: white; }
+    .cart { background: #007bff; color: white; }
+    .qty { width: 50px; }
+    footer { background: #000; color: #ccc; padding: 2rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Auto Spares Solution</h1>
+  </header>
+  <nav>
+    <a href="#home">Home</a>
+    <a href="#about">About Us</a>
+    <a href="#brands">Brands</a>
+    <a href="#reach">Our Reach</a>
+    <a href="#products">Products</a>
+    <a href="#contact">Contact Us</a>
+    <a href="https://razorpay.me/@autosparessolution" target="_blank">Pay</a>
+    <a href="#">Sign In</a>
+  </nav>
 
-  function checkout(){
-    if(cart.length === 0){ alert("Cart is empty"); return; }
-    const customerName = prompt("Enter Customer Name:");
-    const customerEmail = prompt("Enter Customer Email:");
-    const customerAddress = prompt("Enter Customer Address:");
-    const customerGST = prompt("Enter Customer GSTIN (Leave blank if not available):");
+  <section id="about" style="padding: 2rem;">
+    <h2>About Us</h2>
+    <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. Specialist dealers of TVS & STL Fasteners (Nut & Bolt), authorized distributors of Volume Rubber Products.</p>
+  </section>
 
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+  <section class="gallery" id="products"></section>
 
-    doc.addImage("ASS.jpg", "JPEG", 10, 10, 30, 15);
-    doc.setFontSize(14);
-    doc.text("Auto Spares Solution", 45, 15);
-    doc.setFontSize(10);
-    doc.text("57/5 101, 1st floor Howrah, West Bengal, 711108 - India", 45, 20);
-    doc.text("GSTIN: 19ANOPD3300R1ZO", 45, 25);
+  <section id="cart-section" style="padding: 2rem; background: rgba(255,255,255,0.1);">
+    <h2>Your Cart</h2>
+    <table id="cart-table" border="1" cellpadding="5" style="width:100%; background:#fff; color:#000;">
+      <thead><tr><th>Part No</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <h3 id="cart-total">Total: ₹0.00</h3>
+    <button class="btn buy" onclick="generatePI()">Generate Proforma Invoice</button>
+  </section>
 
-    doc.text(`Proforma Invoice`, 150, 15);
-    doc.setFontSize(10);
-    doc.text(`Customer: ${customerName}`, 10, 40);
-    doc.text(`Email: ${customerEmail}`, 10, 45);
-    doc.text(`Address: ${customerAddress}`, 10, 50);
-    if(customerGST) doc.text(`Customer GSTIN: ${customerGST}`, 10, 55);
+  <footer>
+    <p>&copy; 2025 Auto Spares Solution. All Rights Reserved.</p>
+  </footer>
 
-    const tableData = cart.map(item => [item.part, item.qty, `₹${item.price.toFixed(2)}`, `₹${(item.price*item.qty).toFixed(2)}`]);
-    doc.autoTable({ head: [['Part', 'Qty', 'Price', 'Total']], body: tableData, startY: 60 });
+<script>
+emailjs.init("O96bA706XTVFv8okp");
 
-    const total = cart.reduce((sum, item) => sum + (item.price*item.qty), 0);
-    doc.text(`Grand Total: ₹${total.toFixed(2)}`, 150, doc.lastAutoTable.finalY + 10);
+let productsData = [];
+let cart = [];
 
-    const pdfData = doc.output('datauristring');
-
-    emailjs.send("service_8ar4dui", "template_iif6vwh", {
-      to_email: customerEmail,
-      from_name: "Auto Spares Solution",
-      message: "Please find attached your Proforma Invoice.",
-      attachment: pdfData
+fetch('prices.csv')
+  .then(res => res.text())
+  .then(csv => {
+    const rows = csv.split("\n").slice(1);
+    productsData = rows.map(r => {
+      const cols = r.split(",");
+      return {
+        part: cols[0],
+        desc: cols[1],
+        price: parseFloat(cols[6] || 0),
+        stock: parseInt(cols[7] || 0)
+      };
     });
+    displayProducts();
+  });
 
-    emailjs.send("service_8ar4dui", "template_iif6vwh", {
-      to_email: "dipankar@autosparessolution.com",
-      from_name: "Auto Spares Solution",
-      message: "New Proforma Invoice generated.",
-      attachment: pdfData
-    });
+function displayProducts() {
+  const gallery = document.getElementById("products");
+  productsData.forEach(p => {
+    if (p.stock > 0) {
+      gallery.innerHTML += `
+        <div class="card">
+          <img src="images/${p.part}.png" alt="${p.part}" style="max-width:100%">
+          <div>${p.part}</div>
+          <div>₹${p.price.toFixed(2)}</div>
+          <input class="qty" type="number" value="1" min="1">
+          <button class="btn cart" onclick="addToCart('${p.part}', this)">Add</button>
+        </div>`;
+    }
+  });
+}
 
-    alert("Proforma Invoice generated & sent!");
-  }
+function addToCart(part, el) {
+  const qty = parseInt(el.previousElementSibling.value);
+  const prod = productsData.find(p => p.part === part);
+  const existing = cart.find(c => c.part === part);
+  if (existing) { existing.qty += qty; }
+  else { cart.push({ ...prod, qty }); }
+  updateCart();
+}
 
-  displayProducts();
+function updateCart() {
+  const tbody = document.querySelector("#cart-table tbody");
+  tbody.innerHTML = "";
+  let total = 0;
+  cart.forEach(c => {
+    const t = c.qty * c.price;
+    total += t;
+    tbody.innerHTML += `<tr><td>${c.part}</td><td>${c.qty}</td><td>₹${c.price}</td><td>₹${t.toFixed(2)}</td></tr>`;
+  });
+  document.getElementById("cart-total").innerText = "Total: ₹" + total.toFixed(2);
+}
+
+function generatePI() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.addImage("ASS.jpg", "JPEG", 10, 10, 30, 30);
+  doc.setFontSize(12);
+  doc.text("Auto Spares Solution", 50, 15);
+  doc.text("57/5 101, 1st floor Howrah, West Bengal, 711108 - India", 50, 22);
+  doc.text("GSTIN: 19ANOPD3300R1ZO", 50, 29);
+  doc.text("Proforma Invoice", 10, 50);
+
+  const rows = cart.map(c => [c.part, c.desc, c.qty, c.price.toFixed(2), (c.qty * c.price).toFixed(2)]);
+  doc.autoTable({ head: [["Part No", "Description", "Qty", "Price", "Total"]], body: rows, startY: 55 });
+
+  let totalAmt = cart.reduce((sum, c) => sum + (c.qty * c.price), 0);
+  doc.text(`Total: ₹${totalAmt.toFixed(2)}`, 150, doc.lastAutoTable.finalY + 10);
+
+  doc.save("Proforma_Invoice.pdf");
+
+  // Send email with EmailJS
+  emailjs.send("service_8ar4dui", "template_iif6vwh", {
+    to_email: "dipankar@autosparessolution.com",
+    message: "Proforma Invoice generated for customer.",
+    total: totalAmt.toFixed(2)
+  }).then(() => alert("Proforma Invoice emailed!"));
+}
 </script>
 </body>
-</html>
+  </html>
