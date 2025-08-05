@@ -1,1 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Auto Spares Solution</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable"></script>
+  <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <!-- Styles -->
+  <style>
+    body {
+      margin: 0; font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #fff;
+    }
+    header, footer {
+      text-align: center; background: #000; padding: 1rem;
+    }
+    header h1 {
+      margin: 0; color: #00ffcc;
+    }
+    nav {
+      display: flex; justify-content: space-around; background: #111; padding: 0.5rem;
+    }
+    nav a {
+      color: white; text-decoration: none; font-weight: bold;
+    }
+    .gallery {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem; padding: 1rem;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.1); padding: 1rem;
+      border-radius: 10px; text-align: center;
+    }
+    .card img { width: 100%; max-height: 120px; object-fit: contain; }
+    .qty { width: 60px; }
+    #cart-table, #cart-table th, #cart-table td {
+      border: 1px solid #ccc; border-collapse: collapse;
+      background: #fff; color: #000;
+    }
+    #cart-table th, #cart-table td { padding: 8px; text-align: center; }
+    button {
+      background: #00ffcc; color: #000;
+      border: none; padding: 8px 12px; margin: 5px;
+      cursor: pointer; font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Auto Spares Solution</h1>
+  </header>
+  <nav>
+    <a href="#">Home</a>
+    <a href="#">Products</a>
+    <a href="#">About</a>
+    <a href="#">Contact</a>
+    <a href="https://razorpay.me/@autosparessolution" target="_blank">Pay</a>
+    <a href="#">Sign In</a>
+  </nav>
+  <section class="gallery" id="products"></section>
+  <section id="cart-section" style="padding: 1rem;">
+    <h2>Your Cart</h2>
+    <table id="cart-table" style="width:100%">
+      <thead>
+        <tr><th>Part No</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <h3 id="cart-total">Total: ₹0.00</h3>
+    <button onclick="generatePI()">Generate Proforma Invoice</button>
+  </section>
+  <footer>
+    <p>&copy; 2025 Auto Spares Solution – GSTIN: 19ANOPD3300R1ZO</p>
+    <p>57/5 101, 1st Floor, Howrah, West Bengal, 711108</p>
+  </footer>
+  <script>
+  let products = [];
+  let cart = [];
 
+  // Load CSV
+  fetch('prices.csv')
+    .then(response => response.text())
+    .then(csv => {
+      const rows = csv.trim().split('\n').slice(1); // skip header
+      rows.forEach(row => {
+        const cols = row.split(',');
+        const part = cols[2]?.trim();
+        const price = parseFloat(cols[6]);
+        const stock = cols[7]?.toLowerCase();
+        if (!part || !price || stock === 'nil' || stock === '0' || parseInt(stock) <= 0) return;
+
+        products.push({ part, price, stock });
+      });
+      displayProducts();
+    });
+
+  function displayProducts() {
+    const gallery = document.getElementById('products');
+    gallery.innerHTML = '';
+    products.forEach(item => {
+      gallery.innerHTML += `
+        <div class="card">
+          <img src="images/${item.part}.png" alt="${item.part}">
+          <div><strong>${item.part}</strong></div>
+          <div>Price: ₹${item.price.toFixed(2)}</div>
+          <input class="qty" type="number" min="1" max="${item.stock}" value="1" id="qty-${item.part}">
+          <br/>
+          <button onclick="addToCart('${item.part}')">Add to Cart</button>
+        </div>
+      `;
+    });
+  }
+
+  function addToCart(part) {
+    const qty = parseInt(document.getElementById(`qty-${part}`).value);
+    const product = products.find(p => p.part === part);
+    if (!qty || qty < 1 || !product) return;
+    const existing = cart.find(p => p.part === part);
+    if (existing) {
+      existing.qty += qty;
+    } else {
+      cart.push({ part, qty, price: product.price });
+    }
+    updateCart();
+  }
+
+  function updateCart() {
+    const tbody = document.querySelector('#cart-table tbody');
+    tbody.innerHTML = '';
+    let total = 0;
+    cart.forEach(item => {
+      const itemTotal = item.qty * item.price;
+      total += itemTotal;
+      tbody.innerHTML += `
+        <tr>
+          <td>${item.part}</td>
+          <td>${item.qty}</td>
+          <td>₹${item.price.toFixed(2)}</td>
+          <td>₹${itemTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+    document.getElementById('cart-total').innerText = `Total: ₹${total.toFixed(2)}`;
+  }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<script>
+  emailjs.init("O96bA706XTVFv8okp"); // Replace with your own public key
+
+  function generateProformaAndEmail() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.addImage("ASS.jpg", "JPEG", 10, 10, 40, 20);
+    doc.setFontSize(12);
+    doc.text("Auto Spares Solution", 10, 40);
+    doc.text("57/5 101, 1st Floor, Howrah, West Bengal, 711108", 10, 47);
+    doc.text("GSTIN: 19ANOPD3300R1ZO", 10, 54);
+    doc.text("Proforma Invoice", 80, 65);
+
+    const rows = cart.map(item => [
+      item.part,
+      item.qty,
+      `₹${item.price.toFixed(2)}`,
+      `₹${(item.qty * item.price).toFixed(2)}`
+    ]);
+
+    doc.autoTable({
+      head: [["Part No", "Qty", "Unit Price", "Total"]],
+      body: rows,
+      startY: 70
+    });
+
+    const total = cart.reduce((sum, item) => sum + item.qty * item.price, 0);
+    doc.text(`Grand Total (incl. GST): ₹${total.toFixed(2)}`, 130, doc.lastAutoTable.finalY + 10);
+    const pdfBlob = doc.output('blob');
+
+    // Send email using EmailJS
+    const formData = new FormData();
+    formData.append('file', pdfBlob, 'ProformaInvoice.pdf');
+
+    emailjs.send("service_8ar4dui", "template_iif6vwh", {
+      to_email: "dipankar@autosparessolution.com",
+      message: "New Proforma Invoice",
+      total: total.toFixed(2)
+    }).then(() => {
+      alert("Proforma Invoice sent via Email!");
+    });
+
+    doc.save("Proforma_Invoice.pdf");
+  }
+
+  function payWithRazorpay() {
+    const total = cart.reduce((sum, item) => sum + item.qty * item.price, 0);
+    if (total === 0) return alert("Your cart is empty.");
+
+    const options = {
+      key: "rzp_live_90iWxpNYThOpyE", // Replace with your Razorpay key
+      amount: total * 100,
+      currency: "INR",
+      name: "Auto Spares Solution",
+      description: "Spare Parts Purchase",
+      handler: function (response) {
+        alert("Payment Successful! Payment ID: " + response.razorpay_payment_id);
+        generateProformaAndEmail(); // send invoice on success
+      }
+    };
+    const rzp = new Razorpay(options);
+    rzp.open();
+  }
+</script>
+  <button class="btn buy" onclick="payWithRazorpay()">Checkout & Pay</button>
+  
