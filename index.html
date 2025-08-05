@@ -77,8 +77,11 @@
     .card:hover { transform: scale(1.05); }
     .card img {
       max-width: 100%;
+      height: 150px;
+      object-fit: contain;
       border-radius: 6px;
-      height: auto;
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
     }
     .part-number {
       font-weight: bold;
@@ -137,6 +140,19 @@
       padding: 0.2rem 0.5rem;
       cursor: pointer;
     }
+    .remove-item {
+      background: #ff4444;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 10px;
+      cursor: pointer;
+    }
     footer {
       background: #000;
       color: #ccc;
@@ -144,10 +160,10 @@
       text-align: center;
     }
     footer a { color: #00ffcc; text-decoration: none; margin: 0 10px; }
-    .qty { 
-      width: 50px; 
-      padding: 0.3rem;
+    .qty-input {
+      width: 50px;
       text-align: center;
+      padding: 0.3rem;
       background: rgba(255,255,255,0.1);
       color: white;
       border: 1px solid #444;
@@ -170,12 +186,14 @@
     <a href="#" id="cart-link">Cart <span id="cart-count">0</span></a>
     <a href="#">Sign In</a>
   </nav>
+
   <section id="about" style="padding: 2rem;">
     <h2>About Us</h2>
     <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. Specialist dealers of TVS & STL Fasteners (Nut & Bolt), authorized distributors of Volume Rubber Products.</p>
   </section>
+
   <section class="gallery" id="products"></section>
-  
+
   <!-- Cart Sidebar -->
   <div id="cart-sidebar">
     <h2>Your Cart</h2>
@@ -184,7 +202,7 @@
     <button class="btn buy" onclick="checkout()">Checkout with Razorpay</button>
     <button class="btn whatsapp" onclick="generatePI()">Generate Proforma Invoice</button>
   </div>
-  
+
   <section id="contact" class="contact-form">
     <h2>Get In Touch</h2>
     <form>
@@ -198,6 +216,7 @@
       <button type="submit" class="btn">Send</button>
     </form>
   </section>
+
   <footer>
     <p>&copy; 2025 Auto Spares Solution. All Rights Reserved.</p>
     <div>
@@ -213,7 +232,20 @@
     
     let cart = [];
     let productsData = [];
-    
+    const productsList = [
+      "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
+      "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
+      "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+      "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+      "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
+      "M07520-0200"
+    ];
+
+    document.getElementById("cart-link").addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById("cart-sidebar").classList.toggle("active");
+    });
+
     // Load products from CSV
     fetch("prices.csv")
       .then(res => res.text())
@@ -237,14 +269,15 @@
       .catch(err => {
         console.error("Error loading products:", err);
         // Fallback to hardcoded products if CSV fails
-        productsData = [
-          { part: "M63241-0200", desc: "Bolt", price: 15.25, stock: 10 },
-          { part: "M63251-0200", desc: "Nut", price: 14.51, stock: 8 },
-          { part: "M64770-0200", desc: "Washer", price: 18.20, stock: 15 }
-        ];
+        productsData = productsList.map(part => ({
+          part: part,
+          desc: "Auto Spare Part",
+          price: Math.random() * 100 + 10, // Random price between 10-110
+          stock: Math.floor(Math.random() * 20) + 1 // Random stock 1-20
+        }));
         displayProducts();
       });
-    
+
     // Display products in gallery
     function displayProducts() {
       const gallery = document.getElementById("products");
@@ -254,11 +287,11 @@
         if (p.stock > 0) {
           gallery.innerHTML += `
             <div class="card">
-              <img src="images/${p.part}.png" alt="${p.part}" onerror="this.src='images/default.png'">
+              <img src="images/${p.part}.png" alt="${p.part}" onerror="this.onerror=null; this.src='images/default.png'">
               <div class="part-number">${p.part}</div>
               <div class="price">₹${p.price.toFixed(2)}</div>
               <div class="stock" style="color:${p.stock > 5 ? 'lightgreen' : 'red'}">In Stock: ${p.stock}</div>
-              <input class="qty" type="number" value="1" min="1" max="${p.stock}">
+              <input class="qty-input" type="number" value="1" min="1" max="${p.stock}">
               <button class="btn cart" onclick="addToCart('${p.part}', this.previousElementSibling)">Add to Cart</button>
               <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${p.part}" target="_blank">Enquire Now</a>
             </div>
@@ -266,13 +299,8 @@
         }
       });
     }
-    
+
     // Cart functionality
-    document.getElementById("cart-link").addEventListener("click", (e) => {
-      e.preventDefault();
-      document.getElementById("cart-sidebar").classList.toggle("active");
-    });
-    
     function addToCart(part, qtyElement) {
       const qty = parseInt(qtyElement.value);
       if (isNaN(qty) return;
@@ -295,7 +323,7 @@
       updateCartUI();
       document.getElementById("cart-sidebar").classList.add("active");
     }
-    
+
     function updateCartUI() {
       document.getElementById("cart-count").textContent = cart.reduce((sum, i) => sum + i.qty, 0);
       
@@ -313,7 +341,7 @@
               ${item.qty}
               <button onclick="changeQty('${item.part}', 1)">+</button>
               <span>₹${(item.price * item.qty).toFixed(2)}</span>
-              <button onclick="removeItem('${item.part}')" style="margin-left:10px;background:#ff4444;">×</button>
+              <button class="remove-item" onclick="removeItem('${item.part}')">×</button>
             </div>
           </div>
         `;
@@ -321,7 +349,7 @@
       
       document.getElementById("cart-total").textContent = total.toFixed(2);
     }
-    
+
     function changeQty(part, delta) {
       const item = cart.find(i => i.part === part);
       if (!item) return;
@@ -333,12 +361,12 @@
       
       updateCartUI();
     }
-    
+
     function removeItem(part) {
       cart = cart.filter(i => i.part !== part);
       updateCartUI();
     }
-    
+
     // Checkout with Razorpay
     function checkout() {
       const totalAmount = cart.reduce((sum, i) => sum + i.price * i.qty, 0) * 100;
@@ -372,7 +400,7 @@
       const rzp = new Razorpay(options);
       rzp.open();
     }
-    
+
     // Generate Proforma Invoice
     function generatePI() {
       if (cart.length === 0) return alert("Your cart is empty.");
@@ -420,4 +448,4 @@
     }
   </script>
 </body>
-</html>
+    </html>
