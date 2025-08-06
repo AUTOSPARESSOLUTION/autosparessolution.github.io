@@ -311,29 +311,30 @@
       });
 
     function showProduct(part, price, stock, isMissing) {
-      const badge = isMissing ? 
-        '<div class="not-available">NOT IN SYSTEM</div>' :
-        (stock <= 0 ? '<div class="out-of-stock">OUT OF STOCK</div>' : '');
-      
-      document.getElementById("products").innerHTML += `
-        <div class="card">
-          ${badge}
-          <img src="images/${part}.png" alt="${part}" onerror="this.src='images/default.png'">
-          <div class="part-number">${part}</div>
-          <div class="price">${price > 0 ? `₹${price.toFixed(2)}` : 'Price NA'}</div>
-          <div class="stock">
-            ${isMissing ? 'Not in inventory' : (stock > 0 ? `${stock} available` : 'Restocking soon')}
-          </div>
-          ${stock > 0 ? `
-            <input class="qty-input" type="number" value="1" min="1" max="${stock}">
-            <button class="btn cart" onclick="addToCart('${part}', ${price})">Add to Cart</button>
-          ` : '<button class="btn" disabled style="background:gray">Unavailable</button>'}
-          <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">
-            ${stock > 0 ? 'Enquire' : 'Notify Me'}
-          </a>
-        </div>
-      `;
-    }
+  const badge = isMissing ? 
+    '<div class="not-available">NOT IN SYSTEM</div>' :
+    (stock <= 0 ? '<div class="out-of-stock">OUT OF STOCK</div>' : '');
+  
+  document.getElementById("products").innerHTML += `
+    <div class="card">
+      ${badge}
+      <img src="images/${part}.png" alt="${part}" 
+           onerror="this.onerror=null; this.src='images/default.png'">
+      <div class="part-number">${part}</div>
+      <div class="price">${price > 0 ? `₹${price.toFixed(2)}` : 'Price NA'}</div>
+      <div class="stock">
+        ${isMissing ? 'Not in inventory' : (stock > 0 ? `${stock} available` : 'Restocking soon')}
+      </div>
+      ${stock > 0 ? `
+        <input class="qty-input" type="number" value="1" min="1" max="${stock}">
+        <button class="btn cart" onclick="addToCart('${part}', ${price})">Add to Cart</button>
+      ` : '<button class="btn" disabled style="background:gray">Unavailable</button>'}
+      <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">
+        ${stock > 0 ? 'Enquire' : 'Notify Me'}
+      </a>
+    </div>
+  `;
+}
 
     function addToCart(part, price) {
       const existing = cart.find(item => item.part === part);
