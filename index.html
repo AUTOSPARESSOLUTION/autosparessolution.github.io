@@ -285,24 +285,25 @@
 
     // Load and display products
     fetch("prices.csv")
-      .then(res => res.text())
-      .then(data => {
-        const rows = data.split("\n").map(r => r.split(","));
-        const headers = rows.shift();
-        const priceIndex = 6;
-        const stockIndex = 7;
+    fetch("prices.csv")
+  .then(res => res.text())
+  .then(data => {
+    const rows = data.split("\n").map(r => r.split(","));
+    const headers = rows.shift();
+    const priceIndex = 6; // Column G
+    const stockIndex = 7; // Column H
 
-        productsList.forEach(part => {
-          const row = rows.find(r => r[0] && r[0].trim() === part);
-          if (!row) {
-            showProduct(part, 0, 0, true);
-            return;
-          }
-          const price = parseFloat(row[priceIndex]) || 0;
-          const stock = row[stockIndex] ? parseInt(row[stockIndex]) : 0;
-          showProduct(part, price, stock, false);
-        });
-      })
+    productsList.forEach(part => {
+      const row = rows.find(r => r[0] && r[0].trim() === part);
+      if (!row) {
+        showProduct(part, 0, 0, true); // Show as "Not in system"
+        return;
+      }
+      const price = parseFloat(row[priceIndex]) || 0;
+      const stock = row[stockIndex] ? parseInt(row[stockIndex]) : 0;
+      showProduct(part, price, stock, false); // Show all products
+    });
+  })
       .catch(err => {
         console.error("Error loading products:", err);
         productsList.forEach(part => {
