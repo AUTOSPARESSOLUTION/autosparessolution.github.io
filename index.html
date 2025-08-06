@@ -178,27 +178,6 @@
       opacity: 0.6;
       cursor: not-allowed;
     }
-    #orders-section {
-      padding: 2rem; 
-      display: none; 
-      background: rgba(0,0,0,0.7); 
-      margin: 20px; 
-      border-radius: 10px;
-    }
-    #orders-table {
-      width:100%; 
-      border-collapse: collapse; 
-      background: white; 
-      color: black;
-    }
-    #orders-table th, #orders-table td {
-      padding: 8px; 
-      border: 1px solid #555;
-    }
-    #orders-table th {
-      background: #333; 
-      color: white;
-    }
   </style>
 </head>
 <body>
@@ -212,7 +191,6 @@
     <a href="#contact">Contact Us</a>
     <a href="https://razorpay.me/@autosparessolution" target="_blank">Pay</a>
     <a href="#" id="cart-link">Cart <span id="cart-count">0</span></a>
-    <a href="#" id="admin-link" style="color: #00ffcc;">Admin Orders</a>
   </nav>
 
   <section id="about" style="padding: 2rem;">
@@ -228,21 +206,6 @@
     <h3>Total: ₹<span id="cart-total">0.00</span></h3>
     <button class="btn buy" onclick="checkout()">Checkout</button>
   </div>
-
-  <section id="orders-section">
-    <h2 style="color: #00ffcc;">Order History</h2>
-    <table id="orders-table">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Payment ID</th>
-          <th>Items</th>
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody id="orders-list"></tbody>
-    </table>
-  </section>
 
   <section id="contact" style="padding: 2rem;">
     <h2>Get In Touch</h2>
@@ -268,14 +231,13 @@
   <script>
     emailjs.init("O96bA706XTVFv8okp");
     let cart = [];
-    let orders = [];
     const productsList = [
       "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
       "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-      "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
-      "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+      "A04331020-0200", "A04183020-0200", "MA2710-0201", "A04330020-0200",
+      "MA2720-0201", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
       "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
-      "M07520-0200", "MA2710-0201", "MA2720-0201"
+      "M07520-0200"
     ];
 
     document.getElementById("cart-link").addEventListener("click", (e) => {
@@ -283,27 +245,25 @@
       document.getElementById("cart-sidebar").classList.toggle("active");
     });
 
-    // Load and display products
     fetch("prices.csv")
-    fetch("prices.csv")
-  .then(res => res.text())
-  .then(data => {
-    const rows = data.split("\n").map(r => r.split(","));
-    const headers = rows.shift();
-    const priceIndex = 6; // Column G
-    const stockIndex = 7; // Column H
+      .then(res => res.text())
+      .then(data => {
+        const rows = data.split("\n").map(r => r.split(","));
+        const headers = rows.shift();
+        const priceIndex = 6;
+        const stockIndex = 7;
 
-    productsList.forEach(part => {
-      const row = rows.find(r => r[0] && r[0].trim() === part);
-      if (!row) {
-        showProduct(part, 0, 0, true); // Show as "Not in system"
-        return;
-      }
-      const price = parseFloat(row[priceIndex]) || 0;
-      const stock = row[stockIndex] ? parseInt(row[stockIndex]) : 0;
-      showProduct(part, price, stock, false); // Show all products
-    });
-  })
+        productsList.forEach(part => {
+          const row = rows.find(r => r[0] && r[0].trim() === part);
+          if (!row) {
+            showProduct(part, 0, 0, true);
+            return;
+          }
+          const price = parseFloat(row[priceIndex]) || 0;
+          const stock = row[stockIndex] ? parseInt(row[stockIndex]) : 0;
+          showProduct(part, price, stock, false);
+        });
+      })
       .catch(err => {
         console.error("Error loading products:", err);
         productsList.forEach(part => {
@@ -312,30 +272,29 @@
       });
 
     function showProduct(part, price, stock, isMissing) {
-  const badge = isMissing ? 
-    '<div class="not-available">NOT IN SYSTEM</div>' :
-    (stock <= 0 ? '<div class="out-of-stock">OUT OF STOCK</div>' : '');
-  
-  document.getElementById("products").innerHTML += `
-    <div class="card">
-      ${badge}
-      <img src="images/${part}.png" alt="${part}" 
-           onerror="this.onerror=null; this.src='images/default.png'">
-      <div class="part-number">${part}</div>
-      <div class="price">${price > 0 ? `₹${price.toFixed(2)}` : 'Price NA'}</div>
-      <div class="stock">
-        ${isMissing ? 'Not in inventory' : (stock > 0 ? `${stock} available` : 'Restocking soon')}
-      </div>
-      ${stock > 0 ? `
-        <input class="qty-input" type="number" value="1" min="1" max="${stock}">
-        <button class="btn cart" onclick="addToCart('${part}', ${price})">Add to Cart</button>
-      ` : '<button class="btn" disabled style="background:gray">Unavailable</button>'}
-      <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">
-        ${stock > 0 ? 'Enquire' : 'Notify Me'}
-      </a>
-    </div>
-  `;
-}
+      const cardHTML = `
+        <div class="card">
+          ${isMissing ? '<div class="not-available">NOT IN SYSTEM</div>' : 
+            (stock <= 0 ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
+          <img src="images/${part}.png" alt="${part}" 
+               onerror="this.src='images/default.png';this.onerror=null;">
+          <div class="part-number">${part}</div>
+          <div class="price">${price > 0 ? '₹'+price.toFixed(2) : 'Price NA'}</div>
+          <div class="stock">
+            ${isMissing ? 'Not in inventory' : 
+              (stock > 0 ? `${stock} available` : 'Restocking soon')}
+          </div>
+          ${stock > 0 ? `
+            <input class="qty-input" type="number" value="1" min="1" max="${stock}">
+            <button class="btn cart" onclick="addToCart('${part}', ${price})">Add to Cart</button>
+          ` : '<button class="btn" disabled style="background:gray">Unavailable</button>'}
+          <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">
+            ${stock > 0 ? 'Enquire' : 'Notify Me'}
+          </a>
+        </div>
+      `;
+      document.getElementById("products").insertAdjacentHTML('beforeend', cardHTML);
+    }
 
     function addToCart(part, price) {
       const existing = cart.find(item => item.part === part);
@@ -394,7 +353,6 @@
         name: "Auto Spares Solution",
         description: "Purchase",
         handler: function(response) {
-          saveOrder(response.razorpay_payment_id);
           alert("Payment Successful. Payment ID: " + response.razorpay_payment_id);
           cart = [];
           updateCartUI();
@@ -402,56 +360,6 @@
       };
       const rzp = new Razorpay(options);
       rzp.open();
-    }
-
-    function saveOrder(paymentId) {
-      const order = {
-        date: new Date().toLocaleString(),
-        paymentId: paymentId,
-        items: [...cart],
-        total: cart.reduce((sum, i) => sum + i.price * i.qty, 0)
-      };
-      orders.push(order);
-      
-      // Send email notification
-      emailjs.send("service_8ar4dui", "template_iif6vwh", {
-        to_email: "dipankar@autosparessolution.com",
-        message: `New Order Received (${paymentId})`,
-        order_details: order.items.map(i => 
-          `Part: ${i.part}, Qty: ${i.qty}, Price: ₹${i.price}`
-        ).join('\n'),
-        total: `₹${order.total.toFixed(2)}`
-      }).then(() => console.log('Email notification sent'));
-    }
-
-    // Admin order viewing functions
-    document.getElementById('admin-link').addEventListener('click', (e) => {
-      e.preventDefault();
-      const ordersSection = document.getElementById('orders-section');
-      ordersSection.style.display = ordersSection.style.display === 'none' ? 'block' : 'none';
-      if (ordersSection.style.display === 'block') {
-        displayOrders();
-      }
-    });
-
-    function displayOrders() {
-      const ordersList = document.getElementById('orders-list');
-      ordersList.innerHTML = '';
-      
-      orders.forEach(order => {
-        const itemsList = order.items.map(item => 
-          `${item.part} (Qty: ${item.qty} × ₹${item.price})`
-        ).join('<br>');
-        
-        ordersList.innerHTML += `
-          <tr>
-            <td>${order.date}</td>
-            <td>${order.paymentId}</td>
-            <td>${itemsList}</td>
-            <td>₹${order.total.toFixed(2)}</td>
-          </tr>
-        `;
-      });
     }
   </script>
 </body>
