@@ -13,6 +13,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auto Spares Solution</title>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body {
       margin: 0;
@@ -57,9 +59,20 @@
       top: -8px;
       right: -10px;
     }
+    .search-container {
+      padding: 1rem 2rem;
+      background: rgba(0,0,0,0.3);
+    }
+    #search-input {
+      width: 100%;
+      padding: 0.8rem;
+      border-radius: 5px;
+      border: none;
+      font-size: 1rem;
+    }
     .gallery {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 1rem;
       padding: 2rem;
     }
@@ -86,10 +99,23 @@
       margin-top: 0.5rem;
       color: #00ffcc;
     }
+    .part-desc {
+      font-size: 0.9rem;
+      margin: 0.5rem 0;
+      color: #ccc;
+      min-height: 40px;
+    }
     .price { font-size: 1.1rem; color: #ffd700; }
-    .stock {
+    .stock-info {
       font-size: 0.9rem;
       margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .stock-info span {
+      display: inline-block;
+      margin: 2px 0;
     }
     .btn {
       display: inline-block;
@@ -177,6 +203,11 @@
       opacity: 0.6;
       cursor: not-allowed;
     }
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      font-size: 1.2rem;
+    }
   </style>
 </head>
 <body>
@@ -197,18 +228,25 @@
     <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. Specialist dealers of TVS & STL Fasteners (Nut & Bolt), authorized distributors of Volume Rubber Products.</p>
   </section>
 
-  <section class="gallery" id="products"></section>
+  <div class="search-container">
+    <input type="text" id="search-input" placeholder="Search by part number or description...">
+  </div>
+
+  <section class="gallery" id="products">
+    <div class="loading">Loading products...</div>
+  </section>
 
   <div id="cart-sidebar">
     <h2>Your Cart</h2>
     <div id="cart-items"></div>
     <h3>Total: ₹<span id="cart-total">0.00</span></h3>
     <button class="btn buy" onclick="checkout()">Checkout</button>
+    <button class="btn" onclick="sendOrderEmail()" style="margin-top: 10px;">Email Order</button>
   </div>
 
   <section id="contact" style="padding: 2rem;">
     <h2>Get In Touch</h2>
-    <form>
+    <form id="contact-form">
       <input type="text" placeholder="Your Name" required style="padding: 0.5rem; width: 100%; margin-bottom: 1rem;">
       <input type="email" placeholder="Email Id" required style="padding: 0.5rem; width: 100%; margin-bottom: 1rem;">
       <input type="tel" placeholder="Phone no." required style="padding: 0.5rem; width: 100%; margin-bottom: 1rem;">
@@ -230,13 +268,13 @@
   <script>
     // Initialize variables
     let productsData = [];
-    let productsList = [];
+    let filteredProducts = [];
     let cart = [];
     const fixedProducts = [
       "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
       "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-      "A04331020-0200", "A04183020-0200", "MA2710-0201", "A04330020-0200",
-      "MA2720-0201", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+      "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+      "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
       "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
       "M07520-0200"
     ];
@@ -245,6 +283,20 @@
     document.getElementById("cart-link").addEventListener("click", (e) => {
       e.preventDefault();
       document.getElementById("cart-sidebar").classList.toggle("active");
+    });
+
+    // Search functionality
+    document.getElementById("search-input").addEventListener("input", (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      if (searchTerm === '') {
+        filteredProducts = [...productsData];
+      } else {
+        filteredProducts = productsData.filter(product => 
+          product.part.toLowerCase().includes(searchTerm) || 
+          (product.desc && product.desc.toLowerCase().includes(searchTerm))
+        );
+      }
+      displayProducts();
     });
 
     // Load product data from CSV
@@ -257,76 +309,122 @@
           const cols = r.split(",");
           return {
             part: cols[0]?.trim(),
-            desc: cols[1]?.trim(),
+            desc: cols[1]?.trim() || "Auto Spare Part",
             price: parseFloat(cols[6] || 0),
-            stock: parseInt(cols[7] || 0)
+            stock: parseInt(cols[7] || 0),
+            boxQty: parseInt(cols[8] || 1), // Box quantity
+            masterCarton: parseInt(cols[9] || 1) // Master carton quantity
           };
-        }).filter(p => p.part); // Remove empty rows
+        }).filter(p => p.part && p.stock > 0); // Remove empty rows and out-of-stock items
 
-        // Build combined product list (CSV + fixed products)
-        productsList = [...new Set([
-          ...productsData.map(p => p.part),
-          ...fixedProducts
-        ])];
+        // Add fixed products that might not be in CSV
+        fixedProducts.forEach(part => {
+          if (!productsData.some(p => p.part === part)) {
+            productsData.push({
+              part,
+              desc: "Auto Spare Part",
+              price: 0,
+              stock: 0,
+              boxQty: 1,
+              masterCarton: 1
+            });
+          }
+        });
         
+        filteredProducts = [...productsData];
         displayProducts();
       })
       .catch(err => {
         console.error("Error loading CSV:", err);
-        productsList = fixedProducts; // Fallback to fixed products
+        // Fallback to fixed products with default values
+        productsData = fixedProducts.map(part => ({
+          part,
+          desc: "Auto Spare Part",
+          price: 0,
+          stock: 0,
+          boxQty: 1,
+          masterCarton: 1
+        }));
+        filteredProducts = [...productsData];
         displayProducts();
       });
 
-    // Display all products
+    // Display filtered products
     function displayProducts() {
       const gallery = document.getElementById("products");
       gallery.innerHTML = "";
       
-      productsList.forEach(part => {
-        const product = productsData.find(p => p.part === part) || {
-          part,
-          desc: "Auto Spare Part",
-          price: 0,
-          stock: 0
-        };
-        
-        const isInCsv = productsData.some(p => p.part === part);
+      if (filteredProducts.length === 0) {
+        gallery.innerHTML = '<div class="loading">No products found matching your search.</div>';
+        return;
+      }
+      
+      filteredProducts.forEach(product => {
+        const isInStock = product.stock > 0;
         
         gallery.insertAdjacentHTML('beforeend', `
-          <div class="card">
-            ${!isInCsv ? '<div class="not-available">NOT IN SYSTEM</div>' : 
-              (product.stock <= 0 ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
+          <div class="card" data-part="${product.part}">
+            ${!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
             
-            <img src="images/${part}.png" alt="${part}" 
+            <img src="images/${product.part}.png" alt="${product.part}" 
                  onerror="this.src='images/default.png';this.onerror=null;">
             
-            <div class="part-number">${part}</div>
+            <div class="part-number">${product.part}</div>
+            <div class="part-desc">${product.desc}</div>
             <div class="price">${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
-            <div class="stock">
-              ${!isInCsv ? 'Not in inventory' : 
-                (product.stock > 0 ? `${product.stock} available` : 'Restocking soon')}
+            
+            <div class="stock-info">
+              <span>Stock: ${isInStock ? product.stock : '0'}</span>
+              <span>Box Qty: ${product.boxQty}</span>
+              <span>Carton: ${product.masterCarton}</span>
             </div>
             
-            ${product.stock > 0 ? `
-              <input class="qty-input" type="number" value="1" min="1" max="${product.stock}">
-              <button class="btn cart" onclick="addToCart('${part}', ${product.price})">Add to Cart</button>
+            ${isInStock ? `
+              <div>
+                <input class="qty-input" type="number" value="1" min="1" max="${product.stock}" 
+                       onchange="updateProductQty('${product.part}', this.value)">
+                <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">Add to Cart</button>
+              </div>
             ` : '<button class="btn" disabled>Unavailable</button>'}
             
-            <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${part}" target="_blank">
-              ${product.stock > 0 ? 'Enquire' : 'Notify Me'}
+            <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
+              ${isInStock ? 'Enquire' : 'Notify Me'}
             </a>
           </div>
         `);
       });
     }
 
+    // Update product quantity in the product card
+    function updateProductQty(part, qty) {
+      const card = document.querySelector(`.card[data-part="${part}"]`);
+      if (card) {
+        const input = card.querySelector('.qty-input');
+        if (input) {
+          input.value = Math.max(1, Math.min(qty, parseInt(input.max)));
+        }
+      }
+    }
+
     // Cart functions
     function addToCart(part, price) {
+      const card = document.querySelector(`.card[data-part="${part}"]`);
+      const qtyInput = card ? card.querySelector('.qty-input') : null;
+      const qty = qtyInput ? parseInt(qtyInput.value) : 1;
+      
       const existing = cart.find(item => item.part === part);
       if (existing) {
-        existing.qty++;
+        existing.qty += qty;
       } else {
-        cart.push({ part, price, qty: 1 });
+        const product = productsData.find(p => p.part === part);
+        cart.push({ 
+          part, 
+          price, 
+          qty,
+          desc: product?.desc || "Auto Spare Part",
+          boxQty: product?.boxQty || 1,
+          masterCarton: product?.masterCarton || 1
+        });
       }
       updateCartUI();
     }
@@ -340,11 +438,15 @@
       cart.forEach(item => {
         total += item.price * item.qty;
         itemsDiv.innerHTML += `
-          <div class="cart-item">
-            <span>${item.part}</span>
+          <div class="cart-item" data-part="${item.part}">
+            <div>
+              <div>${item.part}</div>
+              <small>${item.desc}</small>
+            </div>
             <div class="qty-control">
               <button onclick="changeQty('${item.part}', -1)">-</button>
-              ${item.qty}
+              <input class="qty-input" type="number" value="${item.qty}" min="1" 
+                     onchange="updateCartItemQty('${item.part}', this.value)">
               <button onclick="changeQty('${item.part}', 1)">+</button>
               <span>₹${(item.price * item.qty).toFixed(2)}</span>
             </div>
@@ -362,7 +464,28 @@
       item.qty += delta;
       if (item.qty <= 0) {
         cart = cart.filter(i => i.part !== part);
+      } else {
+        // Ensure we don't exceed available stock
+        const product = productsData.find(p => p.part === part);
+        if (product) {
+          item.qty = Math.min(item.qty, product.stock);
+        }
       }
+      updateCartUI();
+    }
+
+    function updateCartItemQty(part, qty) {
+      const item = cart.find(i => i.part === part);
+      if (!item) return;
+      
+      qty = parseInt(qty) || 1;
+      // Ensure we don't exceed available stock
+      const product = productsData.find(p => p.part === part);
+      if (product) {
+        qty = Math.min(qty, product.stock);
+      }
+      
+      item.qty = Math.max(1, qty);
       updateCartUI();
     }
 
@@ -378,13 +501,125 @@
         description: "Purchase",
         handler: function(response) {
           alert("Payment Successful. Payment ID: " + response.razorpay_payment_id);
+          sendOrderConfirmation(response.razorpay_payment_id);
           cart = [];
           updateCartUI();
+          document.getElementById("cart-sidebar").classList.remove("active");
+        },
+        prefill: {
+          name: "Customer Name",
+          email: "customer@example.com",
+          contact: "9999999999"
+        },
+        theme: {
+          color: "#3399cc"
         }
       };
       const rzp = new Razorpay(options);
       rzp.open();
     }
+
+    function sendOrderConfirmation(paymentId) {
+      // In a real implementation, you would send this to your server
+      console.log("Order confirmation would be sent for payment:", paymentId);
+      console.log("Order details:", cart);
+      
+      // Generate PDF
+      generateOrderPDF(paymentId);
+      
+      // Generate Excel
+      generateOrderExcel(paymentId);
+    }
+
+    function generateOrderPDF(paymentId) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      
+      doc.setFontSize(18);
+      doc.text('Auto Spares Solution - Order Confirmation', 10, 15);
+      doc.setFontSize(12);
+      doc.text(`Order Date: ${new Date().toLocaleString()}`, 10, 25);
+      doc.text(`Payment ID: ${paymentId}`, 10, 35);
+      
+      doc.setFontSize(14);
+      doc.text('Order Items:', 10, 45);
+      
+      let y = 55;
+      doc.setFontSize(12);
+      cart.forEach(item => {
+        doc.text(`${item.part} - ${item.desc}`, 10, y);
+        doc.text(`Qty: ${item.qty} x ₹${item.price.toFixed(2)} = ₹${(item.qty * item.price).toFixed(2)}`, 150, y);
+        y += 10;
+      });
+      
+      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      doc.setFontSize(14);
+      doc.text(`Total Amount: ₹${total.toFixed(2)}`, 10, y + 10);
+      
+      doc.save(`order_${paymentId}.pdf`);
+    }
+
+    function generateOrderExcel(paymentId) {
+      const wb = XLSX.utils.book_new();
+      
+      // Prepare order data
+      const orderData = cart.map(item => ({
+        'Part Number': item.part,
+        'Description': item.desc,
+        'Quantity': item.qty,
+        'Box Quantity': item.boxQty,
+        'Master Carton': item.masterCarton,
+        'Unit Price': item.price,
+        'Total': (item.qty * item.price).toFixed(2)
+      }));
+      
+      // Add total row
+      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      orderData.push({
+        'Part Number': 'TOTAL',
+        'Description': '',
+        'Quantity': '',
+        'Box Quantity': '',
+        'Master Carton': '',
+        'Unit Price': '',
+        'Total': total.toFixed(2)
+      });
+      
+      const ws = XLSX.utils.json_to_sheet(orderData);
+      XLSX.utils.book_append_sheet(wb, ws, "Order");
+      
+      XLSX.writeFile(wb, `order_${paymentId}.xlsx`);
+    }
+
+    function sendOrderEmail() {
+      if (cart.length === 0) {
+        alert("Your cart is empty.");
+        return;
+      }
+      
+      const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
+      let body = "Please find below my order details:\n\n";
+      
+      cart.forEach(item => {
+        body += `${item.part} - ${item.desc}\n`;
+        body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
+        body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
+      });
+      
+      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      body += `\nTotal Amount: ₹${total.toFixed(2)}\n\n`;
+      body += "Please confirm availability and provide payment instructions.\n\n";
+      body += "Regards,\n[Your Name]";
+      
+      window.location.href = `mailto:autosparessolution@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
+
+    // Contact form submission
+    document.getElementById("contact-form").addEventListener("submit", function(e) {
+      e.preventDefault();
+      alert("Thank you for your message. We will contact you soon.");
+      this.reset();
+    });
   </script>
 </body>
 </html>
