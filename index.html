@@ -289,8 +289,10 @@
     document.getElementById("search-input").addEventListener("input", (e) => {
       const searchTerm = e.target.value.toLowerCase();
       if (searchTerm === '') {
-        filteredProducts = [...productsData];
+        // When search is empty, show only in-stock items
+        filteredProducts = productsData.filter(product => product.stock > 0);
       } else {
+        // When searching, show all matching products regardless of stock
         filteredProducts = productsData.filter(product => 
           product.part.toLowerCase().includes(searchTerm) || 
           (product.desc && product.desc.toLowerCase().includes(searchTerm))
@@ -315,7 +317,7 @@
             boxQty: parseInt(cols[8] || 1), // Box quantity
             masterCarton: parseInt(cols[9] || 1) // Master carton quantity
           };
-        }).filter(p => p.part && p.stock > 0); // Remove empty rows and out-of-stock items
+        }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
 
         // Add fixed products that might not be in CSV
         fixedProducts.forEach(part => {
@@ -331,7 +333,8 @@
           }
         });
         
-        filteredProducts = [...productsData];
+        // Initialize with only in-stock items shown by default
+        filteredProducts = productsData.filter(product => product.stock > 0);
         displayProducts();
       })
       .catch(err => {
@@ -361,10 +364,12 @@
       
       filteredProducts.forEach(product => {
         const isInStock = product.stock > 0;
+        const isInSystem = productsData.some(p => p.part === product.part);
         
         gallery.insertAdjacentHTML('beforeend', `
           <div class="card" data-part="${product.part}">
-            ${!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
+            ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
+              (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
             
             <img src="images/${product.part}.png" alt="${product.part}" 
                  onerror="this.src='images/default.png';this.onerror=null;">
@@ -375,8 +380,10 @@
             
             <div class="stock-info">
               <span>Stock: ${isInStock ? product.stock : '0'}</span>
-              <span>Box Qty: ${product.boxQty}</span>
-              <span>Carton: ${product.masterCarton}</span>
+              ${isInStock ? `
+                <span>Box Qty: ${product.boxQty}</span>
+                <span>Carton: ${product.masterCarton}</span>
+              ` : ''}
             </div>
             
             ${isInStock ? `
@@ -385,10 +392,10 @@
                        onchange="updateProductQty('${product.part}', this.value)">
                 <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">Add to Cart</button>
               </div>
-            ` : '<button class="btn" disabled>Unavailable</button>'}
+            ` : ''}
             
             <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
-              ${isInStock ? 'Enquire' : 'Notify Me'}
+              ${isInStock ? 'Enquire' : 'Notify When Available'}
             </a>
           </div>
         `);
@@ -548,8 +555,9 @@
       doc.setFontSize(12);
       cart.forEach(item => {
         doc.text(`${item.part} - ${item.desc}`, 10, y);
-        doc.text(`Qty: ${item.qty} x ₹${item.price.toFixed(2)} = ₹${(item.qty * item.price).toFixed(2)}`, 150, y);
-        y += 10;
+        doc.text(`Qty: ${item.qty} (Box: ${item.boxQty}, Carton: ${item.masterCarton})`, 10, y + 5);
+        doc.text(`Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.qty * item.price).toFixed(2)}`, 150, y);
+        y += 15;
       });
       
       const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
