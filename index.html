@@ -247,22 +247,27 @@
             margin: 0.5rem 0;
         }
         
-        .stock-info {
-            font-size: 0.9rem;
+        .product-details {
+            font-size: 0.85rem;
             margin-bottom: 0.5rem;
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 0.5rem;
             background: rgba(0,0,0,0.2);
-            padding: 0.5rem;
+            padding: 0.8rem;
             border-radius: 5px;
+            text-align: left;
         }
         
-        .stock-info span {
+        .detail-row {
             display: flex;
-            align-items: center;
-            gap: 0.3rem;
+            justify-content: space-between;
+            margin-bottom: 0.3rem;
+        }
+        
+        .detail-label {
+            color: #aaa;
+        }
+        
+        .detail-value {
+            font-weight: 500;
         }
         
         .btn {
@@ -1075,13 +1080,105 @@
         let productsData = [];
         let filteredProducts = [];
         let cart = [];
-        const fixedProducts = [
-            "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
-            "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-            "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
-            "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
-            "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
-            "M07520-0200"
+        
+        // Sample data matching CSV structure
+        const sampleProducts = [
+            {
+                part: "M63241-0200",
+                desc: "Engine Mounting Bolt",
+                brand: "TVS",
+                model: "Suzuki Swift",
+                category: "Fasteners",
+                subcategory: "Bolts",
+                price: 120.50,
+                stock: 45,
+                boxQty: 10,
+                masterCarton: 50
+            },
+            {
+                part: "M63251-0200",
+                desc: "Suspension Arm Bushing",
+                brand: "VRP",
+                model: "Hyundai i20",
+                category: "Rubber Parts",
+                subcategory: "Bushings",
+                price: 345.75,
+                stock: 22,
+                boxQty: 5,
+                masterCarton: 25
+            },
+            {
+                part: "M64770-0200",
+                desc: "Brake Caliper Pin",
+                brand: "STL",
+                model: "Toyota Innova",
+                category: "Brake System",
+                subcategory: "Caliper Parts",
+                price: 89.90,
+                stock: 0,
+                boxQty: 20,
+                masterCarton: 100
+            },
+            {
+                part: "212123040-0200",
+                desc: "Fuel Injector Seal",
+                brand: "OEM",
+                model: "Maruti Baleno",
+                category: "Fuel System",
+                subcategory: "Seals",
+                price: 45.25,
+                stock: 78,
+                boxQty: 50,
+                masterCarton: 250
+            },
+            {
+                part: "A40778820-0200",
+                desc: "Timing Belt Tensioner",
+                brand: "TVS",
+                model: "Honda City",
+                category: "Engine Parts",
+                subcategory: "Belt System",
+                price: 560.00,
+                stock: 12,
+                boxQty: 1,
+                masterCarton: 10
+            },
+            {
+                part: "A40788820-0200",
+                desc: "Radiator Hose Connector",
+                brand: "VRP",
+                model: "Ford EcoSport",
+                category: "Cooling System",
+                subcategory: "Hoses",
+                price: 78.40,
+                stock: 0,
+                boxQty: 10,
+                masterCarton: 50
+            },
+            {
+                part: "A05691020-0200",
+                desc: "Wheel Bearing Kit",
+                brand: "STL",
+                model: "Tata Nexon",
+                category: "Suspension",
+                subcategory: "Bearings",
+                price: 890.00,
+                stock: 8,
+                boxQty: 1,
+                masterCarton: 5
+            },
+            {
+                part: "A04182020-0200",
+                desc: "Clutch Release Bearing",
+                brand: "OEM",
+                model: "Renault Kwid",
+                category: "Transmission",
+                subcategory: "Clutch",
+                price: 320.50,
+                stock: 15,
+                boxQty: 5,
+                masterCarton: 25
+            }
         ];
 
         // DOM elements
@@ -1177,21 +1274,10 @@
 
         // Load product data
         function loadProducts() {
-            // Generate realistic product data with proper stock levels
-            productsData = fixedProducts.map(part => {
-                // 70% chance of being in stock, 30% chance of out of stock
-                const isInStock = Math.random() > 0.3;
-                const stock = isInStock ? Math.floor(Math.random() * 100) : 0;
-                
-                return {
-                    part,
-                    desc: `Auto spare part ${part} for various vehicle models`,
-                    price: Math.floor(Math.random() * 1000) + 100,
-                    stock: stock,
-                    boxQty: Math.floor(Math.random() * 10) + 1,
-                    masterCarton: Math.floor(Math.random() * 20) + 1
-                };
-            });
+            // In a real implementation, this would load from your CSV file
+            // For now, we'll use the sample data that matches the CSV structure
+            
+            productsData = [...sampleProducts];
             
             // Initialize with only in-stock items shown by default
             filteredProducts = productsData.filter(product => product.stock > 0);
@@ -1240,12 +1326,27 @@
                         <div class="part-desc">${product.desc}</div>
                         <div class="price">₹${product.price.toFixed(2)}</div>
                         
-                        <div class="stock-info">
-                            <span><i class="fas fa-box"></i> Stock: ${product.stock}</span>
-                            ${isInStock ? `
-                                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
-                                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
-                            ` : ''}
+                        <div class="product-details">
+                            <div class="detail-row">
+                                <span class="detail-label">Brand:</span>
+                                <span class="detail-value">${product.brand}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Model:</span>
+                                <span class="detail-value">${product.model}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Category:</span>
+                                <span class="detail-value">${product.category}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Box Qty:</span>
+                                <span class="detail-value">${product.boxQty}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Master Carton:</span>
+                                <span class="detail-value">${product.masterCarton}</span>
+                            </div>
                         </div>
                         
                         ${isInStock ? `
