@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +7,9 @@
     <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary: #0a7c71;
@@ -28,7 +32,6 @@
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
             color: var(--light);
             line-height: 1.6;
-            overflow-x: hidden;
         }
         
         header {
@@ -152,8 +155,6 @@
             border-radius: 8px;
             margin: 1rem 0 2rem;
             position: relative;
-            display: flex;
-            align-items: center;
         }
         
         #search-input {
@@ -176,6 +177,8 @@
         .search-icon {
             position: absolute;
             left: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
             color: #aaa;
         }
         
@@ -197,22 +200,12 @@
             display: flex;
             flex-direction: column;
             height: 100%;
-            border: 2px solid transparent;
         }
         
         .card:hover {
             transform: translateY(-5px);
             box-shadow: 0 8px 20px rgba(0,0,0,0.3);
             background: rgba(255, 255, 255, 0.12);
-        }
-        
-        .card.in-stock {
-            border-color: var(--primary);
-        }
-        
-        .card.out-of-stock {
-            border-color: #e74c3c;
-            opacity: 0.9;
         }
         
         .card img {
@@ -248,27 +241,22 @@
             margin: 0.5rem 0;
         }
         
-        .product-details {
-            font-size: 0.85rem;
+        .stock-info {
+            font-size: 0.9rem;
             margin-bottom: 0.5rem;
-            background: rgba(0,0,0,0.2);
-            padding: 0.8rem;
-            border-radius: 5px;
-            text-align: left;
-        }
-        
-        .detail-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 0.3rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            background: rgba(0,0,0,0.2);
+            padding: 0.5rem;
+            border-radius: 5px;
         }
         
-        .detail-label {
-            color: #aaa;
-        }
-        
-        .detail-value {
-            font-weight: 500;
+        .stock-info span {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
         }
         
         .btn {
@@ -427,10 +415,11 @@
             border-radius: 4px;
         }
         
-        .stock-badge {
+        .out-of-stock {
             position: absolute;
             top: 10px;
             right: 10px;
+            background: rgba(220, 53, 69, 0.85);
             color: white;
             padding: 6px 12px;
             border-radius: 5px;
@@ -439,16 +428,17 @@
             z-index: 2;
         }
         
-        .in-stock-badge {
-            background: rgba(39, 174, 96, 0.85);
-        }
-        
-        .low-stock-badge {
-            background: rgba(241, 196, 15, 0.85);
-        }
-        
-        .out-of-stock-badge {
-            background: rgba(231, 76, 60, 0.85);
+        .not-available {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 165, 0, 0.85);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            z-index: 2;
         }
         
         .btn:disabled {
@@ -742,74 +732,6 @@
             gap: 0.5rem;
         }
         
-        .search-performance {
-            margin-top: 10px;
-            font-size: 0.85rem;
-            color: #a0d9d4;
-            text-align: right;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        
-        .search-options {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-        
-        .stock-toggle {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 24px;
-        }
-        
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #444;
-            transition: .4s;
-            border-radius: 24px;
-        }
-        
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 16px;
-            width: 16px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        
-        input:checked + .slider {
-            background-color: var(--primary);
-        }
-        
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-        
         @media (max-width: 768px) {
             header h1 {
                 font-size: 1.8rem;
@@ -849,18 +771,6 @@
             nav {
                 padding: 0.6rem 0.5rem;
                 gap: 0.8rem;
-            }
-            
-            .search-performance {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 0.5rem;
-            }
-            
-            .search-options {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 0.5rem;
             }
         }
     </style>
@@ -933,23 +843,11 @@
             <i class="fas fa-search search-icon"></i>
             <input type="text" id="search-input" placeholder="Search by part number or description...">
         </div>
-        <div class="search-performance">
-            <span id="search-stats">Showing 24 products</span>
-            <div class="search-options">
-                <div class="stock-toggle">
-                    <span>Show out-of-stock:</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="show-out-of-stock">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-        </div>
 
         <section id="products" class="section">
             <h2 class="section-title">Our Products</h2>
             <div class="gallery">
-                <!-- Products will be loaded here -->
+                <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>
             </div>
         </section>
 
@@ -1081,285 +979,13 @@
         let productsData = [];
         let filteredProducts = [];
         let cart = [];
-        
-        // Sample data matching CSV structure
-        const sampleProducts = [
-            {
-                part: "M63241-0200",
-                desc: "Engine Mounting Bolt",
-                brand: "TVS",
-                model: "Suzuki Swift",
-                category: "Fasteners",
-                subcategory: "Bolts",
-                price: 120.50,
-                stock: 45,
-                boxQty: 10,
-                masterCarton: 50
-            },
-            {
-                part: "M63251-0200",
-                desc: "Suspension Arm Bushing",
-                brand: "VRP",
-                model: "Hyundai i20",
-                category: "Rubber Parts",
-                subcategory: "Bushings",
-                price: 345.75,
-                stock: 22,
-                boxQty: 5,
-                masterCarton: 25
-            },
-            {
-                part: "M64770-0200",
-                desc: "Brake Caliper Pin",
-                brand: "STL",
-                model: "Toyota Innova",
-                category: "Brake System",
-                subcategory: "Caliper Parts",
-                price: 89.90,
-                stock: 0,
-                boxQty: 20,
-                masterCarton: 100
-            },
-            {
-                part: "212123040-0200",
-                desc: "Fuel Injector Seal",
-                brand: "OEM",
-                model: "Maruti Baleno",
-                category: "Fuel System",
-                subcategory: "Seals",
-                price: 45.25,
-                stock: 78,
-                boxQty: 50,
-                masterCarton: 250
-            },
-            {
-                part: "A40778820-0200",
-                desc: "Timing Belt Tensioner",
-                brand: "TVS",
-                model: "Honda City",
-                category: "Engine Parts",
-                subcategory: "Belt System",
-                price: 560.00,
-                stock: 12,
-                boxQty: 1,
-                masterCarton: 10
-            },
-            {
-                part: "A40788820-0200",
-                desc: "Radiator Hose Connector",
-                brand: "VRP",
-                model: "Ford EcoSport",
-                category: "Cooling System",
-                subcategory: "Hoses",
-                price: 78.40,
-                stock: 0,
-                boxQty: 10,
-                masterCarton: 50
-            },
-            {
-                part: "A05691020-0200",
-                desc: "Wheel Bearing Kit",
-                brand: "STL",
-                model: "Tata Nexon",
-                category: "Suspension",
-                subcategory: "Bearings",
-                price: 890.00,
-                stock: 8,
-                boxQty: 1,
-                masterCarton: 5
-            },
-            {
-                part: "A04182020-0200",
-                desc: "Clutch Release Bearing",
-                brand: "OEM",
-                model: "Renault Kwid",
-                category: "Transmission",
-                subcategory: "Clutch",
-                price: 320.50,
-                stock: 15,
-                boxQty: 5,
-                masterCarton: 25
-            },
-            {
-                part: "A04331020-0200",
-                desc: "Steering Rack Boot",
-                brand: "VRP",
-                model: "Mahindra Scorpio",
-                category: "Steering",
-                subcategory: "Boots",
-                price: 185.75,
-                stock: 30,
-                boxQty: 10,
-                masterCarton: 50
-            },
-            {
-                part: "A04183020-0200",
-                desc: "Drive Shaft Seal",
-                brand: "OEM",
-                model: "Kia Seltos",
-                category: "Drivetrain",
-                subcategory: "Seals",
-                price: 95.25,
-                stock: 42,
-                boxQty: 25,
-                masterCarton: 100
-            },
-            {
-                part: "MA2710-0200",
-                desc: "Timing Chain Kit",
-                brand: "TVS",
-                model: "Hyundai Creta",
-                category: "Engine Parts",
-                subcategory: "Timing",
-                price: 1250.00,
-                stock: 5,
-                boxQty: 1,
-                masterCarton: 5
-            },
-            {
-                part: "A04330020-0200",
-                desc: "Exhaust Hanger Bracket",
-                brand: "STL",
-                model: "Toyota Fortuner",
-                category: "Exhaust System",
-                subcategory: "Hangers",
-                price: 78.90,
-                stock: 18,
-                boxQty: 5,
-                masterCarton: 25
-            },
-            {
-                part: "MA2720-0200",
-                desc: "Water Pump Assembly",
-                brand: "TVS",
-                model: "Maruti Ertiga",
-                category: "Cooling System",
-                subcategory: "Pumps",
-                price: 890.00,
-                stock: 7,
-                boxQty: 1,
-                masterCarton: 5
-            },
-            {
-                part: "A04854020-0200",
-                desc: "Fuel Pump Strainer",
-                brand: "OEM",
-                model: "Honda Amaze",
-                category: "Fuel System",
-                subcategory: "Pumps",
-                price: 120.00,
-                stock: 25,
-                boxQty: 10,
-                masterCarton: 50
-            },
-            {
-                part: "M73710-0200",
-                desc: "Suspension Strut Mount",
-                brand: "STL",
-                model: "Volkswagen Polo",
-                category: "Suspension",
-                subcategory: "Mounts",
-                price: 210.50,
-                stock: 14,
-                boxQty: 5,
-                masterCarton: 25
-            },
-            {
-                part: "M73720-0200",
-                desc: "Control Arm Bushing",
-                brand: "VRP",
-                model: "Skoda Rapid",
-                category: "Suspension",
-                subcategory: "Bushings",
-                price: 145.75,
-                stock: 33,
-                boxQty: 10,
-                masterCarton: 50
-            },
-            {
-                part: "A03121020-0200",
-                desc: "AC Compressor Clutch",
-                brand: "OEM",
-                model: "Nissan Magnite",
-                category: "AC System",
-                subcategory: "Compressors",
-                price: 780.00,
-                stock: 3,
-                boxQty: 1,
-                masterCarton: 5
-            },
-            {
-                part: "M85060-0200",
-                desc: "Wheel Hub Assembly",
-                brand: "TVS",
-                model: "Renault Triber",
-                category: "Suspension",
-                subcategory: "Hubs",
-                price: 620.00,
-                stock: 9,
-                boxQty: 1,
-                masterCarton: 5
-            },
-            {
-                part: "A0A509020-0200",
-                desc: "Throttle Body Gasket",
-                brand: "VRP",
-                model: "Tata Altroz",
-                category: "Engine Parts",
-                subcategory: "Gaskets",
-                price: 35.25,
-                stock: 50,
-                boxQty: 50,
-                masterCarton: 200
-            },
-            {
-                part: "M54760-0200",
-                desc: "Brake Master Cylinder",
-                brand: "STL",
-                model: "MG Hector",
-                category: "Brake System",
-                subcategory: "Cylinders",
-                price: 420.00,
-                stock: 6,
-                boxQty: 1,
-                masterCarton: 5
-            },
-            {
-                part: "M87340-0200",
-                desc: "Clutch Slave Cylinder",
-                brand: "STL",
-                model: "Jeep Compass",
-                category: "Transmission",
-                subcategory: "Clutch",
-                price: 380.50,
-                stock: 11,
-                boxQty: 1,
-                masterCarton: 5
-            },
-            {
-                part: "M07500-0200",
-                desc: "Radiator Fan Motor",
-                brand: "OEM",
-                model: "Hyundai Venue",
-                category: "Cooling System",
-                subcategory: "Fans",
-                price: 780.00,
-                stock: 4,
-                boxQty: 1,
-                masterCarton: 5
-            },
-            {
-                part: "M07520-0200",
-                desc: "AC Condenser Fan",
-                brand: "OEM",
-                model: "Kia Sonet",
-                category: "AC System",
-                subcategory: "Fans",
-                price: 650.00,
-                stock: 2,
-                boxQty: 1,
-                masterCarton: 5
-            }
+        const fixedProducts = [
+            "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
+            "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
+            "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+            "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+            "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
+            "M07520-0200"
         ];
 
         // DOM elements
@@ -1368,8 +994,6 @@
         const closeCartBtn = document.querySelector(".close-cart");
         const toast = document.getElementById("toast");
         const toastMessage = document.getElementById("toast-message");
-        const searchStats = document.getElementById("search-stats");
-        const showOutOfStockToggle = document.getElementById("show-out-of-stock");
 
         // Initialize cart toggle
         cartLink.addEventListener("click", (e) => {
@@ -1394,82 +1018,79 @@
             }, 3000);
         }
 
-        // Debounce function to optimize search
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-
-        // Toggle out-of-stock items visibility
-        showOutOfStockToggle.addEventListener("change", function() {
-            const searchTerm = document.getElementById("search-input").value.toLowerCase();
-            filterProducts(searchTerm);
+        // Search functionality
+        document.getElementById("search-input").addEventListener("input", (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            if (searchTerm === '') {
+                // When search is empty, show only in-stock items
+                filteredProducts = productsData.filter(product => product.stock > 0);
+            } else {
+                // When searching, show all matching products regardless of stock
+                filteredProducts = productsData.filter(product => 
+                    product.part.toLowerCase().includes(searchTerm) || 
+                    (product.desc && product.desc.toLowerCase().includes(searchTerm))
+                );
+            }
+            displayProducts();
         });
 
-        // Search functionality with debounce
-        const performSearch = debounce(function() {
-            const searchTerm = document.getElementById("search-input").value.toLowerCase();
-            filterProducts(searchTerm);
-        }, 300);
-
-        document.getElementById("search-input").addEventListener("input", performSearch);
-
-        // Filter products based on search term and toggle
-        function filterProducts(searchTerm) {
-            const showOutOfStock = showOutOfStockToggle.checked;
-            
-            if (searchTerm === '') {
-                if (showOutOfStock) {
-                    filteredProducts = [...productsData];
-                    searchStats.textContent = `Showing all ${productsData.length} products`;
-                } else {
-                    filteredProducts = productsData.filter(product => product.stock > 0);
-                    searchStats.textContent = `Showing ${filteredProducts.length} in-stock products`;
-                }
-            } else {
-                filteredProducts = productsData.filter(product => 
-                    (product.part.toLowerCase().includes(searchTerm) || 
-                    (product.desc && product.desc.toLowerCase().includes(searchTerm))) &&
-                    (showOutOfStock || product.stock > 0)
-                );
-                
-                const inStockCount = filteredProducts.filter(p => p.stock > 0).length;
-                const outOfStockCount = filteredProducts.length - inStockCount;
-                
-                if (showOutOfStock) {
-                    searchStats.textContent = `Found ${inStockCount} in-stock and ${outOfStockCount} out-of-stock items`;
-                } else {
-                    searchStats.textContent = `Found ${inStockCount} in-stock items`;
-                }
-            }
-            
-            displayProducts();
-        }
-
-        // Load product data
+        // Load product data from CSV
         function loadProducts() {
-            // In a real implementation, this would load from your CSV file
-            // For now, we'll use the sample data that matches the CSV structure
-            
-            productsData = [...sampleProducts];
-            
-            // Initialize with only in-stock items shown by default
-            filteredProducts = productsData.filter(product => product.stock > 0);
-            searchStats.textContent = `Showing ${filteredProducts.length} in-stock products`;
-            displayProducts();
-            showToast("Products loaded successfully!");
+            fetch("prices.csv")
+                .then(res => res.text())
+                .then(csv => {
+                    const rows = csv.split("\n").slice(1); // Skip header
+                    
+                    productsData = rows.map(r => {
+                        const cols = r.split(",");
+                        return {
+                            part: cols[0]?.trim(),
+                            desc: cols[1]?.trim() || "Auto Spare Part",
+                            price: parseFloat(cols[6] || 0),
+                            stock: parseInt(cols[7] || 0),
+                            boxQty: parseInt(cols[8] || 1), // Box quantity
+                            masterCarton: parseInt(cols[9] || 1) // Master carton quantity
+                        };
+                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
+
+                    // Add fixed products that might not be in CSV
+                    fixedProducts.forEach(part => {
+                        if (!productsData.some(p => p.part === part)) {
+                            productsData.push({
+                                part,
+                                desc: "Auto Spare Part",
+                                price: 0,
+                                stock: 0,
+                                boxQty: 1,
+                                masterCarton: 1
+                            });
+                        }
+                    });
+                    
+                    // Initialize with only in-stock items shown by default
+                    filteredProducts = productsData.filter(product => product.stock > 0);
+                    displayProducts();
+                })
+                .catch(err => {
+                    console.error("Error loading CSV:", err);
+                    // Fallback to fixed products with default values
+                    productsData = fixedProducts.map(part => ({
+                        part,
+                        desc: "Auto Spare Part",
+                        price: 0,
+                        stock: 0,
+                        boxQty: 1,
+                        masterCarton: 1
+                    }));
+                    filteredProducts = [...productsData];
+                    displayProducts();
+                    showToast("Error loading product data. Using fallback data.", true);
+                });
         }
 
         // Display filtered products
         function displayProducts() {
-            const gallery = document.querySelector(".gallery");
+            const gallery = document.getElementById("products");
             gallery.innerHTML = "";
             
             if (filteredProducts.length === 0) {
@@ -1479,55 +1100,26 @@
             
             filteredProducts.forEach(product => {
                 const isInStock = product.stock > 0;
-                const isLowStock = isInStock && product.stock <= 10;
-                
-                // Determine card class based on stock status
-                const cardClass = isInStock ? "in-stock" : "out-of-stock";
-                
-                // Determine badge text and class
-                let badgeText, badgeClass;
-                if (!isInStock) {
-                    badgeText = "OUT OF STOCK";
-                    badgeClass = "out-of-stock-badge";
-                } else if (isLowStock) {
-                    badgeText = "LOW STOCK";
-                    badgeClass = "low-stock-badge";
-                } else {
-                    badgeText = "IN STOCK";
-                    badgeClass = "in-stock-badge";
-                }
+                const isInSystem = productsData.some(p => p.part === product.part);
                 
                 gallery.insertAdjacentHTML('beforeend', `
-                    <div class="card ${cardClass}" data-part="${product.part}">
-                        <div class="stock-badge ${badgeClass}">${badgeText}</div>
+                    <div class="card" data-part="${product.part}">
+                        ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
+                            (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
                         
-                        <img src="https://via.placeholder.com/300x180/2c5364/ffffff?text=${product.part}" alt="${product.part}">
+                        <img src="images/${product.part}.png" alt="${product.part}" 
+                             onerror="this.src='images/default.png';this.onerror=null;">
                         
                         <div class="part-number">${product.part}</div>
                         <div class="part-desc">${product.desc}</div>
-                        <div class="price">₹${product.price.toFixed(2)}</div>
+                        <div class="price">${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
                         
-                        <div class="product-details">
-                            <div class="detail-row">
-                                <span class="detail-label">Brand:</span>
-                                <span class="detail-value">${product.brand}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Model:</span>
-                                <span class="detail-value">${product.model}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Category:</span>
-                                <span class="detail-value">${product.category}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Box Qty:</span>
-                                <span class="detail-value">${product.boxQty}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Master Carton:</span>
-                                <span class="detail-value">${product.masterCarton}</span>
-                            </div>
+                        <div class="stock-info">
+                            <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
+                            ${isInStock ? `
+                                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
+                                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
+                            ` : ''}
                         </div>
                         
                         ${isInStock ? `
@@ -1538,13 +1130,7 @@
                                     <i class="fas fa-cart-plus"></i> Add to Cart
                                 </button>
                             </div>
-                        ` : `
-                            <div style="margin-top: 0.5rem;">
-                                <button class="btn" style="background: #6c757d;" onclick="requestNotification('${product.part}')">
-                                    <i class="fas fa-bell"></i> Notify When Available
-                                </button>
-                            </div>
-                        `}
+                        ` : ''}
                         
                         <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
                             <i class="fab fa-whatsapp"></i> ${isInStock ? 'Enquire' : 'Notify Me'}
@@ -1554,19 +1140,13 @@
             });
         }
 
-        // Request notification for out-of-stock item
-        function requestNotification(part) {
-            showToast(`We'll notify you when ${part} is back in stock!`);
-        }
-
         // Update product quantity in the product card
         function updateProductQty(part, qty) {
             const card = document.querySelector(`.card[data-part="${part}"]`);
             if (card) {
                 const input = card.querySelector('.qty-input');
                 if (input) {
-                    const max = parseInt(input.getAttribute('max'));
-                    input.value = Math.max(1, Math.min(qty, max));
+                    input.value = Math.max(1, Math.min(qty, parseInt(input.max)));
                 }
             }
         }
@@ -1691,7 +1271,117 @@
                 return;
             }
             
-            showToast("Checkout functionality would be implemented here");
+            const options = {
+                key: "rzp_live_90iWxpNYThOpyE",
+                amount: totalAmount,
+                currency: "INR",
+                name: "Auto Spares Solution",
+                description: "Purchase (Prices include 18% GST)",
+                handler: function(response) {
+                    showToast("Payment Successful! Order confirmed.");
+                    sendOrderConfirmation(response.razorpay_payment_id);
+                    cart = [];
+                    updateCartUI();
+                    cartSidebar.classList.remove("active");
+                },
+                prefill: {
+                    name: "Customer Name",
+                    email: "customer@example.com",
+                    contact: "9999999999"
+                },
+                theme: {
+                    color: "#0a7c71"
+                }
+            };
+            
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+
+        function sendOrderConfirmation(paymentId) {
+            // In a real implementation, you would send this to your server
+            console.log("Order confirmation would be sent for payment:", paymentId);
+            console.log("Order details:", cart);
+            
+            // Generate PDF
+            generateOrderPDF(paymentId);
+            
+            // Generate Excel
+            generateOrderExcel(paymentId);
+        }
+
+        function generateOrderPDF(paymentId) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Header
+            doc.setFontSize(18);
+            doc.text('Auto Spares Solution', 105, 15, null, null, 'center');
+            doc.setFontSize(12);
+            doc.text('Office: 101, 1st floor, 57/5, Q Road, Howrah, WB 711108', 105, 22, null, null, 'center');
+            doc.text('Warehouse: 1 no British Indian Street, Kolkata, WB 700069', 105, 28, null, null, 'center');
+            doc.text('GSTIN: 19ANOPD3300R1ZO', 105, 34, null, null, 'center');
+            
+            // Order details
+            doc.setFontSize(16);
+            doc.text('Order Confirmation', 105, 45, null, null, 'center');
+            doc.setFontSize(12);
+            doc.text(`Order Date: ${new Date().toLocaleString()}`, 10, 55);
+            doc.text(`Payment ID: ${paymentId}`, 10, 62);
+            
+            doc.setFontSize(14);
+            doc.text('Order Items:', 10, 72);
+            
+            let y = 80;
+            doc.setFontSize(12);
+            cart.forEach(item => {
+                doc.text(`${item.part} - ${item.desc}`, 10, y);
+                doc.text(`Qty: ${item.qty} | Box: ${item.boxQty} | Carton: ${item.masterCarton}`, 10, y + 5);
+                doc.text(`Price: ₹${item.price.toFixed(2)} each | Total: ₹${(item.qty * item.price).toFixed(2)}`, 10, y + 10);
+                y += 20;
+            });
+            
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            doc.setFontSize(14);
+            doc.text(`Total Amount (incl. GST): ₹${total.toFixed(2)}`, 10, y + 10);
+            
+            // Footer
+            doc.setFontSize(10);
+            doc.text('Terms: 1. Goods once sold will not be taken back. 2. Interest @24% on bills unpaid after 30 days.', 105, doc.internal.pageSize.height - 10, null, null, 'center');
+            
+            doc.save(`order_${paymentId}.pdf`);
+        }
+
+        function generateOrderExcel(paymentId) {
+            const wb = XLSX.utils.book_new();
+            
+            // Prepare order data
+            const orderData = cart.map(item => ({
+                'Part Number': item.part,
+                'Description': item.desc,
+                'Quantity': item.qty,
+                'Box Quantity': item.boxQty,
+                'Master Carton': item.masterCarton,
+                'Unit Price': item.price,
+                'Total': (item.qty * item.price).toFixed(2)
+            }));
+            
+            // Add total row
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            orderData.push({
+                'Part Number': 'TOTAL (incl. GST)',
+                'Description': '',
+                'Quantity': '',
+                'Box Quantity': '',
+                'Master Carton': '',
+                'Unit Price': '',
+                'Total': total.toFixed(2)
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(orderData);
+            XLSX.utils.book_append_sheet(wb, ws, "Order");
+            
+            XLSX.writeFile(wb, `order_${paymentId}.xlsx`);
         }
 
         function sendOrderEmail() {
@@ -1700,7 +1390,21 @@
                 return;
             }
             
-            showToast("Order details sent to contact@autosparessolution.com");
+            const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
+            let body = "Please find below my order details:\n\n";
+            
+            cart.forEach(item => {
+                body += `${item.part} - ${item.desc}\n`;
+                body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
+                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
+            });
+            
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            body += `\nTotal Amount: ₹${total.toFixed(2)}\n\n`;
+            body += "Please confirm availability and provide payment instructions.\n\n";
+            body += "Regards,\n[Your Name]";
+            
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         }
 
         // Contact form submission
@@ -1713,6 +1417,11 @@
             const city = document.getElementById("city").value;
             const message = document.getElementById("message").value;
             
+            const subject = `Contact Form Submission from ${name}`;
+            const body = `Name: ${name}%0AEmail: ${email}%0APhone: ${phone}%0ACity: ${city}%0AMessage: ${message}`;
+            
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            
             // Reset the form
             this.reset();
             showToast("Your message has been sent. We'll contact you soon!");
@@ -1722,4 +1431,4 @@
         loadProducts();
     </script>
 </body>
-    </html>
+</html>
