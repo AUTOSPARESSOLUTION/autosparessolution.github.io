@@ -1,1366 +1,1398 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9GSY9Q5R5P"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-9GSY9Q5R5P');
-  </script>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --primary: #0a7c71;
-      --secondary: #ff6f61;
-      --accent: #ffd700;
-      --dark: #0f2027;
-      --light: #f8f9fa;
-      --gray: #6c757d;
-      --success: #28a745;
-    }
-    
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    
-    body {
-      font-family: 'Roboto', sans-serif;
-      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-      color: var(--light);
-      line-height: 1.6;
-    }
-    
-    header {
-      text-align: center;
-      padding: 1.5rem 1rem;
-      background: rgba(0, 0, 0, 0.85);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    }
-    
-    .header-content {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    
-    header h1 {
-      margin: 0;
-      font-size: 2.2rem;
-      letter-spacing: 1px;
-      color: var(--accent);
-      text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-      font-family: 'Montserrat', sans-serif;
-    }
-    
-    .tagline {
-      color: #a0d9d4;
-      font-size: 1rem;
-      margin-top: 0.5rem;
-      max-width: 600px;
-    }
-    
-    nav {
-      background: rgba(0, 0, 0, 0.9);
-      padding: 0.8rem 1rem;
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 1.5rem;
-      position: sticky;
-      top: 80px;
-      z-index: 99;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    }
-    
-    nav a {
-      color: white;
-      text-decoration: none;
-      font-weight: 500;
-      position: relative;
-      padding: 0.3rem 0;
-      transition: color 0.3s;
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-    
-    nav a:hover {
-      color: var(--accent);
-    }
-    
-    nav a i {
-      font-size: 1.1rem;
-    }
-    
-    #cart-count {
-      background: var(--secondary);
-      color: white;
-      border-radius: 50%;
-      width: 20px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.75rem;
-      position: absolute;
-      top: -8px;
-      right: -12px;
-    }
-    
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 1rem;
-    }
-    
-    .section {
-      padding: 3rem 1rem;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 10px;
-      margin: 1.5rem 0;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-    }
-    
-    .section-title {
-      text-align: center;
-      margin-bottom: 2rem;
-      color: var(--accent);
-      font-family: 'Montserrat', sans-serif;
-      position: relative;
-    }
-    
-    .section-title::after {
-      content: '';
-      display: block;
-      width: 80px;
-      height: 3px;
-      background: var(--primary);
-      margin: 0.5rem auto 0;
-      border-radius: 3px;
-    }
-    
-    .search-container {
-      padding: 1rem;
-      background: rgba(0,0,0,0.3);
-      border-radius: 8px;
-      margin: 1rem 0 2rem;
-      position: relative;
-    }
-    
-    #search-input {
-      width: 100%;
-      padding: 0.9rem 1rem 0.9rem 3rem;
-      border-radius: 5px;
-      border: none;
-      font-size: 1rem;
-      background: rgba(255,255,255,0.1);
-      color: white;
-      transition: all 0.3s;
-    }
-    
-    #search-input:focus {
-      outline: none;
-      background: rgba(255,255,255,0.15);
-      box-shadow: 0 0 0 2px var(--primary);
-    }
-    
-    .search-icon {
-      position: absolute;
-      left: 1.5rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #aaa;
-    }
-    
-    .gallery {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1.5rem;
-    }
-    
-    .card {
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      padding: 1.2rem;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-      text-align: center;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-    
-    .card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-      background: rgba(255, 255, 255, 0.12);
-    }
-    
-    .card img {
-      width: 100%;
-      height: 180px;
-      object-fit: contain;
-      border-radius: 6px;
-      background: rgba(255,255,255,0.1);
-      padding: 15px;
-      margin-bottom: 1rem;
-    }
-    
-    .part-number {
-      font-weight: bold;
-      margin-top: 0.2rem;
-      color: var(--accent);
-      font-size: 1.1rem;
-      letter-spacing: 0.5px;
-    }
-    
-    .part-desc {
-      font-size: 0.9rem;
-      margin: 0.5rem 0;
-      color: #ddd;
-      min-height: 40px;
-      flex-grow: 1;
-    }
-    
-    .price {
-      font-size: 1.2rem;
-      color: var(--accent);
-      font-weight: 600;
-      margin: 0.5rem 0;
-    }
-    
-    .stock-info {
-      font-size: 0.9rem;
-      margin-bottom: 0.5rem;
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      background: rgba(0,0,0,0.2);
-      padding: 0.5rem;
-      border-radius: 5px;
-    }
-    
-    .stock-info span {
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-    
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-      padding: 0.7rem 1.2rem;
-      border: none;
-      border-radius: 5px;
-      text-decoration: none;
-      font-weight: 600;
-      transition: all 0.3s ease;
-      margin-right: 0.5rem;
-      cursor: pointer;
-      font-size: 0.95rem;
-    }
-    
-    .whatsapp {
-      background: #25D366;
-      color: #fff;
-    }
-    
-    .whatsapp:hover {
-      background: #1ebd5b;
-      transform: translateY(-2px);
-    }
-    
-    .buy {
-      background: var(--secondary);
-      color: white;
-    }
-    
-    .buy:hover {
-      background: #e85c50;
-      transform: translateY(-2px);
-    }
-    
-    .cart {
-      background: var(--primary);
-      color: white;
-    }
-    
-    .cart:hover {
-      background: #09645a;
-      transform: translateY(-2px);
-    }
-    
-    #cart-sidebar {
-      position: fixed;
-      top: 0;
-      right: -400px;
-      width: 100%;
-      max-width: 380px;
-      height: 100%;
-      background: #1a1a1a;
-      color: white;
-      box-shadow: -2px 0 15px rgba(0,0,0,0.5);
-      padding: 1.5rem;
-      transition: right 0.4s ease;
-      overflow-y: auto;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-    }
-    
-    #cart-sidebar.active {
-      right: 0;
-    }
-    
-    #cart-sidebar h2 {
-      margin-top: 0;
-      padding-bottom: 1rem;
-      border-bottom: 2px solid var(--primary);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .cart-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid #333;
-    }
-    
-    .cart-item-info {
-      flex-grow: 1;
-    }
-    
-    .cart-item-title {
-      font-weight: 600;
-      margin-bottom: 0.3rem;
-    }
-    
-    .cart-item-desc {
-      font-size: 0.85rem;
-      color: #aaa;
-      margin-bottom: 0.3rem;
-    }
-    
-    .cart-item-price {
-      color: var(--accent);
-      font-weight: 600;
-    }
-    
-    .qty-control {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .qty-control button {
-      background: #444;
-      color: white;
-      border: none;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      transition: background 0.2s;
-    }
-    
-    .qty-control button:hover {
-      background: var(--primary);
-    }
-    
-    .remove-item {
-      color: #ff6b6b;
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 1.2rem;
-      margin-left: 0.5rem;
-      transition: color 0.2s;
-    }
-    
-    .remove-item:hover {
-      color: #ff0000;
-    }
-    
-    .qty-input {
-      width: 50px;
-      text-align: center;
-      padding: 0.4rem;
-      background: rgba(255,255,255,0.1);
-      color: white;
-      border: 1px solid #444;
-      border-radius: 4px;
-    }
-    
-    .out-of-stock {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(220, 53, 69, 0.85);
-      color: white;
-      padding: 6px 12px;
-      border-radius: 5px;
-      font-weight: 600;
-      font-size: 0.85rem;
-      z-index: 2;
-    }
-    
-    .not-available {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(255, 165, 0, 0.85);
-      color: white;
-      padding: 6px 12px;
-      border-radius: 5px;
-      font-weight: 600;
-      font-size: 0.85rem;
-      z-index: 2;
-    }
-    
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none !important;
-    }
-    
-    .loading {
-      text-align: center;
-      padding: 2rem;
-      font-size: 1.2rem;
-      grid-column: 1 / -1;
-    }
-    
-    .cart-actions {
-      margin-top: auto;
-      padding-top: 1.5rem;
-    }
-    
-    .cart-summary {
-      background: rgba(0,0,0,0.3);
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 1.5rem;
-    }
-    
-    .summary-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 0.8rem;
-    }
-    
-    .total-row {
-      font-weight: 700;
-      font-size: 1.2rem;
-      border-top: 2px solid var(--primary);
-      padding-top: 0.8rem;
-      margin-top: 0.5rem;
-    }
-    
-    .close-cart {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      background: none;
-      border: none;
-      color: #aaa;
-      font-size: 1.5rem;
-      cursor: pointer;
-      transition: color 0.2s;
-    }
-    
-    .close-cart:hover {
-      color: white;
-    }
-    
-    .empty-cart {
-      text-align: center;
-      padding: 2rem 0;
-      color: #aaa;
-    }
-    
-    .empty-cart i {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-      opacity: 0.3;
-    }
-    
-    .contact-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-    
-    .contact-info {
-      background: rgba(0,0,0,0.2);
-      padding: 1.5rem;
-      border-radius: 8px;
-    }
-    
-    .contact-info h3 {
-      color: var(--accent);
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-    }
-    
-    .contact-info p {
-      margin-bottom: 1.2rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 0.8rem;
-    }
-    
-    .contact-info i {
-      color: var(--primary);
-      min-width: 20px;
-    }
-    
-    .form-group {
-      margin-bottom: 1.2rem;
-    }
-    
-    .form-group label {
-      display: block;
-      margin-bottom: 0.5rem;
-      color: #ddd;
-    }
-    
-    .form-control {
-      width: 100%;
-      padding: 0.8rem 1rem;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid #444;
-      border-radius: 5px;
-      color: white;
-      font-size: 1rem;
-    }
-    
-    .form-control:focus {
-      outline: none;
-      border-color: var(--primary);
-      background: rgba(255,255,255,0.12);
-    }
-    
-    textarea.form-control {
-      min-height: 120px;
-      resize: vertical;
-    }
-    
-    .btn-block {
-      display: block;
-      width: 100%;
-      text-align: center;
-    }
-    
-    .brand-logos {
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      flex-wrap: wrap;
-      margin: 2rem 0;
-    }
-    
-    .brand-logo {
-      width: 120px;
-      height: 80px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    
-    footer {
-      background: rgba(0, 0, 0, 0.9);
-      color: #ccc;
-      padding: 3rem 1rem 2rem;
-      text-align: center;
-      margin-top: 3rem;
-    }
-    
-    .footer-content {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 2rem;
-      text-align: left;
-    }
-    
-    .footer-column h3 {
-      color: var(--accent);
-      margin-bottom: 1.2rem;
-      font-size: 1.2rem;
-    }
-    
-    .footer-links {
-      list-style: none;
-    }
-    
-    .footer-links li {
-      margin-bottom: 0.6rem;
-    }
-    
-    .footer-links a {
-      color: #aaa;
-      text-decoration: none;
-      transition: color 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .footer-links a:hover {
-      color: white;
-    }
-    
-    .social-links {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-    
-    .social-links a {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #333;
-      color: white;
-      transition: all 0.3s;
-    }
-    
-    .social-links a:hover {
-      background: var(--primary);
-      transform: translateY(-3px);
-    }
-    
-    .copyright {
-      margin-top: 2rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid #333;
-      font-size: 0.9rem;
-      color: #777;
-    }
-    
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%) translateY(100px);
-      background: var(--success);
-      color: white;
-      padding: 0.8rem 1.5rem;
-      border-radius: 5px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-      z-index: 1000;
-      transition: transform 0.3s ease;
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-    }
-    
-    .toast.show {
-      transform: translateX(-50%) translateY(0);
-    }
-    
-    .toast.error {
-      background: #dc3545;
-    }
-    
-    @media (max-width: 768px) {
-      header h1 {
-        font-size: 1.8rem;
-      }
-      
-      nav {
-        gap: 1rem;
-        top: 70px;
-      }
-      
-      nav a span {
-        display: none;
-      }
-      
-      #cart-sidebar {
-        max-width: 100%;
-      }
-      
-      .gallery {
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      }
-    }
-    
-    @media (max-width: 480px) {
-      .section {
-        padding: 2rem 1rem;
-      }
-      
-      .gallery {
-        grid-template-columns: 1fr;
-      }
-      
-      .contact-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      nav {
-        padding: 0.6rem 0.5rem;
-        gap: 0.8rem;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #0a7c71;
+            --secondary: #e74c3c;
+            --accent: #f1c40f;
+            --dark: #0f2027;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+            --success: #27ae60;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: var(--light);
+            line-height: 1.6;
+        }
+        
+        header {
+            text-align: center;
+            padding: 1.5rem 1rem;
+            background: rgba(0, 0, 0, 0.85);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        header h1 {
+            margin: 0;
+            font-size: 2.2rem;
+            letter-spacing: 1px;
+            color: var(--accent);
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            font-family: 'Montserrat', sans-serif;
+        }
+        
+        .tagline {
+            color: #a0d9d4;
+            font-size: 1rem;
+            margin-top: 0.5rem;
+            max-width: 600px;
+        }
+        
+        nav {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 0.8rem 1rem;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 1.5rem;
+            position: sticky;
+            top: 80px;
+            z-index: 99;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            position: relative;
+            padding: 0.3rem 0;
+            transition: color 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        
+        nav a:hover {
+            color: var(--accent);
+        }
+        
+        nav a i {
+            font-size: 1.1rem;
+        }
+        
+        #cart-count {
+            background: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            position: absolute;
+            top: -8px;
+            right: -12px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
+        .section {
+            padding: 3rem 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin: 1.5rem 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .section-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--accent);
+            font-family: 'Montserrat', sans-serif;
+            position: relative;
+        }
+        
+        .section-title::after {
+            content: '';
+            display: block;
+            width: 80px;
+            height: 3px;
+            background: var(--primary);
+            margin: 0.5rem auto 0;
+            border-radius: 3px;
+        }
+        
+        .search-container {
+            padding: 1rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 1rem 0 2rem;
+            position: relative;
+        }
+        
+        #search-input {
+            width: 100%;
+            padding: 0.9rem 1rem 0.9rem 3rem;
+            border-radius: 5px;
+            border: none;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transition: all 0.3s;
+        }
+        
+        #search-input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #aaa;
+        }
+        
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 1.2rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            background: rgba(255, 255, 255, 0.12);
+        }
+        
+        .card img {
+            width: 100%;
+            height: 180px;
+            object-fit: contain;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            margin-bottom: 1rem;
+        }
+        
+        .part-number {
+            font-weight: bold;
+            margin-top: 0.2rem;
+            color: var(--accent);
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .part-desc {
+            font-size: 0.9rem;
+            margin: 0.5rem 0;
+            color: #ddd;
+            min-height: 40px;
+            flex-grow: 1;
+        }
+        
+        .price {
+            font-size: 1.2rem;
+            color: var(--accent);
+            font-weight: 600;
+            margin: 0.5rem 0;
+        }
+        
+        .stock-info {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            background: rgba(0,0,0,0.2);
+            padding: 0.5rem;
+            border-radius: 5px;
+        }
+        
+        .stock-info span {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding: 0.7rem 1.2rem;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-right: 0.5rem;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        
+        .whatsapp {
+            background: #25D366;
+            color: #fff;
+        }
+        
+        .whatsapp:hover {
+            background: #1ebd5b;
+            transform: translateY(-2px);
+        }
+        
+        .buy {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .buy:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+        
+        .cart {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .cart:hover {
+            background: #09645a;
+            transform: translateY(-2px);
+        }
+        
+        #cart-sidebar {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 100%;
+            max-width: 380px;
+            height: 100%;
+            background: #1a1a1a;
+            color: white;
+            box-shadow: -2px 0 15px rgba(0,0,0,0.5);
+            padding: 1.5rem;
+            transition: right 0.4s ease;
+            overflow-y: auto;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #cart-sidebar.active {
+            right: 0;
+        }
+        
+        #cart-sidebar h2 {
+            margin-top: 0;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #333;
+        }
+        
+        .cart-item-info {
+            flex-grow: 1;
+        }
+        
+        .cart-item-title {
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+        
+        .cart-item-desc {
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 0.3rem;
+        }
+        
+        .cart-item-price {
+            color: var(--accent);
+            font-weight: 600;
+        }
+        
+        .qty-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .qty-control button {
+            background: #444;
+            color: white;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        
+        .qty-control button:hover {
+            background: var(--primary);
+        }
+        
+        .remove-item {
+            color: #ff6b6b;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            margin-left: 0.5rem;
+            transition: color 0.2s;
+        }
+        
+        .remove-item:hover {
+            color: #ff0000;
+        }
+        
+        .qty-input {
+            width: 50px;
+            text-align: center;
+            padding: 0.4rem;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid #444;
+            border-radius: 4px;
+        }
+        
+        .out-of-stock {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(220, 53, 69, 0.85);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            z-index: 2;
+        }
+        
+        .not-available {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 165, 0, 0.85);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            z-index: 2;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            font-size: 1.2rem;
+            grid-column: 1 / -1;
+        }
+        
+        .cart-actions {
+            margin-top: auto;
+            padding-top: 1.5rem;
+        }
+        
+        .cart-summary {
+            background: rgba(0,0,0,0.3);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.8rem;
+        }
+        
+        .total-row {
+            font-weight: 700;
+            font-size: 1.2rem;
+            border-top: 2px solid var(--primary);
+            padding-top: 0.8rem;
+            margin-top: 0.5rem;
+        }
+        
+        .close-cart {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        
+        .close-cart:hover {
+            color: white;
+        }
+        
+        .empty-cart {
+            text-align: center;
+            padding: 2rem 0;
+            color: #aaa;
+        }
+        
+        .empty-cart i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+        
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .contact-info {
+            background: rgba(0,0,0,0.2);
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+        
+        .contact-info h3 {
+            color: var(--accent);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        
+        .contact-info p {
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.8rem;
+        }
+        
+        .contact-info i {
+            color: var(--primary);
+            min-width: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #ddd;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid #444;
+            border-radius: 5px;
+            color: white;
+            font-size: 1rem;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255,255,255,0.12);
+        }
+        
+        textarea.form-control {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        .btn-block {
+            display: block;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .brand-logos {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin: 2rem 0;
+        }
+        
+        .brand-logo {
+            width: 120px;
+            height: 80px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .business-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .business-card {
+            background: rgba(0,0,0,0.2);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .business-card i {
+            font-size: 2.5rem;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+        
+        .business-card h3 {
+            margin-bottom: 1rem;
+            color: var(--accent);
+        }
+        
+        footer {
+            background: rgba(0, 0, 0, 0.9);
+            color: #ccc;
+            padding: 3rem 1rem 2rem;
+            text-align: center;
+            margin-top: 3rem;
+        }
+        
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            text-align: left;
+        }
+        
+        .footer-column h3 {
+            color: var(--accent);
+            margin-bottom: 1.2rem;
+            font-size: 1.2rem;
+        }
+        
+        .footer-links {
+            list-style: none;
+        }
+        
+        .footer-links li {
+            margin-bottom: 0.6rem;
+        }
+        
+        .footer-links a {
+            color: #aaa;
+            text-decoration: none;
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .footer-links a:hover {
+            color: white;
+        }
+        
+        .social-links {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .social-links a {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #333;
+            color: white;
+            transition: all 0.3s;
+        }
+        
+        .social-links a:hover {
+            background: var(--primary);
+            transform: translateY(-3px);
+        }
+        
+        .copyright {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #333;
+            font-size: 0.9rem;
+            color: #777;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--success);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border-radius: 5px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        .toast.error {
+            background: #dc3545;
+        }
+        
+        .terms-agreement {
+            margin: 1rem 0;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8rem;
+            }
+            
+            nav {
+                gap: 1rem;
+                top: 70px;
+            }
+            
+            nav a span {
+                display: none;
+            }
+            
+            #cart-sidebar {
+                max-width: 100%;
+            }
+            
+            .gallery {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .section {
+                padding: 2rem 1rem;
+            }
+            
+            .gallery {
+                grid-template-columns: 1fr;
+            }
+            
+            .contact-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            nav {
+                padding: 0.6rem 0.5rem;
+                gap: 0.8rem;
+            }
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <div class="header-content">
-      <h1><i class="fas fa-car"></i> Auto Spares Solution</h1>
-      <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
-    </div>
-  </header>
-  
-  <nav>
-    <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
-    <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
-    <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
-    <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
-    <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
-    <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span id="cart-count">0</span></a>
-  </nav>
-
-  <div class="container">
-    <section id="about" class="section">
-      <h2 class="section-title">About Auto Spares Solution</h2>
-      <div class="about-content">
-        <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We specialize in providing high-quality components that meet industry standards and ensure optimal vehicle performance.</p>
-        
-        <div style="margin: 1.5rem 0;">
-          <p><strong>Our Specializations:</strong></p>
-          <ul style="padding-left: 1.5rem; margin-top: 0.5rem;">
-            <li>Specialist dealers of TVS & STL Fasteners (Nut & Bolt)</li>
-            <li>Authorized distributors of Volume Rubber Products</li>
-            <li>Wide range of OEM and aftermarket parts</li>
-            <li>Bulk supply for workshops and retailers</li>
-          </ul>
+    <header>
+        <div class="header-content">
+            <h1><i class="fas fa-car"></i> Auto Spares Solution</h1>
+            <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
         </div>
-        
-        <p>With our extensive network and industry expertise, we ensure timely delivery of genuine parts at competitive prices. Our commitment to quality and customer satisfaction has made us a trusted partner for automotive businesses across the region.</p>
-      </div>
-      
-      <div class="brand-logos">
-        <div class="brand-logo">TVS</div>
-        <div class="brand-logo">STL</div>
-        <div class="brand-logo">VRP</div>
-        <div class="brand-logo">OEM</div>
-      </div>
-    </section>
-
-    <div class="search-container">
-      <i class="fas fa-search search-icon"></i>
-      <input type="text" id="search-input" placeholder="Search by part number or description...">
-    </div>
-
-    <section id="products" class="section">
-      <h2 class="section-title">Our Products</h2>
-      <div class="gallery">
-        <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>
-      </div>
-    </section>
-
-    <div id="cart-sidebar">
-      <button class="close-cart"><i class="fas fa-times"></i></button>
-      <h2><i class="fas fa-shopping-cart"></i> Your Cart</h2>
-      <div id="cart-items"></div>
-      <div class="cart-actions">
-        <div class="cart-summary">
-          <div class="summary-row">
-            <span>Subtotal:</span>
-            <span>₹<span id="cart-subtotal">0.00</span></span>
-          </div>
-          <div class="summary-row">
-            <span>Tax (18%):</span>
-            <span>₹<span id="cart-tax">0.00</span></span>
-          </div>
-          <div class="summary-row total-row">
-            <span>Total:</span>
-            <span>₹<span id="cart-total">0.00</span></span>
-          </div>
-        </div>
-        <button class="btn buy btn-block" onclick="checkout()"><i class="fas fa-credit-card"></i> Checkout</button>
-        <button class="btn btn-block" onclick="sendOrderEmail()" style="background: #6c757d; margin-top: 10px;"><i class="fas fa-envelope"></i> Email Order</button>
-      </div>
-    </div>
-
-    <section id="contact" class="section">
-      <h2 class="section-title">Get In Touch</h2>
-      <div class="contact-grid">
-        <div class="contact-info">
-          <h3><i class="fas fa-map-marker-alt"></i> Our Location</h3>
-          <p><i class="fas fa-building"></i> Auto Spares Solution</p>
-          <p><i class="fas fa-road"></i> 123 Industrial Area, Phase II</p>
-          <p><i class="fas fa-city"></i> Mumbai, Maharashtra 400001</p>
-          
-          <h3 style="margin-top: 1.5rem;"><i class="fas fa-phone-alt"></i> Contact Details</h3>
-          <p><i class="fas fa-phone"></i> +91 98303 00193</p>
-          <p><i class="fas fa-envelope"></i> autosparessolution@gmail.com</p>
-          <p><i class="fas fa-clock"></i> Mon-Sat: 9:00 AM - 7:00 PM</p>
-          
-          <div class="social-links">
-            <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
-            <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
-            <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
-            <a href="https://wa.me/919830300193" title="WhatsApp" target="_blank"><i class="fab fa-whatsapp"></i></a>
-          </div>
-        </div>
-        
-        <div>
-          <form id="contact-form">
-            <div class="form-group">
-              <label for="name">Your Name</label>
-              <input type="text" id="name" class="form-control" placeholder="Enter your name" required>
-            </div>
-            <div class="form-group">
-              <label for="email">Email Address</label>
-              <input type="email" id="email" class="form-control" placeholder="Enter your email" required>
-            </div>
-            <div class="form-group">
-              <label for="phone">Phone Number</label>
-              <input type="tel" id="phone" class="form-control" placeholder="Enter your phone number" required>
-            </div>
-            <div class="form-group">
-              <label for="city">City</label>
-              <input type="text" id="city" class="form-control" placeholder="Enter your city" required>
-            </div>
-            <div class="form-group">
-              <label for="message">How can we help you?</label>
-              <textarea id="message" class="form-control" placeholder="Describe your requirements" required></textarea>
-            </div>
-            <button type="submit" class="btn btn-block" style="background: var(--primary);"><i class="fas fa-paper-plane"></i> Send Message</button>
-          </form>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <footer>
-    <div class="footer-content">
-      <div class="footer-column">
-        <h3>Auto Spares Solution</h3>
-        <p>Your trusted partner for premium automobile spare parts since 2020. We provide quality components for both commercial and private vehicles.</p>
-      </div>
-      
-      <div class="footer-column">
-        <h3>Quick Links</h3>
-        <ul class="footer-links">
-          <li><a href="#home"><i class="fas fa-chevron-right"></i> Home</a></li>
-          <li><a href="#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
-          <li><a href="#products"><i class="fas fa-chevron-right"></i> Products</a></li>
-          <li><a href="#contact"><i class="fas fa-chevron-right"></i> Contact</a></li>
-        </ul>
-      </div>
-      
-      <div class="footer-column">
-        <h3>Policy</h3>
-        <ul class="footer-links">
-          <li><a href="#"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
-          <li><a href="#"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
-          <li><a href="#"><i class="fas fa-chevron-right"></i> Return & Refund Policy</a></li>
-          <li><a href="#"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
-        </ul>
-      </div>
-    </div>
+    </header>
     
-    <div class="copyright">
-      <p>&copy; 2025 Auto Spares Solution. All Rights Reserved.</p>
+    <nav>
+        <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
+        <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
+        <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
+        <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
+        <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
+        <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span id="cart-count">0</span></a>
+    </nav>
+
+    <div class="container">
+        <section id="about" class="section">
+            <h2 class="section-title">About Auto Spares Solution</h2>
+            <div class="about-content">
+                <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We specialize in providing high-quality components that meet industry standards and ensure optimal vehicle performance.</p>
+                
+                <div style="margin: 1.5rem 0;">
+                    <p><strong>Our Specializations:</strong></p>
+                    <ul style="padding-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>Specialist dealers of TVS & STL Fasteners (Nut & Bolt)</li>
+                        <li>Authorized distributors of Volume Rubber Products</li>
+                        <li>Wide range of OEM and aftermarket parts</li>
+                        <li>Bulk supply for workshops and retailers</li>
+                    </ul>
+                </div>
+                
+                <p>With our extensive network and industry expertise, we ensure timely delivery of genuine parts at competitive prices. Our commitment to quality and customer satisfaction has made us a trusted partner for automotive businesses across the region.</p>
+            </div>
+            
+            <div class="business-info">
+                <div class="business-card">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <h3>Office</h3>
+                    <p>101, 1st floor, 57/5, Q Road<br>Howrah, West Bengal 711108</p>
+                </div>
+                
+                <div class="business-card">
+                    <i class="fas fa-warehouse"></i>
+                    <h3>Warehouse</h3>
+                    <p>1 no British Indian Street<br>Kolkata, West Bengal 700069</p>
+                </div>
+                
+                <div class="business-card">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <h3>Business Details</h3>
+                    <p>GSTIN: 19ANOPD3300R1ZO<br>Established: 2020</p>
+                </div>
+            </div>
+            
+            <div class="brand-logos">
+                <div class="brand-logo">TVS</div>
+                <div class="brand-logo">STL</div>
+                <div class="brand-logo">VRP</div>
+                <div class="brand-logo">OEM</div>
+            </div>
+        </section>
+
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="search-input" placeholder="Search by part number or description...">
+        </div>
+
+        <section id="products" class="section">
+            <h2 class="section-title">Our Products</h2>
+            <div class="gallery">
+                <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>
+            </div>
+        </section>
+
+        <div id="cart-sidebar">
+            <button class="close-cart"><i class="fas fa-times"></i></button>
+            <h2><i class="fas fa-shopping-cart"></i> Your Cart</h2>
+            <div id="cart-items"></div>
+            <div class="cart-actions">
+                <div class="cart-summary">
+                    <div class="summary-row total-row">
+                        <span>Total (incl. GST):</span>
+                        <span>₹<span id="cart-total">0.00</span></span>
+                    </div>
+                </div>
+                <div class="terms-agreement">
+                    <input type="checkbox" id="agree-terms" required>
+                    <label for="agree-terms">I agree to the <a href="#" style="color: var(--accent);">Terms & Conditions</a></label>
+                </div>
+                <button class="btn buy btn-block" onclick="checkout()"><i class="fas fa-credit-card"></i> Checkout</button>
+                <button class="btn btn-block" onclick="sendOrderEmail()" style="background: #6c757d; margin-top: 10px;"><i class="fas fa-envelope"></i> Email Order</button>
+            </div>
+        </div>
+
+        <section id="contact" class="section">
+            <h2 class="section-title">Get In Touch</h2>
+            <div class="contact-grid">
+                <div class="contact-info">
+                    <h3><i class="fas fa-phone-alt"></i> Contact Details</h3>
+                    <p><i class="fas fa-phone"></i> +91 98303 00193</p>
+                    <p><i class="fas fa-envelope"></i> contact@autosparessolution.com</p>
+                    <p><i class="fas fa-clock"></i> Mon-Sat: 9:00 AM - 7:00 PM</p>
+                    
+                    <h3 style="margin-top: 1.5rem;"><i class="fas fa-file-invoice"></i> Business Information</h3>
+                    <p><i class="fas fa-id-card"></i> GSTIN: 19ANOPD3300R1ZO</p>
+                    
+                    <div class="social-links">
+                        <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+                        <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
+                        <a href="https://wa.me/919830300193" title="WhatsApp" target="_blank"><i class="fab fa-whatsapp"></i></a>
+                    </div>
+                </div>
+                
+                <div>
+                    <form id="contact-form">
+                        <div class="form-group">
+                            <label for="name">Your Name</label>
+                            <input type="text" id="name" class="form-control" placeholder="Enter your name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <input type="email" id="email" class="form-control" placeholder="Enter your email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="phone">Phone Number</label>
+                            <input type="tel" id="phone" class="form-control" placeholder="Enter your phone number" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="city">City</label>
+                            <input type="text" id="city" class="form-control" placeholder="Enter your city" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="message">How can we help you?</label>
+                            <textarea id="message" class="form-control" placeholder="Describe your requirements" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-block" style="background: var(--primary);"><i class="fas fa-paper-plane"></i> Send Message</button>
+                    </form>
+                </div>
+            </div>
+        </section>
     </div>
-  </footer>
 
-  <div class="toast" id="toast">
-    <i class="fas fa-check-circle"></i>
-    <span id="toast-message">Product added to cart!</span>
-  </div>
+    <footer>
+        <div class="footer-content">
+            <div class="footer-column">
+                <h3>Auto Spares Solution</h3>
+                <p>Your trusted partner for premium automobile spare parts since 2020.</p>
+                <p><i class="fas fa-map-marker-alt"></i> Office: 101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+                <p><i class="fas fa-warehouse"></i> Warehouse: 1 no British Indian Street, Kolkata, WB 700069</p>
+            </div>
+            
+            <div class="footer-column">
+                <h3>Quick Links</h3>
+                <ul class="footer-links">
+                    <li><a href="#home"><i class="fas fa-chevron-right"></i> Home</a></li>
+                    <li><a href="#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
+                    <li><a href="#products"><i class="fas fa-chevron-right"></i> Products</a></li>
+                    <li><a href="#contact"><i class="fas fa-chevron-right"></i> Contact</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-column">
+                <h3>Policy</h3>
+                <ul class="footer-links">
+                    <li><a href="#"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
+                    <li><a href="#"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
+                    <li><a href="#"><i class="fas fa-chevron-right"></i> Return & Refund Policy</a></li>
+                    <li><a href="#"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-column">
+                <h3>Contact Us</h3>
+                <ul class="footer-links">
+                    <li><a href="tel:+919830300193"><i class="fas fa-phone"></i> +91 98303 00193</a></li>
+                    <li><a href="mailto:contact@autosparessolution.com"><i class="fas fa-envelope"></i> contact@autosparessolution.com</a></li>
+                </ul>
+                <div class="social-links">
+                    <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
+                    <a href="https://wa.me/919830300193" title="WhatsApp" target="_blank"><i class="fab fa-whatsapp"></i></a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="copyright">
+            <p>&copy; 2025 Auto Spares Solution. All Rights Reserved. | GSTIN: 19ANOPD3300R1ZO</p>
+        </div>
+    </footer>
 
-  <script>
-    // Initialize variables
-    let productsData = [];
-    let filteredProducts = [];
-    let cart = [];
-    const fixedProducts = [
-      "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
-      "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-      "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
-      "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
-      "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
-      "M07520-0200"
-    ];
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toast-message">Product added to cart!</span>
+    </div>
 
-    // DOM elements
-    const cartLink = document.getElementById("cart-link");
-    const cartSidebar = document.getElementById("cart-sidebar");
-    const closeCartBtn = document.querySelector(".close-cart");
-    const toast = document.getElementById("toast");
-    const toastMessage = document.getElementById("toast-message");
+    <script>
+        // Initialize variables
+        let productsData = [];
+        let filteredProducts = [];
+        let cart = [];
+        const fixedProducts = [
+            "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
+            "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
+            "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+            "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+            "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
+            "M07520-0200"
+        ];
 
-    // Initialize cart toggle
-    cartLink.addEventListener("click", (e) => {
-      e.preventDefault();
-      cartSidebar.classList.toggle("active");
-    });
+        // DOM elements
+        const cartLink = document.getElementById("cart-link");
+        const cartSidebar = document.getElementById("cart-sidebar");
+        const closeCartBtn = document.querySelector(".close-cart");
+        const toast = document.getElementById("toast");
+        const toastMessage = document.getElementById("toast-message");
 
-    // Close cart sidebar
-    closeCartBtn.addEventListener("click", () => {
-      cartSidebar.classList.remove("active");
-    });
+        // Initialize cart toggle
+        cartLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            cartSidebar.classList.toggle("active");
+        });
 
-    // Show toast message
-    function showToast(message, isError = false) {
-      toastMessage.textContent = message;
-      toast.classList.remove("error");
-      if (isError) toast.classList.add("error");
-      toast.classList.add("show");
-      
-      setTimeout(() => {
-        toast.classList.remove("show");
-      }, 3000);
-    }
+        // Close cart sidebar
+        closeCartBtn.addEventListener("click", () => {
+            cartSidebar.classList.remove("active");
+        });
 
-    // Search functionality
-    document.getElementById("search-input").addEventListener("input", (e) => {
-      const searchTerm = e.target.value.toLowerCase();
-      if (searchTerm === '') {
-        // When search is empty, show only in-stock items
-        filteredProducts = productsData.filter(product => product.stock > 0);
-      } else {
-        // When searching, show all matching products regardless of stock
-        filteredProducts = productsData.filter(product => 
-          product.part.toLowerCase().includes(searchTerm) || 
-          (product.desc && product.desc.toLowerCase().includes(searchTerm))
-        );
-      }
-      displayProducts();
-    });
+        // Show toast message
+        function showToast(message, isError = false) {
+            toastMessage.textContent = message;
+            toast.classList.remove("error");
+            if (isError) toast.classList.add("error");
+            toast.classList.add("show");
+            
+            setTimeout(() => {
+                toast.classList.remove("show");
+            }, 3000);
+        }
 
-    // Load product data from CSV
-    function loadProducts() {
-      fetch("prices.csv")
-        .then(res => res.text())
-        .then(csv => {
-          const rows = csv.split("\n").slice(1); // Skip header
-          
-          productsData = rows.map(r => {
-            const cols = r.split(",");
-            return {
-              part: cols[0]?.trim(),
-              desc: cols[1]?.trim() || "Auto Spare Part",
-              price: parseFloat(cols[6] || 0),
-              stock: parseInt(cols[7] || 0),
-              boxQty: parseInt(cols[8] || 1), // Box quantity
-              masterCarton: parseInt(cols[9] || 1) // Master carton quantity
-            };
-          }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
-
-          // Add fixed products that might not be in CSV
-          fixedProducts.forEach(part => {
-            if (!productsData.some(p => p.part === part)) {
-              productsData.push({
-                part,
-                desc: "Auto Spare Part",
-                price: 0,
-                stock: 0,
-                boxQty: 1,
-                masterCarton: 1
-              });
+        // Search functionality
+        document.getElementById("search-input").addEventListener("input", (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            if (searchTerm === '') {
+                // When search is empty, show only in-stock items
+                filteredProducts = productsData.filter(product => product.stock > 0);
+            } else {
+                // When searching, show all matching products regardless of stock
+                filteredProducts = productsData.filter(product => 
+                    product.part.toLowerCase().includes(searchTerm) || 
+                    (product.desc && product.desc.toLowerCase().includes(searchTerm))
+                );
             }
-          });
-          
-          // Initialize with only in-stock items shown by default
-          filteredProducts = productsData.filter(product => product.stock > 0);
-          displayProducts();
-        })
-        .catch(err => {
-          console.error("Error loading CSV:", err);
-          // Fallback to fixed products with default values
-          productsData = fixedProducts.map(part => ({
-            part,
-            desc: "Auto Spare Part",
-            price: 0,
-            stock: 0,
-            boxQty: 1,
-            masterCarton: 1
-          }));
-          filteredProducts = [...productsData];
-          displayProducts();
-          showToast("Error loading product data. Using fallback data.", true);
+            displayProducts();
         });
-    }
 
-    // Display filtered products
-    function displayProducts() {
-      const gallery = document.getElementById("products");
-      gallery.innerHTML = "";
-      
-      if (filteredProducts.length === 0) {
-        gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
-        return;
-      }
-      
-      filteredProducts.forEach(product => {
-        const isInStock = product.stock > 0;
-        const isInSystem = productsData.some(p => p.part === product.part);
+        // Load product data from CSV
+        function loadProducts() {
+            // Simulating CSV data fetch
+            setTimeout(() => {
+                // This is mock data - in production, you would fetch prices.csv
+                productsData = fixedProducts.map(part => ({
+                    part,
+                    desc: "High-quality auto spare part",
+                    price: Math.floor(Math.random() * 1000) + 100,
+                    stock: Math.floor(Math.random() * 50),
+                    boxQty: Math.floor(Math.random() * 10) + 1,
+                    masterCarton: Math.floor(Math.random() * 20) + 5
+                }));
+                
+                // Initialize with only in-stock items shown by default
+                filteredProducts = productsData.filter(product => product.stock > 0);
+                displayProducts();
+            }, 1000);
+        }
+
+        // Display filtered products
+        function displayProducts() {
+            const gallery = document.getElementById("products");
+            gallery.innerHTML = "";
+            
+            if (filteredProducts.length === 0) {
+                gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
+                return;
+            }
+            
+            filteredProducts.forEach(product => {
+                const isInStock = product.stock > 0;
+                const isInSystem = productsData.some(p => p.part === product.part);
+                
+                gallery.insertAdjacentHTML('beforeend', `
+                    <div class="card" data-part="${product.part}">
+                        ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
+                            (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
+                        
+                        <img src="https://via.placeholder.com/300x200/0f2027/ffffff?text=${product.part}" alt="${product.part}">
+                        
+                        <div class="part-number">${product.part}</div>
+                        <div class="part-desc">${product.desc}</div>
+                        <div class="price">₹${product.price.toFixed(2)}</div>
+                        
+                        <div class="stock-info">
+                            <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
+                            ${isInStock ? `
+                                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
+                                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
+                            ` : ''}
+                        </div>
+                        
+                        ${isInStock ? `
+                            <div style="margin-top: 0.5rem;">
+                                <input class="qty-input" type="number" value="1" min="1" max="${product.stock}" 
+                                       onchange="updateProductQty('${product.part}', this.value)">
+                                <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">
+                                    <i class="fas fa-cart-plus"></i> Add to Cart
+                                </button>
+                            </div>
+                        ` : ''}
+                        
+                        <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
+                            <i class="fab fa-whatsapp"></i> ${isInStock ? 'Enquire' : 'Notify Me'}
+                        </a>
+                    </div>
+                `);
+            });
+        }
+
+        // Update product quantity in the product card
+        function updateProductQty(part, qty) {
+            const card = document.querySelector(`.card[data-part="${part}"]`);
+            if (card) {
+                const input = card.querySelector('.qty-input');
+                if (input) {
+                    input.value = Math.max(1, Math.min(qty, parseInt(input.max)));
+                }
+            }
+        }
+
+        // Cart functions
+        function addToCart(part, price) {
+            const card = document.querySelector(`.card[data-part="${part}"]`);
+            const qtyInput = card ? card.querySelector('.qty-input') : null;
+            const qty = qtyInput ? parseInt(qtyInput.value) : 1;
+            
+            const existing = cart.find(item => item.part === part);
+            if (existing) {
+                existing.qty += qty;
+            } else {
+                const product = productsData.find(p => p.part === part);
+                cart.push({ 
+                    part, 
+                    price, 
+                    qty,
+                    desc: product?.desc || "Auto Spare Part",
+                    boxQty: product?.boxQty || 1,
+                    masterCarton: product?.masterCarton || 1
+                });
+            }
+            
+            updateCartUI();
+            showToast(`${part} added to cart!`);
+        }
+
+        function updateCartUI() {
+            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+            document.getElementById("cart-count").textContent = cartCount;
+            
+            const itemsDiv = document.getElementById("cart-items");
+            let total = 0;
+            
+            if (cart.length === 0) {
+                itemsDiv.innerHTML = `
+                    <div class="empty-cart">
+                        <i class="fas fa-shopping-cart"></i>
+                        <h3>Your cart is empty</h3>
+                        <p>Add products to your cart to continue</p>
+                    </div>
+                `;
+            } else {
+                itemsDiv.innerHTML = "";
+                cart.forEach(item => {
+                    const itemTotal = item.price * item.qty;
+                    total += itemTotal;
+                    
+                    itemsDiv.innerHTML += `
+                        <div class="cart-item" data-part="${item.part}">
+                            <div class="cart-item-info">
+                                <div class="cart-item-title">${item.part}</div>
+                                <div class="cart-item-desc">${item.desc}</div>
+                                <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
+                            </div>
+                            <div class="qty-control">
+                                <button onclick="changeQty('${item.part}', -1)">-</button>
+                                <input class="qty-input" type="number" value="${item.qty}" min="1" 
+                                       onchange="updateCartItemQty('${item.part}', this.value)">
+                                <button onclick="changeQty('${item.part}', 1)">+</button>
+                                <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
+                                <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            document.getElementById("cart-total").textContent = total.toFixed(2);
+        }
+
+        function changeQty(part, delta) {
+            const item = cart.find(i => i.part === part);
+            if (!item) return;
+            
+            item.qty += delta;
+            if (item.qty <= 0) {
+                cart = cart.filter(i => i.part !== part);
+                showToast(`${part} removed from cart`);
+            } else {
+                // Ensure we don't exceed available stock
+                const product = productsData.find(p => p.part === part);
+                if (product) {
+                    item.qty = Math.min(item.qty, product.stock);
+                }
+            }
+            updateCartUI();
+        }
+
+        function updateCartItemQty(part, qty) {
+            const item = cart.find(i => i.part === part);
+            if (!item) return;
+            
+            qty = parseInt(qty) || 1;
+            // Ensure we don't exceed available stock
+            const product = productsData.find(p => p.part === part);
+            if (product) {
+                qty = Math.min(qty, product.stock);
+            }
+            
+            item.qty = Math.max(1, qty);
+            updateCartUI();
+        }
         
-        gallery.insertAdjacentHTML('beforeend', `
-          <div class="card" data-part="${product.part}">
-            ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
-              (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
-            
-            <img src="images/${product.part}.png" alt="${product.part}" 
-                 onerror="this.src='images/default.png';this.onerror=null;">
-            
-            <div class="part-number">${product.part}</div>
-            <div class="part-desc">${product.desc}</div>
-            <div class="price">${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
-            
-            <div class="stock-info">
-              <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
-              ${isInStock ? `
-                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
-                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
-              ` : ''}
-            </div>
-            
-            ${isInStock ? `
-              <div style="margin-top: 0.5rem;">
-                <input class="qty-input" type="number" value="1" min="1" max="${product.stock}" 
-                       onchange="updateProductQty('${product.part}', this.value)">
-                <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">
-                  <i class="fas fa-cart-plus"></i> Add to Cart
-                </button>
-              </div>
-            ` : ''}
-            
-            <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
-              <i class="fab fa-whatsapp"></i> ${isInStock ? 'Enquire' : 'Notify Me'}
-            </a>
-          </div>
-        `);
-      });
-    }
-
-    // Update product quantity in the product card
-    function updateProductQty(part, qty) {
-      const card = document.querySelector(`.card[data-part="${part}"]`);
-      if (card) {
-        const input = card.querySelector('.qty-input');
-        if (input) {
-          input.value = Math.max(1, Math.min(qty, parseInt(input.max)));
+        function removeFromCart(part) {
+            cart = cart.filter(i => i.part !== part);
+            updateCartUI();
+            showToast(`${part} removed from cart`);
         }
-      }
-    }
 
-    // Cart functions
-    function addToCart(part, price) {
-      const card = document.querySelector(`.card[data-part="${part}"]`);
-      const qtyInput = card ? card.querySelector('.qty-input') : null;
-      const qty = qtyInput ? parseInt(qtyInput.value) : 1;
-      
-      const existing = cart.find(item => item.part === part);
-      if (existing) {
-        existing.qty += qty;
-      } else {
-        const product = productsData.find(p => p.part === part);
-        cart.push({ 
-          part, 
-          price, 
-          qty,
-          desc: product?.desc || "Auto Spare Part",
-          boxQty: product?.boxQty || 1,
-          masterCarton: product?.masterCarton || 1
+        function checkout() {
+            if (!document.getElementById("agree-terms").checked) {
+                showToast("Please agree to the Terms & Conditions", true);
+                return;
+            }
+            
+            const totalAmount = cart.reduce((sum, i) => sum + i.price * i.qty, 0) * 100;
+            if (totalAmount <= 0) {
+                showToast("Your cart is empty", true);
+                return;
+            }
+            
+            const options = {
+                key: "rzp_live_90iWxpNYThOpyE",
+                amount: totalAmount,
+                currency: "INR",
+                name: "Auto Spares Solution",
+                description: "Purchase (Prices include 18% GST)",
+                handler: function(response) {
+                    showToast("Payment Successful! Order confirmed.");
+                    sendOrderConfirmation(response.razorpay_payment_id);
+                    cart = [];
+                    updateCartUI();
+                    cartSidebar.classList.remove("active");
+                },
+                prefill: {
+                    name: "Customer Name",
+                    email: "customer@example.com",
+                    contact: "9999999999"
+                },
+                theme: {
+                    color: "#0a7c71"
+                }
+            };
+            
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+
+        function sendOrderConfirmation(paymentId) {
+            // In a real implementation, you would send this to your server
+            console.log("Order confirmation would be sent for payment:", paymentId);
+            console.log("Order details:", cart);
+            
+            // Generate PDF
+            generateOrderPDF(paymentId);
+            
+            // Generate Excel
+            generateOrderExcel(paymentId);
+        }
+
+        function generateOrderPDF(paymentId) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Header
+            doc.setFontSize(18);
+            doc.text('Auto Spares Solution', 105, 15, null, null, 'center');
+            doc.setFontSize(12);
+            doc.text('Office: 101, 1st floor, 57/5, Q Road, Howrah, WB 711108', 105, 22, null, null, 'center');
+            doc.text('Warehouse: 1 no British Indian Street, Kolkata, WB 700069', 105, 28, null, null, 'center');
+            doc.text('GSTIN: 19ANOPD3300R1ZO', 105, 34, null, null, 'center');
+            
+            // Order details
+            doc.setFontSize(16);
+            doc.text('Order Confirmation', 105, 45, null, null, 'center');
+            doc.setFontSize(12);
+            doc.text(`Order Date: ${new Date().toLocaleString()}`, 10, 55);
+            doc.text(`Payment ID: ${paymentId}`, 10, 62);
+            
+            doc.setFontSize(14);
+            doc.text('Order Items:', 10, 72);
+            
+            let y = 80;
+            doc.setFontSize(12);
+            cart.forEach(item => {
+                doc.text(`${item.part} - ${item.desc}`, 10, y);
+                doc.text(`Qty: ${item.qty} | Box: ${item.boxQty} | Carton: ${item.masterCarton}`, 10, y + 5);
+                doc.text(`Price: ₹${item.price.toFixed(2)} each | Total: ₹${(item.qty * item.price).toFixed(2)}`, 10, y + 10);
+                y += 20;
+            });
+            
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            doc.setFontSize(14);
+            doc.text(`Total Amount (incl. GST): ₹${total.toFixed(2)}`, 10, y + 10);
+            
+            // Footer
+            doc.setFontSize(10);
+            doc.text('Terms: 1. Goods once sold will not be taken back. 2. Interest @24% on bills unpaid after 30 days.', 105, doc.internal.pageSize.height - 10, null, null, 'center');
+            
+            doc.save(`order_${paymentId}.pdf`);
+        }
+
+        function generateOrderExcel(paymentId) {
+            const wb = XLSX.utils.book_new();
+            
+            // Prepare order data
+            const orderData = cart.map(item => ({
+                'Part Number': item.part,
+                'Description': item.desc,
+                'Quantity': item.qty,
+                'Box Quantity': item.boxQty,
+                'Master Carton': item.masterCarton,
+                'Unit Price': item.price,
+                'Total': (item.qty * item.price).toFixed(2)
+            }));
+            
+            // Add total row
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            orderData.push({
+                'Part Number': 'TOTAL (incl. GST)',
+                'Description': '',
+                'Quantity': '',
+                'Box Quantity': '',
+                'Master Carton': '',
+                'Unit Price': '',
+                'Total': total.toFixed(2)
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(orderData);
+            XLSX.utils.book_append_sheet(wb, ws, "Order");
+            
+            XLSX.writeFile(wb, `order_${paymentId}.xlsx`);
+        }
+
+        function sendOrderEmail() {
+            if (cart.length === 0) {
+                showToast("Your cart is empty", true);
+                return;
+            }
+            
+            const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
+            let body = "Please find below my order details:\n\n";
+            
+            cart.forEach(item => {
+                body += `${item.part} - ${item.desc}\n`;
+                body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
+                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
+            });
+            
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            body += `\nTotal Amount: ₹${total.toFixed(2)}\n\n`;
+            body += "Please confirm availability and provide payment instructions.\n\n";
+            body += "Regards,\n[Your Name]";
+            
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        }
+
+        // Contact form submission
+        document.getElementById("contact-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById("name").value;
+            const email = document.getElementById("email").value;
+            const phone = document.getElementById("phone").value;
+            const city = document.getElementById("city").value;
+            const message = document.getElementById("message").value;
+            
+            const subject = `Contact Form Submission from ${name}`;
+            const body = `Name: ${name}%0AEmail: ${email}%0APhone: ${phone}%0ACity: ${city}%0AMessage: ${message}`;
+            
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            
+            // Reset the form
+            this.reset();
+            showToast("Your message has been sent. We'll contact you soon!");
         });
-      }
-      
-      updateCartUI();
-      showToast(`${part} added to cart!`);
-    }
 
-    function updateCartUI() {
-      const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
-      document.getElementById("cart-count").textContent = cartCount;
-      
-      const itemsDiv = document.getElementById("cart-items");
-      let total = 0;
-      
-      if (cart.length === 0) {
-        itemsDiv.innerHTML = `
-          <div class="empty-cart">
-            <i class="fas fa-shopping-cart"></i>
-            <h3>Your cart is empty</h3>
-            <p>Add products to your cart to continue</p>
-          </div>
-        `;
-      } else {
-        itemsDiv.innerHTML = "";
-        cart.forEach(item => {
-          const itemTotal = item.price * item.qty;
-          total += itemTotal;
-          
-          itemsDiv.innerHTML += `
-            <div class="cart-item" data-part="${item.part}">
-              <div class="cart-item-info">
-                <div class="cart-item-title">${item.part}</div>
-                <div class="cart-item-desc">${item.desc}</div>
-                <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
-              </div>
-              <div class="qty-control">
-                <button onclick="changeQty('${item.part}', -1)">-</button>
-                <input class="qty-input" type="number" value="${item.qty}" min="1" 
-                       onchange="updateCartItemQty('${item.part}', this.value)">
-                <button onclick="changeQty('${item.part}', 1)">+</button>
-                <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
-                <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
-              </div>
-            </div>
-          `;
-        });
-      }
-      
-      const subtotal = total;
-      const tax = subtotal * 0.18;
-      const totalWithTax = subtotal + tax;
-      
-      document.getElementById("cart-subtotal").textContent = subtotal.toFixed(2);
-      document.getElementById("cart-tax").textContent = tax.toFixed(2);
-      document.getElementById("cart-total").textContent = totalWithTax.toFixed(2);
-    }
-
-    function changeQty(part, delta) {
-      const item = cart.find(i => i.part === part);
-      if (!item) return;
-      
-      item.qty += delta;
-      if (item.qty <= 0) {
-        cart = cart.filter(i => i.part !== part);
-        showToast(`${part} removed from cart`);
-      } else {
-        // Ensure we don't exceed available stock
-        const product = productsData.find(p => p.part === part);
-        if (product) {
-          item.qty = Math.min(item.qty, product.stock);
-        }
-      }
-      updateCartUI();
-    }
-
-    function updateCartItemQty(part, qty) {
-      const item = cart.find(i => i.part === part);
-      if (!item) return;
-      
-      qty = parseInt(qty) || 1;
-      // Ensure we don't exceed available stock
-      const product = productsData.find(p => p.part === part);
-      if (product) {
-        qty = Math.min(qty, product.stock);
-      }
-      
-      item.qty = Math.max(1, qty);
-      updateCartUI();
-    }
-    
-    function removeFromCart(part) {
-      cart = cart.filter(i => i.part !== part);
-      updateCartUI();
-      showToast(`${part} removed from cart`);
-    }
-
-    function checkout() {
-      const totalAmount = cart.reduce((sum, i) => sum + i.price * i.qty, 0) * 100;
-      if (totalAmount <= 0) {
-        showToast("Your cart is empty", true);
-        return;
-      }
-      
-      const options = {
-        key: "rzp_live_90iWxpNYThOpyE",
-        amount: totalAmount,
-        currency: "INR",
-        name: "Auto Spares Solution",
-        description: "Purchase",
-        handler: function(response) {
-          showToast("Payment Successful! Order confirmed.");
-          sendOrderConfirmation(response.razorpay_payment_id);
-          cart = [];
-          updateCartUI();
-          cartSidebar.classList.remove("active");
-        },
-        prefill: {
-          name: "Customer Name",
-          email: "customer@example.com",
-          contact: "9999999999"
-        },
-        theme: {
-          color: "#0a7c71"
-        }
-      };
-      
-      const rzp = new Razorpay(options);
-      rzp.open();
-    }
-
-    function sendOrderConfirmation(paymentId) {
-      // In a real implementation, you would send this to your server
-      console.log("Order confirmation would be sent for payment:", paymentId);
-      console.log("Order details:", cart);
-      
-      // Generate PDF
-      generateOrderPDF(paymentId);
-      
-      // Generate Excel
-      generateOrderExcel(paymentId);
-    }
-
-    function generateOrderPDF(paymentId) {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      
-      doc.setFontSize(18);
-      doc.text('Auto Spares Solution - Order Confirmation', 10, 15);
-      doc.setFontSize(12);
-      doc.text(`Order Date: ${new Date().toLocaleString()}`, 10, 25);
-      doc.text(`Payment ID: ${paymentId}`, 10, 35);
-      
-      doc.setFontSize(14);
-      doc.text('Order Items:', 10, 45);
-      
-      let y = 55;
-      doc.setFontSize(12);
-      cart.forEach(item => {
-        doc.text(`${item.part} - ${item.desc}`, 10, y);
-        doc.text(`Qty: ${item.qty} (Box: ${item.boxQty}, Carton: ${item.masterCarton})`, 10, y + 5);
-        doc.text(`Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.qty * item.price).toFixed(2)}`, 150, y);
-        y += 15;
-      });
-      
-      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      doc.setFontSize(14);
-      doc.text(`Total Amount: ₹${total.toFixed(2)}`, 10, y + 10);
-      
-      doc.save(`order_${paymentId}.pdf`);
-    }
-
-    function generateOrderExcel(paymentId) {
-      const wb = XLSX.utils.book_new();
-      
-      // Prepare order data
-      const orderData = cart.map(item => ({
-        'Part Number': item.part,
-        'Description': item.desc,
-        'Quantity': item.qty,
-        'Box Quantity': item.boxQty,
-        'Master Carton': item.masterCarton,
-        'Unit Price': item.price,
-        'Total': (item.qty * item.price).toFixed(2)
-      }));
-      
-      // Add total row
-      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      orderData.push({
-        'Part Number': 'TOTAL',
-        'Description': '',
-        'Quantity': '',
-        'Box Quantity': '',
-        'Master Carton': '',
-        'Unit Price': '',
-        'Total': total.toFixed(2)
-      });
-      
-      const ws = XLSX.utils.json_to_sheet(orderData);
-      XLSX.utils.book_append_sheet(wb, ws, "Order");
-      
-      XLSX.writeFile(wb, `order_${paymentId}.xlsx`);
-    }
-
-    function sendOrderEmail() {
-      if (cart.length === 0) {
-        showToast("Your cart is empty", true);
-        return;
-      }
-      
-      const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
-      let body = "Please find below my order details:\n\n";
-      
-      cart.forEach(item => {
-        body += `${item.part} - ${item.desc}\n`;
-        body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
-        body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
-      });
-      
-      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      body += `\nTotal Amount: ₹${total.toFixed(2)}\n\n`;
-      body += "Please confirm availability and provide payment instructions.\n\n";
-      body += "Regards,\n[Your Name]";
-      
-      window.location.href = `mailto:autosparessolution@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    }
-
-    // Contact form submission
-    document.getElementById("contact-form").addEventListener("submit", function(e) {
-      e.preventDefault();
-      
-      const name = document.getElementById("name").value;
-      const email = document.getElementById("email").value;
-      const phone = document.getElementById("phone").value;
-      const city = document.getElementById("city").value;
-      const message = document.getElementById("message").value;
-      
-      const subject = `Contact Form Submission from ${name}`;
-      const body = `Name: ${name}%0AEmail: ${email}%0APhone: ${phone}%0ACity: ${city}%0AMessage: ${message}`;
-      
-      window.location.href = `mailto:autosparessolution@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      
-      // Reset the form
-      this.reset();
-      showToast("Your message has been sent. We'll contact you soon!");
-    });
-
-    // Initialize the page
-    loadProducts();
-  </script>
+        // Initialize the page
+        loadProducts();
+    </script>
 </body>
 </html>
