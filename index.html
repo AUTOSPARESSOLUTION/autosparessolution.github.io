@@ -1035,22 +1035,56 @@
 
         // Load product data from CSV
         function loadProducts() {
-            // Simulating CSV data fetch
-            setTimeout(() => {
-                // This is mock data - in production, you would fetch prices.csv
-                productsData = fixedProducts.map(part => ({
-                    part,
-                    desc: "High-quality auto spare part",
-                    price: Math.floor(Math.random() * 1000) + 100,
-                    stock: Math.floor(Math.random() * 50),
-                    boxQty: Math.floor(Math.random() * 10) + 1,
-                    masterCarton: Math.floor(Math.random() * 20) + 5
-                }));
-                
-                // Initialize with only in-stock items shown by default
-                filteredProducts = productsData.filter(product => product.stock > 0);
-                displayProducts();
-            }, 1000);
+            fetch("prices.csv")
+                .then(res => res.text())
+                .then(csv => {
+                    const rows = csv.split("\n").slice(1); // Skip header
+                    
+                    productsData = rows.map(r => {
+                        const cols = r.split(",");
+                        return {
+                            part: cols[0]?.trim(),
+                            desc: cols[1]?.trim() || "Auto Spare Part",
+                            price: parseFloat(cols[6] || 0),
+                            stock: parseInt(cols[7] || 0),
+                            boxQty: parseInt(cols[8] || 1), // Box quantity
+                            masterCarton: parseInt(cols[9] || 1) // Master carton quantity
+                        };
+                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
+
+                    // Add fixed products that might not be in CSV
+                    fixedProducts.forEach(part => {
+                        if (!productsData.some(p => p.part === part)) {
+                            productsData.push({
+                                part,
+                                desc: "Auto Spare Part",
+                                price: 0,
+                                stock: 0,
+                                boxQty: 1,
+                                masterCarton: 1
+                            });
+                        }
+                    });
+                    
+                    // Initialize with only in-stock items shown by default
+                    filteredProducts = productsData.filter(product => product.stock > 0);
+                    displayProducts();
+                })
+                .catch(err => {
+                    console.error("Error loading CSV:", err);
+                    // Fallback to fixed products with default values
+                    productsData = fixedProducts.map(part => ({
+                        part,
+                        desc: "Auto Spare Part",
+                        price: 0,
+                        stock: 0,
+                        boxQty: 1,
+                        masterCarton: 1
+                    }));
+                    filteredProducts = [...productsData];
+                    displayProducts();
+                    showToast("Error loading product data. Using fallback data.", true);
+                });
         }
 
         // Display filtered products
@@ -1072,11 +1106,12 @@
                         ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
                             (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
                         
-                        <img src="https://via.placeholder.com/300x200/0f2027/ffffff?text=${product.part}" alt="${product.part}">
+                        <img src="images/${product.part}.png" alt="${product.part}" 
+                             onerror="this.src='images/default.png';this.onerror=null;">
                         
                         <div class="part-number">${product.part}</div>
                         <div class="part-desc">${product.desc}</div>
-                        <div class="price">₹${product.price.toFixed(2)}</div>
+                        <div class="price">${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
                         
                         <div class="stock-info">
                             <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
