@@ -772,20 +772,6 @@
                 gap: 0.8rem;
             }
         }
-        
-        /* Search status indicator */
-        .search-status {
-            text-align: center;
-            padding: 1rem;
-            color: #f1c40f;
-            font-size: 0.9rem;
-            display: none;
-        }
-        
-        /* Optimized for search performance */
-        .card[data-indexed] {
-            transition: transform 0.2s ease;
-        }
     </style>
 </head>
 <body>
@@ -856,13 +842,10 @@
             <i class="fas fa-search search-icon"></i>
             <input type="text" id="search-input" placeholder="Search by part number or description...">
         </div>
-        <div class="search-status" id="search-status">
-            <i class="fas fa-search"></i> Searching...
-        </div>
 
         <section id="products" class="section">
             <h2 class="section-title">Our Products</h2>
-            <div class="gallery" id="products-gallery">
+            <div class="gallery">
                 <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>
             </div>
         </section>
@@ -1004,20 +987,12 @@
             "M07520-0200"
         ];
 
-        // Search optimization variables
-        let searchIndex = {};
-        let searchCache = {};
-        let searchTimeout = null;
-        const DEBOUNCE_TIME = 300; // milliseconds
-
         // DOM elements
         const cartLink = document.getElementById("cart-link");
         const cartSidebar = document.getElementById("cart-sidebar");
         const closeCartBtn = document.querySelector(".close-cart");
         const toast = document.getElementById("toast");
         const toastMessage = document.getElementById("toast-message");
-        const searchStatus = document.getElementById("search-status");
-        const productsGallery = document.getElementById("products-gallery");
 
         // Initialize cart toggle
         cartLink.addEventListener("click", (e) => {
@@ -1042,170 +1017,97 @@
             }, 3000);
         }
 
-        // Preprocess and create search index
-        function createSearchIndex(products) {
-            const index = {};
-            
-            products.forEach((product, index) => {
-                // Add to index by part number
-                const partNormalized = product.part.toLowerCase();
-                if (!index[partNormalized]) {
-                    index[partNormalized] = [];
-                }
-                index[partNormalized].push(index);
-                
-                // Add to index by description words
-                const descWords = (product.desc || "Auto Spare Part").toLowerCase().split(/\s+/);
-                descWords.forEach(word => {
-                    if (word.length < 3) return; // Skip short words
-                    if (!index[word]) {
-                        index[word] = [];
-                    }
-                    if (!index[word].includes(index)) {
-                        index[word].push(index);
-                    }
-                });
-            });
-            
-            return index;
-        }
-
-        // Optimized search function
-        function searchProducts(term) {
-            if (!term) {
-                return productsData.filter(product => product.stock > 0);
-            }
-            
-            // Check cache first
-            if (searchCache[term]) {
-                return searchCache[term];
-            }
-            
-            const normalizedTerm = term.toLowerCase();
-            const termWords = normalizedTerm.split(/\s+/);
-            const resultSet = new Set();
-            
-            // Search for exact matches first
-            if (searchIndex[normalizedTerm]) {
-                searchIndex[normalizedTerm].forEach(idx => {
-                    resultSet.add(idx);
-                });
-            }
-            
-            // Search for partial matches
-            termWords.forEach(word => {
-                for (const key in searchIndex) {
-                    if (key.includes(word)) {
-                        searchIndex[key].forEach(idx => {
-                            resultSet.add(idx);
-                        });
-                    }
-                }
-            });
-            
-            // Convert set to array of products
-            const results = Array.from(resultSet).map(idx => productsData[idx]);
-            
-            // Cache the results
-            searchCache[term] = results;
-            
-            return results;
-        }
-
-        // Search functionality with debouncing
+        // Search functionality
         document.getElementById("search-input").addEventListener("input", (e) => {
-            const searchTerm = e.target.value.trim();
-            
-            // Clear previous timeout
-            if (searchTimeout) {
-                clearTimeout(searchTimeout);
-            }
-            
+            const searchTerm = e.target.value.toLowerCase();
             if (searchTerm === '') {
-                // Show only in-stock items
+                // When search is empty, show only in-stock items
                 filteredProducts = productsData.filter(product => product.stock > 0);
-                displayProducts();
-                searchStatus.style.display = 'none';
             } else {
-                // Show searching indicator
-                searchStatus.innerHTML = `<i class="fas fa-search"></i> Searching for "${searchTerm}"...`;
-                searchStatus.style.display = 'block';
-                
-                // Set debounce timeout
-                searchTimeout = setTimeout(() => {
-                    // Perform optimized search
-                    filteredProducts = searchProducts(searchTerm);
-                    
-                    // Update status
-                    if (filteredProducts.length > 0) {
-                        searchStatus.innerHTML = `<i class="fas fa-check"></i> Found ${filteredProducts.length} products matching "${searchTerm}"`;
-                    } else {
-                        searchStatus.innerHTML = `<i class="fas fa-times"></i> No products found matching "${searchTerm}"`;
-                    }
-                    
-                    // Display results
-                    displayProducts();
-                    
-                    // Hide status after 3 seconds
-                    setTimeout(() => {
-                        searchStatus.style.display = 'none';
-                    }, 3000);
-                }, DEBOUNCE_TIME);
+                // When searching, show all matching products regardless of stock
+                filteredProducts = productsData.filter(product => 
+                    product.part.toLowerCase().includes(searchTerm) || 
+                    (product.desc && product.desc.toLowerCase().includes(searchTerm))
+                );
             }
+            displayProducts();
         });
 
         // Load product data from CSV
         function loadProducts() {
-            // For demo purposes, we'll create mock data
-            // In production, you would fetch your actual CSV file
-            productsData = fixedProducts.map(part => ({
-                part,
-                desc: `${part.replace('-0200', '')} Auto Spare Part`,
-                price: Math.floor(Math.random() * 1000) + 100,
-                stock: Math.floor(Math.random() * 100),
-                boxQty: Math.floor(Math.random() * 10) + 1,
-                masterCarton: Math.floor(Math.random() * 20) + 5
-            }));
-            
-            // Add a few extra products for demonstration
-            for (let i = 1; i <= 10; i++) {
-                productsData.push({
-                    part: `EXTRA-${i}`,
-                    desc: `Extra Auto Part ${i}`,
-                    price: Math.floor(Math.random() * 800) + 50,
-                    stock: Math.floor(Math.random() * 50),
-                    boxQty: Math.floor(Math.random() * 8) + 1,
-                    masterCarton: Math.floor(Math.random() * 15) + 5
+            fetch("prices.csv")
+                .then(res => res.text())
+                .then(csv => {
+                    const rows = csv.split("\n").slice(1); // Skip header
+                    
+                    productsData = rows.map(r => {
+                        const cols = r.split(",");
+                        return {
+                            part: cols[0]?.trim(),
+                            desc: cols[1]?.trim() || "Auto Spare Part",
+                            price: parseFloat(cols[6] || 0),
+                            stock: parseInt(cols[7] || 0),
+                            boxQty: parseInt(cols[8] || 1), // Box quantity
+                            masterCarton: parseInt(cols[9] || 1) // Master carton quantity
+                        };
+                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
+
+                    // Add fixed products that might not be in CSV
+                    fixedProducts.forEach(part => {
+                        if (!productsData.some(p => p.part === part)) {
+                            productsData.push({
+                                part,
+                                desc: "Auto Spare Part",
+                                price: 0,
+                                stock: 0,
+                                boxQty: 1,
+                                masterCarton: 1
+                            });
+                        }
+                    });
+                    
+                    // Initialize with only in-stock items shown by default
+                    filteredProducts = productsData.filter(product => product.stock > 0);
+                    displayProducts();
+                })
+                .catch(err => {
+                    console.error("Error loading CSV:", err);
+                    // Fallback to fixed products with default values
+                    productsData = fixedProducts.map(part => ({
+                        part,
+                        desc: "Auto Spare Part",
+                        price: 0,
+                        stock: 0,
+                        boxQty: 1,
+                        masterCarton: 1
+                    }));
+                    filteredProducts = [...productsData];
+                    displayProducts();
+                    showToast("Error loading product data. Using fallback data.", true);
                 });
-            }
-            
-            // Create search index
-            searchIndex = createSearchIndex(productsData);
-            
-            // Initialize with only in-stock items shown by default
-            filteredProducts = productsData.filter(product => product.stock > 0);
-            displayProducts();
         }
 
         // Display filtered products
         function displayProducts() {
-            productsGallery.innerHTML = "";
+            const gallery = document.getElementById("products");
+            gallery.innerHTML = "";
             
             if (filteredProducts.length === 0) {
-                productsGallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
+                gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
                 return;
             }
             
             filteredProducts.forEach(product => {
                 const isInStock = product.stock > 0;
-                const isInSystem = true; // Always true in this demo
+                const isInSystem = productsData.some(p => p.part === product.part);
                 
-                productsGallery.insertAdjacentHTML('beforeend', `
-                    <div class="card" data-part="${product.part}" data-indexed="true">
+                gallery.insertAdjacentHTML('beforeend', `
+                    <div class="card" data-part="${product.part}">
                         ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
                             (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
                         
-                        <img src="https://via.placeholder.com/300x180/0a7c71/ffffff?text=${product.part}" alt="${product.part}">
+                        <img src="images/${product.part}.png" alt="${product.part}" 
+                             onerror="this.src='images/default.png';this.onerror=null;">
                         
                         <div class="part-number">${product.part}</div>
                         <div class="part-desc">${product.desc}</div>
@@ -1248,7 +1150,7 @@
             }
         }
 
-        // Add to cart
+        // Cart functions
         function addToCart(part, price) {
             const card = document.querySelector(`.card[data-part="${part}"]`);
             const qtyInput = card ? card.querySelector('.qty-input') : null;
@@ -1273,139 +1175,259 @@
             showToast(`${part} added to cart!`);
         }
 
-        // Update cart UI
         function updateCartUI() {
-            const cartItems = document.getElementById("cart-items");
-            const cartCount = document.getElementById("cart-count");
-            const cartTotal = document.getElementById("cart-total");
+            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+            document.getElementById("cart-count").textContent = cartCount;
             
-            // Update cart count
-            cartCount.textContent = cart.reduce((sum, item) => sum + item.qty, 0);
+            const itemsDiv = document.getElementById("cart-items");
+            let total = 0;
             
-            // Update cart items
             if (cart.length === 0) {
-                cartItems.innerHTML = `
+                itemsDiv.innerHTML = `
                     <div class="empty-cart">
                         <i class="fas fa-shopping-cart"></i>
-                        <p>Your cart is empty</p>
+                        <h3>Your cart is empty</h3>
+                        <p>Add products to your cart to continue</p>
                     </div>
                 `;
-                cartTotal.textContent = "0.00";
-                return;
+            } else {
+                itemsDiv.innerHTML = "";
+                cart.forEach(item => {
+                    const itemTotal = item.price * item.qty;
+                    total += itemTotal;
+                    
+                    itemsDiv.innerHTML += `
+                        <div class="cart-item" data-part="${item.part}">
+                            <div class="cart-item-info">
+                                <div class="cart-item-title">${item.part}</div>
+                                <div class="cart-item-desc">${item.desc}</div>
+                                <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
+                            </div>
+                            <div class="qty-control">
+                                <button onclick="changeQty('${item.part}', -1)">-</button>
+                                <input class="qty-input" type="number" value="${item.qty}" min="1" 
+                                       onchange="updateCartItemQty('${item.part}', this.value)">
+                                <button onclick="changeQty('${item.part}', 1)">+</button>
+                                <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
+                                <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
             }
             
-            cartItems.innerHTML = cart.map(item => {
-                const itemTotal = (item.price * item.qty).toFixed(2);
-                return `
-                    <div class="cart-item">
-                        <div class="cart-item-info">
-                            <div class="cart-item-title">${item.part}</div>
-                            <div class="cart-item-desc">${item.desc}</div>
-                            <div class="cart-item-price">₹${item.price.toFixed(2)} x ${item.qty} = ₹${itemTotal}</div>
-                        </div>
-                        <div class="qty-control">
-                            <button onclick="updateCartItemQty('${item.part}', ${item.qty - 1})">-</button>
-                            <input type="number" class="qty-input" value="${item.qty}" min="1" 
-                                   onchange="updateCartItemQty('${item.part}', parseInt(this.value))">
-                            <button onclick="updateCartItemQty('${item.part}', ${item.qty + 1})">+</button>
-                            <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-            
-            // Update cart total
-            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            cartTotal.textContent = total.toFixed(2);
+            document.getElementById("cart-total").textContent = total.toFixed(2);
         }
 
-        // Remove from cart
-        function removeFromCart(part) {
-            cart = cart.filter(item => item.part !== part);
+        function changeQty(part, delta) {
+            const item = cart.find(i => i.part === part);
+            if (!item) return;
+            
+            item.qty += delta;
+            if (item.qty <= 0) {
+                cart = cart.filter(i => i.part !== part);
+                showToast(`${part} removed from cart`);
+            } else {
+                // Ensure we don't exceed available stock
+                const product = productsData.find(p => p.part === part);
+                if (product) {
+                    item.qty = Math.min(item.qty, product.stock);
+                }
+            }
             updateCartUI();
-            showToast(`${part} removed from cart!`);
         }
 
-        // Update cart item quantity
-        function updateCartItemQty(part, newQty) {
-            const item = cart.find(item => item.part === part);
-            if (item) {
-                newQty = Math.max(1, newQty);
-                item.qty = newQty;
-                updateCartUI();
+        function updateCartItemQty(part, qty) {
+            const item = cart.find(i => i.part === part);
+            if (!item) return;
+            
+            qty = parseInt(qty) || 1;
+            // Ensure we don't exceed available stock
+            const product = productsData.find(p => p.part === part);
+            if (product) {
+                qty = Math.min(qty, product.stock);
             }
+            
+            item.qty = Math.max(1, qty);
+            updateCartUI();
+        }
+        
+        function removeFromCart(part) {
+            cart = cart.filter(i => i.part !== part);
+            updateCartUI();
+            showToast(`${part} removed from cart`);
         }
 
-        // Checkout function
         function checkout() {
-            const agreeCheckbox = document.getElementById("agree-terms");
-            if (!agreeCheckbox.checked) {
-                showToast("Please agree to the terms and conditions", true);
+            if (!document.getElementById("agree-terms").checked) {
+                showToast("Please agree to the Terms & Conditions", true);
                 return;
             }
             
-            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            if (total <= 0) {
-                showToast("Cart total must be greater than zero", true);
+            const totalAmount = cart.reduce((sum, i) => sum + i.price * i.qty, 0) * 100;
+            if (totalAmount <= 0) {
+                showToast("Your cart is empty", true);
                 return;
             }
             
-            try {
-                // Simulate payment process
-                showToast("Redirecting to payment gateway...");
-                
-                // Clear cart after successful payment
-                setTimeout(() => {
+            const options = {
+                key: "rzp_live_90iWxpNYThOpyE",
+                amount: totalAmount,
+                currency: "INR",
+                name: "Auto Spares Solution",
+                description: "Purchase (Prices include 18% GST)",
+                handler: function(response) {
+                    showToast("Payment Successful! Order confirmed.");
+                    sendOrderConfirmation(response.razorpay_payment_id);
                     cart = [];
                     updateCartUI();
-                    showToast("Payment successful! Order placed.");
-                }, 2000);
-            } catch (error) {
-                console.error("Checkout error:", error);
-                showToast("Error during checkout. Please try again.", true);
-            }
+                    cartSidebar.classList.remove("active");
+                },
+                prefill: {
+                    name: "Customer Name",
+                    email: "customer@example.com",
+                    contact: "9999999999"
+                },
+                theme: {
+                    color: "#0a7c71"
+                }
+            };
+            
+            const rzp = new Razorpay(options);
+            rzp.open();
         }
 
-        // Send order email
+        function sendOrderConfirmation(paymentId) {
+            // In a real implementation, you would send this to your server
+            console.log("Order confirmation would be sent for payment:", paymentId);
+            console.log("Order details:", cart);
+            
+            // Generate PDF
+            generateOrderPDF(paymentId);
+            
+            // Generate Excel
+            generateOrderExcel(paymentId);
+        }
+
+        function generateOrderPDF(paymentId) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Header
+            doc.setFontSize(18);
+            doc.text('Auto Spares Solution', 105, 15, null, null, 'center');
+            doc.setFontSize(12);
+            doc.text('Office: 101, 1st floor, 57/5, Q Road, Howrah, WB 711108', 105, 22, null, null, 'center');
+            doc.text('Warehouse: 1 no British Indian Street, Kolkata, WB 700069', 105, 28, null, null, 'center');
+            doc.text('GSTIN: 19ANOPD3300R1ZO', 105, 34, null, null, 'center');
+            
+            // Order details
+            doc.setFontSize(16);
+            doc.text('Order Confirmation', 105, 45, null, null, 'center');
+            doc.setFontSize(12);
+            doc.text(`Order Date: ${new Date().toLocaleString()}`, 10, 55);
+            doc.text(`Payment ID: ${paymentId}`, 10, 62);
+            
+            doc.setFontSize(14);
+            doc.text('Order Items:', 10, 72);
+            
+            let y = 80;
+            doc.setFontSize(12);
+            cart.forEach(item => {
+                doc.text(`${item.part} - ${item.desc}`, 10, y);
+                doc.text(`Qty: ${item.qty} | Box: ${item.boxQty} | Carton: ${item.masterCarton}`, 10, y + 5);
+                doc.text(`Price: ₹${item.price.toFixed(2)} each | Total: ₹${(item.qty * item.price).toFixed(2)}`, 10, y + 10);
+                y += 20;
+            });
+            
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            doc.setFontSize(14);
+            doc.text(`Total Amount (incl. GST): ₹${total.toFixed(2)}`, 10, y + 10);
+            
+            // Footer
+            doc.setFontSize(10);
+            doc.text('Terms: 1. Goods once sold will not be taken back. 2. Interest @24% on bills unpaid after 30 days.', 105, doc.internal.pageSize.height - 10, null, null, 'center');
+            
+            doc.save(`order_${paymentId}.pdf`);
+        }
+
+        function generateOrderExcel(paymentId) {
+            const wb = XLSX.utils.book_new();
+            
+            // Prepare order data
+            const orderData = cart.map(item => ({
+                'Part Number': item.part,
+                'Description': item.desc,
+                'Quantity': item.qty,
+                'Box Quantity': item.boxQty,
+                'Master Carton': item.masterCarton,
+                'Unit Price': item.price,
+                'Total': (item.qty * item.price).toFixed(2)
+            }));
+            
+            // Add total row
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            orderData.push({
+                'Part Number': 'TOTAL (incl. GST)',
+                'Description': '',
+                'Quantity': '',
+                'Box Quantity': '',
+                'Master Carton': '',
+                'Unit Price': '',
+                'Total': total.toFixed(2)
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(orderData);
+            XLSX.utils.book_append_sheet(wb, ws, "Order");
+            
+            XLSX.writeFile(wb, `order_${paymentId}.xlsx`);
+        }
+
         function sendOrderEmail() {
             if (cart.length === 0) {
-                showToast("Cart is empty. Add products to send an order.", true);
+                showToast("Your cart is empty", true);
                 return;
             }
             
-            const agreeCheckbox = document.getElementById("agree-terms");
-            if (!agreeCheckbox.checked) {
-                showToast("Please agree to the terms and conditions", true);
-                return;
-            }
+            const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
+            let body = "Please find below my order details:\n\n";
             
-            // Format order details
-            let orderText = "Order Details:\n\n";
             cart.forEach(item => {
-                orderText += `${item.part} - ${item.desc}: ${item.qty} x ₹${item.price.toFixed(2)} = ₹${(item.qty * item.price).toFixed(2)}\n`;
+                body += `${item.part} - ${item.desc}\n`;
+                body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
+                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
             });
+            
             const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            orderText += `\nTotal: ₹${total.toFixed(2)}`;
+            body += `\nTotal Amount: ₹${total.toFixed(2)}\n\n`;
+            body += "Please confirm availability and provide payment instructions.\n\n";
+            body += "Regards,\n[Your Name]";
             
-            // Open email client
-            const emailSubject = encodeURIComponent(`Order from Auto Spares Solution`);
-            const emailBody = encodeURIComponent(orderText);
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${emailSubject}&body=${emailBody}`;
-            
-            showToast("Email client opened. Please send the order details.");
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         }
 
-        // Initialize contact form
+        // Contact form submission
         document.getElementById("contact-form").addEventListener("submit", function(e) {
             e.preventDefault();
-            showToast("Message sent successfully! We'll contact you soon.");
+            
+            const name = document.getElementById("name").value;
+            const email = document.getElementById("email").value;
+            const phone = document.getElementById("phone").value;
+            const city = document.getElementById("city").value;
+            const message = document.getElementById("message").value;
+            
+            const subject = `Contact Form Submission from ${name}`;
+            const body = `Name: ${name}%0AEmail: ${email}%0APhone: ${phone}%0ACity: ${city}%0AMessage: ${message}`;
+            
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            
+            // Reset the form
             this.reset();
+            showToast("Your message has been sent. We'll contact you soon!");
         });
 
-        // Initialize page
-        document.addEventListener("DOMContentLoaded", function() {
-            loadProducts();
-        });
+        // Initialize the page
+        loadProducts();
     </script>
 </body>
-</html>
+    </html>
