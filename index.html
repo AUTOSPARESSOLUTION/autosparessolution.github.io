@@ -974,63 +974,51 @@
     </div>
 
     <script>
-    // Initialize variables
-    let productsData = [];
-    let filteredProducts = [];
-    let cart = [];
-    const fixedProducts = [
-        "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
-        "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-        "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
-        "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
-        "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
-        "M07520-0200"
-    ];
+        // Initialize variables
+        let productsData = [];
+        let filteredProducts = [];
+        let cart = [];
+        const fixedProducts = [
+            "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
+            "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
+            "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+            "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+            "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
+            "M07520-0200"
+        ];
 
-    // Debounce variables
-    let searchTimeout = null;
-    const DEBOUNCE_DELAY = 300; // 300ms delay for debouncing
+        // DOM elements
+        const cartLink = document.getElementById("cart-link");
+        const cartSidebar = document.getElementById("cart-sidebar");
+        const closeCartBtn = document.querySelector(".close-cart");
+        const toast = document.getElementById("toast");
+        const toastMessage = document.getElementById("toast-message");
 
-    // DOM elements
-    const cartLink = document.getElementById("cart-link");
-    const cartSidebar = document.getElementById("cart-sidebar");
-    const closeCartBtn = document.querySelector(".close-cart");
-    const toast = document.getElementById("toast");
-    const toastMessage = document.getElementById("toast-message");
-    const searchInput = document.getElementById("search-input");
+        // Initialize cart toggle
+        cartLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            cartSidebar.classList.toggle("active");
+        });
 
-    // Initialize cart toggle
-    cartLink.addEventListener("click", (e) => {
-        e.preventDefault();
-        cartSidebar.classList.toggle("active");
-    });
+        // Close cart sidebar
+        closeCartBtn.addEventListener("click", () => {
+            cartSidebar.classList.remove("active");
+        });
 
-    // Close cart sidebar
-    closeCartBtn.addEventListener("click", () => {
-        cartSidebar.classList.remove("active");
-    });
-
-    // Show toast message
-    function showToast(message, isError = false) {
-        toastMessage.textContent = message;
-        toast.classList.remove("error");
-        if (isError) toast.classList.add("error");
-        toast.classList.add("show");
-        
-        setTimeout(() => {
-            toast.classList.remove("show");
-        }, 3000);
-    }
-
-    // Search functionality with debouncing
-    searchInput.addEventListener("input", (e) => {
-        // Clear previous timeout if it exists
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
+        // Show toast message
+        function showToast(message, isError = false) {
+            toastMessage.textContent = message;
+            toast.classList.remove("error");
+            if (isError) toast.classList.add("error");
+            toast.classList.add("show");
+            
+            setTimeout(() => {
+                toast.classList.remove("show");
+            }, 3000);
         }
-        
-        // Set new timeout
-        searchTimeout = setTimeout(() => {
+
+        // Search functionality
+        document.getElementById("search-input").addEventListener("input", (e) => {
             const searchTerm = e.target.value.toLowerCase();
             if (searchTerm === '') {
                 // When search is empty, show only in-stock items
@@ -1043,70 +1031,114 @@
                 );
             }
             displayProducts();
-        }, DEBOUNCE_DELAY);
-    });
+        });
 
-    // Load product data from CSV
-    function loadProducts() {
-        fetch("prices.csv")
-            .then(res => res.text())
-            .then(csv => {
-                const rows = csv.split("\n").slice(1); // Skip header
-                
-                productsData = rows.map(r => {
-                    const cols = r.split(",");
-                    return {
-                        part: cols[0]?.trim(),
-                        desc: cols[1]?.trim() || "Auto Spare Part",
-                        price: parseFloat(cols[6] || 0),
-                        stock: parseInt(cols[7] || 0),
-                        boxQty: parseInt(cols[8] || 1), // Box quantity
-                        masterCarton: parseInt(cols[9] || 1) // Master carton quantity
-                    };
-                }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
+        // Load product data from CSV
+        function loadProducts() {
+            fetch("prices.csv")
+                .then(res => res.text())
+                .then(csv => {
+                    const rows = csv.split("\n").slice(1); // Skip header
+                    
+                    productsData = rows.map(r => {
+                        const cols = r.split(",");
+                        return {
+                            part: cols[0]?.trim(),
+                            desc: cols[1]?.trim() || "Auto Spare Part",
+                            price: parseFloat(cols[6] || 0),
+                            stock: parseInt(cols[7] || 0),
+                            boxQty: parseInt(cols[8] || 1), // Box quantity
+                            masterCarton: parseInt(cols[9] || 1) // Master carton quantity
+                        };
+                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
 
-                // Add fixed products that might not be in CSV
-                fixedProducts.forEach(part => {
-                    if (!productsData.some(p => p.part === part)) {
-                        productsData.push({
-                            part,
-                            desc: "Auto Spare Part",
-                            price: 0,
-                            stock: 0,
-                            boxQty: 1,
-                            masterCarton: 1
-                        });
-                    }
+                    // Add fixed products that might not be in CSV
+                    fixedProducts.forEach(part => {
+                        if (!productsData.some(p => p.part === part)) {
+                            productsData.push({
+                                part,
+                                desc: "Auto Spare Part",
+                                price: 0,
+                                stock: 0,
+                                boxQty: 1,
+                                masterCarton: 1
+                            });
+                        }
+                    });
+                    
+                    // Initialize with only in-stock items shown by default
+                    filteredProducts = productsData.filter(product => product.stock > 0);
+                    displayProducts();
+                })
+                .catch(err => {
+                    console.error("Error loading CSV:", err);
+                    // Fallback to fixed products with default values
+                    productsData = fixedProducts.map(part => ({
+                        part,
+                        desc: "Auto Spare Part",
+                        price: 0,
+                        stock: 0,
+                        boxQty: 1,
+                        masterCarton: 1
+                    }));
+                    filteredProducts = [...productsData];
+                    displayProducts();
+                    showToast("Error loading product data. Using fallback data.", true);
                 });
+        }
+
+        // Display filtered products
+        function displayProducts() {
+            const gallery = document.getElementById("products");
+            gallery.innerHTML = "";
+            
+            if (filteredProducts.length === 0) {
+                gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
+                return;
+            }
+            
+            filteredProducts.forEach(product => {
+                const isInStock = product.stock > 0;
+                const isInSystem = productsData.some(p => p.part === product.part);
                 
-                // Initialize with only in-stock items shown by default
-                filteredProducts = productsData.filter(product => product.stock > 0);
-                displayProducts();
-            })
-            .catch(err => {
-                console.error("Error loading CSV:", err);
-                // Fallback to fixed products with default values
-                productsData = fixedProducts.map(part => ({
-                    part,
-                    desc: "Auto Spare Part",
-                    price: 0,
-                    stock: 0,
-                    boxQty: 1,
-                    masterCarton: 1
-                }));
-                filteredProducts = [...productsData];
-                displayProducts();
-                showToast("Error loading product data. Using fallback data.", true);
+                gallery.insertAdjacentHTML('beforeend', `
+                    <div class="card" data-part="${product.part}">
+                        ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
+                            (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
+                        
+                        <img src="images/${product.part}.png" alt="${product.part}" 
+                             onerror="this.src='images/default.png';this.onerror=null;">
+                        
+                        <div class="part-number">${product.part}</div>
+                        <div class="part-desc">${product.desc}</div>
+                        <div class="price">${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
+                        
+                        <div class="stock-info">
+                            <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
+                            ${isInStock ? `
+                                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
+                                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
+                            ` : ''}
+                        </div>
+                        
+                        ${isInStock ? `
+                            <div style="margin-top: 0.5rem;">
+                                <input class="qty-input" type="number" value="1" min="1" max="${product.stock}" 
+                                       onchange="updateProductQty('${product.part}', this.value)">
+                                <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">
+                                    <i class="fas fa-cart-plus"></i> Add to Cart
+                                </button>
+                            </div>
+                        ` : ''}
+                        
+                        <a class="btn whatsapp" href="https://wa.me/919830300193?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
+                            <i class="fab fa-whatsapp"></i> ${isInStock ? 'Enquire' : 'Notify Me'}
+                        </a>
+                    </div>
+                `);
             });
-    }
+        }
 
-    // [Rest of your existing functions remain unchanged...]
-    // displayProducts(), updateProductQty(), addToCart(), updateCartUI(), etc.
-    // All other functions remain exactly the same as in your original code
-
-    // Initialize the page
-    loadProducts();
-</script>
         // Update product quantity in the product card
         function updateProductQty(part, qty) {
             const card = document.querySelector(`.card[data-part="${part}"]`);
