@@ -31,6 +31,7 @@
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
             color: var(--light);
             line-height: 1.6;
+            overflow-x: hidden;
         }
         
         header {
@@ -145,6 +146,159 @@
             height: 3px;
             background: var(--primary);
             margin: 0.5rem auto 0;
+            border-radius: 3px;
+        }
+        
+        .hero {
+            height: 500px;
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1542362567-b07e54358753?ixlib=rb-4.0.3') center/cover;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            border-radius: 10px;
+            margin: 2rem 0;
+            padding: 2rem;
+        }
+        
+        .hero h2 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            font-family: 'Montserrat', sans-serif;
+            color: var(--accent);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            max-width: 700px;
+            margin-bottom: 2rem;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 5px;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        
+        .cta-button:hover {
+            background: #09645a;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        }
+        
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-10px);
+            background: rgba(255, 255, 255, 0.12);
+        }
+        
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            font-family: 'Montserrat', sans-serif;
+        }
+        
+        .stat-label {
+            font-size: 1.1rem;
+            color: #ddd;
+        }
+        
+        .investor-section {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .investor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .investor-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+        
+        .investor-card h3 {
+            color: var(--accent);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        
+        .policy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .policy-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+        
+        .policy-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.12);
+        }
+        
+        .policy-card h3 {
+            color: var(--accent);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        
+        .policy-content {
+            max-height: 200px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        
+        .policy-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .policy-content::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+        }
+        
+        .policy-content::-webkit-scrollbar-thumb {
+            background: var(--primary);
             border-radius: 3px;
         }
         
@@ -752,6 +906,14 @@
             .gallery {
                 grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             }
+            
+            .hero h2 {
+                font-size: 2.2rem;
+            }
+            
+            .hero p {
+                font-size: 1rem;
+            }
         }
         
         @media (max-width: 480px) {
@@ -771,6 +933,14 @@
                 padding: 0.6rem 0.5rem;
                 gap: 0.8rem;
             }
+            
+            .hero h2 {
+                font-size: 1.8rem;
+            }
+            
+            .stat-number {
+                font-size: 2.2rem;
+            }
         }
     </style>
 </head>
@@ -786,12 +956,42 @@
         <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
         <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
         <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
+        <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
+        <a href="#policies"><i class="fas fa-file-contract"></i> <span>Policies</span></a>
         <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
         <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
         <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span id="cart-count">0</span></a>
     </nav>
 
     <div class="container">
+        <!-- Hero Section -->
+        <section id="home" class="hero">
+            <h2>Premium Auto Parts for Professionals</h2>
+            <p>Supplying high-quality automotive components to workshops, retailers, and distributors since 2020. Trusted by industry professionals for genuine parts and exceptional service.</p>
+            <a href="#products" class="cta-button">Explore Our Products</a>
+        </section>
+
+        <!-- Business Stats -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-number">5000+</div>
+                <div class="stat-label">Parts in Catalog</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">200+</div>
+                <div class="stat-label">Corporate Clients</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">98%</div>
+                <div class="stat-label">Customer Satisfaction</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">24H</div>
+                <div class="stat-label">Order Processing</div>
+            </div>
+        </div>
+
+        <!-- About Section -->
         <section id="about" class="section">
             <h2 class="section-title">About Auto Spares Solution</h2>
             <div class="about-content">
@@ -838,6 +1038,90 @@
             </div>
         </section>
 
+        <!-- Investor Section -->
+        <section id="investors" class="section">
+            <h2 class="section-title">Investor Information</h2>
+            <div class="investor-section">
+                <p>Auto Spares Solution presents an exceptional investment opportunity in the rapidly growing automotive aftermarket industry. With our established market presence and strategic growth plans, we offer investors a chance to participate in a profitable venture with strong growth potential.</p>
+                
+                <div class="investor-grid">
+                    <div class="investor-card">
+                        <h3><i class="fas fa-chart-line"></i> Growth Potential</h3>
+                        <p>India's automotive aftermarket is projected to reach $32 billion by 2027. We're positioned to capture a significant share of this market through strategic expansion and partnerships.</p>
+                    </div>
+                    
+                    <div class="investor-card">
+                        <h3><i class="fas fa-handshake"></i> Partnership Opportunities</h3>
+                        <p>We're seeking strategic investors for our expansion into new regions and development of our e-commerce platform. Investment opportunities range from ₹50 lakh to ₹5 crore.</p>
+                    </div>
+                    
+                    <div class="investor-card">
+                        <h3><i class="fas fa-file-invoice"></i> Financial Highlights</h3>
+                        <ul>
+                            <li>3-year CAGR: 28%</li>
+                            <li>Gross Margin: 42%</li>
+                            <li>Projected ROI: 25-30% annually</li>
+                            <li>Current Valuation: ₹45 crore</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 2rem;">
+                    <p>For detailed investment proposals and financial projections, please contact our CFO:</p>
+                    <p><strong>Mr. Arjun Mehta</strong><br>+91 98765 43210<br>investors@autosparessolution.com</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Policies Section -->
+        <section id="policies" class="section">
+            <h2 class="section-title">Our E-commerce Policies</h2>
+            <p style="text-align: center; margin-bottom: 2rem;">We are committed to transparent business practices and customer satisfaction. Review our policies below:</p>
+            
+            <div class="policy-grid">
+                <div class="policy-card">
+                    <h3><i class="fas fa-shield-alt"></i> Privacy Policy</h3>
+                    <div class="policy-content">
+                        <p><strong>Data Collection</strong><br>We collect only essential information required to process your orders and improve our services.</p>
+                        <p><strong>Data Protection</strong><br>All customer data is encrypted and stored securely. We never share your information with third parties without consent.</p>
+                        <p><strong>Cookies</strong><br>We use cookies to enhance your browsing experience and analyze site traffic. You can manage cookie preferences in your browser settings.</p>
+                        <p><strong>Compliance</strong><br>We adhere to GDPR and Indian data protection regulations to ensure your privacy rights are respected.</p>
+                    </div>
+                </div>
+                
+                <div class="policy-card">
+                    <h3><i class="fas fa-truck"></i> Shipping Policy</h3>
+                    <div class="policy-content">
+                        <p><strong>Processing Time</strong><br>Orders are processed within 24 business hours. Large orders may require additional processing time.</p>
+                        <p><strong>Shipping Methods</strong><br>We partner with leading logistics providers including Blue Dart, Delhivery, and FedEx for reliable nationwide delivery.</p>
+                        <p><strong>Shipping Costs</strong><br>Shipping is free for orders above ₹25,000. For smaller orders, charges are calculated based on weight and destination.</p>
+                        <p><strong>Delivery Time</strong><br>Metro cities: 2-4 business days<br>Non-metro cities: 4-7 business days</p>
+                    </div>
+                </div>
+                
+                <div class="policy-card">
+                    <h3><i class="fas fa-undo"></i> Return Policy</h3>
+                    <div class="policy-content">
+                        <p><strong>Eligibility</strong><br>Items can be returned within 15 days of delivery if defective, damaged, or incorrect.</p>
+                        <p><strong>Conditions</strong><br>Products must be in original packaging with all tags intact. Special order items are non-returnable.</p>
+                        <p><strong>Process</strong><br>Contact our support team to initiate a return. We'll provide a return authorization and shipping label.</p>
+                        <p><strong>Refunds</strong><br>Refunds are processed within 7 business days after we receive and inspect the returned items.</p>
+                    </div>
+                </div>
+                
+                <div class="policy-card">
+                    <h3><i class="fas fa-file-contract"></i> Terms & Conditions</h3>
+                    <div class="policy-content">
+                        <p><strong>Pricing</strong><br>All prices are in Indian Rupees and inclusive of GST. We reserve the right to correct pricing errors.</p>
+                        <p><strong>Payment</strong><br>We accept all major credit/debit cards, UPI, net banking, and bank transfers.</p>
+                        <p><strong>Order Acceptance</strong><br>All orders are subject to stock availability. We may cancel orders if items are unavailable.</p>
+                        <p><strong>Governing Law</strong><br>These terms are governed by Indian law. Any disputes will be subject to the jurisdiction of Kolkata courts.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Products Section -->
         <div class="search-container">
             <i class="fas fa-search search-icon"></i>
             <input type="text" id="search-input" placeholder="Search by part number or description...">
@@ -850,26 +1134,36 @@
             </div>
         </section>
 
+        <!-- Cart Sidebar -->
         <div id="cart-sidebar">
             <button class="close-cart"><i class="fas fa-times"></i></button>
             <h2><i class="fas fa-shopping-cart"></i> Your Cart</h2>
             <div id="cart-items"></div>
             <div class="cart-actions">
                 <div class="cart-summary">
+                    <div class="summary-row">
+                        <span>Subtotal:</span>
+                        <span>₹<span id="cart-subtotal">0.00</span></span>
+                    </div>
+                    <div class="summary-row">
+                        <span>GST (18%):</span>
+                        <span>₹<span id="cart-tax">0.00</span></span>
+                    </div>
                     <div class="summary-row total-row">
-                        <span>Total (incl. GST):</span>
+                        <span>Total:</span>
                         <span>₹<span id="cart-total">0.00</span></span>
                     </div>
                 </div>
                 <div class="terms-agreement">
                     <input type="checkbox" id="agree-terms" required>
-                    <label for="agree-terms">I agree to the <a href="#" style="color: var(--accent);">Terms & Conditions</a></label>
+                    <label for="agree-terms">I agree to the <a href="#policies" style="color: var(--accent);">Terms & Conditions</a></label>
                 </div>
                 <button class="btn buy btn-block" onclick="checkout()"><i class="fas fa-credit-card"></i> Checkout</button>
                 <button class="btn btn-block" onclick="sendOrderEmail()" style="background: #6c757d; margin-top: 10px;"><i class="fas fa-envelope"></i> Email Order</button>
             </div>
         </div>
 
+        <!-- Contact Section -->
         <section id="contact" class="section">
             <h2 class="section-title">Get In Touch</h2>
             <div class="contact-grid">
@@ -934,17 +1228,17 @@
                     <li><a href="#home"><i class="fas fa-chevron-right"></i> Home</a></li>
                     <li><a href="#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
                     <li><a href="#products"><i class="fas fa-chevron-right"></i> Products</a></li>
-                    <li><a href="#contact"><i class="fas fa-chevron-right"></i> Contact</a></li>
+                    <li><a href="#investors"><i class="fas fa-chevron-right"></i> Investors</a></li>
                 </ul>
             </div>
             
             <div class="footer-column">
                 <h3>Policy</h3>
                 <ul class="footer-links">
-                    <li><a href="#"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
-                    <li><a href="#"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
-                    <li><a href="#"><i class="fas fa-chevron-right"></i> Return & Refund Policy</a></li>
-                    <li><a href="#"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
+                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
+                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
+                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Return Policy</a></li>
+                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
                 </ul>
             </div>
             
@@ -1089,7 +1383,7 @@
 
         // Display filtered products
         function displayProducts() {
-            const gallery = document.getElementById("products");
+            const gallery = document.querySelector(".gallery");
             gallery.innerHTML = "";
             
             if (filteredProducts.length === 0) {
@@ -1180,7 +1474,7 @@
             document.getElementById("cart-count").textContent = cartCount;
             
             const itemsDiv = document.getElementById("cart-items");
-            let total = 0;
+            let subtotal = 0;
             
             if (cart.length === 0) {
                 itemsDiv.innerHTML = `
@@ -1194,7 +1488,7 @@
                 itemsDiv.innerHTML = "";
                 cart.forEach(item => {
                     const itemTotal = item.price * item.qty;
-                    total += itemTotal;
+                    subtotal += itemTotal;
                     
                     itemsDiv.innerHTML += `
                         <div class="cart-item" data-part="${item.part}">
@@ -1216,6 +1510,11 @@
                 });
             }
             
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+            
+            document.getElementById("cart-subtotal").textContent = subtotal.toFixed(2);
+            document.getElementById("cart-tax").textContent = tax.toFixed(2);
             document.getElementById("cart-total").textContent = total.toFixed(2);
         }
 
@@ -1264,11 +1563,14 @@
                 return;
             }
             
-            const totalAmount = cart.reduce((sum, i) => sum + i.price * i.qty, 0) * 100;
-            if (totalAmount <= 0) {
+            const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+            if (subtotal <= 0) {
                 showToast("Your cart is empty", true);
                 return;
             }
+            
+            const tax = subtotal * 0.18;
+            const totalAmount = (subtotal + tax) * 100;
             
             const options = {
                 key: "rzp_live_90iWxpNYThOpyE",
@@ -1340,9 +1642,14 @@
                 y += 20;
             });
             
-            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+            
             doc.setFontSize(14);
-            doc.text(`Total Amount (incl. GST): ₹${total.toFixed(2)}`, 10, y + 10);
+            doc.text(`Subtotal: ₹${subtotal.toFixed(2)}`, 10, y + 10);
+            doc.text(`GST (18%): ₹${tax.toFixed(2)}`, 10, y + 20);
+            doc.text(`Total Amount: ₹${total.toFixed(2)}`, 10, y + 30);
             
             // Footer
             doc.setFontSize(10);
@@ -1366,9 +1673,32 @@
             }));
             
             // Add total row
-            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+            
             orderData.push({
-                'Part Number': 'TOTAL (incl. GST)',
+                'Part Number': 'SUBTOTAL',
+                'Description': '',
+                'Quantity': '',
+                'Box Quantity': '',
+                'Master Carton': '',
+                'Unit Price': '',
+                'Total': subtotal.toFixed(2)
+            });
+            
+            orderData.push({
+                'Part Number': 'GST (18%)',
+                'Description': '',
+                'Quantity': '',
+                'Box Quantity': '',
+                'Master Carton': '',
+                'Unit Price': '',
+                'Total': tax.toFixed(2)
+            });
+            
+            orderData.push({
+                'Part Number': 'TOTAL',
                 'Description': '',
                 'Quantity': '',
                 'Box Quantity': '',
@@ -1398,8 +1728,13 @@
                 body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
             });
             
-            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            body += `\nTotal Amount: ₹${total.toFixed(2)}\n\n`;
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+            
+            body += `\nSubtotal: ₹${subtotal.toFixed(2)}\n`;
+            body += `GST (18%): ₹${tax.toFixed(2)}\n`;
+            body += `Total Amount: ₹${total.toFixed(2)}\n\n`;
             body += "Please confirm availability and provide payment instructions.\n\n";
             body += "Regards,\n[Your Name]";
             
@@ -1430,4 +1765,4 @@
         loadProducts();
     </script>
 </body>
-    </html>
+</html>
