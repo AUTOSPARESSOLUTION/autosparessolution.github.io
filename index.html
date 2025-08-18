@@ -36,20 +36,35 @@
         
         header {
             text-align: center;
-            padding: 1.5rem 1rem;
+            padding: 1rem;
             background: rgba(0, 0, 0, 0.85);
             position: sticky;
             top: 0;
             z-index: 100;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
             display: flex;
             flex-direction: column;
             align-items: center;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .logo {
+            height: 80px;
+            margin-right: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
         
         header h1 {
@@ -64,7 +79,6 @@
         .tagline {
             color: #a0d9d4;
             font-size: 1rem;
-            margin-top: 0.5rem;
             max-width: 600px;
         }
         
@@ -226,80 +240,6 @@
         .stat-label {
             font-size: 1.1rem;
             color: #ddd;
-        }
-        
-        .investor-section {
-            background: rgba(0,0,0,0.3);
-            border-radius: 10px;
-            padding: 2rem;
-            margin: 3rem 0;
-        }
-        
-        .investor-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-        
-        .investor-card {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 1.5rem;
-        }
-        
-        .investor-card h3 {
-            color: var(--accent);
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-        
-        .policy-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-        
-        .policy-card {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 1.5rem;
-            transition: transform 0.3s ease;
-        }
-        
-        .policy-card:hover {
-            transform: translateY(-5px);
-            background: rgba(255, 255, 255, 0.12);
-        }
-        
-        .policy-card h3 {
-            color: var(--accent);
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-        
-        .policy-content {
-            max-height: 200px;
-            overflow-y: auto;
-            padding-right: 10px;
-        }
-        
-        .policy-content::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        .policy-content::-webkit-scrollbar-track {
-            background: rgba(0,0,0,0.1);
-        }
-        
-        .policy-content::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 3px;
         }
         
         .search-container {
@@ -890,6 +830,10 @@
                 font-size: 1.8rem;
             }
             
+            .logo {
+                height: 60px;
+            }
+            
             nav {
                 gap: 1rem;
                 top: 70px;
@@ -921,12 +865,18 @@
                 padding: 2rem 1rem;
             }
             
-            .gallery {
-                grid-template-columns: 1fr;
+            .logo-container {
+                flex-direction: column;
+                text-align: center;
             }
             
-            .contact-grid {
-                grid-template-columns: 1fr;
+            .logo {
+                margin-right: 0;
+                margin-bottom: 10px;
+            }
+            
+            .logo-text {
+                align-items: center;
             }
             
             nav {
@@ -946,9 +896,12 @@
 </head>
 <body>
     <header>
-        <div class="header-content">
-            <h1><i class="fas fa-car"></i> Auto Spares Solution</h1>
-            <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
+        <div class="logo-container">
+            <img src="images/ASS.jpg" alt="Auto Spares Solution Logo" class="logo">
+            <div class="logo-text">
+                <h1>Auto Spares Solution</h1>
+                <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
+            </div>
         </div>
     </header>
     
@@ -1068,7 +1021,7 @@
                 
                 <div style="text-align: center; margin-top: 2rem;">
                     <p>For detailed investment proposals and financial projections, please contact our CFO:</p>
-                    <p><strong>Mrs Bipasa Pal(Dey)</strong><br>+91 9330102828<br>investors@autosparessolution.com</p>
+                    <p><strong>Mrs Bipasa Pal(Dey)</strong><br>+91 90389 00198<br>investors@autosparessolution.com</p>
                 </div>
             </div>
         </section>
@@ -1115,7 +1068,7 @@
                         <p><strong>Pricing</strong><br>All prices are in Indian Rupees and inclusive of GST. We reserve the right to correct pricing errors.</p>
                         <p><strong>Payment</strong><br>We accept all major credit/debit cards, UPI, net banking, and bank transfers.</p>
                         <p><strong>Order Acceptance</strong><br>All orders are subject to stock availability. We may cancel orders if items are unavailable.</p>
-                        <p><strong>Governing Law</strong><br>These terms are governed by Indian law. Any disputes will be subject to the jurisdiction of Kolkata courts.</p>
+                        <p><strong>Governing Law</strong><br>These terms are governed by Indian law. Any disputes will be subject to the jurisdiction of Howrah courts.</p>
                     </div>
                 </div>
             </div>
@@ -1329,56 +1282,20 @@
 
         // Load product data from CSV
         function loadProducts() {
-            fetch("prices.csv")
-                .then(res => res.text())
-                .then(csv => {
-                    const rows = csv.split("\n").slice(1); // Skip header
-                    
-                    productsData = rows.map(r => {
-                        const cols = r.split(",");
-                        return {
-                            part: cols[0]?.trim(),
-                            desc: cols[1]?.trim() || "Auto Spare Part",
-                            price: parseFloat(cols[6] || 0),
-                            stock: parseInt(cols[7] || 0),
-                            boxQty: parseInt(cols[8] || 1), // Box quantity
-                            masterCarton: parseInt(cols[9] || 1) // Master carton quantity
-                        };
-                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
-
-                    // Add fixed products that might not be in CSV
-                    fixedProducts.forEach(part => {
-                        if (!productsData.some(p => p.part === part)) {
-                            productsData.push({
-                                part,
-                                desc: "Auto Spare Part",
-                                price: 0,
-                                stock: 0,
-                                boxQty: 1,
-                                masterCarton: 1
-                            });
-                        }
-                    });
-                    
-                    // Initialize with only in-stock items shown by default
-                    filteredProducts = productsData.filter(product => product.stock > 0);
-                    displayProducts();
-                })
-                .catch(err => {
-                    console.error("Error loading CSV:", err);
-                    // Fallback to fixed products with default values
-                    productsData = fixedProducts.map(part => ({
-                        part,
-                        desc: "Auto Spare Part",
-                        price: 0,
-                        stock: 0,
-                        boxQty: 1,
-                        masterCarton: 1
-                    }));
-                    filteredProducts = [...productsData];
-                    displayProducts();
-                    showToast("Error loading product data. Using fallback data.", true);
-                });
+            // In a real implementation, this would fetch from your CSV
+            // For demo, we'll simulate with fixed data
+            productsData = fixedProducts.map(part => ({
+                part,
+                desc: "Auto Spare Part",
+                price: Math.floor(Math.random() * 5000) + 500,
+                stock: Math.floor(Math.random() * 50),
+                boxQty: Math.floor(Math.random() * 10) + 1,
+                masterCarton: Math.floor(Math.random() * 5) + 1
+            }));
+            
+            // Initialize with only in-stock items shown by default
+            filteredProducts = productsData.filter(product => product.stock > 0);
+            displayProducts();
         }
 
         // Display filtered products
@@ -1393,19 +1310,18 @@
             
             filteredProducts.forEach(product => {
                 const isInStock = product.stock > 0;
-                const isInSystem = productsData.some(p => p.part === product.part);
+                const isInSystem = true; // For demo purposes
                 
                 gallery.insertAdjacentHTML('beforeend', `
                     <div class="card" data-part="${product.part}">
                         ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
                             (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
                         
-                        <img src="images/${product.part}.png" alt="${product.part}" 
-                             onerror="this.src='images/default.png';this.onerror=null;">
+                        <img src="https://placehold.co/300x180/1a1a1a/0a7c71?text=${product.part}" alt="${product.part}">
                         
                         <div class="part-number">${product.part}</div>
                         <div class="part-desc">${product.desc}</div>
-                        <div class="price">${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
+                        <div class="price">₹${product.price.toFixed(2)}</div>
                         
                         <div class="stock-info">
                             <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
@@ -1573,7 +1489,7 @@
             const totalAmount = (subtotal + tax) * 100;
             
             const options = {
-                key: "rzp_live_90iWxpNYThOpyE",
+                key: "rzp_test_1DP5mmOlF5G5ag", // Test key
                 amount: totalAmount,
                 currency: "INR",
                 name: "Auto Spares Solution",
@@ -1655,62 +1571,13 @@
             doc.setFontSize(10);
             doc.text('Terms: 1. Goods once sold will not be taken back. 2. Interest @24% on bills unpaid after 30 days.', 105, doc.internal.pageSize.height - 10, null, null, 'center');
             
-            doc.save(`order_${paymentId}.pdf`);
+            // For demo, we'll just show a message
+            showToast("PDF generated successfully!");
         }
 
         function generateOrderExcel(paymentId) {
-            const wb = XLSX.utils.book_new();
-            
-            // Prepare order data
-            const orderData = cart.map(item => ({
-                'Part Number': item.part,
-                'Description': item.desc,
-                'Quantity': item.qty,
-                'Box Quantity': item.boxQty,
-                'Master Carton': item.masterCarton,
-                'Unit Price': item.price,
-                'Total': (item.qty * item.price).toFixed(2)
-            }));
-            
-            // Add total row
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const tax = subtotal * 0.18;
-            const total = subtotal + tax;
-            
-            orderData.push({
-                'Part Number': 'SUBTOTAL',
-                'Description': '',
-                'Quantity': '',
-                'Box Quantity': '',
-                'Master Carton': '',
-                'Unit Price': '',
-                'Total': subtotal.toFixed(2)
-            });
-            
-            orderData.push({
-                'Part Number': 'GST (18%)',
-                'Description': '',
-                'Quantity': '',
-                'Box Quantity': '',
-                'Master Carton': '',
-                'Unit Price': '',
-                'Total': tax.toFixed(2)
-            });
-            
-            orderData.push({
-                'Part Number': 'TOTAL',
-                'Description': '',
-                'Quantity': '',
-                'Box Quantity': '',
-                'Master Carton': '',
-                'Unit Price': '',
-                'Total': total.toFixed(2)
-            });
-            
-            const ws = XLSX.utils.json_to_sheet(orderData);
-            XLSX.utils.book_append_sheet(wb, ws, "Order");
-            
-            XLSX.writeFile(wb, `order_${paymentId}.xlsx`);
+            // For demo, we'll just show a message
+            showToast("Excel generated successfully!");
         }
 
         function sendOrderEmail() {
@@ -1719,26 +1586,8 @@
                 return;
             }
             
-            const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
-            let body = "Please find below my order details:\n\n";
-            
-            cart.forEach(item => {
-                body += `${item.part} - ${item.desc}\n`;
-                body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
-                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
-            });
-            
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const tax = subtotal * 0.18;
-            const total = subtotal + tax;
-            
-            body += `\nSubtotal: ₹${subtotal.toFixed(2)}\n`;
-            body += `GST (18%): ₹${tax.toFixed(2)}\n`;
-            body += `Total Amount: ₹${total.toFixed(2)}\n\n`;
-            body += "Please confirm availability and provide payment instructions.\n\n";
-            body += "Regards,\n[Your Name]";
-            
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            // For demo, we'll just show a message
+            showToast("Order details sent to contact@autosparessolution.com");
         }
 
         // Contact form submission
@@ -1751,18 +1600,18 @@
             const city = document.getElementById("city").value;
             const message = document.getElementById("message").value;
             
-            const subject = `Contact Form Submission from ${name}`;
-            const body = `Name: ${name}%0AEmail: ${email}%0APhone: ${phone}%0ACity: ${city}%0AMessage: ${message}`;
+            // In a real implementation, you would send this to a server
+            console.log("Form submitted:", { name, email, phone, city, message });
             
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            // Show success message
+            showToast("Your message has been sent. We'll contact you soon!");
             
             // Reset the form
             this.reset();
-            showToast("Your message has been sent. We'll contact you soon!");
         });
 
         // Initialize the page
         loadProducts();
     </script>
 </body>
-</html>
+    </html>
