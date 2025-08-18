@@ -1643,8 +1643,8 @@
             });
             
             const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            
-            const total = subtotal;
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
             
             doc.setFontSize(14);
             doc.text(`Subtotal: ₹${subtotal.toFixed(2)}`, 10, y + 10);
@@ -1729,8 +1729,8 @@
             });
             
             const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            
-            const total = subtotal;
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
             
             body += `\nSubtotal: ₹${subtotal.toFixed(2)}\n`;
             body += `GST (18%): ₹${tax.toFixed(2)}\n`;
