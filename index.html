@@ -1339,7 +1339,9 @@
                         return {
                             part: cols[0]?.trim(),
                             desc: cols[1]?.trim() || "Auto Spare Part",
-                            price: parseFloat(cols[6] || 0),
+                       List: parseFloat(cols[2] || 0),
+                       Mrp: parseFloat(cols[3] || 0),     
+                      price: parseFloat(cols[6] || 0),
                             stock: parseInt(cols[7] || 0),
                             boxQty: parseInt(cols[8] || 1), // Box quantity
                             masterCarton: parseInt(cols[9] || 1) // Master carton quantity
