@@ -2,29 +2,52 @@
 <html lang="en">
 <head>
     <script type="text/javascript">
-var _iub = _iub || [];
-_iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","storage":{"useSiteId":true}};
-</script>
-<script type="text/javascript" src="https://cs.iubenda.com/autoblocking/4209039.js"></script>
-<script type="text/javascript" src="//cdn.iubenda.com/cs/gpp/stub.js"></script>
-<script type="text/javascript" src="//cdn.iubenda.com/cs/iubenda_cs.js" charset="UTF-8" async></script>
+    var _iub = _iub || [];
+    _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","storage":{"useSiteId":true}};
+    </script>
+    <script type="text/javascript" src="https://cs.iubenda.com/autoblocking/4209039.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/gpp/stub.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/iubenda_cs.js" charset="UTF-8" async></script>
     <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-9GSY9Q5R5P"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9GSY9Q5R5P"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
 
-  gtag('config', 'G-9GSY9Q5R5P');
-</script>
+      gtag('config', 'G-9GSY9Q5R5P');
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-     <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
+    <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
+    
+    <!-- CDN Services -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- WhatsApp Business Widget -->
+    <script>
+      var whWidgetSettings = {
+        phone: '03369028606',
+        message: 'Hello, I have a question about Auto Spares Solution',
+        size: '60px',
+        position: 'right',
+        color: '#25D366',
+        title: 'Chat with us',
+        description: 'Typically replies within minutes',
+        backgroundColor: '#075E54'
+      };
+      (function() {
+        var w = document.createElement('script');
+        w.src = 'https://cdn.fastly.widgetpack.com/widget.js';
+        w.async = true;
+        document.head.appendChild(w);
+      })();
+    </script>
+    
     <style>
         :root {
             --primary: #0a7c71;
@@ -58,6 +81,23 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
             top: 0;
             z-index: 100;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .logo {
+            height: 60px;
+            width: auto;
+            border-radius: 5px;
         }
         
         .header-content {
@@ -401,6 +441,24 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
             color: #ddd;
             min-height: 40px;
             flex-grow: 1;
+        }
+        
+        .price-container {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.5rem 0;
+            background: rgba(0,0,0,0.2);
+            padding: 0.5rem;
+            border-radius: 5px;
+        }
+        
+        .price-label {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        
+        .price-value {
+            font-weight: 600;
         }
         
         .price {
@@ -901,6 +959,157 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
             gap: 0.5rem;
         }
         
+        /* New Styles for Additional Features */
+        
+        /* User Panel */
+        .user-panel {
+            position: fixed;
+            top: 80px;
+            left: -300px;
+            width: 300px;
+            height: calc(100% - 80px);
+            background: #1a1a1a;
+            z-index: 999;
+            padding: 20px;
+            transition: left 0.3s ease;
+            overflow-y: auto;
+        }
+        
+        .user-panel.active {
+            left: 0;
+        }
+        
+        .user-toggle {
+            position: fixed;
+            top: 90px;
+            left: 10px;
+            z-index: 1000;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .user-form {
+            margin-bottom: 20px;
+        }
+        
+        .user-form h3 {
+            color: var(--accent);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        /* Advertisement Space */
+        .ad-space {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .ad-space h3 {
+            color: var(--accent);
+            margin-bottom: 10px;
+        }
+        
+        .ad-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .ad-item {
+            width: 250px;
+            height: 150px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+            font-size: 14px;
+        }
+        
+        /* Consultancy Service */
+        .consultancy-service {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        
+        .consultancy-service h3 {
+            color: var(--accent);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .ai-chat-container {
+            background: rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+        
+        .user-message {
+            background: var(--primary);
+            margin-left: auto;
+        }
+        
+        .ai-message {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .chat-input {
+            display: flex;
+            margin-top: 15px;
+        }
+        
+        .chat-input input {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 5px 0 0 5px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        
+        .chat-input button {
+            padding: 10px 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+        }
+        
+        .payment-required {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
         @media (max-width: 768px) {
             header h1 {
                 font-size: 1.8rem;
@@ -930,6 +1139,10 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
             .hero p {
                 font-size: 1rem;
             }
+            
+            .user-panel {
+                width: 250px;
+            }
         }
         
         @media (max-width: 480px) {
@@ -957,14 +1170,76 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
             .stat-number {
                 font-size: 2.2rem;
             }
+            
+            .user-panel {
+                width: 100%;
+                left: -100%;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- User Panel Toggle -->
+    <button class="user-toggle" id="user-toggle">
+        <i class="fas fa-user"></i>
+    </button>
+    
+    <!-- User Panel -->
+    <div class="user-panel" id="user-panel">
+        <div class="user-form" id="login-form">
+            <h3><i class="fas fa-sign-in-alt"></i> Login</h3>
+            <div class="form-group">
+                <input type="email" id="login-email" class="form-control" placeholder="Email" required>
+            </div>
+            <div class="form-group">
+                <input type="password" id="login-password" class="form-control" placeholder="Password" required>
+            </div>
+            <button class="btn btn-block" onclick="login()" style="background: var(--primary);">Login</button>
+            <p style="text-align: center; margin-top: 10px; font-size: 0.9rem;">
+                Don't have an account? <a href="#" onclick="showRegisterForm()" style="color: var(--accent);">Register</a>
+            </p>
+        </div>
+        
+        <div class="user-form" id="register-form" style="display: none;">
+            <h3><i class="fas fa-user-plus"></i> Register</h3>
+            <div class="form-group">
+                <input type="text" id="register-name" class="form-control" placeholder="Full Name" required>
+            </div>
+            <div class="form-group">
+                <input type="email" id="register-email" class="form-control" placeholder="Email" required>
+            </div>
+            <div class="form-group">
+                <input type="password" id="register-password" class="form-control" placeholder="Password" required>
+            </div>
+            <div class="form-group">
+                <input type="tel" id="register-phone" class="form-control" placeholder="Phone Number" required>
+            </div>
+            <div class="form-group">
+                <input type="text" id="register-business" class="form-control" placeholder="Business Name">
+            </div>
+            <div class="form-group">
+                <input type="text" id="register-gstin" class="form-control" placeholder="GSTIN (Optional)">
+            </div>
+            <button class="btn btn-block" onclick="register()" style="background: var(--primary);">Register</button>
+            <p style="text-align: center; margin-top: 10px; font-size: 0.9rem;">
+                Already have an account? <a href="#" onclick="showLoginForm()" style="color: var(--accent);">Login</a>
+            </p>
+        </div>
+        
+        <div id="user-profile" style="display: none;">
+            <h3><i class="fas fa-user-circle"></i> Profile</h3>
+            <div id="profile-info"></div>
+            <button class="btn btn-block" onclick="logout()" style="background: var(--secondary); margin-top: 20px;">Logout</button>
+        </div>
+    </div>
+    
     <header>
-        <div class="header-content">
-            <h1><i class="fas fa-car"></i> Auto Spares Solution</h1>
-            <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
+        <div class="logo-container">
+            <img src="images/ASS.jpg" alt="Auto Spares Solution Logo" class="logo">
+            <div>
+                <h1>Auto Spares Solution</h1>
+                <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
+            </div>
         </div>
     </header>
     
@@ -974,12 +1249,23 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
         <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
         <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
         <a href="#policies"><i class="fas fa-file-contract"></i> <span>Policies</span></a>
+        <a href="#consultancy"><i class="fas fa-robot"></i> <span>Consultancy</span></a>
         <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
         <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
         <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span id="cart-count">0</span></a>
     </nav>
 
     <div class="container">
+        <!-- Advertisement Space -->
+        <div class="ad-space">
+            <h3><i class="fas fa-ad"></i> Featured Partners</h3>
+            <div class="ad-container">
+                <div class="ad-item">Advertisement Space 1</div>
+                <div class="ad-item">Advertisement Space 2</div>
+                <div class="ad-item">Advertisement Space 3</div>
+            </div>
+        </div>
+
         <!-- Hero Section -->
         <section id="home" class="hero">
             <h2>Premium Auto Parts for Professionals</h2>
@@ -1051,6 +1337,15 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                 <div class="brand-logo">STL</div>
                 <div class="brand-logo">VRP</div>
                 <div class="brand-logo">OEM</div>
+            </div>
+            
+            <!-- Advertisement Space -->
+            <div class="ad-space">
+                <h3><i class="fas fa-ad"></i> Special Offers</h3>
+                <div class="ad-container">
+                    <div class="ad-item">Special Discount on Bulk Orders</div>
+                    <div class="ad-item">New Customer Offer - 5% Off</div>
+                </div>
             </div>
         </section>
 
@@ -1132,6 +1427,47 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                         <p><strong>Payment</strong><br>We accept all major credit/debit cards, UPI, net banking, and bank transfers.</p>
                         <p><strong>Order Acceptance</strong><br>All orders are subject to stock availability. We may cancel orders if items are unavailable.</p>
                         <p><strong>Governing Law</strong><br>These terms are governed by Indian law. Any disputes will be subject to the jurisdiction of Howrah courts.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Consultancy Service Section -->
+        <section id="consultancy" class="section">
+            <h2 class="section-title">AI-Powered Consultancy Service</h2>
+            <div class="consultancy-service">
+                <p>Get expert advice on auto parts selection, compatibility, and troubleshooting with our AI-powered consultancy service. Our system leverages extensive product data to provide accurate recommendations.</p>
+                
+                <div id="free-chat-container">
+                    <div class="ai-chat-container" id="chat-messages">
+                        <div class="chat-message ai-message">
+                            <p>Hello! I'm your auto parts consultant. How can I help you today? You can ask me 3 questions for free.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input">
+                        <input type="text" id="chat-input" placeholder="Ask your question about auto parts...">
+                        <button onclick="askQuestion()"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                    
+                    <div class="payment-required" id="payment-prompt" style="display: none;">
+                        <p>You've used your free questions. Please purchase a consultancy package to continue.</p>
+                        <button class="btn" onclick="initiateConsultancyPayment()" style="background: var(--primary);">
+                            <i class="fas fa-credit-card"></i> Purchase Consultancy Package (₹499)
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="paid-chat-container" style="display: none;">
+                    <div class="ai-chat-container" id="paid-chat-messages">
+                        <div class="chat-message ai-message">
+                            <p>Welcome to premium consultancy! You can now ask unlimited questions.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input">
+                        <input type="text" id="paid-chat-input" placeholder="Ask your question about auto parts...">
+                        <button onclick="askPaidQuestion()"><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             </div>
@@ -1297,12 +1633,39 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
             "M07520-0200"
         ];
 
+        // User management variables
+        let currentUser = null;
+        let users = JSON.parse(localStorage.getItem('users')) || [];
+        let freeQuestionsAsked = 0;
+        const MAX_FREE_QUESTIONS = 3;
+        let hasPaidConsultancy = false;
+
+        // Consultancy knowledge base (in a real scenario, this would be loaded from a CSV or database)
+        const consultancyKnowledge = {
+            "engine parts": "We offer a wide range of engine components including pistons, gaskets, valves, and timing belts. For specific recommendations, please provide your vehicle make and model.",
+            "brake system": "Our brake parts include discs, pads, calipers, and master cylinders. We recommend replacing brake components in sets for optimal performance.",
+            "suspension": "We carry shock absorbers, struts, bushings, and control arms for most vehicle models. Let me know your specific requirements.",
+            "electrical": "We provide alternators, starters, batteries, and wiring harnesses. Many electrical components are vehicle-specific.",
+            "filters": "We stock air, oil, fuel, and cabin filters for all major vehicle brands. Filters should be replaced according to your vehicle's maintenance schedule.",
+            "bulb": "We have halogen, LED, and HID bulbs for headlights, brake lights, and indicators. Please specify your vehicle model for correct fitment.",
+            "bearing": "We offer wheel bearings, hub assemblies, and precision bearings for various applications. Quality bearings ensure smooth operation and safety.",
+            "fastener": "As specialists in TVS & STL fasteners, we provide high-quality nuts, bolts, and screws meeting OEM standards.",
+            "rubber": "We are authorized distributors of Volume Rubber Products, offering bushings, mounts, seals, and hoses.",
+            "default": "I'm here to help with your auto parts needs. For specific recommendations, please provide your vehicle make, model, and year, along with the part you're looking for."
+        };
+
         // DOM elements
         const cartLink = document.getElementById("cart-link");
         const cartSidebar = document.getElementById("cart-sidebar");
         const closeCartBtn = document.querySelector(".close-cart");
         const toast = document.getElementById("toast");
         const toastMessage = document.getElementById("toast-message");
+        const userToggle = document.getElementById("user-toggle");
+        const userPanel = document.getElementById("user-panel");
+        const loginForm = document.getElementById("login-form");
+        const registerForm = document.getElementById("register-form");
+        const userProfile = document.getElementById("user-profile");
+        const profileInfo = document.getElementById("profile-info");
 
         // Initialize cart toggle
         cartLink.addEventListener("click", (e) => {
@@ -1315,6 +1678,11 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
             cartSidebar.classList.remove("active");
         });
 
+        // Toggle user panel
+        userToggle.addEventListener("click", () => {
+            userPanel.classList.toggle("active");
+        });
+
         // Show toast message
         function showToast(message, isError = false) {
             toastMessage.textContent = message;
@@ -1325,6 +1693,221 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
             setTimeout(() => {
                 toast.classList.remove("show");
             }, 3000);
+        }
+
+        // User management functions
+        function showRegisterForm() {
+            loginForm.style.display = "none";
+            registerForm.style.display = "block";
+            userProfile.style.display = "none";
+        }
+
+        function showLoginForm() {
+            registerForm.style.display = "none";
+            loginForm.style.display = "block";
+            userProfile.style.display = "none";
+        }
+
+        function showUserProfile() {
+            registerForm.style.display = "none";
+            loginForm.style.display = "none";
+            userProfile.style.display = "block";
+            
+            profileInfo.innerHTML = `
+                <p><strong>Name:</strong> ${currentUser.name}</p>
+                <p><strong>Email:</strong> ${currentUser.email}</p>
+                <p><strong>Phone:</strong> ${currentUser.phone}</p>
+                ${currentUser.business ? `<p><strong>Business:</strong> ${currentUser.business}</p>` : ''}
+                ${currentUser.gstin ? `<p><strong>GSTIN:</strong> ${currentUser.gstin}</p>` : ''}
+            `;
+        }
+
+        function register() {
+            const name = document.getElementById("register-name").value;
+            const email = document.getElementById("register-email").value;
+            const password = document.getElementById("register-password").value;
+            const phone = document.getElementById("register-phone").value;
+            const business = document.getElementById("register-business").value;
+            const gstin = document.getElementById("register-gstin").value;
+            
+            if (!name || !email || !password || !phone) {
+                showToast("Please fill all required fields", true);
+                return;
+            }
+            
+            if (users.some(user => user.email === email)) {
+                showToast("Email already registered", true);
+                return;
+            }
+            
+            const newUser = {
+                name,
+                email,
+                password, // In a real application, this would be hashed
+                phone,
+                business,
+                gstin,
+                registrationDate: new Date().toISOString()
+            };
+            
+            users.push(newUser);
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            currentUser = newUser;
+            showUserProfile();
+            showToast("Registration successful!");
+            
+            // Clear form
+            document.getElementById("register-form").reset();
+        }
+
+        function login() {
+            const email = document.getElementById("login-email").value;
+            const password = document.getElementById("login-password").value;
+            
+            const user = users.find(u => u.email === email && u.password === password);
+            
+            if (user) {
+                currentUser = user;
+                showUserProfile();
+                showToast("Login successful!");
+            } else {
+                showToast("Invalid email or password", true);
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            showLoginForm();
+            showToast("Logged out successfully");
+        }
+
+        // Consultancy functions
+        function askQuestion() {
+            if (!currentUser) {
+                showToast("Please login to use the consultancy service", true);
+                return;
+            }
+            
+            if (hasPaidConsultancy) {
+                askPaidQuestion();
+                return;
+            }
+            
+            if (freeQuestionsAsked >= MAX_FREE_QUESTIONS) {
+                document.getElementById("payment-prompt").style.display = "block";
+                return;
+            }
+            
+            const input = document.getElementById("chat-input");
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            // Add user question to chat
+            const chatMessages = document.getElementById("chat-messages");
+            chatMessages.innerHTML += `
+                <div class="chat-message user-message">
+                    <p>${question}</p>
+                </div>
+            `;
+            
+            // Process question and generate response
+            setTimeout(() => {
+                let response = "I'm not sure how to help with that. Could you provide more details about your vehicle or the specific part you need?";
+                
+                // Simple keyword matching for demo purposes
+                const lowerQuestion = question.toLowerCase();
+                for (const [keyword, answer] of Object.entries(consultancyKnowledge)) {
+                    if (lowerQuestion.includes(keyword)) {
+                        response = answer;
+                        break;
+                    }
+                }
+                
+                chatMessages.innerHTML += `
+                    <div class="chat-message ai-message">
+                        <p>${response}</p>
+                    </div>
+                `;
+                
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                freeQuestionsAsked++;
+                
+                if (freeQuestionsAsked >= MAX_FREE_QUESTIONS) {
+                    document.getElementById("payment-prompt").style.display = "block";
+                }
+            }, 1000);
+            
+            input.value = "";
+        }
+
+        function askPaidQuestion() {
+            if (!hasPaidConsultancy) return;
+            
+            const input = document.getElementById("paid-chat-input");
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            // Add user question to chat
+            const chatMessages = document.getElementById("paid-chat-messages");
+            chatMessages.innerHTML += `
+                <div class="chat-message user-message">
+                    <p>${question}</p>
+                </div>
+            `;
+            
+            // Process question and generate response (more advanced in real implementation)
+            setTimeout(() => {
+                let response = consultancyKnowledge.default;
+                
+                // Simple keyword matching for demo purposes
+                const lowerQuestion = question.toLowerCase();
+                for (const [keyword, answer] of Object.entries(consultancyKnowledge)) {
+                    if (lowerQuestion.includes(keyword)) {
+                        response = answer;
+                        break;
+                    }
+                }
+                
+                chatMessages.innerHTML += `
+                    <div class="chat-message ai-message">
+                        <p>${response}</p>
+                    </div>
+                `;
+                
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 1000);
+            
+            input.value = "";
+        }
+
+        function initiateConsultancyPayment() {
+            const options = {
+                key: "rzp_live_90iWxpNYThOpyE",
+                amount: 49900, // ₹499 in paise
+                currency: "INR",
+                name: "Auto Spares Solution",
+                description: "AI Consultancy Service Package",
+                handler: function(response) {
+                    hasPaidConsultancy = true;
+                    document.getElementById("free-chat-container").style.display = "none";
+                    document.getElementById("paid-chat-container").style.display = "block";
+                    showToast("Consultancy package activated successfully!");
+                },
+                prefill: {
+                    name: currentUser ? currentUser.name : "Customer",
+                    email: currentUser ? currentUser.email : "customer@example.com",
+                    contact: currentUser ? currentUser.phone : "9999999999"
+                },
+                theme: {
+                    color: "#0a7c71"
+                }
+            };
+            
+            const rzp = new Razorpay(options);
+            rzp.open();
         }
 
         // Search functionality
@@ -1355,9 +1938,9 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                         return {
                             part: cols[0]?.trim(),
                             desc: cols[1]?.trim() || "Auto Spare Part",
-                       List: parseFloat(cols[2] || 0),
-                       Mrp: parseFloat(cols[3] || 0),     
-                      price: parseFloat(cols[6] || 0),
+                            List: parseFloat(cols[2] || 0),
+                            Mrp: parseFloat(cols[3] || 0),     
+                            price: parseFloat(cols[6] || 0),
                             stock: parseInt(cols[7] || 0),
                             boxQty: parseInt(cols[8] || 1), // Box quantity
                             masterCarton: parseInt(cols[9] || 1) // Master carton quantity
@@ -1370,6 +1953,8 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                             productsData.push({
                                 part,
                                 desc: "Auto Spare Part",
+                                List: 0,
+                                Mrp: 0,
                                 price: 0,
                                 stock: 0,
                                 boxQty: 1,
@@ -1388,6 +1973,8 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                     productsData = fixedProducts.map(part => ({
                         part,
                         desc: "Auto Spare Part",
+                        List: 0,
+                        Mrp: 0,
                         price: 0,
                         stock: 0,
                         boxQty: 1,
@@ -1423,7 +2010,19 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                         
                         <div class="part-number">${product.part}</div>
                         <div class="part-desc">${product.desc}</div>
-                        <div class="price">${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
+                        
+                        <div class="price-container">
+                            <div>
+                                <div class="price-label">List Price:</div>
+                                <div class="price-value">${product.List > 0 ? '₹'+product.List.toFixed(2) : 'NA'}</div>
+                            </div>
+                            <div>
+                                <div class="price-label">MRP:</div>
+                                <div class="price-value">${product.Mrp > 0 ? '₹'+product.Mrp.toFixed(2) : 'NA'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="price">Our Price: ${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
                         
                         <div class="stock-info">
                             <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
@@ -1604,9 +2203,9 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                     cartSidebar.classList.remove("active");
                 },
                 prefill: {
-                    name: "Customer Name",
-                    email: "customer@example.com",
-                    contact: "9999999999"
+                    name: currentUser ? currentUser.name : "Customer Name",
+                    email: currentUser ? currentUser.email : "customer@example.com",
+                    contact: currentUser ? currentUser.phone : "9999999999"
                 },
                 theme: {
                     color: "#0a7c71"
@@ -1781,6 +2380,21 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
 
         // Initialize the page
         loadProducts();
+        
+        // Check if user is already logged in
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser) {
+            currentUser = JSON.parse(savedUser);
+            showUserProfile();
+        }
+        
+        // Check if user has paid consultancy
+        const paidConsultancy = localStorage.getItem('hasPaidConsultancy');
+        if (paidConsultancy === 'true') {
+            hasPaidConsultancy = true;
+            document.getElementById("free-chat-container").style.display = "none";
+            document.getElementById("paid-chat-container").style.display = "block";
+        }
     </script>
 </body>
 </html>
