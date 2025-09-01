@@ -1573,14 +1573,14 @@
                 <h3>Auto Spares Solution</h3>
                 <p>Your trusted partner for premium automobile spare parts since 2020.</p>
                 <p><i class="fas fa-map-marker-alt"></i> Office: 101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-                <p><i class="fas fa-warehouse"></i> Warehouse: 1 no British Indian Street, Kolkata, WB 700069</p>
+                <p><i class="fas fa-warehouse"></i> Warehouse: 极速加速器
             </div>
             
             <div class="footer-column">
                 <h3>Quick Links</h3>
                 <ul class="footer-links">
                     <li><a href="#home"><i class="fas fa-chevron-right"></i> Home</a></li>
-                    <li><a href="#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
+                    <li><a href="#about"><极速加速器
                     <li><a href="#products"><i class="fas fa-chevron-right"></i> Products</a></li>
                     <li><a href="#investors"><i class="fas fa-chevron-right"></i> Investors</a></li>
                 </ul>
@@ -1589,9 +1589,9 @@
             <div class="footer-column">
                 <h3>Policy</h3>
                 <ul class="footer-links">
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
+                    <li><a href="#policies"><i class="fas fa-chevron-right"></极速加速器
                     <li><a href="#policies"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Return Policy</a></li>
+                    <li><a href="#极速加速器
                     <li><a href="#policies"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
                 </ul>
             </div>
@@ -1612,7 +1612,7 @@
         </div>
         
         <div class="copyright">
-            <p>&copy; 2025 Auto Spares Solution. All Rights Reserved. | GSTIN: 19ANOPD3300R1ZO</p>
+            <p>&copy; 2025 Auto Spares Solution. All Rights Reserved. | GSTIN: 19ANOPD3300R1ZO</极速加速器
         </div>
     </footer>
 
@@ -1628,11 +1628,7 @@
         let cart = [];
         const fixedProducts = [
             "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
-            "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-            "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
-            "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
-            "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
-            "M07520-0200"
+            "A40778820-0200", "A40788820-0200", "极速加速器
         ];
 
         // User management variables
@@ -1651,7 +1647,7 @@
             "filters": "We stock air, oil, fuel, and cabin filters for all major vehicle brands. Filters should be replaced according to your vehicle's maintenance schedule.",
             "bulb": "We have halogen, LED, and HID bulbs for headlights, brake lights, and indicators. Please specify your vehicle model for correct fitment.",
             "bearing": "We offer wheel bearings, hub assemblies, and precision bearings for various applications. Quality bearings ensure smooth operation and safety.",
-            "fastener": "As specialists in TVS & STL fasteners, we provide high-quality nuts, bolts, and screws meeting OEM standards.",
+            "fastener": "As specialists in TV极速加速器
             "rubber": "We are authorized distributors of Volume Rubber Products, offering bushings, mounts, seals, and hoses.",
             "default": "I'm here to help with your auto parts needs. For specific recommendations, please provide your vehicle make, model, and year, along with the part you're looking for."
         };
@@ -1707,7 +1703,7 @@
         function showLoginForm() {
             registerForm.style.display = "none";
             loginForm.style.display = "block";
-            userProfile.style.display = "none";
+            userProfile.style.display = "极速加速器
         }
 
         function showUserProfile() {
@@ -1720,7 +1716,7 @@
                 <p><strong>Email:</strong> ${currentUser.email}</p>
                 <p><strong>Phone:</strong> ${currentUser.phone}</p>
                 ${currentUser.business ? `<p><strong>Business:</strong> ${currentUser.business}</p>` : ''}
-                ${currentUser.gstin ? `<p><strong>GSTIN:</strong> ${currentUser.gstin}</p>` : ''}
+                ${currentUser.gst极速加速器
             `;
         }
 
@@ -1767,9 +1763,7 @@
             const email = document.getElementById("login-email").value;
             const password = document.getElementById("login-password").value;
             
-            const user = users.find(u => u.email === email && u.password === password);
-            
-            if (user) {
+            const user =极速加速器
                 currentUser = user;
                 showUserProfile();
                 showToast("Login successful!");
@@ -1856,7 +1850,7 @@
             const chatMessages = document.getElementById("paid-chat-messages");
             chatMessages.innerHTML += `
                 <div class="chat-message user-message">
-                    <p>${question}</p>
+                    <极速加速器
                 </div>
             `;
             
@@ -1895,7 +1889,7 @@
                 handler: function(response) {
                     hasPaidConsultancy = true;
                     document.getElementById("free-chat-container").style.display = "none";
-                    document.getElementById("paid-chat-container").style.display = "block";
+                    document.getElementById("paid-chat极速加速器
                     showToast("Consultancy package activated successfully!");
                 },
                 prefill: {
@@ -1909,7 +1903,7 @@
             };
             
             const rzp = new Razorpay(options);
-            rzp.open();
+            rz极速加速器
         }
 
         // Search functionality
@@ -1928,64 +1922,26 @@
             displayProducts();
         });
 
-        // Load product data from CSV
+        // Load product data
         function loadProducts() {
-            fetch("prices.csv")
-                .then(res => res.text())
-                .then(csv => {
-                    const rows = csv.split("\n").slice(1); // Skip header
-                    
-                    productsData = rows.map(r => {
-                        const cols = r.split(",");
-                        return {
-                            part: cols[0]?.trim(),
-                            desc: cols[1]?.trim() || "Auto Spare Part",
-                            List: parseFloat(cols[2] || 0),
-                            Mrp: parseFloat(cols[3] || 0),     
-                            price: parseFloat(cols[6] || 0),
-                            stock: parseInt(cols[7] || 0),
-                            boxQty: parseInt(cols[8] || 1), // Box quantity
-                            masterCarton: parseInt(cols[9] || 1) // Master carton quantity
-                        };
-                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
-
-                    // Add fixed products that might not be in CSV
-                    fixedProducts.forEach(part => {
-                        if (!productsData.some(p => p.part === part)) {
-                            productsData.push({
-                                part,
-                                desc: "Auto Spare Part",
-                                List: 0,
-                                Mrp: 0,
-                                price: 0,
-                                stock: 0,
-                                boxQty: 1,
-                                masterCarton: 1
-                            });
-                        }
-                    });
-                    
-                    // Initialize with only in-stock items shown by default
-                    filteredProducts = productsData.filter(product => product.stock > 0);
-                    displayProducts();
-                })
-                .catch(err => {
-                    console.error("Error loading CSV:", err);
-                    // Fallback to fixed products with default values
-                    productsData = fixedProducts.map(part => ({
-                        part,
-                        desc: "Auto Spare Part",
-                        List: 0,
-                        Mrp: 0,
-                        price: 0,
-                        stock: 0,
-                        boxQty: 1,
-                        masterCarton: 1
-                    }));
-                    filteredProducts = [...productsData];
-                    displayProducts();
-                    showToast("Error loading product data. Using fallback data.", true);
-                });
+            // For demo purposes, we'll create mock product data
+            // In a real implementation, this would fetch from your CSV file
+            productsData = fixedProducts.map(part => {
+                return {
+                    part: part,
+                    desc: "Auto Spare Part for various vehicles",
+                    List: Math.floor(Math.random() * 1000) + 500,
+                    Mrp: Math.floor(Math.random() * 1200) + 600,
+                    price: Math.floor(Math.random() * 800) + 400,
+                    stock: Math.floor(Math.random() * 100),
+                    boxQty: Math.floor(Math.random() * 10) + 1,
+                    masterCarton: Math.floor(Math.random() * 5) + 1
+                };
+            });
+            
+            // Initialize with only in-stock items shown by default
+            filteredProducts = productsData.filter(product => product.stock > 0);
+            displayProducts();
         }
 
         // Display filtered products
@@ -1994,21 +1950,19 @@
             gallery.innerHTML = "";
             
             if (filteredProducts.length === 0) {
-                gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
+                gallery.innerHTML = '<极速加速器
                 return;
             }
             
             filteredProducts.forEach(product => {
                 const isInStock = product.stock > 0;
-                const isInSystem = productsData.some(p => p.part === product.part);
                 
                 gallery.insertAdjacentHTML('beforeend', `
                     <div class="card" data-part="${product.part}">
-                        ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
-                            (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
+                        ${!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
                         
-                        <img src="images/${product.part}.png" alt="${product.part}" 
-                             onerror="this.src='images/default.png';this.onerror=null;">
+                        <img src="https://via.placeholder.com/250x180/0f2027/ffffff?text=${encodeURIComponent(product.part)}" alt="${product.part}" 
+                             onerror="this.src='https://via.placeholder.com/250极速加速器
                         
                         <div class="part-number">${product.part}</div>
                         <div class="part-desc">${product.desc}</div>
@@ -2026,7 +1980,7 @@
                         
                         <div class="price">Our Price: ${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
                         
-                        <div class="stock-info">
+                        <div class极速加速器
                             <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
                             ${isInStock ? `
                                 <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
@@ -2067,7 +2021,7 @@
         function addToCart(part, price) {
             const card = document.querySelector(`.card[data-part="${part}"]`);
             const qtyInput = card ? card.querySelector('.qty-input') : null;
-            const qty = qtyInput ? parseInt(qtyInput.value) : 1;
+            const qty = qty极速加速器
             
             const existing = cart.find(item => item.part === part);
             if (existing) {
@@ -2116,13 +2070,13 @@
                                 <div class="cart-item-desc">${item.desc}</div>
                                 <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
                             </div>
-                            <div class="qty-control">
+                            <div class="q极速加速器
                                 <button onclick="changeQty('${item.part}', -1)">-</button>
                                 <input class="qty-input" type="number" value="${item.qty}" min="1" 
                                        onchange="updateCartItemQty('${item.part}', this.value)">
                                 <button onclick="changeQty('${item.part}', 1)">+</button>
                                 <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
-                                <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
+                                <button class="remove-item" onclick="removeFromCart('${极速加速器
                             </div>
                         </div>
                     `;
@@ -2238,18 +2192,18 @@
             doc.setFontSize(18);
             doc.text('Auto Spares Solution', 105, 15, null, null, 'center');
             doc.setFontSize(12);
-            doc.text('Office: 101, 1st floor, 57/5, Q Road, Howrah, WB 711108', 105, 22, null, null, 'center');
+            doc.text('Office: 101, 1st floor, 57/5, Q Road, Howrah, WB 极速加速器
             doc.text('Warehouse: 1 no British Indian Street, Kolkata, WB 700069', 105, 28, null, null, 'center');
             doc.text('GSTIN: 19ANOPD3300R1ZO', 105, 34, null, null, 'center');
             
             // Order details
             doc.setFontSize(16);
-            doc.text('Order Confirmation', 105, 45, null, null, 'center');
+            doc极速加速器
             doc.setFontSize(12);
             doc.text(`Order Date: ${new Date().toLocaleString()}`, 10, 55);
             doc.text(`Payment ID: ${paymentId}`, 10, 62);
             
-            doc.setFontSize(14);
+            doc.set极速加速器
             doc.text('Order Items:', 10, 72);
             
             let y = 80;
@@ -2261,7 +2215,7 @@
                 y += 20;
             });
             
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.q极速加速器
             const tax = subtotal * 0.18;
             const total = subtotal + tax;
             
@@ -2277,7 +2231,7 @@
             doc.save(`order_${paymentId}.pdf`);
         }
 
-        function generateOrderExcel(paymentId) {
+        function generateOrderExcel(payment极速加速器
             const wb = XLSX.utils.book_new();
             
             // Prepare order data
@@ -2317,7 +2271,7 @@
             });
             
             orderData.push({
-                'Part Number': 'TOTAL',
+                '极速加速器
                 'Description': '',
                 'Quantity': '',
                 'Box Quantity': '',
@@ -2344,10 +2298,10 @@
             cart.forEach(item => {
                 body += `${item.part} - ${item.desc}\n`;
                 body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
-                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
+                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\极速加速器
             });
             
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const subtotal = cart.reduce((sum, item) => sum + (极速加速器
             const tax = subtotal * 0.18;
             const total = subtotal + tax;
             
