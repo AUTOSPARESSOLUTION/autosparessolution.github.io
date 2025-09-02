@@ -1931,7 +1931,7 @@ document.getElementById("search-input").addEventListener("input", (e) => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
         performSearch(e.target.value);
-    }, 50); // 50ms delay before searching
+    }, 250); // 250ms delay before searching
 });
 
 // Add Enter key support
