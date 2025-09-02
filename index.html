@@ -1488,18 +1488,7 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
 
         <!-- Products Section -->
         <div class="search-container">
-             // Search with debounce
-            const searchInput = document.getElementById("search-input");
-            let searchTimeout = null;
-            
-            searchInput.addEventListener("input", (e) => {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => {
-                    performSearch(e.target.value);
-                }, 500); // 500ms delay before searching
-            });
-
-            <i class="fas fa-search search-icon"></i>
+              <i class="fas fa-search search-icon"></i>
             <input type="text" id="search-input" placeholder="Search by part number or description...">
         </div>
 
@@ -1935,6 +1924,25 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
         }
 
         // Search functionality
+        // Search with debounce
+            const searchInput = document.getElementById("search-input");
+            let searchTimeout = null;
+            
+            searchInput.addEventListener("input", (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    performSearch(e.target.value);
+                }, 500); // 500ms delay before searching
+            });
+
+            // Enter key to search
+            searchInput.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    clearTimeout(searchTimeout);
+                    performSearch(e.target.value);
+                }
+            });
+        }
         document.getElementById("search-input").addEventListener("input", (e) => {
             const searchTerm = e.target.value.toLowerCase();
             if (searchTerm === '') {
