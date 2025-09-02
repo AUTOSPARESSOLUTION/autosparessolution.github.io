@@ -1929,7 +1929,7 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
         document.getElementById("search-input").addEventListener("input", (e) => {clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => {
                     performSearch(e.target.value);
-                }, 50); // 50ms delay before searching
+                }, 50)// 50ms delay before searching
             const searchTerm = e.target.value.toLowerCase();
             if (searchTerm === '') {
                 // When search is empty, show only in-stock items
