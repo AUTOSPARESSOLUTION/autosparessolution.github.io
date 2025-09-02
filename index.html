@@ -1934,15 +1934,8 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                     performSearch(e.target.value);
                 }, 500); // 500ms delay before searching
             });
-
-            // Enter key to search
-            searchInput.addEventListener("keypress", (e) => {
-                if (e.key === "Enter") {
-                    clearTimeout(searchTimeout);
-                    performSearch(e.target.value);
-                }
-            });
         }
+            // Enter key to search
         document.getElementById("search-input").addEventListener("input", (e) => {
             const searchTerm = e.target.value.toLowerCase();
             if (searchTerm === '') {
