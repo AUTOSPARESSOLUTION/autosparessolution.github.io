@@ -1924,26 +1924,39 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
         }
 
         // Search functionality
-        // Search with debounce
-            // Enter key to search
-        document.getElementById("search-input").addEventListener("input", (e) => {clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => {
-                    performSearch(e.target.value);
-                }, 50)// 50ms delay before searching
-            const searchTerm = e.target.value.toLowerCase();
-            if (searchTerm === '') {
-                // When search is empty, show only in-stock items
-                filteredProducts = productsData.filter(product => product.stock > 0);
-            } else {
-                // When searching, show all matching products regardless of stock
-                filteredProducts = productsData.filter(product => 
-                    product.part.toLowerCase().includes(searchTerm) || 
-                    (product.desc && product.desc.toLowerCase().includes(searchTerm))
-                );
-            }
-            displayProducts();
-        });
+let searchTimeout;
 
+// Search with debounce and Enter key support
+document.getElementById("search-input").addEventListener("input", (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        performSearch(e.target.value);
+    }, 50); // 50ms delay before searching
+});
+
+// Add Enter key support
+document.getElementById("search-input").addEventListener("keypress", (e) => {
+    if (e.key === 'Enter') {
+        clearTimeout(searchTimeout); // Clear any pending timeout
+        performSearch(e.target.value);
+    }
+});
+
+function performSearch(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (term === '') {
+        // When search is empty, show only in-stock items
+        filteredProducts = productsData.filter(product => product.stock > 0);
+    } else {
+        // When searching, show all matching products regardless of stock
+        filteredProducts = productsData.filter(product => 
+            product.part.toLowerCase().includes(term) || 
+            (product.desc && product.desc.toLowerCase().includes(term))
+        );
+    }
+    displayProducts();
+}
         // Load product data from CSV
         function loadProducts() {
             fetch("prices.csv")
