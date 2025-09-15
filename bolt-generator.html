@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bolt Part Number Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --success: #2ecc71;
+            --warning: #f39c12;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid var(--secondary);
+        }
+        
+        .tab {
+            padding: 1.2rem 2rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-align: center;
+            flex: 1;
+        }
+        
+        .tab.active {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 2rem;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.8rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid var(--secondary);
+        }
+        
+        .card h3 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.8rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .card h3 i {
+            margin-right: 10px;
+            color: var(--secondary);
+        }
+        
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.8rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        
+        .input-hint {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        button {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 14px 22px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        button i {
+            margin-right: 8px;
+        }
+        
+        button:hover {
+            background: var(--primary);
+        }
+        
+        .btn-primary {
+            background: var(--secondary);
+            width: 100%;
+        }
+        
+        .result-box {
+            background: #e8f4fc;
+            padding: 2rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+            text-align: center;
+        }
+        
+        .part-number {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 1.5rem 0;
+            word-break: break-all;
+        }
+        
+        .decode-result {
+            text-align: left;
+            margin-top: 1.5rem;
+        }
+        
+        .decode-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #b3d9f2;
+        }
+        
+        .decode-item:last-child {
+            border-bottom: none;
+        }
+        
+        .property {
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .value {
+            color: var(--primary;
+        }
+        
+        .specs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        
+        .system-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .system-btn {
+            flex: 1;
+            padding: 10px;
+            background: #e9ecef;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .system-btn.active {
+            background: var(--secondary);
+            color: white;
+            border-color: var(--secondary);
+        }
+        
+        .inch-options {
+            display: none;
+        }
+        
+        .fraction-input {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .fraction-input select, .fraction-input input {
+            flex: 1;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: #777;
+            background: #f9f9f9;
+            border-top: 1px solid #eee;
+        }
+        
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .specs-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tab-content {
+                padding: 1.5rem;
+            }
+            
+            .system-selector {
+                flex-direction: column;
+            }
+            
+            .fraction-input {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Bolt Part Number Generator</h1>
+            <p class="subtitle">Generate part numbers for hex bolts in metric and inch series</p>
+        </header>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="generate"><i class="fas fa-cog"></i> Generate Part Number</div>
+            <div class="tab" data-tab="decode"><i class="fas fa-search"></i> Decode Part Number</div>
+        </div>
+        
+        <div id="generate" class="tab-content active">
+            <div class="card">
+                <h3><i class="fas fa-cog"></i> Generate Bolt Part Number</h3>
+                
+                <div class="system-selector">
+                    <div class="system-btn active" data-system="metric">Metric Series</div>
+                    <div class="system-btn" data-system="inch">Inch Series</div>
+                </div>
+                
+                <!-- Metric System Options -->
+                <div id="metric-options">
+                    <div class="specs-grid">
+                        <div class="input-group">
+                            <label for="gen-type"><i class="fas fa-tag"></i> Fastener Type</label>
+                            <select id="gen-type">
+                                <option value="1">1 - Screw</option>
+                                <option value="2" selected>2 - Bolt</option>
+                            </select>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="gen-grade"><i class="fas fa-shield-alt"></i> Grade/Class</label>
+                            <select id="gen-grade">
+                                <option value="2" selected>2 - 8.8</option>
+                                <option value="5">5 - 10.9</option>
+                                <option value="6">6 - 12.9</option>
+                            </select>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="gen-diameter"><i class="fas fa-arrows-alt-h"></i> Diameter</label>
+                            <select id="gen-diameter">
+                                <option value="03">03 - M3</option>
+                                <option value="04">04 - M4</option>
+                                <option value="05">05 - M5</option>
+                                <option value="06">06 - M6</option>
+                                <option value="08">08 - M8</option>
+                                <option value="10">10 - M10</option>
+                                <option value="12" selected>12 - M12</option>
+                                <option value="14">14 - M14</option>
+                                <option value="16">16 - M16</option>
+                                <option value="18">18 - M18</option>
+                                <option value="20">20 - M20</option>
+                                <option value="22">22 - M22</option>
+                                <option value="24">24 - M24</option>
+                                <option value="27">27 - M27</option>
+                                <option value="30">30 - M30</option>
+                                <option value="36">36 - M36</option>
+                            </select>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="gen-pitch"><i class="fas fa-wave-square"></i> Pitch Code</label>
+                            <select id="gen-pitch">
+                                <option value="1">1 - M3-M6 (1.0 mm)</option>
+                                <option value="2">2 - M8 (1.25 mm)</option>
+                                <option value="3">3 - M10 (1.5 mm)</option>
+                                <option value="4" selected>4 - M12 (1.75 mm)</option>
+                                <option value="5">5 - M14/M16 (2.0 mm)</option>
+                                <option value="7">7 - M18/M20/M22 (2.5 mm)</option>
+                                <option value="9">9 - M24 (3.0 mm)</option>
+                                <option value="8">8 - M27 (3.0 mm)</option>
+                                <option value="6">6 - M30 (3.5 mm)</option>
+                                <option value="0">0 - M36 (4.0 mm)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="gen-length"><i class="fas fa-ruler-vertical"></i> Length (mm)</label>
+                            <input type="number" id="gen-length" min="5" max="500" value="70">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Inch Series Options -->
+                <div id="inch-options" class="inch-options">
+                    <div class="specs-grid">
+                        <div class="input-group">
+                            <label for="inch-type"><i class="fas fa-tag"></i> Fastener Type</label>
+                            <select id="inch-type">
+                                <option value="1">1 - Screw</option>
+                                <option value="2" selected>2 - Bolt</option>
+                            </select>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="inch-grade"><i class="fas fa-shield-alt"></i> Grade/Class</label>
+                            <select id="inch-grade">
+                                <option value="2" selected>2 - Grade 2 (BSW/BSF)</option>
+                                <option value="8">8 - Grade 8 (UNC/UNF)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="inch-diameter"><i class="fas fa-arrows-alt-h"></i> Diameter (inches)</label>
+                            <select id="inch-diameter">
+                                <option value="0.25">1/4"</option>
+                                <option value="0.3125">5/16"</option>
+                                <option value="0.375" selected>3/8"</option>
+                                <option value="0.4375">7/16"</option>
+                                <option value="0.5">1/2"</option>
+                                <option value="0.625">5/8"</option>
+                                <option value="0.75">3/4"</option>
+                                <option value="0.875">7/8"</option>
+                                <option value="1">1"</option>
+                            </select>
+                            <div class="input-hint">Diameter code = diameter × 32</div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="inch-tpi"><i class="fas fa-wave-square"></i> Thread Type</label>
+                            <select id="inch-tpi">
+                                <option value="1">1 - BSW</option>
+                                <option value="2">2 - BSF</option>
+                                <option value="4" selected>4 - UNC</option>
+                                <option value="5">5 - UNF</option>
+                            </select>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="inch-length"><i class="fas fa-ruler-vertical"></i> Length (inches)</label>
+                            <div class="fraction-input">
+                                <input type="number" id="inch-whole" min="0" max="20" value="1" placeholder="Whole">
+                                <select id="inch-fraction">
+                                    <option value="0">0/0</option>
+                                    <option value="0.125">1/8</option>
+                                    <option value="0.25" selected>1/4</option>
+                                    <option value="0.375">3/8</option>
+                                    <option value="0.5">1/2</option>
+                                    <option value="0.625">5/8</option>
+                                    <option value="0.75">3/4</option>
+                                    <option value="0.875">7/8</option>
+                                </select>
+                            </div>
+                            <div class="input-hint">Length code = whole number + (fraction × 16)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label for="gen-finish"><i class="fas fa-paint-roller"></i> Finish Code (optional)</label>
+                    <select id="gen-finish">
+                        <option value="">No finish code</option>
+                        <option value="0200">0200 - Zinc Phosphate</option>
+                        <option value="0300">0300 - Zinc White/Blue</option>
+                        <option value="0400">0400 - Zinc Yellow</option>
+                        <option value="0900">0900 - Zinc Green</option>
+                        <option value="2500">2500 - Trivalent</option>
+                        <option value="4400">4400 - Geomet (Silver)</option>
+                        <option value="4500">4500 - Dacromet (Silver)</option>
+                        <option value="5901">5901 - Zinc Grey/Black</option>
+                        <option value="9700">9700 - Hot Dip Galvanizing</option>
+                    </select>
+                </div>
+                
+                <button class="btn-primary" id="generate-btn"><i class="fas fa-cog"></i> Generate Part Number</button>
+                
+                <div class="result-box">
+                    <h3><i class="fas fa-barcode"></i> Generated Bolt Part Number</h3>
+                    <div class="part-number" id="generated-part">222124104</div>
+                    
+                    <div class="decode-result">
+                        <div class="decode-item">
+                            <span class="property">Complete Part Number:</span>
+                            <span class="value" id="complete-part">222124104</span>
+                        </div>
+                        <div class="decode-item">
+                            <span class="property">With Finish Code:</span>
+                            <span class="value" id="finished-part">222124104</span>
+                        </div>
+                        <div class="decode-item">
+                            <span class="property">Calculations:</span>
+                            <span class="value" id="calculations">Diameter: 3/8" × 32 = 12, Length: 1 + (1/4 × 16) = 1 + 04 = 104</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="decode" class="tab-content">
+            <div class="card">
+                <h3><i class="fas fa-search"></i> Decode Bolt Part Number</h3>
+                
+                <div class="input-group">
+                    <label for="part-input"><i class="fas fa-barcode"></i> Enter Part Number</label>
+                    <input type="text" id="part-input" placeholder="e.g., 212124070 or 222124104" value="222124104">
+                    <div class="input-hint">Enter 9-digit part number (optional finish code with -)</div>
+                </div>
+                
+                <button class="btn-primary" id="decode-btn"><i class="fas fa-qrcode"></i> Decode Part Number</button>
+                
+                <div class="result-box">
+                    <h3><i class="fas fa-info-circle"></i> Decoded Information</h3>
+                    <div class="part-number" id="part-number">222124104</div>
+                    
+                    <div class="decode-result">
+                        <div class="decode-item">
+                            <span class="property">1st Digit - Fastener Type:</span>
+                            <span class="value" id="decode-type">Bolt (2)</span>
+                        </div>
+                        <div class="decode-item">
+                            <span class="property">2nd Digit - Series:</span>
+                            <span class="value" id="decode-series">Inch (2)</span>
+                        </div>
+                        <div class="decode-item">
+                            <span class="property">3rd Digit - Grade/Class:</span>
+                            <span class="value" id="decode-grade">Grade 2 (2)</span>
+                        </div>
+                        <div class="decode-item">
+                            <span class="property">4th-5th Digits - Diameter:</span>
+                            <span class="value" id="decode-diameter">3/8" (12)</span>
+                        </div>
+                        <div class="decode-item">
+                            <span class="property">6th Digit - Thread Type:</span>
+                            <span class="value" id="decode-pitch">UNC (4)</span>
+                        </div>
+                        <div class="decode-item">
+                            <span class="property">7th-9th Digits - Length:</span>
+                            <span class="value" id="decode-length">1 1/4" (104)</span>
+                        </div>
+                        <div class="decode-item">
+                            <span class="property">Finish Code (if any):</span>
+                            <span class="value" id="decode-finish">Not specified</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Bolt Part Number Generator &copy; 2023 | Hex & Inch Series Only</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab functionality
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // Remove active class from all tabs and contents
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    // Add active class to clicked tab and corresponding content
+                    this.classList.add('active');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // System selector functionality
+            const systemBtns = document.querySelectorAll('.system-btn');
+            
+            systemBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const system = this.getAttribute('data-system');
+                    
+                    // Remove active class from all buttons
+                    systemBtns.forEach(b => b.classList.remove('active'));
+                    // Add active class to clicked button
+                    this.classList.add('active');
+                    
+                    // Hide all options
+                    document.getElementById('metric-options').style.display = 'none';
+                    document.getElementById('inch-options').style.display = 'none';
+                    
+                    // Show selected options
+                    document.getElementById(system + '-options').style.display = 'block';
+                });
+            });
+            
+            // Decode button event
+            document.getElementById('decode-btn').addEventListener('click', decodePartNumber);
+            
+            // Generate button event
+            document.getElementById('generate-btn').addEventListener('click', generatePartNumber);
+            
+            // Initial decode
+            decodePartNumber();
+            
+            function decodePartNumber() {
+                const partInput = document.getElementById('part-input').value;
+                let partNumber = partInput;
+                let finishCode = '';
+                
+                // Check if there's a finish code
+                if (partInput.includes('-')) {
+                    const parts = partInput.split('-');
+                    partNumber = parts[0];
+                    finishCode = parts[1];
+                }
+                
+                // Validate input
+                if (partNumber.length !== 9) {
+                    alert('Part number must be 9 digits long');
+                    return;
+                }
+                
+                // Decode each segment for standard 9-digit parts
+                const typeCode = partNumber[0];
+                const seriesCode = partNumber[1];
+                const gradeCode = partNumber[2];
+                const diameterCode = partNumber.substring(3, 5);
+                const pitchCode = partNumber[5];
+                const lengthCode = partNumber.substring(6, 9);
+                
+                // Decode values
+                const type = decodeType(typeCode);
+                const series = decodeSeries(seriesCode);
+                const grade = decodeGrade(gradeCode, seriesCode);
+                const diameter = decodeDiameter(diameterCode, seriesCode);
+                const pitch = decodePitch(pitchCode, seriesCode);
+                const length = decodeLength(lengthCode, seriesCode);
+                const finish = decodeFinish(finishCode);
+                
+                // Update UI
+                document.getElementById('part-number').textContent = partNumber;
+                document.getElementById('decode-type').textContent = `${type} (${typeCode})`;
+                document.getElementById('decode-series').textContent = `${series} (${seriesCode})`;
+                document.getElementById('decode-grade').textContent = `${grade} (${gradeCode})`;
+                document.getElementById('decode-diameter').textContent = `${diameter}`;
+                document.getElementById('decode-pitch').textContent = `${pitch} (${pitchCode})`;
+                document.getElementById('decode-length').textContent = `${length} (${lengthCode})`;
+                document.getElementById('decode-finish').textContent = finish;
+            }
+            
+            function generatePartNumber() {
+                // Get current system
+                const activeSystem = document.querySelector('.system-btn.active').getAttribute('data-system');
+                
+                if (activeSystem === 'metric') {
+                    generateMetricPart();
+                } else if (activeSystem === 'inch') {
+                    generateInchPart();
+                }
+            }
+            
+            function generateMetricPart() {
+                // Get all input values
+                const type = document.getElementById('gen-type').value;
+                const grade = document.getElementById('gen-grade').value;
+                const diameter = document.getElementById('gen-diameter').value;
+                const pitch = document.getElementById('gen-pitch').value;
+                const length = document.getElementById('gen-length').value;
+                const finish = document.getElementById('gen-finish').value;
+                
+                // Format length to 3 digits
+                const formattedLength = length.toString().padStart(3, '0');
+                
+                // Create part number
+                const partNumber = type + '1' + grade + diameter + pitch + formattedLength;
+                
+                // Display results
+                document.getElementById('generated-part').textContent = partNumber;
+                document.getElementById('complete-part').textContent = partNumber;
+                document.getElementById('finished-part').textContent = finish ? `${partNumber}-${finish}` : partNumber;
+                document.getElementById('calculations').textContent = '';
+            }
+            
+            function generateInchPart() {
+                // Get all input values
+                const type = document.getElementById('inch-type').value;
+                const grade = document.getElementById('inch-grade').value;
+                const diameterInches = parseFloat(document.getElementById('inch-diameter').value);
+                const tpi = document.getElementById('inch-tpi').value;
+                const whole = parseInt(document.getElementById('inch-whole').value) || 0;
+                const fraction = parseFloat(document.getElementById('inch-fraction').value);
+                const finish = document.getElementById('gen-finish').value;
+                
+                // Calculate diameter code (diameter × 32)
+                const diameterCode = Math.round(diameterInches * 32).toString().padStart(2, '0');
+                
+                // Calculate length code (whole number + fraction × 16)
+                const fractionCode = Math.round(fraction * 16).toString().padStart(2, '0');
+                const lengthCode = whole.toString() + fractionCode;
+                
+                // Create part number
+                const partNumber = type + '2' + grade + diameterCode + tpi + lengthCode;
+                
+                // Display results
+                document.getElementById('generated-part').textContent = partNumber;
+                document.getElementById('complete-part').textContent = partNumber;
+                document.getElementById('finished-part').textContent = finish ? `${partNumber}-${finish}` : partNumber;
+                
+                // Show calculations
+                const fractionText = getFractionText(fraction);
+                document.getElementById('calculations').textContent = 
+                    `Diameter: ${diameterInches}" × 32 = ${diameterCode}, Length: ${whole} + (${fractionText} × 16) = ${whole} + ${fractionCode} = ${lengthCode}`;
+            }
+            
+            function getFractionText(fraction) {
+                switch(fraction) {
+                    case 0.125: return '1/8';
+                    case 0.25: return '1/4';
+                    case 0.375: return '3/8';
+                    case 0.5: return '1/2';
+                    case 0.625: return '5/8';
+                    case 0.75: return '3/4';
+                    case 0.875: return '7/8';
+                    default: return fraction.toString();
+                }
+            }
+            
+            function decodeType(code) {
+                switch(code) {
+                    case '1': return 'Screw';
+                    case '2': return 'Bolt';
+                    default: return 'Unknown';
+                }
+            }
+            
+            function decodeSeries(code) {
+                switch(code) {
+                    case '1': return 'Metric';
+                    case '2': return 'Inch';
+                    default: return 'Unknown';
+                }
+            }
+            
+            function decodeGrade(code, seriesCode) {
+                // For Metric series
+                if (seriesCode === '1') {
+                    switch(code) {
+                        case '2': return 'Grade 8.8';
+                        case '5': return 'Grade 10.9';
+                        case '6': return 'Grade 12.9';
+                        default: return 'Unknown Grade';
+                    }
+                } 
+                // For Inch series
+                else if (seriesCode === '2') {
+                    switch(code) {
+                        case '2': return 'Grade 2';
+                        case '8': return 'Grade 8';
+                        default: return 'Unknown Grade';
+                    }
+                }
+                return 'Unknown Grade';
+            }
+            
+            function decodeDiameter(code, seriesCode) {
+                if (seriesCode === '1') {
+                    return `M${parseInt(code)}`;
+                } else {
+                    // Convert code to inch size (code / 32)
+                    const sizeInInches = parseInt(code) / 32;
+                    
+                    // Convert to fraction format
+                    let fraction = '';
+                    if (sizeInInches === 0.25) fraction = '1/4"';
+                    else if (sizeInInches === 0.3125) fraction = '5/16"';
+                    else if (sizeInInches === 0.375) fraction = '3/8"';
+                    else if (sizeInInches === 0.4375) fraction = '7/16"';
+                    else if (sizeInInches === 0.5) fraction = '1/2"';
+                    else if (sizeInInches === 0.625) fraction = '5/8"';
+                    else if (sizeInInches === 0.75) fraction = '3/4"';
+                    else if (sizeInInches === 0.875) fraction = '7/8"';
+                    else if (sizeInInches === 1) fraction = '1"';
+                    else fraction = `${sizeInInches}"`;
+                    
+                    return `${fraction} (${code})`;
+                }
+            }
+            
+            function decodePitch(code, seriesCode) {
+                if (seriesCode === '1') {
+                    // Metric pitch
+                    switch(code) {
+                        case '1': return 'M3-M6 (1.0 mm)';
+                        case '2': return 'M8 (1.25 mm)';
+                        case '3': return 'M10 (1.5 mm)';
+                        case '4': return 'M12 (1.75 mm)';
+                        case '5': return 'M14/M16 (2.0 mm)';
+                        case '7': return 'M18/M20/M22 (2.5 mm)';
+                        case '9': return 'M24 (3.0 mm)';
+                        case '8': return 'M27 (3.0 mm)';
+                        case '6': return 'M30 (3.5 mm)';
+                        case '0': return 'M36 (4.0 mm)';
+                        default: return 'Unknown';
+                    }
+                } else {
+                    // Inch TPI
+                    switch(code) {
+                        case '1': return 'BSW';
+                        case '2': return 'BSF';
+                        case '4': return 'UNC';
+                        case '5': return 'UNF';
+                        default: return 'Unknown';
+                    }
+                }
+            }
+            
+            function decodeLength(code, seriesCode) {
+                if (seriesCode === '1') {
+                    return `${parseInt(code)} mm`;
+                } else {
+                    // Convert code to inches
+                    const whole = parseInt(code.substring(0, 1));
+                    const fractionCode = parseInt(code.substring(1, 3));
+                    const fraction = fractionCode / 16;
+                    
+                    // Convert to fraction format
+                    let fractionText = '';
+                    if (fraction === 0) fractionText = '';
+                    else if (fraction === 0.125) fractionText = '1/8';
+                    else if (fraction === 0.25) fractionText = '1/4';
+                    else if (fraction === 0.375) fractionText = '3/8';
+                    else if (fraction === 0.5) fractionText = '1/2';
+                    else if (fraction === 0.625) fractionText = '5/8';
+                    else if (fraction === 0.75) fractionText = '3/4';
+                    else if (fraction === 0.875) fractionText = '7/8';
+                    else fractionText = fraction.toFixed(3);
+                    
+                    const lengthText = whole > 0 ? 
+                        `${whole} ${fractionText}"` : 
+                        `${fractionText}"`;
+                        
+                    return `${lengthText} (${code})`;
+                }
+            }
+            
+            function decodeFinish(code) {
+                if (!code) return 'Not specified';
+                
+                switch(code) {
+                    case '0200': return 'Zinc Phosphate (0200)';
+                    case '0300': return 'Zinc White/Blue (0300)';
+                    case '0400': return 'Zinc Yellow (0400)';
+                    case '0900': return 'Zinc Green (0900)';
+                    case '2500': return 'Trivalent (2500)';
+                    case '4400': return 'Geomet (Silver) (4400)';
+                    case '4500': return 'Dacromet (Silver) (4500)';
+                    case '5901': return 'Zinc Grey/Black (5901)';
+                    case '9700': return 'Hot Dip Galvanizing (9700)';
+                    default: return `Unknown finish (${code})`;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
