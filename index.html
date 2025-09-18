@@ -2464,34 +2464,432 @@ function performSearch(searchTerm) {
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const header = document.querySelector('header');
-        const nav = document.querySelector('nav');
-        const headerHeight = header.offsetHeight;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixed Menu Solution - Auto Spares Solution</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         
-        // Set the correct top position for the nav based on header height
-        nav.style.top = headerHeight + 'px';
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #f8f9fa;
+            line-height: 1.6;
+            padding-top: 160px; /* Adjust based on total header height */
+        }
         
-        // Make sure the menu stays visible on scroll
-        window.addEventListener('scroll', function() {
-            const scrollPosition = window.scrollY;
-            
-            if (scrollPosition > headerHeight) {
-                nav.style.position = 'fixed';
-                nav.style.width = '100%';
-                nav.style.top = '0';
-                nav.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-            } else {
-                nav.style.position = 'sticky';
-                nav.style.top = headerHeight + 'px';
-                nav.style.boxShadow = 'none';
+        /* Fixed header solution */
+        .fixed-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.95);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.4);
+        }
+        
+        .header-content {
+            text-align: center;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .logo {
+            height: 50px;
+            width: auto;
+            border-radius: 5px;
+        }
+        
+        .header-content h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: #f1c40f;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+        }
+        
+        .tagline {
+            color: #a0d9d4;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            max-width: 600px;
+        }
+        
+        .fixed-nav {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 0.8rem 1rem;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 1.5rem;
+            border-top: 1px solid #2c5364;
+        }
+        
+        .fixed-nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            position: relative;
+            padding: 0.3rem 0;
+            transition: color 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.9rem;
+        }
+        
+        .fixed-nav a:hover {
+            color: #f1c40f;
+        }
+        
+        .fixed-nav a i {
+            font-size: 1rem;
+        }
+        
+        .cart-count {
+            background: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            position: absolute;
+            top: -8px;
+            right: -12px;
+        }
+        
+        .search-container {
+            padding: 0.5rem 1rem;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            border-bottom: 1px solid #2c5364;
+        }
+        
+        .search-box {
+            display: flex;
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 0.8rem 1rem 0.8rem 2.5rem;
+            border-radius: 5px;
+            border: none;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transition: all 0.3s;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 0 0 2px #0a7c71;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 0.8rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #aaa;
+        }
+        
+        /* Demo content */
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .section-title {
+            color: #f1c40f;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #0a7c71;
+        }
+        
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        
+        .product-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 1.2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.12);
+        }
+        
+        .product-img {
+            width: 100%;
+            height: 150px;
+            object-fit: contain;
+            margin-bottom: 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        
+        .product-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #f1c40f;
+        }
+        
+        .product-price {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+            color: #0a7c71;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.6rem 1.2rem;
+            background: #0a7c71;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin-top: 0.5rem;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn:hover {
+            background: #09645a;
+            transform: translateY(-2px);
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            body {
+                padding-top: 200px; /* More space for mobile */
             }
-        });
+            
+            .fixed-nav {
+                gap: 1rem;
+                padding: 0.6rem 0.5rem;
+            }
+            
+            .fixed-nav a span {
+                display: none;
+            }
+            
+            .header-content h1 {
+                font-size: 1.5rem;
+            }
+            
+            .tagline {
+                font-size: 0.8rem;
+            }
+        }
         
-        // Adjust on window resize
-        window.addEventListener('resize', function() {
-            const newHeaderHeight = header.offsetHeight;
-            nav.style.top = newHeaderHeight + 'px';
+        @media (max-width: 480px) {
+            body {
+                padding-top: 220px;
+            }
+            
+            .fixed-nav {
+                gap: 0.8rem;
+            }
+            
+            .fixed-nav a {
+                font-size: 0.8rem;
+            }
+            
+            .logo {
+                height: 40px;
+            }
+            
+            .header-content h1 {
+                font-size: 1.3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Fixed Header with Navigation -->
+    <div class="fixed-header">
+        <div class="header-content">
+            <div class="logo-container">
+                <img src="https://via.placeholder.com/50x50/0a7c71/ffffff?text=ASS" alt="Auto Spares Solution Logo" class="logo">
+                <div>
+                    <h1>Auto Spares Solution</h1>
+                    <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="search-container">
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" placeholder="Search by part number or description...">
+            </div>
+        </div>
+        
+        <nav class="fixed-nav">
+            <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
+            <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
+            <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
+            <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
+            <a href="#policies"><i class="fas fa-file-contract"></i> <span>Policies</span></a>
+            <a href="#consultancy"><i class="fas fa-robot"></i> <span>Consultancy</span></a>
+            <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
+            <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
+            <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span class="cart-count">3</span></a>
+        </nav>
+    </div>
+
+    <!-- Demo Content -->
+    <div class="container">
+        <div class="section">
+            <h2 class="section-title">Featured Products</h2>
+            <div class="product-grid">
+                <div class="product-card">
+                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Engine+Part" alt="Engine Part" class="product-img">
+                    <h3 class="product-title">Engine Cylinder Head</h3>
+                    <p>High-performance cylinder head for all major brands</p>
+                    <div class="product-price">₹12,499</div>
+                    <button class="btn">Add to Cart</button>
+                </div>
+                
+                <div class="product-card">
+                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Brake+System" alt="Brake System" class="product-img">
+                    <h3 class="product-title">Brake Caliper Assembly</h3>
+                    <p>Premium brake calipers with extended lifespan</p>
+                    <div class="product-price">₹8,299</div>
+                    <button class="btn">Add to Cart</button>
+                </div>
+                
+                <div class="product-card">
+                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Transmission" alt="Transmission" class="product-img">
+                    <h3 class="product-title">Automatic Transmission Kit</h3>
+                    <p>Complete kit for transmission overhaul</p>
+                    <div class="product-price">₹24,999</div>
+                    <button class="btn">Add to Cart</button>
+                </div>
+                
+                <div class="product-card">
+                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Suspension" alt="Suspension" class="product-img">
+                    <h3 class="product-title">Shock Absorber Set</h3>
+                    <p>4-piece set for smooth ride quality</p>
+                    <div class="product-price">₹14,500</div>
+                    <button class="btn">Add to Cart</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">About Auto Spares Solution</h2>
+            <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We specialize in providing high-quality components that meet industry standards and ensure optimal vehicle performance.</p>
+            <p>With our extensive network and industry expertise, we ensure timely delivery of genuine parts at competitive prices. Our commitment to quality and customer satisfaction has made us a trusted partner for automotive businesses across the region.</p>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">Our Services</h2>
+            <p>We offer a comprehensive range of services to meet all your automotive parts needs:</p>
+            <ul>
+                <li>Bulk supply of genuine auto parts</li>
+                <li>Import and distribution of specialized components</li>
+                <li>Technical support and consultancy services</li>
+                <li>Custom sourcing solutions for rare parts</li>
+                <li>Nationwide shipping and logistics</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Simple script to highlight the active menu item on scroll
+        document.addEventListener('DOMContentLoaded', function() {
+            const sections = document.querySelectorAll('.section');
+            const navLinks = document.querySelectorAll('.fixed-nav a');
+            
+            window.addEventListener('scroll', function() {
+                let current = '';
+                
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    
+                    if (pageYOffset >= (sectionTop - 200)) {
+                        current = section.getAttribute('id');
+                    }
+                });
+                
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+            
+            // Add smooth scrolling for navigation links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+                    
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 160,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
         });
-    });
-</script>
+    </script>
+</body>
+</html>
 </body>
 </html>
