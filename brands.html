@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse by Brand - Auto Spares Solution</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #f8f9fa;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            color: #f1c40f;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #a0d9d4;
+            font-size: 1.1rem;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #0a7c71;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .brands-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .section-title {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #f1c40f;
+            font-size: 1.8rem;
+            position: relative;
+            padding-bottom: 10px;
+        }
+        
+        .section-title:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: #0a7c71;
+        }
+        
+        .brands-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 25px;
+            margin-top: 20px;
+        }
+        
+        .brand-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 20px;
+            width: 160px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .brand-card:hover {
+            transform: translateY(-5px);
+            border-color: #f1c40f;
+            background: rgba(255, 255, 255, 0.12);
+        }
+        
+        .brand-card.active {
+            border-color: #0a7c71;
+            background: rgba(10, 124, 113, 0.2);
+        }
+        
+        .brand-logo {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            margin: 0 auto 15px;
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        .brand-name {
+            font-weight: 600;
+            color: #f1c40f;
+            font-size: 1.1rem;
+        }
+        
+        .products-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .filter-info {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(10, 124, 113, 0.2);
+            border-radius: 8px;
+        }
+        
+        .filter-info h3 {
+            color: #f1c40f;
+            margin-bottom: 5px;
+        }
+        
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+        
+        .product-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .product-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #e74c3c;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .product-image {
+            width: 100%;
+            height: 180px;
+            object-fit: contain;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+        }
+        
+        .product-name {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #f1c40f;
+            font-size: 1.2rem;
+        }
+        
+        .product-desc {
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            color: #ddd;
+            min-height: 40px;
+        }
+        
+        .product-price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin: 10px 0;
+            color: #0a7c71;
+        }
+        
+        .product-specs {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+        
+        .product-action {
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            background: #0a7c71;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            gap: 8px;
+        }
+        
+        .btn:hover {
+            background: #09645a;
+            transform: translateY(-2px);
+        }
+        
+        .btn-whatsapp {
+            background: #25D366;
+        }
+        
+        .btn-whatsapp:hover {
+            background: #1ebd5b;
+        }
+        
+        .no-products {
+            text-align: center;
+            padding: 40px;
+            grid-column: 1 / -1;
+            color: #aaa;
+        }
+        
+        .no-products i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            grid-column: 1 / -1;
+            color: #aaa;
+        }
+        
+        .loading i {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: #f1c40f;
+        }
+        
+        .error-message {
+            text-align: center;
+            padding: 40px;
+            grid-column: 1 / -1;
+            color: #e74c3c;
+        }
+        
+        .error-message i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .brands-container {
+                gap: 15px;
+            }
+            
+            .brand-card {
+                width: 140px;
+                padding: 15px;
+            }
+            
+            .brand-logo {
+                width: 70px;
+                height: 70px;
+            }
+            
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 20px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .brands-container {
+                gap: 10px;
+            }
+            
+            .brand-card {
+                width: 120px;
+                padding: 10px;
+            }
+            
+            .brand-logo {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Auto Spares Solution</h1>
+            <p>Browse products by brand</p>
+            <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Main Site</a>
+        </div>
+        
+        <div class="brands-section">
+            <h2 class="section-title">Browse by Brand</h2>
+            <p style="text-align: center; margin-bottom: 20px;">Select a brand to view their products</p>
+            
+            <div class="brands-container" id="brands-container">
+                <div class="brand-card active" data-brand="all">
+                    <img src="https://via.placeholder.com/80x80/0a7c71/ffffff?text=ALL" alt="All Brands" class="brand-logo">
+                    <div class="brand-name">All Brands</div>
+                </div>
+                <!-- Brands will be loaded dynamically from CSV -->
+            </div>
+        </div>
+        
+        <div class="products-section">
+            <div class="filter-info" id="filter-info">
+                <h3>Showing Products: <span id="current-brand">All Brands</span></h3>
+                <p id="product-count">Loading products...</p>
+            </div>
+            
+            <div class="products-grid" id="products-container">
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <h3>Loading Products</h3>
+                    <p>Please wait while we load our product catalog</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let productsData = [];
+        let brandsData = [];
+        let currentBrand = 'all';
+        
+        // DOM elements
+        const brandsContainer = document.getElementById('brands-container');
+        const productsContainer = document.getElementById('products-container');
+        const currentBrandElement = document.getElementById('current-brand');
+        const productCountElement = document.getElementById('product-count');
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProducts();
+        });
+        
+        // Load products from CSV
+        function loadProducts() {
+            console.log('Loading products from CSV...');
+            
+            // Fetch data from prices.csv
+            fetchCSVData()
+                .then(csvData => {
+                    // Parse CSV data
+                    productsData = parseCSVData(csvData);
+                    console.log('Loaded', productsData.length, 'products');
+                    
+                    // Extract unique brands from products
+                    extractBrandsFromProducts();
+                    
+                    // Display brands
+                    displayBrands();
+                    
+                    // Display all products initially
+                    displayProducts(productsData);
+                })
+                .catch(error => {
+                    console.error('Error loading products:', error);
+                    productsContainer.innerHTML = `
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <h3>Error Loading Products</h3>
+                            <p>Could not load product data from prices.csv</p>
+                            <p>Please check the console for more details</p>
+                            <button class="btn" onclick="loadProducts()" style="margin-top: 20px;">
+                                <i class="fas fa-redo"></i> Try Again
+                            </button>
+                        </div>
+                    `;
+                });
+        }
+        
+        // Fetch CSV data from prices.csv
+        function fetchCSVData() {
+            return fetch('prices.csv')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(csvData => {
+                    if (!csvData || csvData.trim().length === 0) {
+                        throw new Error('CSV file is empty');
+                    }
+                    return csvData;
+                })
+                .catch(error => {
+                    console.error('Error fetching CSV:', error);
+                    throw error;
+                });
+        }
+        
+        // Parse CSV data into product objects
+        function parseCSVData(csv) {
+            const lines = csv.split('\n');
+            const products = [];
+            
+            // Get headers from first line
+            const headers = lines[0].split(',').map(header => header.trim());
+            
+            // Check if brand column exists
+            const hasBrandColumn = headers.includes('brand');
+            if (!hasBrandColumn) {
+                console.warn('No brand column found in CSV. Using default brand detection.');
+            }
+            
+            // Process each line
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                
+                const values = lines[i].split(',').map(value => value.trim());
+                const product = {};
+                
+                // Map values to headers
+                headers.forEach((header, index) => {
+                    product[header] = values[index] || '';
+                });
+                
+                // If no brand column, try to detect brand from part number or description
+                if (!hasBrandColumn) {
+                    product.brand = detectBrandFromProduct(product);
+                }
+                
+                products.push(product);
+            }
+            
+            return products;
+        }
+        
+        // Detect brand from product data (fallback if no brand column)
+        function detectBrandFromProduct(product) {
+            const part = (product.part || '').toLowerCase();
+            const description = (product.description || '').toLowerCase();
+            
+            if (part.includes('tvs') || description.includes('tvs')) return 'TVS';
+            if (part.includes('stl') || description.includes('stl')) return 'STL';
+            if (part.includes('vrp') || description.includes('vrp') || description.includes('volume rubber')) return 'VRP';
+            if (part.includes('bosch') || description.includes('bosch')) return 'Bosch';
+            if (part.includes('minda') || description.includes('minda')) return 'Minda';
+            if (part.includes('asco') || description.includes('asco')) return 'Asco';
+            if (part.includes('lucas') || description.includes('lucas')) return 'Lucas';
+            
+            return 'Other';
+        }
+        
+        // Extract unique brands from products
+        function extractBrandsFromProducts() {
+            const brandSet = new Set();
+            
+            productsData.forEach(product => {
+                if (product.brand) {
+                    brandSet.add(product.brand);
+                }
+            });
+            
+            brandsData = Array.from(brandSet).sort();
+            console.log('Extracted brands:', brandsData);
+        }
+        
+        // Display brands in the brands container
+        function displayBrands() {
+            // Clear existing brands (except "All Brands")
+            const allBrandsCard = brandsContainer.querySelector('[data-brand="all"]');
+            brandsContainer.innerHTML = '';
+            brandsContainer.appendChild(allBrandsCard);
+            
+            // Add brand cards for each brand
+            brandsData.forEach(brand => {
+                const brandCard = document.createElement('div');
+                brandCard.className = 'brand-card';
+                brandCard.setAttribute('data-brand', brand.toLowerCase());
+                
+                // Determine logo based on brand name
+                let logoText = brand.substring(0, 3).toUpperCase();
+                let logoBgColor = '#0a7c71';
+                
+                if (brand.toLowerCase() === 'tvs') {
+                    logoText = 'TVS';
+                    logoBgColor = '#0a7c71';
+                } else if (brand.toLowerCase() === 'stl') {
+                    logoText = 'STL';
+                    logoBgColor = '#e74c3c';
+                } else if (brand.toLowerCase() === 'vrp') {
+                    logoText = 'VRP';
+                    logoBgColor = '#27ae60';
+                } else if (brand.toLowerCase() === 'bosch') {
+                    logoText = 'BOSCH';
+                    logoBgColor = '#34495e';
+                } else if (brand.toLowerCase() === 'minda') {
+                    logoText = 'MIN';
+                    logoBgColor = '#9b59b6';
+                } else if (brand.toLowerCase() === 'asco') {
+                    logoText = 'ASC';
+                    logoBgColor = '#e67e22';
+                } else if (brand.toLowerCase() === 'lucas') {
+                    logoText = 'LUC';
+                    logoBgColor = '#16a085';
+                } else if (brand.toLowerCase() === 'other') {
+                    logoText = 'OTH';
+                    logoBgColor = '#7f8c8d';
+                }
+                
+                brandCard.innerHTML = `
+                    <img src="https://via.placeholder.com/80x80/${logoBgColor.replace('#', '')}/ffffff?text=${logoText}" 
+                         alt="${brand}" class="brand-logo">
+                    <div class="brand-name">${brand}</div>
+                `;
+                
+                brandsContainer.appendChild(brandCard);
+            });
+            
+            // Add event listeners to brand cards
+            const brandCards = brandsContainer.querySelectorAll('.brand-card');
+            brandCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const brand = this.getAttribute('data-brand');
+                    
+                    // Update active state
+                    brandCards.forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Filter products
+                    filterProductsByBrand(brand);
+                });
+            });
+        }
+        
+        // Filter products by brand
+        function filterProductsByBrand(brand) {
+            currentBrand = brand;
+            
+            let filteredProducts;
+            
+            if (brand === 'all') {
+                filteredProducts = productsData;
+                currentBrandElement.textContent = 'All Brands';
+            } else {
+                filteredProducts = productsData.filter(product => 
+                    product.brand && product.brand.toLowerCase() === brand
+                );
+                
+                const brandName = brandsContainer.querySelector(`[data-brand="${brand}"] .brand-name`).textContent;
+                currentBrandElement.textContent = brandName;
+            }
+            
+            productCountElement.textContent = `${filteredProducts.length} products found`;
+            displayProducts(filteredProducts);
+        }
+        
+        // Display products in the grid
+        function displayProducts(productsArray) {
+            productsContainer.innerHTML = '';
+            
+            if (productsArray.length === 0) {
+                productsContainer.innerHTML = `
+                    <div class="no-products">
+                        <i class="fas fa-box-open"></i>
+                        <h3>No products found</h3>
+                        <p>Try selecting a different brand</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            productsArray.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'product-card';
+                
+                productCard.innerHTML = `
+                    ${product.stock && product.stock < 10 ? '<div class="product-badge">Low Stock</div>' : ''}
+                    <img src="https://via.placeholder.com/250x180/333333/ffffff?text=${encodeURIComponent(product.part || 'Product')}" 
+                         alt="${product.part || 'Product'}" class="product-image">
+                    <h3 class="product-name">${product.part || 'No Part Number'}</h3>
+                    <p class="product-desc">${product.description || 'No description available'}</p>
+                    <div class="product-specs">
+                        <span><i class="fas fa-tag"></i> ${product.brand || 'Unknown Brand'}</span>
+                        <span><i class="fas fa-cubes"></i> Stock: ${product.stock || 'N/A'}</span>
+                    </div>
+                    <div class="product-price">₹${product.our_price || product.price || '0'}</div>
+                    <div class="product-action">
+                        <button class="btn"><i class="fas fa-cart-plus"></i> Add to Cart</button>
+                        <button class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> Enquire</button>
+                    </div>
+                `;
+                
+                productsContainer.appendChild(productCard);
+            });
+        }
+    </script>
+</body>
+</html>
