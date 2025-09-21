@@ -385,6 +385,16 @@
         let brandsData = [];
         let currentBrand = 'all';
         
+        // Fixed products as fallback
+        const fixedProducts = [
+            "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
+            "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
+            "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
+            "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
+            "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
+            "M07520-0200"
+        ];
+        
         // DOM elements
         const brandsContainer = document.getElementById('brands-container');
         const productsContainer = document.getElementById('products-container');
@@ -396,91 +406,44 @@
             loadProducts();
         });
         
-        // Load products from CSV
+        // Load product data from CSV
         function loadProducts() {
-            console.log('Loading products from CSV...');
-            
-            // First try to fetch from prices.csv
-            fetchCSVData('prices.csv')
-                .then(csvData => {
-                    // Parse CSV data
-                    productsData = parseCSVData(csvData);
-                    console.log('Loaded', productsData.length, 'products from prices.csv');
+            fetch("prices.csv")
+                .then(res => res.text())
+                .then(csv => {
+                    const rows = csv.split("\n").slice(1); // Skip header
                     
-                    // Extract unique brands from products
-                    extractBrandsFromProducts();
-                    
-                    // Display brands
-                    displayBrands();
-                    
-                    // Display all products initially
-                    displayProducts(productsData);
-                })
-                .catch(error => {
-                    console.error('Error loading prices.csv:', error);
-                    // If prices.csv fails, try to load from a backup URL or local data
-                    return loadBackupData();
-                });
-        }
-        
-        // Fetch CSV data from a given URL
-        function fetchCSVData(url) {
-            return fetch(url)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.text();
-                })
-                .then(csvData => {
-                    if (!csvData || csvData.trim().length === 0) {
-                        throw new Error('CSV file is empty');
-                    }
-                    return csvData;
-                })
-                .catch(error => {
-                    console.error('Error fetching CSV:', error);
-                    throw error;
-                });
-        }
-        
-        // Load backup data if primary CSV loading fails
-        function loadBackupData() {
-            console.log('Trying to load backup data...');
-            
-            // Try alternative CSV paths
-            const alternativePaths = [
-                '/prices.csv',
-                './data/prices.csv',
-                '../prices.csv',
-                'https://example.com/prices.csv' // Replace with your actual CSV URL if needed
-            ];
-            
-            // Try each alternative path
-            const fetchPromises = alternativePaths.map(path => 
-                fetchCSVData(path).catch(e => {
-                    console.log(`Failed to load from ${path}`);
-                    return null;
-                })
-            );
-            
-            // Try all paths sequentially
-            let currentPromise = Promise.resolve(null);
-            
-            for (const path of alternativePaths) {
-                currentPromise = currentPromise.then(result => {
-                    if (result) return result; // Already found data
-                    return fetchCSVData(path).catch(e => {
-                        console.log(`Failed to load from ${path}`);
-                        return null;
+                    productsData = rows.map(r => {
+                        const cols = r.split(",");
+                        return {
+                            part: cols[0]?.trim(),
+                            desc: cols[1]?.trim() || "Auto Spare Part",
+                            List: parseFloat(cols[2] || 0),
+                            Mrp: parseFloat(cols[3] || 0),     
+                            price: parseFloat(cols[6] || 0),
+                            stock: parseInt(cols[7] || 0),
+                            boxQty: parseInt(cols[8] || 1), // Box quantity
+                            masterCarton: parseInt(cols[9] || 1), // Master carton quantity
+                            brand: extractBrandFromProductData(cols[0]?.trim(), cols[1]?.trim() || "Auto Spare Part")
+                        };
+                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
+
+                    // Add fixed products that might not be in CSV
+                    fixedProducts.forEach(part => {
+                        if (!productsData.some(p => p.part === part)) {
+                            productsData.push({
+                                part,
+                                desc: "Auto Spare Part",
+                                List: 0,
+                                Mrp: 0,
+                                price: 0,
+                                stock: 0,
+                                boxQty: 1,
+                                masterCarton: 1,
+                                brand: extractBrandFromProductData(part, "Auto Spare Part")
+                            });
+                        }
                     });
-                });
-            }
-            
-            return currentPromise.then(result => {
-                if (result) {
-                    productsData = parseCSVData(result);
-                    console.log('Loaded', productsData.length, 'products from backup source');
                     
                     // Extract unique brands from products
                     extractBrandsFromProducts();
@@ -490,105 +453,61 @@
                     
                     // Display all products initially
                     displayProducts(productsData);
-                } else {
-                    // All fetch attempts failed, use sample data
-                    throw new Error('All data sources failed');
-                }
-            }).catch(error => {
-                console.error('All data loading attempts failed:', error);
-                productsContainer.innerHTML = `
-                    <div class="error-message">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <h3>Error Loading Products</h3>
-                        <p>Could not load product data from any available source</p>
-                        <p>Please check the console for more details</p>
-                        <button class="btn" onclick="loadProducts()" style="margin-top: 20px;">
-                            <i class="fas fa-redo"></i> Try Again
-                        </button>
-                    </div>
-                `;
-            });
-        }
-        
-        // Parse CSV data into product objects
-        function parseCSVData(csv) {
-            const lines = csv.split('\n').filter(line => line.trim() !== '');
-            const products = [];
-            
-            if (lines.length === 0) {
-                throw new Error('CSV file is empty');
-            }
-            
-            // Get headers from first line
-            const headers = lines[0].split(',').map(header => header.trim());
-            
-            // Check if brand column exists
-            const hasBrandColumn = headers.includes('brand');
-            if (!hasBrandColumn) {
-                console.warn('No brand column found in CSV. Using default brand detection.');
-            }
-            
-            // Process each line
-            for (let i = 1; i < lines.length; i++) {
-                if (lines[i].trim() === '') continue;
-                
-                // Handle CSV values that might contain commas within quoted fields
-                const values = parseCSVLine(lines[i]);
-                const product = {};
-                
-                // Map values to headers
-                headers.forEach((header, index) => {
-                    product[header] = values[index] || '';
+                })
+                .catch(err => {
+                    console.error("Error loading CSV:", err);
+                    // Fallback to fixed products with default values
+                    productsData = fixedProducts.map(part => ({
+                        part,
+                        desc: "Auto Spare Part",
+                        List: 0,
+                        Mrp: 0,
+                        price: 0,
+                        stock: 0,
+                        boxQty: 1,
+                        masterCarton: 1,
+                        brand: extractBrandFromProductData(part, "Auto Spare Part")
+                    }));
+                    
+                    // Extract unique brands from products
+                    extractBrandsFromProducts();
+                    
+                    // Display brands
+                    displayBrands();
+                    
+                    // Display all products
+                    displayProducts(productsData);
+                    
+                    showToast("Error loading product data. Using fallback data.", true);
                 });
-                
-                // If no brand column, try to detect brand from part number or description
-                if (!hasBrandColumn) {
-                    product.brand = detectBrandFromProduct(product);
-                }
-                
-                products.push(product);
-            }
-            
-            return products;
         }
         
-        // Parse a CSV line, handling quoted fields with commas
-        function parseCSVLine(line) {
-            const values = [];
-            let current = '';
-            let inQuotes = false;
+        // Extract brand from product data
+        function extractBrandFromProductData(part, description) {
+            if (!part) return "Other";
             
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    values.push(current.trim());
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
+            const partLower = part.toLowerCase();
+            const descLower = description.toLowerCase();
             
-            values.push(current.trim());
-            return values;
-        }
-        
-        // Detect brand from product data (fallback if no brand column)
-        function detectBrandFromProduct(product) {
-            const part = (product.part || '').toLowerCase();
-            const description = (product.description || '').toLowerCase();
+            // TVS parts detection
+            if (partLower.includes('tvs') || descLower.includes('tvs')) return "TVS";
             
-            if (part.includes('tvs') || description.includes('tvs')) return 'TVS';
-            if (part.includes('stl') || description.includes('stl')) return 'STL';
-            if (part.includes('vrp') || description.includes('vrp') || description.includes('volume rubber')) return 'VRP';
-            if (part.includes('bosch') || description.includes('bosch')) return 'Bosch';
-            if (part.includes('minda') || description.includes('minda')) return 'Minda';
-            if (part.includes('asco') || description.includes('asco')) return 'Asco';
-            if (part.includes('lucas') || description.includes('lucas')) return 'Lucas';
+            // STL parts detection
+            if (partLower.includes('stl') || descLower.includes('stl')) return "STL";
             
-            return 'Other';
+            // VRP parts detection
+            if (partLower.includes('vrp') || descLower.includes('vrp') || descLower.includes('volume rubber')) return "VRP";
+            
+            // Bosch parts detection
+            if (partLower.includes('bosch') || descLower.includes('bosch')) return "Bosch";
+            
+            // Other common brands
+            if (partLower.includes('minda') || descLower.includes('minda')) return "Minda";
+            if (partLower.includes('asco') || descLower.includes('asco')) return "Asco";
+            if (partLower.includes('lucas') || descLower.includes('lucas')) return "Lucas";
+            
+            // Default brand for unrecognized parts
+            return "Other";
         }
         
         // Extract unique brands from products
@@ -715,16 +634,16 @@
                 productCard.className = 'product-card';
                 
                 productCard.innerHTML = `
-                    ${product.stock && product.stock < 10 ? '<div class="product-badge">Low Stock</div>' : ''}
-                    <img src="https://via.placeholder.com/250x180/333333/ffffff?text=${encodeURIComponent(product.part || 'Product')}" 
-                         alt="${product.part || 'Product'}" class="product-image">
-                    <h3 class="product-name">${product.part || 'No Part Number'}</h3>
-                    <p class="product-desc">${product.description || 'No description available'}</p>
+                    ${product.stock < 10 ? '<div class="product-badge">Low Stock</div>' : ''}
+                    <img src="https://via.placeholder.com/250x180/333333/ffffff?text=${encodeURIComponent(product.part)}" 
+                         alt="${product.part}" class="product-image">
+                    <h3 class="product-name">${product.part}</h3>
+                    <p class="product-desc">${product.desc}</p>
                     <div class="product-specs">
                         <span><i class="fas fa-tag"></i> ${product.brand || 'Unknown Brand'}</span>
-                        <span><i class="fas fa-cubes"></i> Stock: ${product.stock || 'N/A'}</span>
+                        <span><i class="fas fa-cubes"></i> Stock: ${product.stock || '0'}</span>
                     </div>
-                    <div class="product-price">₹${product.our_price || product.price || '0'}</div>
+                    <div class="product-price">₹${product.price || '0'}</div>
                     <div class="product-action">
                         <button class="btn"><i class="fas fa-cart-plus"></i> Add to Cart</button>
                         <button class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> Enquire</button>
@@ -733,6 +652,13 @@
                 
                 productsContainer.appendChild(productCard);
             });
+        }
+        
+        // Show toast message (from your existing code)
+        function showToast(message, isError = false) {
+            console.log(message);
+            // You can implement a proper toast notification here
+            alert(message);
         }
     </script>
 </body>
