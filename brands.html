@@ -400,12 +400,12 @@
         function loadProducts() {
             console.log('Loading products from CSV...');
             
-            // Fetch data from prices.csv
-            fetchCSVData()
+            // First try to fetch from prices.csv
+            fetchCSVData('prices.csv')
                 .then(csvData => {
                     // Parse CSV data
                     productsData = parseCSVData(csvData);
-                    console.log('Loaded', productsData.length, 'products');
+                    console.log('Loaded', productsData.length, 'products from prices.csv');
                     
                     // Extract unique brands from products
                     extractBrandsFromProducts();
@@ -417,24 +417,15 @@
                     displayProducts(productsData);
                 })
                 .catch(error => {
-                    console.error('Error loading products:', error);
-                    productsContainer.innerHTML = `
-                        <div class="error-message">
-                            <i class="fas fa-exclamation-circle"></i>
-                            <h3>Error Loading Products</h3>
-                            <p>Could not load product data from prices.csv</p>
-                            <p>Please check the console for more details</p>
-                            <button class="btn" onclick="loadProducts()" style="margin-top: 20px;">
-                                <i class="fas fa-redo"></i> Try Again
-                            </button>
-                        </div>
-                    `;
+                    console.error('Error loading prices.csv:', error);
+                    // If prices.csv fails, try to load from a backup URL or local data
+                    return loadBackupData();
                 });
         }
         
-        // Fetch CSV data from prices.csv
-        function fetchCSVData() {
-            return fetch('prices.csv')
+        // Fetch CSV data from a given URL
+        function fetchCSVData(url) {
+            return fetch(url)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
@@ -453,10 +444,80 @@
                 });
         }
         
+        // Load backup data if primary CSV loading fails
+        function loadBackupData() {
+            console.log('Trying to load backup data...');
+            
+            // Try alternative CSV paths
+            const alternativePaths = [
+                '/prices.csv',
+                './data/prices.csv',
+                '../prices.csv',
+                'https://example.com/prices.csv' // Replace with your actual CSV URL if needed
+            ];
+            
+            // Try each alternative path
+            const fetchPromises = alternativePaths.map(path => 
+                fetchCSVData(path).catch(e => {
+                    console.log(`Failed to load from ${path}`);
+                    return null;
+                })
+            );
+            
+            // Try all paths sequentially
+            let currentPromise = Promise.resolve(null);
+            
+            for (const path of alternativePaths) {
+                currentPromise = currentPromise.then(result => {
+                    if (result) return result; // Already found data
+                    return fetchCSVData(path).catch(e => {
+                        console.log(`Failed to load from ${path}`);
+                        return null;
+                    });
+                });
+            }
+            
+            return currentPromise.then(result => {
+                if (result) {
+                    productsData = parseCSVData(result);
+                    console.log('Loaded', productsData.length, 'products from backup source');
+                    
+                    // Extract unique brands from products
+                    extractBrandsFromProducts();
+                    
+                    // Display brands
+                    displayBrands();
+                    
+                    // Display all products initially
+                    displayProducts(productsData);
+                } else {
+                    // All fetch attempts failed, use sample data
+                    throw new Error('All data sources failed');
+                }
+            }).catch(error => {
+                console.error('All data loading attempts failed:', error);
+                productsContainer.innerHTML = `
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <h3>Error Loading Products</h3>
+                        <p>Could not load product data from any available source</p>
+                        <p>Please check the console for more details</p>
+                        <button class="btn" onclick="loadProducts()" style="margin-top: 20px;">
+                            <i class="fas fa-redo"></i> Try Again
+                        </button>
+                    </div>
+                `;
+            });
+        }
+        
         // Parse CSV data into product objects
         function parseCSVData(csv) {
-            const lines = csv.split('\n');
+            const lines = csv.split('\n').filter(line => line.trim() !== '');
             const products = [];
+            
+            if (lines.length === 0) {
+                throw new Error('CSV file is empty');
+            }
             
             // Get headers from first line
             const headers = lines[0].split(',').map(header => header.trim());
@@ -471,7 +532,8 @@
             for (let i = 1; i < lines.length; i++) {
                 if (lines[i].trim() === '') continue;
                 
-                const values = lines[i].split(',').map(value => value.trim());
+                // Handle CSV values that might contain commas within quoted fields
+                const values = parseCSVLine(lines[i]);
                 const product = {};
                 
                 // Map values to headers
@@ -488,6 +550,29 @@
             }
             
             return products;
+        }
+        
+        // Parse a CSV line, handling quoted fields with commas
+        function parseCSVLine(line) {
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    values.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            values.push(current.trim());
+            return values;
         }
         
         // Detect brand from product data (fallback if no brand column)
