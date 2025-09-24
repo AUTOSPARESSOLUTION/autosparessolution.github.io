@@ -618,15 +618,8 @@
         let currentBrand = 'all';
         let cart = [];
         
-        // Fixed products as fallback
-        const fixedProducts = [
-            "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
-            "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-            "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
-            "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
-            "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
-            "M07520-0200"
-        ];
+        // Image base URL - Replace with your GitHub repo URL
+        const imageBaseUrl = 'https://raw.githubusercontent.com/yourusername/yourrepo/main/images/';
         
         // DOM elements
         const brandsContainer = document.getElementById('brands-container');
@@ -673,22 +666,9 @@
                             stock: parseInt(cols[stockIndex] || 0),
                             brand: cols[brandIndex]?.trim() || "Other"
                         };
-                    }).filter(p => p.part); // Remove empty rows
+                    }).filter(p => p.part && p.part.trim() !== ""); // Remove empty rows
 
-                    // Add fixed products that might not be in CSV
-                    fixedProducts.forEach(part => {
-                        if (!productsData.some(p => p.part === part)) {
-                            productsData.push({
-                                part,
-                                desc: "Auto Spare Part",
-                                List: 0,
-                                Mrp: 0,
-                                price: 0,
-                                stock: 0,
-                                brand: "Other"
-                            });
-                        }
-                    });
+                    console.log('Loaded products:', productsData.length);
                     
                     // Extract unique brands from products
                     extractBrandsFromProducts();
@@ -701,27 +681,17 @@
                 })
                 .catch(err => {
                     console.error("Error loading CSV:", err);
-                    // Fallback to fixed products with default values
-                    productsData = fixedProducts.map(part => ({
-                        part,
-                        desc: "Auto Spare Part",
-                        List: 0,
-                        Mrp: 0,
-                        price: 0,
-                        stock: 0,
-                        brand: "Other"
-                    }));
+                    showToast("Error loading product data. Please check if prices.csv exists.", true);
                     
-                    // Extract unique brands from products
-                    extractBrandsFromProducts();
-                    
-                    // Display brands
-                    displayBrands();
-                    
-                    // Display all products
-                    displayProducts(productsData);
-                    
-                    showToast("Error loading product data. Using fallback data.", true);
+                    // Try to load from a different path or show error
+                    productsContainer.innerHTML = `
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <h3>Unable to Load Products</h3>
+                            <p>Please ensure the prices.csv file is available in the correct location.</p>
+                            <p>Error: ${err.message}</p>
+                        </div>
+                    `;
                 });
         }
         
@@ -841,27 +811,21 @@
                 return;
             }
             
-            // Create optimized product images as SVGs
             productsArray.forEach(product => {
                 const productCard = document.createElement('div');
                 productCard.className = 'product-card';
                 
-                // Create product image as SVG for faster loading
-                const productSvg = `<svg width="250" height="180" viewBox="0 0 250 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="250" height="180" rx="8" fill="rgba(255,255,255,0.1)"/>
-                    <rect x="30" y="30" width="190" height="120" rx="5" fill="#2c5364"/>
-                    <text x="125" y="100" text-anchor="middle" fill="#f1c40f" font-family="Arial" font-size="14" font-weight="bold">${product.part}</text>
-                    <text x="125" y="120" text-anchor="middle" fill="#ffffff" font-family="Arial" font-size="10">Auto Part</text>
-                </svg>`;
-                
-                const productSvgDataUri = `data:image/svg+xml;base64,${btoa(productSvg)}`;
+                // Create image URL for the product
+                const imageUrl = `${imageBaseUrl}${product.part}.png`;
                 
                 productCard.innerHTML = `
                     ${product.stock < 10 && product.stock > 0 ? '<div class="product-badge">Low Stock</div>' : ''}
                     ${product.stock === 0 ? '<div class="product-badge">Out of Stock</div>' : ''}
                     ${product.stock > 10 ? '<div class="product-badge stock">In Stock</div>' : ''}
-                    <img src="${productSvgDataUri}" 
-                         alt="${product.part}" class="product-image">
+                    <img src="${imageUrl}" 
+                         alt="${product.part}" 
+                         class="product-image"
+                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIgeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg=='">
                     <h3 class="product-name">${product.part}</h3>
                     <p class="product-desc">${product.desc}</p>
                     <div class="product-specs">
@@ -933,4 +897,4 @@
         }
     </script>
 </body>
-                                                                                    </html>
+    </html>
