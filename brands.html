@@ -511,7 +511,7 @@
 <body>
     <header>
         <div class="logo-container">
-            <img src="https://via.placeholder.com/60x60/0a7c71/ffffff?text=ASS" alt="Auto Spares Solution Logo" class="logo">
+            <img src="https://autosparessolution.github.io/images/ASS.jpg" alt="Auto Spares Solution Logo" class="logo">
             <div>
                 <h1>Auto Spares Solution</h1>
                 <p class="tagline">Browse products by brand</p>
@@ -618,8 +618,10 @@
         let currentBrand = 'all';
         let cart = [];
         
-        // Image base URL - Replace with your GitHub repo URL
-        const imageBaseUrl = 'https://raw.githubusercontent.com/yourusername/yourrepo/main/images/';
+        // Updated references based on your information
+        const imageBaseUrl = 'https://autosparessolution.github.io/images/';
+        const csvFilePath = 'prices.csv';
+        const whatsappNumber = '03369028606';
         
         // DOM elements
         const brandsContainer = document.getElementById('brands-container');
@@ -636,39 +638,55 @@
         
         // Load product data from CSV
         function loadProducts() {
-            fetch("prices.csv")
+            fetch(csvFilePath)
                 .then(res => {
-                    if (!res.ok) throw new Error("Failed to fetch CSV");
+                    if (!res.ok) throw new Error("Failed to fetch CSV file. Status: " + res.status);
                     return res.text();
                 })
                 .then(csv => {
                     const rows = csv.split("\n");
                     const header = rows[0].split(",").map(h => h.trim().toLowerCase());
                     
-                    // Find column indices
+                    console.log("CSV Header:", header);
+                    
+                    // Find column indices - flexible approach
                     const partIndex = header.findIndex(h => h.includes("part"));
-                    const descIndex = header.findIndex(h => h.includes("desc"));
+                    const descIndex = header.findIndex(h => h.includes("desc") || h.includes("description"));
                     const listIndex = header.findIndex(h => h.includes("list"));
                     const mrpIndex = header.findIndex(h => h.includes("mrp"));
-                    const priceIndex = header.findIndex(h => h.includes("price"));
-                    const stockIndex = header.findIndex(h => h.includes("stock"));
+                    const priceIndex = header.findIndex(h => h.includes("price") && !h.includes("list") && !h.includes("mrp"));
+                    const stockIndex = header.findIndex(h => h.includes("stock") || h.includes("qty"));
                     const brandIndex = header.findIndex(h => h.includes("brand"));
                     
+                    console.log("Column indices:", {partIndex, descIndex, listIndex, mrpIndex, priceIndex, stockIndex, brandIndex});
+                    
                     // Process data rows
-                    productsData = rows.slice(1).map(r => {
-                        const cols = r.split(",");
-                        return {
-                            part: cols[partIndex]?.trim(),
-                            desc: cols[descIndex]?.trim() || "Auto Spare Part",
-                            List: parseFloat(cols[listIndex] || 0),
-                            Mrp: parseFloat(cols[mrpIndex] || 0),     
-                            price: parseFloat(cols[priceIndex] || 0),
-                            stock: parseInt(cols[stockIndex] || 0),
-                            brand: cols[brandIndex]?.trim() || "Other"
-                        };
-                    }).filter(p => p.part && p.part.trim() !== ""); // Remove empty rows
+                    productsData = rows.slice(1)
+                        .map(r => {
+                            // Handle CSV with potential quotes and commas in values
+                            const cols = r.split(',').map(c => c.trim().replace(/^"(.*)"$/, '$1'));
+                            
+                            // Skip empty rows
+                            if (cols.length < 2 || !cols[partIndex] || cols[partIndex] === '') return null;
+                            
+                            return {
+                                part: cols[partIndex]?.trim(),
+                                desc: cols[descIndex]?.trim() || "Auto Spare Part",
+                                List: parseFloat(cols[listIndex] || 0),
+                                Mrp: parseFloat(cols[mrpIndex] || 0),     
+                                price: parseFloat(cols[priceIndex] || 0),
+                                stock: parseInt(cols[stockIndex] || 0),
+                                brand: cols[brandIndex]?.trim() || "Other"
+                            };
+                        })
+                        .filter(p => p !== null && p.part && p.part.trim() !== ""); // Remove empty rows
 
                     console.log('Loaded products:', productsData.length);
+                    console.log('Sample products:', productsData.slice(0, 5));
+                    
+                    if (productsData.length === 0) {
+                        throw new Error("No products found in CSV file. Please check the file format.");
+                    }
                     
                     // Extract unique brands from products
                     extractBrandsFromProducts();
@@ -681,15 +699,19 @@
                 })
                 .catch(err => {
                     console.error("Error loading CSV:", err);
-                    showToast("Error loading product data. Please check if prices.csv exists.", true);
+                    showToast("Error loading product data. Please check if the CSV file exists and is accessible.", true);
                     
-                    // Try to load from a different path or show error
+                    // Show detailed error message
                     productsContainer.innerHTML = `
                         <div class="error-message">
                             <i class="fas fa-exclamation-triangle"></i>
                             <h3>Unable to Load Products</h3>
-                            <p>Please ensure the prices.csv file is available in the correct location.</p>
                             <p>Error: ${err.message}</p>
+                            <p>Please ensure the CSV file is available at: ${csvFilePath}</p>
+                            <p>Check the browser console for more details.</p>
+                            <button class="btn" onclick="location.reload()" style="margin-top: 20px;">
+                                <i class="fas fa-redo"></i> Try Again
+                            </button>
                         </div>
                     `;
                 });
@@ -881,7 +903,7 @@
         function enquireOnWhatsApp(part, desc) {
             const message = `I want to enquire about ${part} (${desc})`;
             const encodedMessage = encodeURIComponent(message);
-            window.open(`https://wa.me/03369028606?text=${encodedMessage}`, '_blank');
+            window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
         }
         
         // Show toast message
@@ -897,4 +919,4 @@
         }
     </script>
 </body>
-    </html>
+        </html>
