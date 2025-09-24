@@ -184,6 +184,15 @@
             font-weight: 600;
         }
         
+        .product-badge.stock {
+            background: #27ae60;
+        }
+        
+        .product-badge.condition {
+            background: #f39c12;
+            top: 45px;
+        }
+        
         .product-image {
             width: 100%;
             height: 180px;
@@ -221,6 +230,16 @@
             margin: 10px 0;
             font-size: 0.9rem;
             color: #aaa;
+        }
+        
+        .product-condition {
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: #f1c40f;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
         }
         
         .product-action {
@@ -356,7 +375,7 @@
             
             <div class="brands-container" id="brands-container">
                 <div class="brand-card active" data-brand="all">
-                    <img src="https://via.placeholder.com/80x80/0a7c71/ffffff?text=ALL" alt="All Brands" class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiByeD0iMTAiIGZpbGw9IiMwYTdjNzEiLz4KPHRleHQgeD0iNDAiIHk9IjQ1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iYm9sZCI+QUxMPC90ZXh0Pgo8L3N2Zz4K" alt="All Brands" class="brand-logo">
                     <div class="brand-name">All Brands</div>
                 </div>
                 <!-- Brands will be loaded dynamically from CSV -->
@@ -409,24 +428,41 @@
         // Load product data from CSV
         function loadProducts() {
             fetch("prices.csv")
-                .then(res => res.text())
+                .then(res => {
+                    if (!res.ok) throw new Error("Failed to fetch CSV");
+                    return res.text();
+                })
                 .then(csv => {
-                    const rows = csv.split("\n").slice(1); // Skip header
+                    const rows = csv.split("\n");
+                    const header = rows[0].split(",").map(h => h.trim());
                     
-                    productsData = rows.map(r => {
+                    // Find column indices
+                    const partIndex = header.findIndex(h => h.toLowerCase().includes("part"));
+                    const descIndex = header.findIndex(h => h.toLowerCase().includes("desc"));
+                    const listIndex = header.findIndex(h => h.toLowerCase().includes("list"));
+                    const mrpIndex = header.findIndex(h => h.toLowerCase().includes("mrp"));
+                    const priceIndex = header.findIndex(h => h.toLowerCase().includes("price"));
+                    const stockIndex = header.findIndex(h => h.toLowerCase().includes("stock"));
+                    const boxQtyIndex = header.findIndex(h => h.toLowerCase().includes("box") && h.toLowerCase().includes("qty"));
+                    const masterCartonIndex = header.findIndex(h => h.toLowerCase().includes("master") && h.toLowerCase().includes("carton"));
+                    const brandIndex = header.findIndex(h => h.toLowerCase() === "brand");
+                    
+                    // Process data rows
+                    productsData = rows.slice(1).map(r => {
                         const cols = r.split(",");
                         return {
-                            part: cols[0]?.trim(),
-                            desc: cols[1]?.trim() || "Auto Spare Part",
-                            List: parseFloat(cols[2] || 0),
-                            Mrp: parseFloat(cols[3] || 0),     
-                            price: parseFloat(cols[6] || 0),
-                            stock: parseInt(cols[7] || 0),
-                            boxQty: parseInt(cols[8] || 1), // Box quantity
-                            masterCarton: parseInt(cols[9] || 1), // Master carton quantity
-                            brand: extractBrandFromProductData(cols[0]?.trim(), cols[1]?.trim() || "Auto Spare Part")
+                            part: cols[partIndex]?.trim(),
+                            desc: cols[descIndex]?.trim() || "Auto Spare Part",
+                            List: parseFloat(cols[listIndex] || 0),
+                            Mrp: parseFloat(cols[mrpIndex] || 0),     
+                            price: parseFloat(cols[priceIndex] || 0),
+                            stock: parseInt(cols[stockIndex] || 0),
+                            boxQty: parseInt(cols[boxQtyIndex] || 1),
+                            masterCarton: parseInt(cols[masterCartonIndex] || 1),
+                            brand: cols[brandIndex]?.trim() || "Other",
+                            condition: determineCondition(cols[descIndex]?.trim(), cols[partIndex]?.trim())
                         };
-                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
+                    }).filter(p => p.part); // Remove empty rows
 
                     // Add fixed products that might not be in CSV
                     fixedProducts.forEach(part => {
@@ -440,7 +476,8 @@
                                 stock: 0,
                                 boxQty: 1,
                                 masterCarton: 1,
-                                brand: extractBrandFromProductData(part, "Auto Spare Part")
+                                brand: "Other",
+                                condition: "New"
                             });
                         }
                     });
@@ -466,7 +503,8 @@
                         stock: 0,
                         boxQty: 1,
                         masterCarton: 1,
-                        brand: extractBrandFromProductData(part, "Auto Spare Part")
+                        brand: "Other",
+                        condition: "New"
                     }));
                     
                     // Extract unique brands from products
@@ -482,32 +520,21 @@
                 });
         }
         
-        // Extract brand from product data
-        function extractBrandFromProductData(part, description) {
-            if (!part) return "Other";
+        // Determine product condition based on description and part number
+        function determineCondition(description, part) {
+            if (!description) return "New";
             
-            const partLower = part.toLowerCase();
             const descLower = description.toLowerCase();
+            const partLower = part ? part.toLowerCase() : "";
             
-            // TVS parts detection
-            if (partLower.includes('tvs') || descLower.includes('tvs')) return "TVS";
+            // Check for condition indicators in description
+            if (descLower.includes("new") || descLower.includes("genuine")) return "New";
+            if (descLower.includes("recon") || descLower.includes("refurb")) return "Refurbished";
+            if (descLower.includes("used") || descLower.includes("second")) return "Used";
+            if (descLower.includes("oem")) return "OEM";
             
-            // STL parts detection
-            if (partLower.includes('stl') || descLower.includes('stl')) return "STL";
-            
-            // VRP parts detection
-            if (partLower.includes('vrp') || descLower.includes('vrp') || descLower.includes('volume rubber')) return "VRP";
-            
-            // Bosch parts detection
-            if (partLower.includes('bosch') || descLower.includes('bosch')) return "Bosch";
-            
-            // Other common brands
-            if (partLower.includes('minda') || descLower.includes('minda')) return "Minda";
-            if (partLower.includes('asco') || descLower.includes('asco')) return "Asco";
-            if (partLower.includes('lucas') || descLower.includes('lucas')) return "Lucas";
-            
-            // Default brand for unrecognized parts
-            return "Other";
+            // Default to New
+            return "New";
         }
         
         // Extract unique brands from products
@@ -515,8 +542,8 @@
             const brandSet = new Set();
             
             productsData.forEach(product => {
-                if (product.brand) {
-                    brandSet.add(product.brand);
+                if (product.brand && product.brand.trim() !== "") {
+                    brandSet.add(product.brand.trim());
                 }
             });
             
@@ -537,39 +564,36 @@
                 brandCard.className = 'brand-card';
                 brandCard.setAttribute('data-brand', brand.toLowerCase());
                 
-                // Determine logo based on brand name
-                let logoText = brand.substring(0, 3).toUpperCase();
+                // Create optimized SVG logos instead of external images
                 let logoBgColor = '#0a7c71';
+                let logoText = brand.substring(0, 3).toUpperCase();
                 
-                if (brand.toLowerCase() === 'tvs') {
-                    logoText = 'TVS';
-                    logoBgColor = '#0a7c71';
-                } else if (brand.toLowerCase() === 'stl') {
-                    logoText = 'STL';
-                    logoBgColor = '#e74c3c';
-                } else if (brand.toLowerCase() === 'vrp') {
-                    logoText = 'VRP';
-                    logoBgColor = '#27ae60';
-                } else if (brand.toLowerCase() === 'bosch') {
-                    logoText = 'BOSCH';
-                    logoBgColor = '#34495e';
-                } else if (brand.toLowerCase() === 'minda') {
-                    logoText = 'MIN';
-                    logoBgColor = '#9b59b6';
-                } else if (brand.toLowerCase() === 'asco') {
-                    logoText = 'ASC';
-                    logoBgColor = '#e67e22';
-                } else if (brand.toLowerCase() === 'lucas') {
-                    logoText = 'LUC';
-                    logoBgColor = '#16a085';
-                } else if (brand.toLowerCase() === 'other') {
-                    logoText = 'OTH';
-                    logoBgColor = '#7f8c8d';
+                // Set specific colors for known brands
+                const brandColors = {
+                    'tvs': '#0a7c71',
+                    'stl': '#e74c3c',
+                    'vrp': '#27ae60',
+                    'bosch': '#34495e',
+                    'minda': '#9b59b6',
+                    'asco': '#e67e22',
+                    'lucas': '#16a085',
+                    'other': '#7f8c8d'
+                };
+                
+                if (brandColors[brand.toLowerCase()]) {
+                    logoBgColor = brandColors[brand.toLowerCase()];
                 }
                 
+                // Create SVG logo as data URI for fast loading
+                const svgLogo = `<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="80" height="80" rx="10" fill="${logoBgColor}"/>
+                    <text x="40" y="45" text-anchor="middle" fill="white" font-family="Arial" font-size="14" font-weight="bold">${logoText}</text>
+                </svg>`;
+                
+                const svgDataUri = `data:image/svg+xml;base64,${btoa(svgLogo)}`;
+                
                 brandCard.innerHTML = `
-                    <img src="https://via.placeholder.com/80x80/${logoBgColor.replace('#', '')}/ffffff?text=${logoText}" 
-                         alt="${brand}" class="brand-logo">
+                    <img src="${svgDataUri}" alt="${brand}" class="brand-logo">
                     <div class="brand-name">${brand}</div>
                 `;
                 
@@ -629,19 +653,36 @@
                 return;
             }
             
+            // Create optimized product images as SVGs
             productsArray.forEach(product => {
                 const productCard = document.createElement('div');
                 productCard.className = 'product-card';
                 
+                // Create product image as SVG for faster loading
+                const productSvg = `<svg width="250" height="180" viewBox="0 0 250 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="250" height="180" rx="8" fill="rgba(255,255,255,0.1)"/>
+                    <rect x="30" y="30" width="190" height="120" rx="5" fill="#2c5364"/>
+                    <text x="125" y="100" text-anchor="middle" fill="#f1c40f" font-family="Arial" font-size="14" font-weight="bold">${product.part}</text>
+                    <text x="125" y="120" text-anchor="middle" fill="#ffffff" font-family="Arial" font-size="10">Auto Part</text>
+                </svg>`;
+                
+                const productSvgDataUri = `data:image/svg+xml;base64,${btoa(productSvg)}`;
+                
                 productCard.innerHTML = `
-                    ${product.stock < 10 ? '<div class="product-badge">Low Stock</div>' : ''}
-                    <img src="https://via.placeholder.com/250x180/333333/ffffff?text=${encodeURIComponent(product.part)}" 
+                    ${product.stock < 10 && product.stock > 0 ? '<div class="product-badge">Low Stock</div>' : ''}
+                    ${product.stock === 0 ? '<div class="product-badge">Out of Stock</div>' : ''}
+                    ${product.stock > 10 ? '<div class="product-badge stock">In Stock</div>' : ''}
+                    <div class="product-badge condition">${product.condition || 'New'}</div>
+                    <img src="${productSvgDataUri}" 
                          alt="${product.part}" class="product-image">
                     <h3 class="product-name">${product.part}</h3>
                     <p class="product-desc">${product.desc}</p>
                     <div class="product-specs">
                         <span><i class="fas fa-tag"></i> ${product.brand || 'Unknown Brand'}</span>
                         <span><i class="fas fa-cubes"></i> Stock: ${product.stock || '0'}</span>
+                    </div>
+                    <div class="product-condition">
+                        <i class="fas fa-certificate"></i> Condition: ${product.condition || 'New'}
                     </div>
                     <div class="product-price">₹${product.price || '0'}</div>
                     <div class="product-action">
@@ -654,12 +695,16 @@
             });
         }
         
-        // Show toast message (from your existing code)
+        // Show toast message
         function showToast(message, isError = false) {
             console.log(message);
             // You can implement a proper toast notification here
-            alert(message);
+            if (isError) {
+                alert("Error: " + message);
+            } else {
+                alert(message);
+            }
         }
     </script>
 </body>
-</html>
+            </html>
