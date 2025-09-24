@@ -188,11 +188,6 @@
             background: #27ae60;
         }
         
-        .product-badge.condition {
-            background: #f39c12;
-            top: 45px;
-        }
-        
         .product-image {
             width: 100%;
             height: 180px;
@@ -230,16 +225,6 @@
             margin: 10px 0;
             font-size: 0.9rem;
             color: #aaa;
-        }
-        
-        .product-condition {
-            margin: 10px 0;
-            font-size: 0.9rem;
-            color: #f1c40f;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
         }
         
         .product-action {
@@ -434,18 +419,16 @@
                 })
                 .then(csv => {
                     const rows = csv.split("\n");
-                    const header = rows[0].split(",").map(h => h.trim());
+                    const header = rows[0].split(",").map(h => h.trim().toLowerCase());
                     
                     // Find column indices
-                    const partIndex = header.findIndex(h => h.toLowerCase().includes("part"));
-                    const descIndex = header.findIndex(h => h.toLowerCase().includes("desc"));
-                    const listIndex = header.findIndex(h => h.toLowerCase().includes("list"));
-                    const mrpIndex = header.findIndex(h => h.toLowerCase().includes("mrp"));
-                    const priceIndex = header.findIndex(h => h.toLowerCase().includes("price"));
-                    const stockIndex = header.findIndex(h => h.toLowerCase().includes("stock"));
-                    const boxQtyIndex = header.findIndex(h => h.toLowerCase().includes("box") && h.toLowerCase().includes("qty"));
-                    const masterCartonIndex = header.findIndex(h => h.toLowerCase().includes("master") && h.toLowerCase().includes("carton"));
-                    const brandIndex = header.findIndex(h => h.toLowerCase() === "brand");
+                    const partIndex = header.findIndex(h => h.includes("part"));
+                    const descIndex = header.findIndex(h => h.includes("desc"));
+                    const listIndex = header.findIndex(h => h.includes("list"));
+                    const mrpIndex = header.findIndex(h => h.includes("mrp"));
+                    const priceIndex = header.findIndex(h => h.includes("price"));
+                    const stockIndex = header.findIndex(h => h.includes("stock"));
+                    const brandIndex = header.findIndex(h => h.includes("brand"));
                     
                     // Process data rows
                     productsData = rows.slice(1).map(r => {
@@ -457,10 +440,7 @@
                             Mrp: parseFloat(cols[mrpIndex] || 0),     
                             price: parseFloat(cols[priceIndex] || 0),
                             stock: parseInt(cols[stockIndex] || 0),
-                            boxQty: parseInt(cols[boxQtyIndex] || 1),
-                            masterCarton: parseInt(cols[masterCartonIndex] || 1),
-                            brand: cols[brandIndex]?.trim() || "Other",
-                            condition: determineCondition(cols[descIndex]?.trim(), cols[partIndex]?.trim())
+                            brand: cols[brandIndex]?.trim() || "Other"
                         };
                     }).filter(p => p.part); // Remove empty rows
 
@@ -474,10 +454,7 @@
                                 Mrp: 0,
                                 price: 0,
                                 stock: 0,
-                                boxQty: 1,
-                                masterCarton: 1,
-                                brand: "Other",
-                                condition: "New"
+                                brand: "Other"
                             });
                         }
                     });
@@ -501,10 +478,7 @@
                         Mrp: 0,
                         price: 0,
                         stock: 0,
-                        boxQty: 1,
-                        masterCarton: 1,
-                        brand: "Other",
-                        condition: "New"
+                        brand: "Other"
                     }));
                     
                     // Extract unique brands from products
@@ -518,23 +492,6 @@
                     
                     showToast("Error loading product data. Using fallback data.", true);
                 });
-        }
-        
-        // Determine product condition based on description and part number
-        function determineCondition(description, part) {
-            if (!description) return "New";
-            
-            const descLower = description.toLowerCase();
-            const partLower = part ? part.toLowerCase() : "";
-            
-            // Check for condition indicators in description
-            if (descLower.includes("new") || descLower.includes("genuine")) return "New";
-            if (descLower.includes("recon") || descLower.includes("refurb")) return "Refurbished";
-            if (descLower.includes("used") || descLower.includes("second")) return "Used";
-            if (descLower.includes("oem")) return "OEM";
-            
-            // Default to New
-            return "New";
         }
         
         // Extract unique brands from products
@@ -672,7 +629,6 @@
                     ${product.stock < 10 && product.stock > 0 ? '<div class="product-badge">Low Stock</div>' : ''}
                     ${product.stock === 0 ? '<div class="product-badge">Out of Stock</div>' : ''}
                     ${product.stock > 10 ? '<div class="product-badge stock">In Stock</div>' : ''}
-                    <div class="product-badge condition">${product.condition || 'New'}</div>
                     <img src="${productSvgDataUri}" 
                          alt="${product.part}" class="product-image">
                     <h3 class="product-name">${product.part}</h3>
@@ -680,9 +636,6 @@
                     <div class="product-specs">
                         <span><i class="fas fa-tag"></i> ${product.brand || 'Unknown Brand'}</span>
                         <span><i class="fas fa-cubes"></i> Stock: ${product.stock || '0'}</span>
-                    </div>
-                    <div class="product-condition">
-                        <i class="fas fa-certificate"></i> Condition: ${product.condition || 'New'}
                     </div>
                     <div class="product-price">₹${product.price || '0'}</div>
                     <div class="product-action">
@@ -707,4 +660,4 @@
         }
     </script>
 </body>
-            </html>
+</html>
