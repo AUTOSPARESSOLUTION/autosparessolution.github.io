@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Browse by Brand - Auto Spares Solution</title>
+    <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #0a7c71;
@@ -12,8 +13,8 @@
             --accent: #f1c40f;
             --dark: #0f2027;
             --light: #f8f9fa;
+            --gray: #6c757d;
             --success: #27ae60;
-            --warning: #f39c12;
         }
         
         * {
@@ -23,31 +24,33 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Roboto', sans-serif;
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
             color: var(--light);
             line-height: 1.6;
             overflow-x: hidden;
-            min-height: 100vh;
+            padding-top: 160px; /* Space for fixed header */
         }
         
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 1rem;
+        /* Fixed Header with Navigation */
+        .fixed-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.95);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.4);
         }
         
         header {
             text-align: center;
             padding: 1.5rem 1rem;
-            background: rgba(0, 0, 0, 0.85);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
             display: flex;
             flex-direction: column;
             align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
         }
         
         .logo-container {
@@ -70,6 +73,7 @@
             letter-spacing: 1px;
             color: var(--accent);
             text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            font-family: 'Montserrat', sans-serif;
         }
         
         .tagline {
@@ -87,10 +91,7 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 1.5rem;
-            position: sticky;
-            top: 80px;
-            z-index: 99;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            border-top: 1px solid #2c5364;
         }
         
         nav a {
@@ -128,6 +129,52 @@
             right: -12px;
         }
         
+        .search-container {
+            padding: 0.5rem 1rem;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            border-bottom: 1px solid #2c5364;
+        }
+        
+        .search-box {
+            display: flex;
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+        }
+        
+        #search-input {
+            width: 100%;
+            padding: 0.9rem 1rem 0.9rem 3rem;
+            border-radius: 5px;
+            border: none;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transition: all 0.3s;
+        }
+        
+        #search-input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #aaa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
         .section {
             padding: 3rem 1rem;
             background: rgba(255, 255, 255, 0.05);
@@ -140,6 +187,7 @@
             text-align: center;
             margin-bottom: 2rem;
             color: var(--accent);
+            font-family: 'Montserrat', sans-serif;
             position: relative;
         }
         
@@ -153,229 +201,276 @@
             border-radius: 3px;
         }
         
-        .brands-container {
+        .hero {
+            height: 500px;
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1542362567-b07e54358753?ixlib=rb-4.0.3') center/cover;
             display: flex;
+            flex-direction: column;
             justify-content: center;
-            flex-wrap: wrap;
-            gap: 25px;
-            margin-top: 20px;
+            align-items: center;
+            text-align: center;
+            border-radius: 10px;
+            margin: 2rem 0;
+            padding: 2rem;
         }
         
-        .brand-card {
+        .hero h2 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            font-family: 'Montserrat', sans-serif;
+            color: var(--accent);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            max-width: 700px;
+            margin-bottom: 2rem;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 5px;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            margin: 0.5rem;
+        }
+        
+        .cta-button:hover {
+            background: #09645a;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        }
+        
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .stat-card {
             background: rgba(255, 255, 255, 0.08);
             border-radius: 10px;
-            padding: 20px;
-            width: 160px;
+            padding: 2rem;
             text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            border: 2px solid transparent;
+            transition: transform 0.3s ease;
         }
         
-        .brand-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--accent);
+        .stat-card:hover {
+            transform: translateY(-10px);
             background: rgba(255, 255, 255, 0.12);
         }
         
-        .brand-card.active {
-            border-color: var(--primary);
-            background: rgba(10, 124, 113, 0.2);
-        }
-        
-        .brand-logo {
-            width: 80px;
-            height: 80px;
-            object-fit: contain;
-            margin: 0 auto 15px;
-            background: white;
-            padding: 10px;
-            border-radius: 10px;
-        }
-        
-        .brand-name {
-            font-weight: 600;
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 700;
             color: var(--accent);
+            margin-bottom: 0.5rem;
+            font-family: 'Montserrat', sans-serif;
+        }
+        
+        .stat-label {
             font-size: 1.1rem;
+            color: #ddd;
         }
         
-        .filter-info {
-            text-align: center;
-            margin-bottom: 20px;
-            padding: 15px;
-            background: rgba(10, 124, 113, 0.2);
-            border-radius: 8px;
-        }
-        
-        .filter-info h3 {
-            color: var(--accent);
-            margin-bottom: 5px;
-        }
-        
-        .products-grid {
+        .gallery {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
-            margin-top: 20px;
+            gap: 1.5rem;
         }
         
-        .product-card {
+        .card {
             background: rgba(255, 255, 255, 0.08);
             border-radius: 10px;
-            padding: 20px;
+            padding: 1.2rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             text-align: center;
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
         
-        .product-card:hover {
+        .card:hover {
             transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
             background: rgba(255, 255, 255, 0.12);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
         }
         
-        .product-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-        
-        .in-stock {
-            background: var(--success);
-        }
-        
-        .low-stock {
-            background: var(--warning);
-        }
-        
-        .out-of-stock {
-            background: var(--secondary);
-        }
-        
-        .product-image {
+        .card img {
             width: 100%;
             height: 180px;
             object-fit: contain;
-            margin-bottom: 15px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
             padding: 15px;
+            margin-bottom: 1rem;
         }
         
-        .product-name {
-            font-weight: 600;
-            margin-bottom: 10px;
+        .part-number {
+            font-weight: bold;
+            margin-top: 0.2rem;
             color: var(--accent);
-            font-size: 1.2rem;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
         }
         
-        .product-desc {
+        .part-desc {
             font-size: 0.9rem;
-            margin-bottom: 15px;
+            margin: 0.5rem 0;
             color: #ddd;
             min-height: 40px;
+            flex-grow: 1;
         }
         
-        .product-price {
-            font-size: 1.3rem;
-            font-weight: 700;
-            margin: 10px 0;
-            color: var(--primary);
-        }
-        
-        .product-specs {
+        .price-container {
             display: flex;
             justify-content: space-between;
-            margin: 10px 0;
-            font-size: 0.9rem;
+            margin: 0.5rem 0;
+            background: rgba(0,0,0,0.2);
+            padding: 0.5rem;
+            border-radius: 5px;
+        }
+        
+        .price-label {
+            font-size: 0.85rem;
             color: #aaa;
         }
         
-        .product-action {
-            margin-top: 15px;
+        .price-value {
+            font-weight: 600;
+        }
+        
+        .price {
+            font-size: 1.2rem;
+            color: var(--accent);
+            font-weight: 600;
+            margin: 0.5rem 0;
+        }
+        
+        .stock-info {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
             display: flex;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            background: rgba(0,0,0,0.2);
+            padding: 0.5rem;
+            border-radius: 5px;
+        }
+        
+        .stock-info span {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
         }
         
         .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 10px 20px;
-            background: var(--primary);
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: 600;
-            transition: all 0.3s;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding: 0.7rem 1.2rem;
             border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-right: 0.5rem;
             cursor: pointer;
-            gap: 8px;
-            flex: 1;
-            margin: 0 5px;
+            font-size: 0.95rem;
         }
         
-        .btn:hover {
+        .whatsapp {
+            background: #25D366;
+            color: #fff;
+        }
+        
+        .whatsapp:hover {
+            background: #1ebd5b;
+            transform: translateY(-2px);
+        }
+        
+        .buy {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .buy:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+        
+        .cart {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .cart:hover {
             background: #09645a;
             transform: translateY(-2px);
         }
         
-        .btn-whatsapp {
-            background: #25D366;
-        }
-        
-        .btn-whatsapp:hover {
-            background: #1ebd5b;
-        }
-        
         .btn:disabled {
-            background: #6c757d;
+            opacity: 0.6;
             cursor: not-allowed;
             transform: none !important;
         }
         
-        .no-products {
-            text-align: center;
-            padding: 40px;
-            grid-column: 1 / -1;
-            color: #aaa;
+        .out-of-stock {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(220, 53, 69, 0.85);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            z-index: 2;
         }
         
-        .no-products i {
-            font-size: 3rem;
-            margin-bottom: 15px;
-            opacity: 0.5;
+        .not-available {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 165, 0, 0.85);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            z-index: 2;
+        }
+        
+        .qty-input {
+            width: 60px;
+            text-align: center;
+            padding: 0.4rem;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid #444;
+            border-radius: 4px;
+            margin-right: 0.5rem;
         }
         
         .loading {
             text-align: center;
-            padding: 40px;
+            padding: 2rem;
+            font-size: 1.2rem;
             grid-column: 1 / -1;
-            color: #aaa;
-        }
-        
-        .loading i {
-            font-size: 2rem;
-            margin-bottom: 15px;
-            color: var(--accent);
-        }
-        
-        .error-message {
-            text-align: center;
-            padding: 40px;
-            grid-column: 1 / -1;
-            color: var(--secondary);
-        }
-        
-        .error-message i {
-            font-size: 3rem;
-            margin-bottom: 15px;
         }
         
         .toast {
@@ -400,63 +495,7 @@
         }
         
         .toast.error {
-            background: var(--secondary);
-        }
-        
-        .search-container {
-            padding: 1rem;
-            background: rgba(0,0,0,0.3);
-            border-radius: 8px;
-            margin: 1rem 0 2rem;
-            position: relative;
-        }
-        
-        #search-input {
-            width: 100%;
-            padding: 0.9rem 1rem 0.9rem 3rem;
-            border-radius: 5px;
-            border: none;
-            font-size: 1rem;
-            background: rgba(255,255,255,0.1);
-            color: white;
-            transition: all 0.3s;
-        }
-        
-        #search-input:focus {
-            outline: none;
-            background: rgba(255,255,255,0.15);
-            box-shadow: 0 0 0 2px var(--primary);
-        }
-        
-        .search-icon {
-            position: absolute;
-            left: 1.5rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #aaa;
-        }
-        
-        .stock-filter {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-        
-        .stock-filter-btn {
-            padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 5px;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .stock-filter-btn.active {
-            background: var(--primary);
-            border-color: var(--primary);
+            background: #dc3545;
         }
         
         footer {
@@ -534,116 +573,240 @@
             color: #777;
         }
         
+        /* Responsive adjustments */
         @media (max-width: 768px) {
-            .brands-container {
-                gap: 15px;
+            body {
+                padding-top: 200px; /* More space for mobile */
             }
             
-            .brand-card {
-                width: 140px;
-                padding: 15px;
+            nav {
+                gap: 1rem;
+                padding: 0.6rem 0.5rem;
             }
             
-            .brand-logo {
-                width: 70px;
-                height: 70px;
-            }
-            
-            .products-grid {
-                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-                gap: 20px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .brands-container {
-                gap: 10px;
-            }
-            
-            .brand-card {
-                width: 120px;
-                padding: 10px;
-            }
-            
-            .brand-logo {
-                width: 60px;
-                height: 60px;
-            }
-            
-            .products-grid {
-                grid-template-columns: 1fr;
+            nav a span {
+                display: none;
             }
             
             header h1 {
                 font-size: 1.8rem;
             }
             
-            .product-action {
-                flex-direction: column;
-                gap: 10px;
+            .hero h2 {
+                font-size: 2.2rem;
             }
             
-            .btn {
-                margin: 0;
+            .hero p {
+                font-size: 1rem;
+            }
+            
+            .gallery {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding-top: 220px;
+            }
+            
+            nav {
+                gap: 0.8rem;
+            }
+            
+            nav a {
+                font-size: 0.9rem;
+            }
+            
+            .logo {
+                height: 40px;
+            }
+            
+            header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .hero h2 {
+                font-size: 1.8rem;
+            }
+            
+            .section {
+                padding: 2rem 1rem;
+            }
+            
+            .gallery {
+                grid-template-columns: 1fr;
+            }
+            
+            .cta-button {
+                padding: 0.8rem 1.5rem;
+                font-size: 1rem;
+                display: block;
+                margin: 0.5rem auto;
             }
         }
     </style>
 </head>
 <body>
-    <header>
-        <div class="logo-container">
-            <img src="https://autosparessolution.github.io/images/ASS.jpg" alt="Auto Spares Solution Logo" class="logo">
-            <div>
-                <h1>Auto Spares Solution</h1>
-                <p class="tagline">Browse products by brand</p>
+    <!-- Fixed Header with Navigation -->
+    <div class="fixed-header">
+        <header>
+            <div class="logo-container">
+                <img src="https://autosparessolution.github.io/images/ASS.jpg" alt="Auto Spares Solution Logo" class="logo">
+                <div>
+                    <h1>Auto Spares Solution</h1>
+                    <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
+                </div>
             </div>
-        </div>
-    </header>
-    
-    <nav>
-        <a href="index.html"><i class="fas fa-arrow-left"></i> Back to Main Site</a>
-        <a href="#tvs"><i class="fas fa-tag"></i> TVS</a>
-        <a href="#stl"><i class="fas fa-tag"></i> STL</a>
-        <a href="#vrp"><i class="fas fa-tag"></i> VRP</a>
-        <a href="#other"><i class="fas fa-tag"></i> Other Brands</a>
-    </nav>
-
-    <div class="container">
-        <section class="section">
-            <h2 class="section-title">Browse by Brand</h2>
-            <p style="text-align: center; margin-bottom: 20px;">Select a brand to view their products</p>
-            
-            <div class="search-container">
+        </header>
+        
+        <div class="search-container">
+            <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" id="search-input" placeholder="Search by part number or description...">
             </div>
-            
-            <div class="stock-filter">
-                <div class="stock-filter-btn active" data-stock="all">All Products</div>
-                <div class="stock-filter-btn" data-stock="in-stock">In Stock Only</div>
-                <div class="stock-filter-btn" data-stock="out-of-stock">Out of Stock</div>
+        </div>
+        
+        <nav>
+            <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
+            <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
+            <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
+            <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
+            <a href="#policies"><i class="fas fa-file-contract"></i> <span>Policies</span></a>
+            <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
+            <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
+            <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span id="cart-count">0</span></a>
+            <a href="brands.html" target="_blank"><i class="fas fa-tags"></i> <span>Brands</span></a>
+            <a href="bolt-generator.html" target="_blank"><i class="fas fa-cog"></i> <span>Bolt Generator</span></a>
+        </nav>
+    </div>
+
+    <div class="container">
+        <!-- Hero Section -->
+        <section id="home" class="hero">
+            <h2>Premium Auto Parts for Professionals</h2>
+            <p>Supplying high-quality automotive components to workshops, retailers, and distributors since 2020. Trusted by industry professionals for genuine parts and exceptional service.</p>
+            <a href="#products" class="cta-button">Explore Our Products</a>
+            <a href="brands.html" class="cta-button" target="_blank">Browse by Brand</a>
+            <a href="bolt-generator.html" class="cta-button" target="_blank">Bolt Generator Tool</a>
+        </section>
+
+        <!-- Business Stats -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-number">5000+</div>
+                <div class="stat-label">Parts in Catalog</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">200+</div>
+                <div class="stat-label">Corporate Clients</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">98%</div>
+                <div class="stat-label">Customer Satisfaction</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">24H</div>
+                <div class="stat-label">Order Processing</div>
+            </div>
+        </div>
+
+        <!-- About Section -->
+        <section id="about" class="section">
+            <h2 class="section-title">About Auto Spares Solution</h2>
+            <div class="about-content">
+                <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We specialize in providing high-quality components that meet industry standards and ensure optimal vehicle performance.</p>
+                
+                <div style="margin: 1.5rem 0;">
+                    <p><strong>Our Specializations:</strong></p>
+                    <ul style="padding-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>Specialist dealers of TVS & STL Fasteners (Nut & Bolt)</li>
+                        <li>Authorized distributors of Volume Rubber Products</li>
+                        <li>Wide range of OEM and aftermarket parts</li>
+                        <li>Bulk supply for workshops and retailers</li>
+                    </ul>
+                </div>
+                
+                <p>With our extensive network and industry expertise, we ensure timely delivery of genuine parts at competitive prices. Our commitment to quality and customer satisfaction has made us a trusted partner for automotive businesses across the region.</p>
             </div>
             
-            <div class="brands-container" id="brands-container">
-                <div class="brand-card active" data-brand="all">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiByeD0iMTAiIGZpbGw9IiMwYTdjNzEiLz4KPHRleHQgeD0iNDAiIHk9IjQ1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iYm9sZCI+QUxMPC90ZXh0Pgo8L3N2Zz4K" alt="All Brands" class="brand-logo">
-                    <div class="brand-name">All Brands</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin: 2rem 0;">
+                <div style="background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 8px; text-align: center;">
+                    <i class="fas fa-map-marked-alt" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 1rem;"></i>
+                    <h3 style="margin-bottom: 1rem; color: var(--accent);">Office</h3>
+                    <p>101, 1st floor, 57/5, Q Road<br>Howrah, West Bengal 711108</p>
                 </div>
-                <!-- Brands will be loaded dynamically from CSV -->
+                
+                <div style="background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 8px; text-align: center;">
+                    <i class="fas fa-warehouse" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 1rem;"></i>
+                    <h3 style="margin-bottom: 1rem; color: var(--accent);">Warehouse</h3>
+                    <p>1 no British Indian Street<br>Kolkata, West Bengal 700069</p>
+                </div>
+                
+                <div style="background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 8px; text-align: center;">
+                    <i class="fas fa-file-invoice-dollar" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 1rem;"></i>
+                    <h3 style="margin-bottom: 1rem; color: var(--accent);">Business Details</h3>
+                    <p>GSTIN: 19ANOPD3300R1ZO<br>Established: 2020</p>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin: 2rem 0;">
+                <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">TVS</div>
+                <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">STL</div>
+                <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">VRP</div>
+                <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">OEM</div>
             </div>
         </section>
-        
-        <section class="section">
-            <div class="filter-info" id="filter-info">
-                <h3>Showing Products: <span id="current-brand">All Brands</span></h3>
-                <p id="product-count">Loading products...</p>
+
+        <!-- Products Section -->
+        <section id="products" class="section">
+            <h2 class="section-title">Our Products</h2>
+            <div class="gallery">
+                <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>
             </div>
-            
-            <div class="products-grid" id="products-container">
-                <div class="loading">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <h3>Loading Products</h3>
-                    <p>Please wait while we load our product catalog</p>
+        </section>
+
+        <!-- Contact Section -->
+        <section id="contact" class="section">
+            <h2 class="section-title">Get In Touch</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
+                <div style="background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 8px;">
+                    <h3 style="color: var(--accent); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.8rem;"><i class="fas fa-phone-alt"></i> Contact Details</h3>
+                    <p style="margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: 0.8rem;"><i class="fas fa-phone" style="color: var(--primary); min-width: 20px;"></i> +91 98303 00193</p>
+                    <p style="margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: 0.8rem;"><i class="fas fa-envelope" style="color: var(--primary); min-width: 20px;"></i> contact@autosparessolution.com</p>
+                    <p style="margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: 0.8rem;"><i class="fas fa-clock" style="color: var(--primary); min-width: 20px;"></i> Mon-Sat: 9:00 AM - 7:00 PM</p>
+                    
+                    <h3 style="margin-top: 1.5rem; color: var(--accent); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.8rem;"><i class="fas fa-file-invoice"></i> Business Information</h3>
+                    <p style="margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: 0.8rem;"><i class="fas fa-id-card" style="color: var(--primary); min-width: 20px;"></i> GSTIN: 19ANOPD3300R1ZO</p>
+                    
+                    <div class="social-links">
+                        <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+                        <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
+                        <a href="https://wa.me/03369028606" title="WhatsApp" target="_blank"><i class="fab fa-whatsapp"></i></a>
+                    </div>
+                </div>
+                
+                <div>
+                    <form id="contact-form">
+                        <div style="margin-bottom: 1.2rem;">
+                            <label for="name" style="display: block; margin-bottom: 0.5rem; color: #ddd;">Your Name</label>
+                            <input type="text" id="name" style="width: 100%; padding: 0.8rem 1rem; background: rgba(255,255,255,0.08); border: 1px solid #444; border-radius: 5px; color: white; font-size: 1rem;" placeholder="Enter your name" required>
+                        </div>
+                        <div style="margin-bottom: 1.2rem;">
+                            <label for="email" style="display: block; margin-bottom: 0.5rem; color: #ddd;">Email Address</label>
+                            <input type="email" id="email" style="width: 100%; padding: 0.8rem 1rem; background: rgba(255,255,255,0.08); border: 1px solid #444; border-radius: 5px; color: white; font-size: 1rem;" placeholder="Enter your email" required>
+                        </div>
+                        <div style="margin-bottom: 1.2rem;">
+                            <label for="phone" style="display: block; margin-bottom: 0.5rem; color: #ddd;">Phone Number</label>
+                            <input type="tel" id="phone" style="width: 100%; padding: 0.8rem 1rem; background: rgba(255,255,255,0.08); border: 1px solid #444; border-radius: 5px; color: white; font-size: 1rem;" placeholder="Enter your phone number" required>
+                        </div>
+                        <div style="margin-bottom: 1.2rem;">
+                            <label for="message" style="display: block; margin-bottom: 0.5rem; color: #ddd;">How can we help you?</label>
+                            <textarea id="message" style="width: 100%; padding: 0.8rem 1rem; background: rgba(255,255,255,0.08); border: 1px solid #444; border-radius: 5px; color: white; font-size: 1rem; min-height: 120px; resize: vertical;" placeholder="Describe your requirements" required></textarea>
+                        </div>
+                        <button type="submit" class="btn" style="background: var(--primary); width: 100%; text-align: center;"><i class="fas fa-paper-plane"></i> Send Message</button>
+                    </form>
                 </div>
             </div>
         </section>
@@ -661,20 +824,20 @@
             <div class="footer-column">
                 <h3>Quick Links</h3>
                 <ul class="footer-links">
-                    <li><a href="index.html"><i class="fas fa-chevron-right"></i> Home</a></li>
-                    <li><a href="index.html#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
-                    <li><a href="index.html#products"><i class="fas fa-chevron-right"></i> Products</a></li>
-                    <li><a href="index.html#investors"><i class="fas fa-chevron-right"></i> Investors</a></li>
+                    <li><a href="#home"><i class="fas fa-chevron-right"></i> Home</a></li>
+                    <li><a href="#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
+                    <li><a href="#products"><i class="fas fa-chevron-right"></i> Products</a></li>
+                    <li><a href="#investors"><i class="fas fa-chevron-right"></i> Investors</a></li>
                 </ul>
             </div>
             
             <div class="footer-column">
                 <h3>Policy</h3>
                 <ul class="footer-links">
-                    <li><a href="index.html#policies"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
-                    <li><a href="index.html#policies"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
-                    <li><a href="index.html#policies"><i class="fas fa-chevron-right"></i> Return Policy</a></li>
-                    <li><a href="index.html#policies"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
+                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
+                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
+                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Return Policy</a></li>
+                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
                 </ul>
             </div>
             
@@ -704,426 +867,15 @@
     </div>
 
     <script>
-        // Global variables
+        // Initialize variables
         let productsData = [];
-        let brandsData = [];
-        let currentBrand = 'all';
-        let currentStockFilter = 'all';
-        let cart = [];
         let filteredProducts = [];
-        
-        // Updated references based on your information
-        const imageBaseUrl = 'https://autosparessolution.github.io/images/';
-        const csvFilePath = 'https://autosparessolution.github.io/prices.csv';
-        const whatsappNumber = '03369028606';
+        let cart = [];
         
         // DOM elements
-        const brandsContainer = document.getElementById('brands-container');
-        const productsContainer = document.getElementById('products-container');
-        const currentBrandElement = document.getElementById('current-brand');
-        const productCountElement = document.getElementById('product-count');
-        const toast = document.getElementById('toast');
-        const toastMessage = document.getElementById('toast-message');
-        const searchInput = document.getElementById('search-input');
-        const stockFilterBtns = document.querySelectorAll('.stock-filter-btn');
-        
-        // Initialize the page
-        document.addEventListener('DOMContentLoaded', function() {
-            loadProducts();
-            
-            // Add search functionality
-            searchInput.addEventListener('input', function() {
-                performSearch(this.value);
-            });
-            
-            // Add stock filter functionality
-            stockFilterBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    stockFilterBtns.forEach(b => b.classList.remove('active'));
-                    this.classList.add('active');
-                    currentStockFilter = this.getAttribute('data-stock');
-                    applyFilters();
-                });
-            });
-        });
-        
-        // Perform search
-        function performSearch(searchTerm) {
-            const term = searchTerm.toLowerCase().trim();
-            
-            if (term === '') {
-                applyFilters();
-            } else {
-                // When searching, show all matching products
-                filteredProducts = productsData.filter(product => 
-                    product.part.toLowerCase().includes(term) || 
-                    (product.desc && product.desc.toLowerCase().includes(term))
-                );
-                
-                displayProducts(filteredProducts);
-            }
-        }
-        
-        // Apply both brand and stock filters
-        function applyFilters() {
-            let tempProducts = productsData;
-            
-            // Apply brand filter
-            if (currentBrand !== 'all') {
-                tempProducts = tempProducts.filter(product => 
-                    product.brand && product.brand.toLowerCase() === currentBrand
-                );
-            }
-            
-            // Apply stock filter
-            if (currentStockFilter === 'in-stock') {
-                tempProducts = tempProducts.filter(product => product.stock > 0);
-            } else if (currentStockFilter === 'out-of-stock') {
-                tempProducts = tempProducts.filter(product => product.stock <= 0);
-            }
-            
-            filteredProducts = tempProducts;
-            displayProducts(filteredProducts);
-        }
-        
-        // Load product data from CSV
-        function loadProducts() {
-            // Show loading state
-            productsContainer.innerHTML = `
-                <div class="loading">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <h3>Loading Products</h3>
-                    <p>Please wait while we load our product catalog</p>
-                </div>
-            `;
-            
-            // For demo purposes, we'll use sample data since the CSV might not be accessible
-            // In production, you would fetch from the actual CSV URL
-            const sampleData = `Material,Material,LIST PRICE,MRP PRICE,TYPE,FINISH,billing price,STOCK,Box Qty,Carton,brand
-MA2710M02920000200,M18 X 2.5 X 100 KNURLED WH BOLT & NUT,132.05,165,AUTOMOVOTIVE PRICE LIST PARTS,200,83.19,2200,NaN,NaN,TVS
-MA2710M02920000201,M18 X 2.5 X 110 KNURLED WH BOLT & NUT,142.05,175,AUTOMOVOTIVE PRICE LIST PARTS,200,93.19,1500,NaN,NaN,TVS
-MA2710M02920000202,M18 X 2.5 X 120 KNURLED WH BOLT & NUT,152.05,185,AUTOMOVOTIVE PRICE LIST PARTS,200,103.19,0,NaN,NaN,TVS
-STL001,STL Brake Pad Set,450.00,550,AUTOMOVOTIVE PRICE LIST PARTS,200,350.00,50,NaN,NaN,STL
-STL002,STL Clutch Plate,1200.00,1400,AUTOMOVOTIVE PRICE LIST PARTS,200,950.00,25,NaN,NaN,STL
-VRP001,VRP Fuel Pump,3200.00,3800,AUTOMOVOTIVE PRICE LIST PARTS,200,2800.00,10,NaN,NaN,VRP
-VRP002,VRP Oil Filter,250.00,300,AUTOMOVOTIVE PRICE LIST PARTS,200,200.00,100,NaN,NaN,VRP
-BOS001,BOSCH Spark Plug,180.00,220,AUTOMOVOTIVE PRICE LIST PARTS,200,150.00,200,NaN,NaN,BOSCH
-MIN001,MINDA Horn Set,650.00,750,AUTOMOVOTIVE PRICE LIST PARTS,200,550.00,15,NaN,NaN,Minda`;
-            
-            try {
-                console.log("Using sample product data for demonstration");
-                parseCSVData(sampleData);
-            } catch (err) {
-                console.error("Error parsing sample data:", err);
-                showToast("Error loading product data.", true);
-                
-                productsContainer.innerHTML = `
-                    <div class="error-message">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <h3>Unable to Load Products</h3>
-                        <p>Error: ${err.message}</p>
-                        <button class="btn" onclick="location.reload()" style="margin-top: 20px;">
-                            <i class="fas fa-redo"></i> Try Again
-                        </button>
-                    </div>
-                `;
-            }
-            
-            // Uncomment this section and remove the sample data section above when your CSV is ready
-            /*
-            fetch(csvFilePath)
-                .then(res => {
-                    if (!res.ok) throw new Error("Failed to fetch CSV file. Status: " + res.status);
-                    return res.text();
-                })
-                .then(csv => {
-                    parseCSVData(csv);
-                })
-                .catch(err => {
-                    console.error("Error loading CSV:", err);
-                    showToast("Error loading product data. Please check if the CSV file exists and is accessible.", true);
-                    
-                    productsContainer.innerHTML = `
-                        <div class="error-message">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <h3>Unable to Load Products</h3>
-                            <p>Error: ${err.message}</p>
-                            <p>CSV URL: ${csvFilePath}</p>
-                            <p>Please ensure the CSV file is available at the above URL.</p>
-                            <button class="btn" onclick="location.reload()" style="margin-top: 20px;">
-                                <i class="fas fa-redo"></i> Try Again
-                            </button>
-                        </div>
-                    `;
-                });
-            */
-        }
-        
-        // Parse CSV data
-        function parseCSVData(csv) {
-            console.log("Raw CSV content:", csv.substring(0, 500));
-            
-            const rows = csv.split("\n").filter(row => row.trim() !== "");
-            
-            if (rows.length === 0) {
-                throw new Error("CSV data is empty");
-            }
-            
-            const header = rows[0].split(",").map(h => h.trim().toLowerCase());
-            
-            console.log("CSV Header:", header);
-            
-            // Updated column indices to match your actual CSV structure
-            const materialIndex = 0; // First Material column (part number)
-            const descIndex = 1;     // Second Material column (description)
-            const listIndex = 2;     // LIST PRICE
-            const mrpIndex = 3;      // MRP PRICE
-            const priceIndex = 6;    // billing price (7th column, index 6)
-            const stockIndex = 7;    // STOCK (8th column, index 7)
-            const brandIndex = 10;   // brand (11th column, index 10)
-            
-            console.log("Column indices:", {materialIndex, descIndex, listIndex, mrpIndex, priceIndex, stockIndex, brandIndex});
-            
-            // Process data rows
-            productsData = rows.slice(1)
-                .map(r => {
-                    // Handle CSV with potential quotes and commas in values
-                    const cols = r.split(',').map(c => c.trim().replace(/^"(.*)"$/, '$1'));
-                    
-                    // Skip empty rows or rows without material
-                    if (cols.length < 2 || !cols[materialIndex] || cols[materialIndex] === '') return null;
-                    
-                    return {
-                        part: cols[materialIndex]?.trim(),
-                        desc: cols[descIndex]?.trim() || "Auto Spare Part",
-                        List: parseFloat(cols[listIndex] || 0),
-                        Mrp: parseFloat(cols[mrpIndex] || 0),     
-                        price: parseFloat(cols[priceIndex] || 0),
-                        stock: parseInt(cols[stockIndex] || 0),
-                        brand: cols[brandIndex]?.trim() || "Other"
-                    };
-                })
-                .filter(p => p !== null && p.part && p.part.trim() !== "");
-
-            console.log('Loaded products:', productsData.length);
-            console.log('Sample products:', productsData.slice(0, 5));
-            
-            if (productsData.length === 0) {
-                throw new Error("No products found in CSV data after parsing.");
-            }
-            
-            // Extract unique brands from products
-            extractBrandsFromProducts();
-            
-            // Display brands
-            displayBrands();
-            
-            // Display all products initially
-            filteredProducts = productsData;
-            displayProducts(filteredProducts);
-        }
-        
-        // Extract unique brands from products
-        function extractBrandsFromProducts() {
-            const brandSet = new Set();
-            
-            productsData.forEach(product => {
-                if (product.brand && product.brand.trim() !== "") {
-                    brandSet.add(product.brand.trim());
-                }
-            });
-            
-            brandsData = Array.from(brandSet).sort();
-            console.log('Extracted brands:', brandsData);
-        }
-        
-        // Display brands in the brands container
-        function displayBrands() {
-            // Clear existing brands (except "All Brands")
-            const allBrandsCard = brandsContainer.querySelector('[data-brand="all"]');
-            brandsContainer.innerHTML = '';
-            brandsContainer.appendChild(allBrandsCard);
-            
-            // Add brand cards for each brand
-            brandsData.forEach(brand => {
-                const brandCard = document.createElement('div');
-                brandCard.className = 'brand-card';
-                brandCard.setAttribute('data-brand', brand.toLowerCase());
-                
-                // Create optimized SVG logos instead of external images
-                let logoBgColor = '#0a7c71';
-                let logoText = brand.substring(0, 3).toUpperCase();
-                
-                // Set specific colors for known brands
-                const brandColors = {
-                    'tvs': '#0a7c71',
-                    'stl': '#e74c3c',
-                    'vrp': '#27ae60',
-                    'bosch': '#34495e',
-                    'minda': '#9b59b6',
-                    'asco': '#e67e22',
-                    'lucas': '#16a085',
-                    'other': '#7f8c8d'
-                };
-                
-                if (brandColors[brand.toLowerCase()]) {
-                    logoBgColor = brandColors[brand.toLowerCase()];
-                }
-                
-                // Create SVG logo as data URI for fast loading
-                const svgLogo = `<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="80" height="80" rx="10" fill="${logoBgColor}"/>
-                    <text x="40" y="45" text-anchor="middle" fill="white" font-family="Arial" font-size="14" font-weight="bold">${logoText}</text>
-                </svg>`;
-                
-                const svgDataUri = `data:image/svg+xml;base64,${btoa(svgLogo)}`;
-                
-                brandCard.innerHTML = `
-                    <img src="${svgDataUri}" alt="${brand}" class="brand-logo">
-                    <div class="brand-name">${brand}</div>
-                `;
-                
-                brandsContainer.appendChild(brandCard);
-            });
-            
-            // Add event listeners to brand cards
-            const brandCards = brandsContainer.querySelectorAll('.brand-card');
-            brandCards.forEach(card => {
-                card.addEventListener('click', function() {
-                    const brand = this.getAttribute('data-brand');
-                    
-                    // Update active state
-                    brandCards.forEach(c => c.classList.remove('active'));
-                    this.classList.add('active');
-                    
-                    // Filter products
-                    filterProductsByBrand(brand);
-                });
-            });
-        }
-        
-        // Filter products by brand
-        function filterProductsByBrand(brand) {
-            currentBrand = brand;
-            searchInput.value = ''; // Clear search when filtering by brand
-            applyFilters();
-            
-            if (brand === 'all') {
-                currentBrandElement.textContent = 'All Brands';
-            } else {
-                const brandName = brandsContainer.querySelector(`[data-brand="${brand}"] .brand-name`).textContent;
-                currentBrandElement.textContent = brandName;
-            }
-        }
-        
-        // Display products in the grid
-        function displayProducts(productsArray) {
-            productsContainer.innerHTML = '';
-            
-            if (productsArray.length === 0) {
-                productsContainer.innerHTML = `
-                    <div class="no-products">
-                        <i class="fas fa-box-open"></i>
-                        <h3>No products found</h3>
-                        <p>Try selecting a different brand or search term</p>
-                    </div>
-                `;
-                productCountElement.textContent = '0 products found';
-                return;
-            }
-            
-            productCountElement.textContent = `${productsArray.length} products found`;
-            
-            productsArray.forEach(product => {
-                const productCard = document.createElement('div');
-                productCard.className = 'product-card';
-                
-                // Determine stock status
-                let stockStatus = '';
-                let stockClass = '';
-                if (product.stock > 10) {
-                    stockStatus = 'In Stock';
-                    stockClass = 'in-stock';
-                } else if (product.stock > 0) {
-                    stockStatus = 'Low Stock';
-                    stockClass = 'low-stock';
-                } else {
-                    stockStatus = 'Out of Stock';
-                    stockClass = 'out-of-stock';
-                }
-                
-                // Create image URL for the product (using part number as image name)
-                const imageUrl = `${imageBaseUrl}${product.part}.png`;
-                
-                productCard.innerHTML = `
-                    <div class="product-badge ${stockClass}">${stockStatus}</div>
-                    <img src="${imageUrl}" 
-                         alt="${product.part}" 
-                         class="product-image"
-                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIgeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg=='">
-                    <h3 class="product-name">${product.part}</h3>
-                    <p class="product-desc">${product.desc}</p>
-                    <div class="product-specs">
-                        <span><i class="fas fa-tag"></i> ${product.brand || 'Unknown Brand'}</span>
-                        <span><i class="fas fa-cubes"></i> Stock: ${product.stock || '0'}</span>
-                    </div>
-                    <div class="product-price">₹${product.price || '0'}</div>
-                    <div class="product-action">
-                        <button class="btn" onclick="addToCart('${product.part}')" ${product.stock <= 0 ? 'disabled' : ''}>
-                            <i class="fas fa-cart-plus"></i> ${product.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
-                        </button>
-                        <button class="btn btn-whatsapp" onclick="enquireOnWhatsApp('${product.part}', '${product.desc}')">
-                            <i class="fab fa-whatsapp"></i> ${product.stock <= 0 ? 'Notify Me' : 'Enquire'}
-                        </button>
-                    </div>
-                `;
-                
-                productsContainer.appendChild(productCard);
-            });
-        }
-        
-        // Add to cart function
-        function addToCart(part) {
-            const product = productsData.find(p => p.part === part);
-            if (!product) return;
-            
-            // Check if product is already in cart
-            const existingItem = cart.find(item => item.part === part);
-            if (existingItem) {
-                existingItem.quantity += 1;
-            } else {
-                cart.push({
-                    part: product.part,
-                    desc: product.desc,
-                    price: product.price,
-                    quantity: 1
-                });
-            }
-            
-            // Update cart count in navigation
-            const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
-            const cartLink = document.querySelector('nav a[href="#cart"]');
-            if (cartLink) {
-                let countElement = cartLink.querySelector('#cart-count');
-                if (!countElement) {
-                    countElement = document.createElement('span');
-                    countElement.id = 'cart-count';
-                    cartLink.appendChild(countElement);
-                }
-                countElement.textContent = cartCount;
-            }
-            
-            showToast(`${product.part} added to cart!`);
-        }
-        
-        // Enquire on WhatsApp function
-        function enquireOnWhatsApp(part, desc) {
-            const product = productsData.find(p => p.part === part);
-            const stockStatus = product.stock > 0 ? 'In Stock' : 'Out of Stock';
-            const message = `I want to enquire about ${part} (${desc}). Current stock: ${stockStatus}`;
-            const encodedMessage = encodeURIComponent(message);
-            window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
-        }
+        const cartLink = document.getElementById("cart-link");
+        const toast = document.getElementById("toast");
+        const toastMessage = document.getElementById("toast-message");
         
         // Show toast message
         function showToast(message, isError = false) {
@@ -1136,6 +888,242 @@ MIN001,MINDA Horn Set,650.00,750,AUTOMOVOTIVE PRICE LIST PARTS,200,550.00,15,NaN
                 toast.classList.remove("show");
             }, 3000);
         }
+        
+        // Search functionality
+        let searchTimeout;
+        
+        // Search with debounce and Enter key support
+        document.getElementById("search-input").addEventListener("input", (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                performSearch(e.target.value);
+            }, 300); // 300ms delay before searching
+        });
+        
+        // Add Enter key support
+        document.getElementById("search-input").addEventListener("keypress", (e) => {
+            if (e.key === 'Enter') {
+                clearTimeout(searchTimeout); // Clear any pending timeout
+                performSearch(e.target.value);
+            }
+        });
+        
+        function performSearch(searchTerm) {
+            const term = searchTerm.toLowerCase().trim();
+            
+            if (term === '') {
+                // When search is empty, show only in-stock items
+                filteredProducts = productsData.filter(product => product.stock > 0);
+            } else {
+                // When searching, show all matching products regardless of stock
+                filteredProducts = productsData.filter(product => 
+                    product.part.toLowerCase().includes(term) || 
+                    (product.desc && product.desc.toLowerCase().includes(term))
+                );
+            }
+            displayProducts();
+        }
+        
+        // Load product data from CSV
+        function loadProducts() {
+            // Use the correct URL for your CSV file
+            fetch("https://autosparessolution.github.io/prices.csv")
+                .then(res => {
+                    if (!res.ok) throw new Error("Failed to fetch CSV");
+                    return res.text();
+                })
+                .then(csv => {
+                    const rows = csv.split("\n");
+                    const header = rows[0].split(",").map(h => h.trim().toLowerCase());
+                    
+                    // Find column indices
+                    const materialIndex = header.findIndex(h => h.includes("material"));
+                    const descIndex = header.findIndex(h => h.includes("desc") || h.includes("description"));
+                    const listIndex = header.findIndex(h => h.includes("list"));
+                    const mrpIndex = header.findIndex(h => h.includes("mrp"));
+                    const priceIndex = header.findIndex(h => h.includes("price") && !h.includes("list") && !h.includes("mrp"));
+                    const stockIndex = header.findIndex(h => h.includes("stock") || h.includes("qty"));
+                    
+                    // Process data rows
+                    productsData = rows.slice(1)
+                        .map(r => {
+                            const cols = r.split(",").map(c => c.trim().replace(/^"(.*)"$/, '$1'));
+                            
+                            // Skip empty rows
+                            if (cols.length < 2 || !cols[materialIndex] || cols[materialIndex] === '') return null;
+                            
+                            // Remove "Ex:" prefix if present
+                            let part = cols[materialIndex];
+                            if (part.startsWith("Ex:")) {
+                                part = part.substring(3);
+                            }
+                            
+                            return {
+                                part: part,
+                                desc: cols[descIndex] || "Auto Spare Part",
+                                List: parseFloat(cols[listIndex] || 0),
+                                Mrp: parseFloat(cols[mrpIndex] || 0),     
+                                price: parseFloat(cols[priceIndex] || 0),
+                                stock: parseInt(cols[stockIndex] || 0),
+                                boxQty: 1, // Default values
+                                masterCarton: 1
+                            };
+                        })
+                        .filter(p => p !== null && p.part && p.part.trim() !== "");
+
+                    // Initialize with only in-stock items shown by default
+                    filteredProducts = productsData.filter(product => product.stock > 0);
+                    displayProducts();
+                })
+                .catch(err => {
+                    console.error("Error loading CSV:", err);
+                    showToast("Error loading product data. Please check if the CSV file exists.", true);
+                    
+                    // Show error message
+                    const gallery = document.querySelector(".gallery");
+                    gallery.innerHTML = `
+                        <div class="loading">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <h3>Unable to Load Products</h3>
+                            <p>Error: ${err.message}</p>
+                            <p>CSV URL: https://autosparessolution.github.io/prices.csv</p>
+                            <p>Please ensure the CSV file is available at the above URL.</p>
+                            <button class="btn" onclick="location.reload()" style="margin-top: 20px; background: var(--primary);">
+                                <i class="fas fa-redo"></i> Try Again
+                            </button>
+                        </div>
+                    `;
+                });
+        }
+        
+        // Display filtered products
+        function displayProducts() {
+            const gallery = document.querySelector(".gallery");
+            gallery.innerHTML = "";
+            
+            if (filteredProducts.length === 0) {
+                gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
+                return;
+            }
+            
+            filteredProducts.forEach(product => {
+                const isInStock = product.stock > 0;
+                
+                gallery.insertAdjacentHTML('beforeend', `
+                    <div class="card" data-part="${product.part}">
+                        ${!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
+                        
+                        <img src="https://autosparessolution.github.io/images/${product.part}.png" alt="${product.part}" 
+                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIgeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg==';this.onerror=null;">
+                        
+                        <div class="part-number">${product.part}</div>
+                        <div class="part-desc">${product.desc}</div>
+                        
+                        <div class="price-container">
+                            <div>
+                                <div class="price-label">List Price:</div>
+                                <div class="price-value">${product.List > 0 ? '₹'+product.List.toFixed(2) : 'NA'}</div>
+                            </div>
+                            <div>
+                                <div class="price-label">MRP:</div>
+                                <div class="price-value">${product.Mrp > 0 ? '₹'+product.Mrp.toFixed(2) : 'NA'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="price">Our Price: ${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
+                        
+                        <div class="stock-info">
+                            <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
+                            ${isInStock ? `
+                                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
+                                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
+                            ` : ''}
+                        </div>
+                        
+                        ${isInStock ? `
+                            <div style="margin-top: 0.5rem;">
+                                <input class="qty-input" type="number" value="1" min="1" max="${product.stock}">
+                                <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">
+                                    <i class="fas fa-cart-plus"></i> Add to Cart
+                                </button>
+                            </div>
+                        ` : ''}
+                        
+                        <a class="btn whatsapp" href="https://wa.me/03369028606?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
+                            <i class="fab fa-whatsapp"></i> ${isInStock ? 'Enquire' : 'Notify Me'}
+                        </a>
+                    </div>
+                `);
+            });
+        }
+        
+        // Cart functions
+        function addToCart(part, price) {
+            const card = document.querySelector(`.card[data-part="${part}"]`);
+            const qtyInput = card ? card.querySelector('.qty-input') : null;
+            const qty = qtyInput ? parseInt(qtyInput.value) : 1;
+            
+            const existing = cart.find(item => item.part === part);
+            if (existing) {
+                existing.qty += qty;
+            } else {
+                const product = productsData.find(p => p.part === part);
+                cart.push({ 
+                    part, 
+                    price, 
+                    qty,
+                    desc: product?.desc || "Auto Spare Part"
+                });
+            }
+            
+            updateCartUI();
+            showToast(`${part} added to cart!`);
+        }
+        
+        function updateCartUI() {
+            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+            document.getElementById("cart-count").textContent = cartCount;
+        }
+        
+        // Contact form submission
+        document.getElementById("contact-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById("name").value;
+            const email = document.getElementById("email").value;
+            const phone = document.getElementById("phone").value;
+            const message = document.getElementById("message").value;
+            
+            const subject = `Contact Form Submission from ${name}`;
+            const body = `Name: ${name}%0AEmail: ${email}%0APhone: ${phone}%0AMessage: ${message}`;
+            
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            
+            // Reset the form
+            this.reset();
+            showToast("Your message has been sent. We'll contact you soon!");
+        });
+        
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const targetId = this.getAttribute('href');
+                if (targetId === '#') return;
+                
+                const targetElement = document.querySelector(targetId);
+                if (targetElement) {
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 160,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+        
+        // Initialize the page
+        loadProducts();
     </script>
 </body>
     </html>
