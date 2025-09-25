@@ -1137,5 +1137,143 @@ MIN001,MINDA Horn Set,650.00,750,AUTOMOVOTIVE PRICE LIST PARTS,200,550.00,15,NaN
             }, 3000);
         }
     </script>
+    <body>
+    <!-- Fixed Header with Navigation -->
+    <div class="fixed-header">
+        <div class="header-content">
+            <div class="logo-container">
+                <img src="https://via.placeholder.com/50x50/0a7c71/ffffff?text=ASS" alt="Auto Spares Solution Logo" class="logo">
+                <div>
+                    <h1>Auto Spares Solution</h1>
+                    <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="search-container">
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" placeholder="Search by part number or description...">
+            </div>
+        </div>
+        
+        <nav class="fixed-nav">
+            <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
+            <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
+            <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
+            <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
+            <a href="#policies"><i class="fas fa-file-contract"></i> <span>Policies</span></a>
+            <a href="#consultancy"><i class="fas fa-robot"></i> <span>Consultancy</span></a>
+            <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
+            <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
+            <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span class="cart-count">3</span></a>
+        </nav>
+    </div>
+
+    <!-- Demo Content -->
+    <div class="container">
+        <div class="section">
+            <h2 class="section-title">Featured Products</h2>
+            <div class="product-grid">
+                <div class="product-card">
+                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Engine+Part" alt="Engine Part" class="product-img">
+                    <h3 class="product-title">Engine Cylinder Head</h3>
+                    <p>High-performance cylinder head for all major brands</p>
+                    <div class="product-price">₹12,499</div>
+                    <button class="btn">Add to Cart</button>
+                </div>
+                
+                <div class="product-card">
+                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Brake+System" alt="Brake System" class="product-img">
+                    <h3 class="product-title">Brake Caliper Assembly</h3>
+                    <p>Premium brake calipers with extended lifespan</p>
+                    <div class="product-price">₹8,299</div>
+                    <button class="btn">Add to Cart</button>
+                </div>
+                
+                <div class="product-card">
+                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Transmission" alt="Transmission" class="product-img">
+                    <h3 class="product-title">Automatic Transmission Kit</h3>
+                    <p>Complete kit for transmission overhaul</p>
+                    <div class="product-price">₹24,999</div>
+                    <button class="btn">Add to Cart</button>
+                </div>
+                
+                <div class="product-card">
+                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Suspension" alt="Suspension" class="product-img">
+                    <h3 class="product-title">Shock Absorber Set</h3>
+                    <p>4-piece set for smooth ride quality</p>
+                    <div class="product-price">₹14,500</div>
+                    <button class="btn">Add to Cart</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">About Auto Spares Solution</h2>
+            <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We specialize in providing high-quality components that meet industry standards and ensure optimal vehicle performance.</p>
+            <p>With our extensive network and industry expertise, we ensure timely delivery of genuine parts at competitive prices. Our commitment to quality and customer satisfaction has made us a trusted partner for automotive businesses across the region.</p>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">Our Services</h2>
+            <p>We offer a comprehensive range of services to meet all your automotive parts needs:</p>
+            <ul>
+                <li>Bulk supply of genuine auto parts</li>
+                <li>Import and distribution of specialized components</li>
+                <li>Technical support and consultancy services</li>
+                <li>Custom sourcing solutions for rare parts</li>
+                <li>Nationwide shipping and logistics</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Simple script to highlight the active menu item on scroll
+        document.addEventListener('DOMContentLoaded', function() {
+            const sections = document.querySelectorAll('.section');
+            const navLinks = document.querySelectorAll('.fixed-nav a');
+            
+            window.addEventListener('scroll', function() {
+                let current = '';
+                
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    
+                    if (pageYOffset >= (sectionTop - 200)) {
+                        current = section.getAttribute('id');
+                    }
+                });
+                
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+            
+            // Add smooth scrolling for navigation links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+                    
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 160,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        });
+</script>  
+</body>
+</html>
 </body>
 </html>
