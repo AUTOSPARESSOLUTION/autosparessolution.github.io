@@ -943,7 +943,108 @@
                             masterCarton: parseInt(cols[9] || 1) // Master carton quantity
                         };
                     }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
+// Add fixed products that might not be in CSV
+                    fixedProducts.forEach(part => {
+                        if (!productsData.some(p => p.part === part)) {
+                            productsData.push({
+                                part,
+                                desc: "Auto Spare Part",
+                                List: 0,
+                                Mrp: 0,
+                                price: 0,
+                                stock: 0,
+                                boxQty: 1,
+                                masterCarton: 1
+                            });
+                        }
+                    });
+                    
+                    // Initialize with only in-stock items shown by default
+                    filteredProducts = productsData.filter(product => product.stock > 0);
+                    displayProducts();
+                })
+                .catch(err => {
+                    console.error("Error loading CSV:", err);
+                    // Fallback to fixed products with default values
+                    productsData = fixedProducts.map(part => ({
+                        part,
+                        desc: "Auto Spare Part",
+                        List: 0,
+                        Mrp: 0,
+                        price: 0,
+                        stock: 0,
+                        boxQty: 1,
+                        masterCarton: 1
+                    }));
+                    filteredProducts = [...productsData];
+                    displayProducts();
+                    showToast("Error loading product data. Using fallback data.", true);
+                });
+        }
 
+        // Display filtered products
+        function displayProducts() {
+            const gallery = document.querySelector(".gallery");
+            gallery.innerHTML = "";
+            
+            if (filteredProducts.length === 0) {
+                gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
+                return;
+            }
+            
+            filteredProducts.forEach(product => {
+                const isInStock = product.stock > 0;
+                const isInSystem = productsData.some(p => p.part === product.part);
+                
+                gallery.insertAdjacentHTML('beforeend', `
+                    <div class="card" data-part="${product.part}">
+                        ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
+                            (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
+                        
+                        <img src="images/${product.part}.png" alt="${product.part}" 
+                             onerror="this.src='images/default.png';this.onerror=null;">
+                        
+                        <div class="part-number">${product.part}</div>
+                        <div class="part-desc">${product.desc}</div>
+                        
+                        <div class="price-container">
+                            <div>
+                                <div class="price-label">List Price:</div>
+                                <div class="price-value">${product.List > 0 ? '₹'+product.List.toFixed(2) : 'NA'}</div>
+                            </div>
+                            <div>
+                                <div class="price-label">MRP:</div>
+                                <div class="price-value">${product.Mrp > 0 ? '₹'+product.Mrp.toFixed(2) : 'NA'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="price">Our Price: ${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
+                        
+                        <div class="stock-info">
+                            <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
+                            ${isInStock ? `
+                                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
+                                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
+                            ` : ''}
+                        </div>
+                        
+                        ${isInStock ? `
+                            <div style="margin-top: 0.5rem;">
+                                <input class="qty-input" type="number" value="1" min="1" max="${product.stock}" 
+                                       onchange="updateProductQty('${product.part}', this.value)">
+                                <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">
+                                    <i class="fas fa-cart-plus"></i> Add to Cart
+                                </button>
+                            </div>
+                        ` : ''}
+                        
+                        <a class="btn whatsapp" href="https://wa.me/03369028606?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
+                            <i class="fab fa-whatsapp"></i> ${isInStock ? 'Enquire' : 'Notify Me'}
+                        </a>
+                    </div>
+                `);
+            });
+        }
         
         // Load product data from CSV
         function loadProducts() {
