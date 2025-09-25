@@ -12,8 +12,8 @@
             --accent: #f1c40f;
             --dark: #0f2027;
             --light: #f8f9fa;
-            --gray: #6c757d;
             --success: #27ae60;
+            --warning: #f39c12;
         }
         
         * {
@@ -238,7 +238,6 @@
             position: absolute;
             top: 10px;
             right: 10px;
-            background: var(--secondary);
             color: white;
             padding: 5px 10px;
             border-radius: 5px;
@@ -246,8 +245,16 @@
             font-weight: 600;
         }
         
-        .product-badge.stock {
+        .in-stock {
             background: var(--success);
+        }
+        
+        .low-stock {
+            background: var(--warning);
+        }
+        
+        .out-of-stock {
+            background: var(--secondary);
         }
         
         .product-image {
@@ -322,6 +329,12 @@
         
         .btn-whatsapp:hover {
             background: #1ebd5b;
+        }
+        
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none !important;
         }
         
         .no-products {
@@ -418,6 +431,29 @@
             top: 50%;
             transform: translateY(-50%);
             color: #aaa;
+        }
+        
+        .stock-filter {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .stock-filter-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .stock-filter-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
         }
         
         footer {
@@ -570,6 +606,12 @@
                 <input type="text" id="search-input" placeholder="Search by part number or description...">
             </div>
             
+            <div class="stock-filter">
+                <div class="stock-filter-btn active" data-stock="all">All Products</div>
+                <div class="stock-filter-btn" data-stock="in-stock">In Stock Only</div>
+                <div class="stock-filter-btn" data-stock="out-of-stock">Out of Stock</div>
+            </div>
+            
             <div class="brands-container" id="brands-container">
                 <div class="brand-card active" data-brand="all">
                     <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiByeD0iMTAiIGZpbGw9IiMwYTdjNzEiLz4KPHRleHQgeD0iNDAiIHk9IjQ1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iYm9sZCI+QUxMPC90ZXh0Pgo8L3N2Zz4K" alt="All Brands" class="brand-logo">
@@ -654,6 +696,7 @@
         let productsData = [];
         let brandsData = [];
         let currentBrand = 'all';
+        let currentStockFilter = 'all';
         let cart = [];
         let filteredProducts = [];
         
@@ -670,6 +713,7 @@
         const toast = document.getElementById('toast');
         const toastMessage = document.getElementById('toast-message');
         const searchInput = document.getElementById('search-input');
+        const stockFilterBtns = document.querySelectorAll('.stock-filter-btn');
         
         // Initialize the page
         document.addEventListener('DOMContentLoaded', function() {
@@ -679,6 +723,16 @@
             searchInput.addEventListener('input', function() {
                 performSearch(this.value);
             });
+            
+            // Add stock filter functionality
+            stockFilterBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    stockFilterBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentStockFilter = this.getAttribute('data-stock');
+                    applyFilters();
+                });
+            });
         });
         
         // Perform search
@@ -686,22 +740,37 @@
             const term = searchTerm.toLowerCase().trim();
             
             if (term === '') {
-                // When search is empty, show filtered products by brand
-                if (currentBrand === 'all') {
-                    filteredProducts = productsData;
-                } else {
-                    filteredProducts = productsData.filter(product => 
-                        product.brand && product.brand.toLowerCase() === currentBrand
-                    );
-                }
+                applyFilters();
             } else {
-                // When searching, show all matching products regardless of brand filter
+                // When searching, show all matching products
                 filteredProducts = productsData.filter(product => 
                     product.part.toLowerCase().includes(term) || 
                     (product.desc && product.desc.toLowerCase().includes(term))
                 );
+                
+                displayProducts(filteredProducts);
+            }
+        }
+        
+        // Apply both brand and stock filters
+        function applyFilters() {
+            let tempProducts = productsData;
+            
+            // Apply brand filter
+            if (currentBrand !== 'all') {
+                tempProducts = tempProducts.filter(product => 
+                    product.brand && product.brand.toLowerCase() === currentBrand
+                );
             }
             
+            // Apply stock filter
+            if (currentStockFilter === 'in-stock') {
+                tempProducts = tempProducts.filter(product => product.stock > 0);
+            } else if (currentStockFilter === 'out-of-stock') {
+                tempProducts = tempProducts.filter(product => product.stock <= 0);
+            }
+            
+            filteredProducts = tempProducts;
             displayProducts(filteredProducts);
         }
         
@@ -734,14 +803,14 @@
                     
                     console.log("CSV Header:", header);
                     
-                    // Find column indices - flexible approach
+                    // Find column indices - brand is in column 12 (index 11)
                     const partIndex = header.findIndex(h => h.includes("part"));
                     const descIndex = header.findIndex(h => h.includes("desc") || h.includes("description"));
                     const listIndex = header.findIndex(h => h.includes("list"));
                     const mrpIndex = header.findIndex(h => h.includes("mrp"));
                     const priceIndex = header.findIndex(h => h.includes("price") && !h.includes("list") && !h.includes("mrp"));
                     const stockIndex = header.findIndex(h => h.includes("stock") || h.includes("qty"));
-                    const brandIndex = header.findIndex(h => h.includes("brand"));
+                    const brandIndex = 11; // Column 12 (0-based index 11)
                     
                     console.log("Column indices:", {partIndex, descIndex, listIndex, mrpIndex, priceIndex, stockIndex, brandIndex});
                     
@@ -891,21 +960,14 @@
         function filterProductsByBrand(brand) {
             currentBrand = brand;
             searchInput.value = ''; // Clear search when filtering by brand
+            applyFilters();
             
             if (brand === 'all') {
-                filteredProducts = productsData;
                 currentBrandElement.textContent = 'All Brands';
             } else {
-                filteredProducts = productsData.filter(product => 
-                    product.brand && product.brand.toLowerCase() === brand
-                );
-                
                 const brandName = brandsContainer.querySelector(`[data-brand="${brand}"] .brand-name`).textContent;
                 currentBrandElement.textContent = brandName;
             }
-            
-            productCountElement.textContent = `${filteredProducts.length} products found`;
-            displayProducts(filteredProducts);
         }
         
         // Display products in the grid
@@ -920,24 +982,39 @@
                         <p>Try selecting a different brand or search term</p>
                     </div>
                 `;
+                productCountElement.textContent = '0 products found';
                 return;
             }
+            
+            productCountElement.textContent = `${productsArray.length} products found`;
             
             productsArray.forEach(product => {
                 const productCard = document.createElement('div');
                 productCard.className = 'product-card';
                 
+                // Determine stock status
+                let stockStatus = '';
+                let stockClass = '';
+                if (product.stock > 10) {
+                    stockStatus = 'In Stock';
+                    stockClass = 'in-stock';
+                } else if (product.stock > 0) {
+                    stockStatus = 'Low Stock';
+                    stockClass = 'low-stock';
+                } else {
+                    stockStatus = 'Out of Stock';
+                    stockClass = 'out-of-stock';
+                }
+                
                 // Create image URL for the product (using part number as image name)
                 const imageUrl = `${imageBaseUrl}${product.part}.png`;
                 
                 productCard.innerHTML = `
-                    ${product.stock < 10 && product.stock > 0 ? '<div class="product-badge">Low Stock</div>' : ''}
-                    ${product.stock === 0 ? '<div class="product-badge">Out of Stock</div>' : ''}
-                    ${product.stock > 10 ? '<div class="product-badge stock">In Stock</div>' : ''}
+                    <div class="product-badge ${stockClass}">${stockStatus}</div>
                     <img src="${imageUrl}" 
                          alt="${product.part}" 
                          class="product-image"
-                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIgeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg=='">
+                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIyeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg=='">
                     <h3 class="product-name">${product.part}</h3>
                     <p class="product-desc">${product.desc}</p>
                     <div class="product-specs">
@@ -946,8 +1023,12 @@
                     </div>
                     <div class="product-price">₹${product.price || '0'}</div>
                     <div class="product-action">
-                        <button class="btn" onclick="addToCart('${product.part}')"><i class="fas fa-cart-plus"></i> Add to Cart</button>
-                        <button class="btn btn-whatsapp" onclick="enquireOnWhatsApp('${product.part}', '${product.desc}')"><i class="fab fa-whatsapp"></i> Enquire</button>
+                        <button class="btn" onclick="addToCart('${product.part}')" ${product.stock <= 0 ? 'disabled' : ''}>
+                            <i class="fas fa-cart-plus"></i> ${product.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
+                        </button>
+                        <button class="btn btn-whatsapp" onclick="enquireOnWhatsApp('${product.part}', '${product.desc}')">
+                            <i class="fab fa-whatsapp"></i> ${product.stock <= 0 ? 'Notify Me' : 'Enquire'}
+                        </button>
                     </div>
                 `;
                 
@@ -991,7 +1072,9 @@
         
         // Enquire on WhatsApp function
         function enquireOnWhatsApp(part, desc) {
-            const message = `I want to enquire about ${part} (${desc})`;
+            const product = productsData.find(p => p.part === part);
+            const stockStatus = product.stock > 0 ? 'In Stock' : 'Out of Stock';
+            const message = `I want to enquire about ${part} (${desc}). Current stock: ${stockStatus}`;
             const encodedMessage = encodeURIComponent(message);
             window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
         }
@@ -1009,4 +1092,4 @@
         }
     </script>
 </body>
-                </html>
+    </html>
