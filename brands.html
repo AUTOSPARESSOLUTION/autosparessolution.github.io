@@ -620,7 +620,7 @@
         
         // Updated references based on your information
         const imageBaseUrl = 'https://autosparessolution.github.io/images/';
-        const csvFilePath = 'prices.csv';
+        const csvFilePath = 'https://autosparessolution.github.io/prices.csv';
         const whatsappNumber = '03369028606';
         
         // DOM elements
@@ -837,7 +837,7 @@
                 const productCard = document.createElement('div');
                 productCard.className = 'product-card';
                 
-                // Create image URL for the product
+                // Create image URL for the product (using part number as image name)
                 const imageUrl = `${imageBaseUrl}${product.part}.png`;
                 
                 productCard.innerHTML = `
@@ -919,4 +919,4 @@
         }
     </script>
 </body>
-        </html>
+    </html>
