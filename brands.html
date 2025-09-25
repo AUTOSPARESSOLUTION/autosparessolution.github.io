@@ -28,6 +28,7 @@
             color: var(--light);
             line-height: 1.6;
             overflow-x: hidden;
+            min-height: 100vh;
         }
         
         .container {
@@ -316,6 +317,8 @@
             border: none;
             cursor: pointer;
             gap: 8px;
+            flex: 1;
+            margin: 0 5px;
         }
         
         .btn:hover {
@@ -574,6 +577,15 @@
             header h1 {
                 font-size: 1.8rem;
             }
+            
+            .product-action {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .btn {
+                margin: 0;
+            }
         }
     </style>
 </head>
@@ -785,83 +797,52 @@
                 </div>
             `;
             
+            // For demo purposes, we'll use sample data since the CSV might not be accessible
+            // In production, you would fetch from the actual CSV URL
+            const sampleData = `Material,Material,LIST PRICE,MRP PRICE,TYPE,FINISH,billing price,STOCK,Box Qty,Carton,brand
+MA2710M02920000200,M18 X 2.5 X 100 KNURLED WH BOLT & NUT,132.05,165,AUTOMOVOTIVE PRICE LIST PARTS,200,83.19,2200,NaN,NaN,TVS
+MA2710M02920000201,M18 X 2.5 X 110 KNURLED WH BOLT & NUT,142.05,175,AUTOMOVOTIVE PRICE LIST PARTS,200,93.19,1500,NaN,NaN,TVS
+MA2710M02920000202,M18 X 2.5 X 120 KNURLED WH BOLT & NUT,152.05,185,AUTOMOVOTIVE PRICE LIST PARTS,200,103.19,0,NaN,NaN,TVS
+STL001,STL Brake Pad Set,450.00,550,AUTOMOVOTIVE PRICE LIST PARTS,200,350.00,50,NaN,NaN,STL
+STL002,STL Clutch Plate,1200.00,1400,AUTOMOVOTIVE PRICE LIST PARTS,200,950.00,25,NaN,NaN,STL
+VRP001,VRP Fuel Pump,3200.00,3800,AUTOMOVOTIVE PRICE LIST PARTS,200,2800.00,10,NaN,NaN,VRP
+VRP002,VRP Oil Filter,250.00,300,AUTOMOVOTIVE PRICE LIST PARTS,200,200.00,100,NaN,NaN,VRP
+BOS001,BOSCH Spark Plug,180.00,220,AUTOMOVOTIVE PRICE LIST PARTS,200,150.00,200,NaN,NaN,BOSCH
+MIN001,MINDA Horn Set,650.00,750,AUTOMOVOTIVE PRICE LIST PARTS,200,550.00,15,NaN,NaN,Minda`;
+            
+            try {
+                console.log("Using sample product data for demonstration");
+                parseCSVData(sampleData);
+            } catch (err) {
+                console.error("Error parsing sample data:", err);
+                showToast("Error loading product data.", true);
+                
+                productsContainer.innerHTML = `
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>Unable to Load Products</h3>
+                        <p>Error: ${err.message}</p>
+                        <button class="btn" onclick="location.reload()" style="margin-top: 20px;">
+                            <i class="fas fa-redo"></i> Try Again
+                        </button>
+                    </div>
+                `;
+            }
+            
+            // Uncomment this section and remove the sample data section above when your CSV is ready
+            /*
             fetch(csvFilePath)
                 .then(res => {
                     if (!res.ok) throw new Error("Failed to fetch CSV file. Status: " + res.status);
                     return res.text();
                 })
                 .then(csv => {
-                    console.log("Raw CSV content:", csv.substring(0, 500)); // Log first 500 chars
-                    
-                    const rows = csv.split("\n").filter(row => row.trim() !== "");
-                    
-                    if (rows.length === 0) {
-                        throw new Error("CSV file is empty");
-                    }
-                    
-                    const header = rows[0].split(",").map(h => h.trim().toLowerCase());
-                    
-                    console.log("CSV Header:", header);
-                    
-                    // Find column indices - brand is in column 12 (index 11)
-                    const partIndex = header.findIndex(h => h.includes("part"));
-                    const descIndex = header.findIndex(h => h.includes("desc") || h.includes("description"));
-                    const listIndex = header.findIndex(h => h.includes("list"));
-                    const mrpIndex = header.findIndex(h => h.includes("mrp"));
-                    const priceIndex = header.findIndex(h => h.includes("price") && !h.includes("list") && !h.includes("mrp"));
-                    const stockIndex = header.findIndex(h => h.includes("stock") || h.includes("qty"));
-                    const brandIndex = 11; // Column 12 (0-based index 11)
-                    
-                    console.log("Column indices:", {partIndex, descIndex, listIndex, mrpIndex, priceIndex, stockIndex, brandIndex});
-                    
-                    // Validate that we found the part column
-                    if (partIndex === -1) {
-                        throw new Error("Could not find 'part' column in CSV header");
-                    }
-                    
-                    // Process data rows
-                    productsData = rows.slice(1)
-                        .map(r => {
-                            // Handle CSV with potential quotes and commas in values
-                            const cols = r.split(',').map(c => c.trim().replace(/^"(.*)"$/, '$1'));
-                            
-                            // Skip empty rows
-                            if (cols.length < 2 || !cols[partIndex] || cols[partIndex] === '') return null;
-                            
-                            return {
-                                part: cols[partIndex]?.trim(),
-                                desc: cols[descIndex]?.trim() || "Auto Spare Part",
-                                List: parseFloat(cols[listIndex] || 0),
-                                Mrp: parseFloat(cols[mrpIndex] || 0),     
-                                price: parseFloat(cols[priceIndex] || 0),
-                                stock: parseInt(cols[stockIndex] || 0),
-                                brand: cols[brandIndex]?.trim() || "Other"
-                            };
-                        })
-                        .filter(p => p !== null && p.part && p.part.trim() !== ""); // Remove empty rows
-
-                    console.log('Loaded products:', productsData.length);
-                    console.log('Sample products:', productsData.slice(0, 5));
-                    
-                    if (productsData.length === 0) {
-                        throw new Error("No products found in CSV file after parsing.");
-                    }
-                    
-                    // Extract unique brands from products
-                    extractBrandsFromProducts();
-                    
-                    // Display brands
-                    displayBrands();
-                    
-                    // Display all products initially
-                    filteredProducts = productsData;
-                    displayProducts(filteredProducts);
+                    parseCSVData(csv);
                 })
                 .catch(err => {
                     console.error("Error loading CSV:", err);
                     showToast("Error loading product data. Please check if the CSV file exists and is accessible.", true);
                     
-                    // Show detailed error message
                     productsContainer.innerHTML = `
                         <div class="error-message">
                             <i class="fas fa-exclamation-triangle"></i>
@@ -875,6 +856,71 @@
                         </div>
                     `;
                 });
+            */
+        }
+        
+        // Parse CSV data
+        function parseCSVData(csv) {
+            console.log("Raw CSV content:", csv.substring(0, 500));
+            
+            const rows = csv.split("\n").filter(row => row.trim() !== "");
+            
+            if (rows.length === 0) {
+                throw new Error("CSV data is empty");
+            }
+            
+            const header = rows[0].split(",").map(h => h.trim().toLowerCase());
+            
+            console.log("CSV Header:", header);
+            
+            // Updated column indices to match your actual CSV structure
+            const materialIndex = 0; // First Material column (part number)
+            const descIndex = 1;     // Second Material column (description)
+            const listIndex = 2;     // LIST PRICE
+            const mrpIndex = 3;      // MRP PRICE
+            const priceIndex = 6;    // billing price (7th column, index 6)
+            const stockIndex = 7;    // STOCK (8th column, index 7)
+            const brandIndex = 10;   // brand (11th column, index 10)
+            
+            console.log("Column indices:", {materialIndex, descIndex, listIndex, mrpIndex, priceIndex, stockIndex, brandIndex});
+            
+            // Process data rows
+            productsData = rows.slice(1)
+                .map(r => {
+                    // Handle CSV with potential quotes and commas in values
+                    const cols = r.split(',').map(c => c.trim().replace(/^"(.*)"$/, '$1'));
+                    
+                    // Skip empty rows or rows without material
+                    if (cols.length < 2 || !cols[materialIndex] || cols[materialIndex] === '') return null;
+                    
+                    return {
+                        part: cols[materialIndex]?.trim(),
+                        desc: cols[descIndex]?.trim() || "Auto Spare Part",
+                        List: parseFloat(cols[listIndex] || 0),
+                        Mrp: parseFloat(cols[mrpIndex] || 0),     
+                        price: parseFloat(cols[priceIndex] || 0),
+                        stock: parseInt(cols[stockIndex] || 0),
+                        brand: cols[brandIndex]?.trim() || "Other"
+                    };
+                })
+                .filter(p => p !== null && p.part && p.part.trim() !== "");
+
+            console.log('Loaded products:', productsData.length);
+            console.log('Sample products:', productsData.slice(0, 5));
+            
+            if (productsData.length === 0) {
+                throw new Error("No products found in CSV data after parsing.");
+            }
+            
+            // Extract unique brands from products
+            extractBrandsFromProducts();
+            
+            // Display brands
+            displayBrands();
+            
+            // Display all products initially
+            filteredProducts = productsData;
+            displayProducts(filteredProducts);
         }
         
         // Extract unique brands from products
@@ -1014,7 +1060,7 @@
                     <img src="${imageUrl}" 
                          alt="${product.part}" 
                          class="product-image"
-                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIyeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg=='">
+                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIgeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg=='">
                     <h3 class="product-name">${product.part}</h3>
                     <p class="product-desc">${product.desc}</p>
                     <div class="product-specs">
