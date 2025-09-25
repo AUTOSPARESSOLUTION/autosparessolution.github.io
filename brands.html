@@ -1045,7 +1045,83 @@
                 `);
             });
         }
-        
+        // Update product quantity in the product card
+        function updateProductQty(part, qty) {
+            const card = document.querySelector(`.card[data-part="${part}"]`);
+            if (card) {
+                const input = card.querySelector('.qty-input');
+                if (input) {
+                    input.value = Math.max(1, Math.min(qty, parseInt(input.max)));
+                }
+            }
+        }
+
+        // Cart functions
+        function addToCart(part, price) {
+            const card = document.querySelector(`.card[data-part="${part}"]`);
+            const qtyInput = card ? card.querySelector('.qty-input') : null;
+            const qty = qtyInput ? parseInt(qtyInput.value) : 1;
+            
+            const existing = cart.find(item => item.part === part);
+            if (existing) {
+                existing.qty += qty;
+            } else {
+                const product = productsData.find(p => p.part === part);
+                cart.push({ 
+                    part, 
+                    price, 
+                    qty,
+                    desc: product?.desc || "Auto Spare Part",
+                    boxQty: product?.boxQty || 1,
+                    masterCarton: product?.masterCarton || 1
+                });
+            }
+            
+            updateCartUI();
+            showToast(`${part} added to cart!`);
+        }
+
+        function updateCartUI() {
+            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+            document.getElementById("cart-count").textContent = cartCount;
+            
+            const itemsDiv = document.getElementById("cart-items");
+            let subtotal = 0;
+            
+            if (cart.length === 0) {
+                itemsDiv.innerHTML = `
+                    <div class="empty-cart">
+                        <i class="fas fa-shopping-cart"></i>
+                        <h3>Your cart is empty</h3>
+                        <p>Add products to your cart to continue</p>
+                    </div>
+                `;
+            } else {
+                itemsDiv.innerHTML = "";
+                cart.forEach(item => {
+                    const itemTotal = item.price * item.qty;
+                    subtotal += itemTotal;
+                    
+                    itemsDiv.innerHTML += `
+                        <div class="cart-item" data-part="${item.part}">
+                            <div class="cart-item-info">
+                                <div class="cart-item-title">${item.part}</div>
+                                <div class="cart-item-desc">${item.desc}</div>
+                                <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
+                            </div>
+                            <div class="qty-control">
+                                <button onclick="changeQty('${item.part}', -1)">-</button>
+                                <input class="qty-input" type="number" value="${item.qty}" min="1" 
+                                       onchange="updateCartItemQty('${item.part}', this.value)">
+                                <button onclick="changeQty('${item.part}', 1)">+</button>
+                                <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
+                                <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
         // Load product data from CSV
         function loadProducts() {
             // Use the correct URL for your CSV file
