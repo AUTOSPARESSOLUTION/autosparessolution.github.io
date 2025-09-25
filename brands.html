@@ -387,6 +387,39 @@
             background: var(--secondary);
         }
         
+        .search-container {
+            padding: 1rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 1rem 0 2rem;
+            position: relative;
+        }
+        
+        #search-input {
+            width: 100%;
+            padding: 0.9rem 1rem 0.9rem 3rem;
+            border-radius: 5px;
+            border: none;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transition: all 0.3s;
+        }
+        
+        #search-input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #aaa;
+        }
+        
         footer {
             background: rgba(0, 0, 0, 0.9);
             color: #ccc;
@@ -532,6 +565,11 @@
             <h2 class="section-title">Browse by Brand</h2>
             <p style="text-align: center; margin-bottom: 20px;">Select a brand to view their products</p>
             
+            <div class="search-container">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="search-input" placeholder="Search by part number or description...">
+            </div>
+            
             <div class="brands-container" id="brands-container">
                 <div class="brand-card active" data-brand="all">
                     <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiByeD0iMTAiIGZpbGw9IiMwYTdjNzEiLz4KPHRleHQgeD0iNDAiIHk9IjQ1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iYm9sZCI+QUxMPC90ZXh0Pgo8L3N2Zz4K" alt="All Brands" class="brand-logo">
@@ -617,6 +655,7 @@
         let brandsData = [];
         let currentBrand = 'all';
         let cart = [];
+        let filteredProducts = [];
         
         // Updated references based on your information
         const imageBaseUrl = 'https://autosparessolution.github.io/images/';
@@ -630,21 +669,67 @@
         const productCountElement = document.getElementById('product-count');
         const toast = document.getElementById('toast');
         const toastMessage = document.getElementById('toast-message');
+        const searchInput = document.getElementById('search-input');
         
         // Initialize the page
         document.addEventListener('DOMContentLoaded', function() {
             loadProducts();
+            
+            // Add search functionality
+            searchInput.addEventListener('input', function() {
+                performSearch(this.value);
+            });
         });
+        
+        // Perform search
+        function performSearch(searchTerm) {
+            const term = searchTerm.toLowerCase().trim();
+            
+            if (term === '') {
+                // When search is empty, show filtered products by brand
+                if (currentBrand === 'all') {
+                    filteredProducts = productsData;
+                } else {
+                    filteredProducts = productsData.filter(product => 
+                        product.brand && product.brand.toLowerCase() === currentBrand
+                    );
+                }
+            } else {
+                // When searching, show all matching products regardless of brand filter
+                filteredProducts = productsData.filter(product => 
+                    product.part.toLowerCase().includes(term) || 
+                    (product.desc && product.desc.toLowerCase().includes(term))
+                );
+            }
+            
+            displayProducts(filteredProducts);
+        }
         
         // Load product data from CSV
         function loadProducts() {
+            // Show loading state
+            productsContainer.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <h3>Loading Products</h3>
+                    <p>Please wait while we load our product catalog</p>
+                </div>
+            `;
+            
             fetch(csvFilePath)
                 .then(res => {
                     if (!res.ok) throw new Error("Failed to fetch CSV file. Status: " + res.status);
                     return res.text();
                 })
                 .then(csv => {
-                    const rows = csv.split("\n");
+                    console.log("Raw CSV content:", csv.substring(0, 500)); // Log first 500 chars
+                    
+                    const rows = csv.split("\n").filter(row => row.trim() !== "");
+                    
+                    if (rows.length === 0) {
+                        throw new Error("CSV file is empty");
+                    }
+                    
                     const header = rows[0].split(",").map(h => h.trim().toLowerCase());
                     
                     console.log("CSV Header:", header);
@@ -659,6 +744,11 @@
                     const brandIndex = header.findIndex(h => h.includes("brand"));
                     
                     console.log("Column indices:", {partIndex, descIndex, listIndex, mrpIndex, priceIndex, stockIndex, brandIndex});
+                    
+                    // Validate that we found the part column
+                    if (partIndex === -1) {
+                        throw new Error("Could not find 'part' column in CSV header");
+                    }
                     
                     // Process data rows
                     productsData = rows.slice(1)
@@ -685,7 +775,7 @@
                     console.log('Sample products:', productsData.slice(0, 5));
                     
                     if (productsData.length === 0) {
-                        throw new Error("No products found in CSV file. Please check the file format.");
+                        throw new Error("No products found in CSV file after parsing.");
                     }
                     
                     // Extract unique brands from products
@@ -695,7 +785,8 @@
                     displayBrands();
                     
                     // Display all products initially
-                    displayProducts(productsData);
+                    filteredProducts = productsData;
+                    displayProducts(filteredProducts);
                 })
                 .catch(err => {
                     console.error("Error loading CSV:", err);
@@ -707,8 +798,8 @@
                             <i class="fas fa-exclamation-triangle"></i>
                             <h3>Unable to Load Products</h3>
                             <p>Error: ${err.message}</p>
-                            <p>Please ensure the CSV file is available at: ${csvFilePath}</p>
-                            <p>Check the browser console for more details.</p>
+                            <p>CSV URL: ${csvFilePath}</p>
+                            <p>Please ensure the CSV file is available at the above URL.</p>
                             <button class="btn" onclick="location.reload()" style="margin-top: 20px;">
                                 <i class="fas fa-redo"></i> Try Again
                             </button>
@@ -799,8 +890,7 @@
         // Filter products by brand
         function filterProductsByBrand(brand) {
             currentBrand = brand;
-            
-            let filteredProducts;
+            searchInput.value = ''; // Clear search when filtering by brand
             
             if (brand === 'all') {
                 filteredProducts = productsData;
@@ -827,7 +917,7 @@
                     <div class="no-products">
                         <i class="fas fa-box-open"></i>
                         <h3>No products found</h3>
-                        <p>Try selecting a different brand</p>
+                        <p>Try selecting a different brand or search term</p>
                     </div>
                 `;
                 return;
@@ -919,4 +1009,4 @@
         }
     </script>
 </body>
-    </html>
+                </html>
