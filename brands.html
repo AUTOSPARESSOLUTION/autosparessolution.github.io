@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
+    <title>Browse by Brand - Auto Spares Solution</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #0a7c71;
@@ -13,8 +12,8 @@
             --accent: #f1c40f;
             --dark: #0f2027;
             --light: #f8f9fa;
-            --gray: #6c757d;
             --success: #27ae60;
+            --warning: #f39c12;
         }
         
         * {
@@ -24,33 +23,31 @@
         }
         
         body {
-            font-family: 'Roboto', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
             color: var(--light);
             line-height: 1.6;
             overflow-x: hidden;
-            padding-top: 160px; /* Space for fixed header */
+            min-height: 100vh;
         }
         
-        /* Fixed Header with Navigation */
-        .fixed-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 1000;
-            background: rgba(0, 0, 0, 0.95);
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.4);
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
         }
         
         header {
             text-align: center;
             padding: 1.5rem 1rem;
+            background: rgba(0, 0, 0, 0.85);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
             display: flex;
             flex-direction: column;
             align-items: center;
-            max-width: 1200px;
-            margin: 0 auto;
         }
         
         .logo-container {
@@ -73,7 +70,6 @@
             letter-spacing: 1px;
             color: var(--accent);
             text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-            font-family: 'Montserrat', sans-serif;
         }
         
         .tagline {
@@ -91,7 +87,10 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 1.5rem;
-            border-top: 1px solid #2c5364;
+            position: sticky;
+            top: 80px;
+            z-index: 99;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
         
         nav a {
@@ -129,52 +128,6 @@
             right: -12px;
         }
         
-        .search-container {
-            padding: 0.5rem 1rem;
-            background: rgba(0,0,0,0.3);
-            display: flex;
-            justify-content: center;
-            border-bottom: 1px solid #2c5364;
-        }
-        
-        .search-box {
-            display: flex;
-            width: 100%;
-            max-width: 500px;
-            position: relative;
-        }
-        
-        #search-input {
-            width: 100%;
-            padding: 0.9rem 1rem 0.9rem 3rem;
-            border-radius: 5px;
-            border: none;
-            font-size: 1rem;
-            background: rgba(255,255,255,0.1);
-            color: white;
-            transition: all 0.3s;
-        }
-        
-        #search-input:focus {
-            outline: none;
-            background: rgba(255,255,255,0.15);
-            box-shadow: 0 0 0 2px var(--primary);
-        }
-        
-        .search-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #aaa;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 1rem;
-        }
-        
         .section {
             padding: 3rem 1rem;
             background: rgba(255, 255, 255, 0.05);
@@ -187,7 +140,6 @@
             text-align: center;
             margin-bottom: 2rem;
             color: var(--accent);
-            font-family: 'Montserrat', sans-serif;
             position: relative;
         }
         
@@ -201,276 +153,229 @@
             border-radius: 3px;
         }
         
-        .hero {
-            height: 500px;
-            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1542362567-b07e54358753?ixlib=rb-4.0.3') center/cover;
+        .brands-container {
             display: flex;
-            flex-direction: column;
             justify-content: center;
-            align-items: center;
-            text-align: center;
-            border-radius: 10px;
-            margin: 2rem 0;
-            padding: 2rem;
+            flex-wrap: wrap;
+            gap: 25px;
+            margin-top: 20px;
         }
         
-        .hero h2 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            font-family: 'Montserrat', sans-serif;
-            color: var(--accent);
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        
-        .hero p {
-            font-size: 1.2rem;
-            max-width: 700px;
-            margin-bottom: 2rem;
-        }
-        
-        .cta-button {
-            display: inline-block;
-            padding: 1rem 2.5rem;
-            background: var(--primary);
-            color: white;
-            text-decoration: none;
-            font-weight: 600;
-            border-radius: 5px;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            margin: 0.5rem;
-        }
-        
-        .cta-button:hover {
-            background: #09645a;
-            transform: translateY(-3px);
-            box-shadow: 0 6px 15px rgba(0,0,0,0.4);
-        }
-        
-        .stats-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
-            margin: 3rem 0;
-        }
-        
-        .stat-card {
+        .brand-card {
             background: rgba(255, 255, 255, 0.08);
             border-radius: 10px;
-            padding: 2rem;
+            padding: 20px;
+            width: 160px;
             text-align: center;
-            transition: transform 0.3s ease;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
         }
         
-        .stat-card:hover {
-            transform: translateY(-10px);
+        .brand-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
             background: rgba(255, 255, 255, 0.12);
         }
         
-        .stat-number {
-            font-size: 3rem;
-            font-weight: 700;
+        .brand-card.active {
+            border-color: var(--primary);
+            background: rgba(10, 124, 113, 0.2);
+        }
+        
+        .brand-logo {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            margin: 0 auto 15px;
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        .brand-name {
+            font-weight: 600;
             color: var(--accent);
-            margin-bottom: 0.5rem;
-            font-family: 'Montserrat', sans-serif;
-        }
-        
-        .stat-label {
             font-size: 1.1rem;
-            color: #ddd;
         }
         
-        .gallery {
+        .filter-info {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(10, 124, 113, 0.2);
+            border-radius: 8px;
+        }
+        
+        .filter-info h3 {
+            color: var(--accent);
+            margin-bottom: 5px;
+        }
+        
+        .products-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1.5rem;
+            gap: 25px;
+            margin-top: 20px;
         }
         
-        .card {
+        .product-card {
             background: rgba(255, 255, 255, 0.08);
             border-radius: 10px;
-            padding: 1.2rem;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            padding: 20px;
             text-align: center;
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
         }
         
-        .card:hover {
+        .product-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
             background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
         }
         
-        .card img {
+        .product-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .in-stock {
+            background: var(--success);
+        }
+        
+        .low-stock {
+            background: var(--warning);
+        }
+        
+        .out-of-stock {
+            background: var(--secondary);
+        }
+        
+        .product-image {
             width: 100%;
             height: 180px;
             object-fit: contain;
-            border-radius: 6px;
-            background: rgba(255,255,255,0.1);
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
             padding: 15px;
-            margin-bottom: 1rem;
         }
         
-        .part-number {
-            font-weight: bold;
-            margin-top: 0.2rem;
+        .product-name {
+            font-weight: 600;
+            margin-bottom: 10px;
             color: var(--accent);
-            font-size: 1.1rem;
-            letter-spacing: 0.5px;
+            font-size: 1.2rem;
         }
         
-        .part-desc {
+        .product-desc {
             font-size: 0.9rem;
-            margin: 0.5rem 0;
+            margin-bottom: 15px;
             color: #ddd;
             min-height: 40px;
-            flex-grow: 1;
         }
         
-        .price-container {
+        .product-price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin: 10px 0;
+            color: var(--primary);
+        }
+        
+        .product-specs {
             display: flex;
             justify-content: space-between;
-            margin: 0.5rem 0;
-            background: rgba(0,0,0,0.2);
-            padding: 0.5rem;
-            border-radius: 5px;
-        }
-        
-        .price-label {
-            font-size: 0.85rem;
+            margin: 10px 0;
+            font-size: 0.9rem;
             color: #aaa;
         }
         
-        .price-value {
-            font-weight: 600;
-        }
-        
-        .price {
-            font-size: 1.2rem;
-            color: var(--accent);
-            font-weight: 600;
-            margin: 0.5rem 0;
-        }
-        
-        .stock-info {
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
+        .product-action {
+            margin-top: 15px;
             display: flex;
             justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            background: rgba(0,0,0,0.2);
-            padding: 0.5rem;
-            border-radius: 5px;
-        }
-        
-        .stock-info span {
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
         }
         
         .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-            padding: 0.7rem 1.2rem;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            margin-right: 0.5rem;
-            cursor: pointer;
-            font-size: 0.95rem;
-        }
-        
-        .whatsapp {
-            background: #25D366;
-            color: #fff;
-        }
-        
-        .whatsapp:hover {
-            background: #1ebd5b;
-            transform: translateY(-2px);
-        }
-        
-        .buy {
-            background: var(--secondary);
-            color: white;
-        }
-        
-        .buy:hover {
-            background: #c0392b;
-            transform: translateY(-2px);
-        }
-        
-        .cart {
+            padding: 10px 20px;
             background: var(--primary);
             color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            gap: 8px;
+            flex: 1;
+            margin: 0 5px;
         }
         
-        .cart:hover {
+        .btn:hover {
             background: #09645a;
             transform: translateY(-2px);
         }
         
+        .btn-whatsapp {
+            background: #25D366;
+        }
+        
+        .btn-whatsapp:hover {
+            background: #1ebd5b;
+        }
+        
         .btn:disabled {
-            opacity: 0.6;
+            background: #6c757d;
             cursor: not-allowed;
             transform: none !important;
         }
         
-        .out-of-stock {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(220, 53, 69, 0.85);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 5px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            z-index: 2;
-        }
-        
-        .not-available {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 165, 0, 0.85);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 5px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            z-index: 2;
-        }
-        
-        .qty-input {
-            width: 60px;
+        .no-products {
             text-align: center;
-            padding: 0.4rem;
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border: 1px solid #444;
-            border-radius: 4px;
-            margin-right: 0.5rem;
+            padding: 40px;
+            grid-column: 1 / -1;
+            color: #aaa;
+        }
+        
+        .no-products i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
         }
         
         .loading {
             text-align: center;
-            padding: 2rem;
-            font-size: 1.2rem;
+            padding: 40px;
             grid-column: 1 / -1;
+            color: #aaa;
+        }
+        
+        .loading i {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: var(--accent);
+        }
+        
+        .error-message {
+            text-align: center;
+            padding: 40px;
+            grid-column: 1 / -1;
+            color: var(--secondary);
+        }
+        
+        .error-message i {
+            font-size: 3rem;
+            margin-bottom: 15px;
         }
         
         .toast {
@@ -495,7 +400,63 @@
         }
         
         .toast.error {
-            background: #dc3545;
+            background: var(--secondary);
+        }
+        
+        .search-container {
+            padding: 1rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 1rem 0 2rem;
+            position: relative;
+        }
+        
+        #search-input {
+            width: 100%;
+            padding: 0.9rem 1rem 0.9rem 3rem;
+            border-radius: 5px;
+            border: none;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transition: all 0.3s;
+        }
+        
+        #search-input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #aaa;
+        }
+        
+        .stock-filter {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .stock-filter-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .stock-filter-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
         }
         
         footer {
@@ -573,1143 +534,116 @@
             color: #777;
         }
         
-        /* Responsive adjustments */
         @media (max-width: 768px) {
-            body {
-                padding-top: 200px; /* More space for mobile */
+            .brands-container {
+                gap: 15px;
             }
             
-            nav {
-                gap: 1rem;
-                padding: 0.6rem 0.5rem;
+            .brand-card {
+                width: 140px;
+                padding: 15px;
             }
             
-            nav a span {
-                display: none;
+            .brand-logo {
+                width: 70px;
+                height: 70px;
             }
             
-            header h1 {
-                font-size: 1.8rem;
-            }
-            
-            .hero h2 {
-                font-size: 2.2rem;
-            }
-            
-            .hero p {
-                font-size: 1rem;
-            }
-            
-            .gallery {
+            .products-grid {
                 grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 20px;
             }
         }
         
         @media (max-width: 480px) {
-            body {
-                padding-top: 220px;
+            .brands-container {
+                gap: 10px;
             }
             
-            nav {
-                gap: 0.8rem;
+            .brand-card {
+                width: 120px;
+                padding: 10px;
             }
             
-            nav a {
-                font-size: 0.9rem;
+            .brand-logo {
+                width: 60px;
+                height: 60px;
             }
             
-            .logo {
-                height: 40px;
-            }
-            
-            header h1 {
-                font-size: 1.5rem;
-            }
-            
-            .hero h2 {
-                font-size: 1.8rem;
-            }
-            
-            .section {
-                padding: 2rem 1rem;
-            }
-            
-            .gallery {
+            .products-grid {
                 grid-template-columns: 1fr;
             }
             
-            .cta-button {
-                padding: 0.8rem 1.5rem;
-                font-size: 1rem;
-                display: block;
-                margin: 0.5rem auto;
+            header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .product-action {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .btn {
+                margin: 0;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Fixed Header with Navigation -->
-    <div class="fixed-header">
-        <header>
-            <div class="logo-container">
-                <img src="https://autosparessolution.github.io/images/ASS.jpg" alt="Auto Spares Solution Logo" class="logo">
-                <div>
-                    <h1>Auto Spares Solution</h1>
-                    <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
-                </div>
-            </div>
-        </header>
-        
-        <div class="search-container">
-            <div class="search-box">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" id="search-input" placeholder="Search by part number or description...">
-            </div>
-        </div>
-        
-        <nav>
-            <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
-            <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
-            <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
-            <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
-            <a href="#policies"><i class="fas fa-file-contract"></i> <span>Policies</span></a>
-            <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
-            <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
-            <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span id="cart-count">0</span></a>
-            <a href="brands.html" target="_blank"><i class="fas fa-tags"></i> <span>Brands</span></a>
-            <a href="bolt-generator.html" target="_blank"><i class="fas fa-cog"></i> <span>Bolt Generator</span></a>
-        </nav>
-    </div>
-
-    <div class="container">
-        <!-- Hero Section -->
-        <section id="home" class="hero">
-            <h2>Premium Auto Parts for Professionals</h2>
-            <p>Supplying high-quality automotive components to workshops, retailers, and distributors since 2020. Trusted by industry professionals for genuine parts and exceptional service.</p>
-            <a href="#products" class="cta-button">Explore Our Products</a>
-            <a href="brands.html" class="cta-button" target="_blank">Browse by Brand</a>
-            <a href="bolt-generator.html" class="cta-button" target="_blank">Bolt Generator Tool</a>
-        </section>
-
-        <!-- Business Stats -->
-        <div class="stats-container">
-            <div class="stat-card">
-                <div class="stat-number">5000+</div>
-                <div class="stat-label">Parts in Catalog</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">200+</div>
-                <div class="stat-label">Corporate Clients</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">98%</div>
-                <div class="stat-label">Customer Satisfaction</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">24H</div>
-                <div class="stat-label">Order Processing</div>
-            </div>
-        </div>
-
-        <!-- About Section -->
-        <section id="about" class="section">
-            <h2 class="section-title">About Auto Spares Solution</h2>
-            <div class="about-content">
-                <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We specialize in providing high-quality components that meet industry standards and ensure optimal vehicle performance.</p>
-                
-                <div style="margin: 1.5rem 0;">
-                    <p><strong>Our Specializations:</strong></p>
-                    <ul style="padding-left: 1.5rem; margin-top: 0.5rem;">
-                        <li>Specialist dealers of TVS & STL Fasteners (Nut & Bolt)</li>
-                        <li>Authorized distributors of Volume Rubber Products</li>
-                        <li>Wide range of OEM and aftermarket parts</li>
-                        <li>Bulk supply for workshops and retailers</li>
-                    </ul>
-                </div>
-                
-                <p>With our extensive network and industry expertise, we ensure timely delivery of genuine parts at competitive prices. Our commitment to quality and customer satisfaction has made us a trusted partner for automotive businesses across the region.</p>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin: 2rem 0;">
-                <div style="background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 8px; text-align: center;">
-                    <i class="fas fa-map-marked-alt" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 1rem;"></i>
-                    <h3 style="margin-bottom: 1rem; color: var(--accent);">Office</h3>
-                    <p>101, 1st floor, 57/5, Q Road<br>Howrah, West Bengal 711108</p>
-                </div>
-                
-                <div style="background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 8px; text-align: center;">
-                    <i class="fas fa-warehouse" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 1rem;"></i>
-                    <h3 style="margin-bottom: 1rem; color: var(--accent);">Warehouse</h3>
-                    <p>1 no British Indian Street<br>Kolkata, West Bengal 700069</p>
-                </div>
-                
-                <div style="background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 8px; text-align: center;">
-                    <i class="fas fa-file-invoice-dollar" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 1rem;"></i>
-                    <h3 style="margin-bottom: 1rem; color: var(--accent);">Business Details</h3>
-                    <p>GSTIN: 19ANOPD3300R1ZO<br>Established: 2020</p>
-                </div>
-            </div>
-            
-            <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin: 2rem 0;">
-                <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">TVS</div>
-                <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">STL</div>
-                <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">VRP</div>
-                <div style="width: 120px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">OEM</div>
-            </div>
-        </section>
-
-        <!-- Products Section -->
-        <section id="products" class="section">
-            <h2 class="section-title">Our Products</h2>
-            <div class="gallery">
-                <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>
-            </div>
-        </section>
-
-        <!-- Contact Section -->
-        <section id="contact" class="section">
-            <h2 class="section-title">Get In Touch</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
-                <div style="background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 8px;">
-                    <h3 style="color: var(--accent); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.8rem;"><i class="fas fa-phone-alt"></i> Contact Details</h3>
-                    <p style="margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: 0.8rem;"><i class="fas fa-phone" style="color: var(--primary); min-width: 20px;"></i> +91 98303 00193</p>
-                    <p style="margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: 0.8rem;"><i class="fas fa-envelope" style="color: var(--primary); min-width: 20px;"></i> contact@autosparessolution.com</p>
-                    <p style="margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: 0.8rem;"><i class="fas fa-clock" style="color: var(--primary); min-width: 20px;"></i> Mon-Sat: 9:00 AM - 7:00 PM</p>
-                    
-                    <h3 style="margin-top: 1.5rem; color: var(--accent); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.8rem;"><i class="fas fa-file-invoice"></i> Business Information</h3>
-                    <p style="margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: 0.8rem;"><i class="fas fa-id-card" style="color: var(--primary); min-width: 20px;"></i> GSTIN: 19ANOPD3300R1ZO</p>
-                    
-                    <div class="social-links">
-                        <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
-                        <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
-                        <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
-                        <a href="https://wa.me/03369028606" title="WhatsApp" target="_blank"><i class="fab fa-whatsapp"></i></a>
-                    </div>
-                </div>
-                
-                <div>
-                    <form id="contact-form">
-                        <div style="margin-bottom: 1.2rem;">
-                            <label for="name" style="display: block; margin-bottom: 0.5rem; color: #ddd;">Your Name</label>
-                            <input type="text" id="name" style="width: 100%; padding: 0.8rem 1rem; background: rgba(255,255,255,0.08); border: 1px solid #444; border-radius: 5px; color: white; font-size: 1rem;" placeholder="Enter your name" required>
-                        </div>
-                        <div style="margin-bottom: 1.2rem;">
-                            <label for="email" style="display: block; margin-bottom: 0.5rem; color: #ddd;">Email Address</label>
-                            <input type="email" id="email" style="width: 100%; padding: 0.8rem 1rem; background: rgba(255,255,255,0.08); border: 1px solid #444; border-radius: 5px; color: white; font-size: 1rem;" placeholder="Enter your email" required>
-                        </div>
-                        <div style="margin-bottom: 1.2rem;">
-                            <label for="phone" style="display: block; margin-bottom: 0.5rem; color: #ddd;">Phone Number</label>
-                            <input type="tel" id="phone" style="width: 100%; padding: 0.8rem 1rem; background: rgba(255,255,255,0.08); border: 1px solid #444; border-radius: 5px; color: white; font-size: 1rem;" placeholder="Enter your phone number" required>
-                        </div>
-                        <div style="margin-bottom: 1.2rem;">
-                            <label for="message" style="display: block; margin-bottom: 0.5rem; color: #ddd;">How can we help you?</label>
-                            <textarea id="message" style="width: 100%; padding: 0.8rem 1rem; background: rgba(255,255,255,0.08); border: 1px solid #444; border-radius: 5px; color: white; font-size: 1rem; min-height: 120px; resize: vertical;" placeholder="Describe your requirements" required></textarea>
-                        </div>
-                        <button type="submit" class="btn" style="background: var(--primary); width: 100%; text-align: center;"><i class="fas fa-paper-plane"></i> Send Message</button>
-                    </form>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    <footer>
-        <div class="footer-content">
-            <div class="footer-column">
-                <h3>Auto Spares Solution</h3>
-                <p>Your trusted partner for premium automobile spare parts since 2020.</p>
-                <p><i class="fas fa-map-marker-alt"></i> Office: 101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-                <p><i class="fas fa-warehouse"></i> Warehouse: 1 no British Indian Street, Kolkata, WB 700069</p>
-            </div>
-            
-            <div class="footer-column">
-                <h3>Quick Links</h3>
-                <ul class="footer-links">
-                    <li><a href="#home"><i class="fas fa-chevron-right"></i> Home</a></li>
-                    <li><a href="#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
-                    <li><a href="#products"><i class="fas fa-chevron-right"></i> Products</a></li>
-                    <li><a href="#investors"><i class="fas fa-chevron-right"></i> Investors</a></li>
-                </ul>
-            </div>
-            
-            <div class="footer-column">
-                <h3>Policy</h3>
-                <ul class="footer-links">
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Return Policy</a></li>
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
-                </ul>
-            </div>
-            
-            <div class="footer-column">
-                <h3>Contact Us</h3>
-                <ul class="footer-links">
-                    <li><a href="tel:03369028606"><i class="fas fa-phone"></i> 03369028606</a></li>
-                    <li><a href="mailto:contact@autosparessolution.com"><i class="fas fa-envelope"></i> contact@autosparessolution.com</a></li>
-                </ul>
-                <div class="social-links">
-                    <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
-                    <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
-                    <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
-                    <a href="https://wa.me/03369028606" title="WhatsApp" target="_blank"><i class="fab fa-whatsapp"></i></a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="copyright">
-            <p>&copy; 2025 Auto Spares Solution. All Rights Reserved. | GSTIN: 19ANOPD3300R1ZO</p>
-        </div>
-    </footer>
-
-    <div class="toast" id="toast">
-        <i class="fas fa-check-circle"></i>
-        <span id="toast-message">Product added to cart!</span>
-    </div>
-
-    <script>
-        // Initialize variables
-        let productsData = [];
-        let filteredProducts = [];
-        let cart = [];
-        
-        // DOM elements
-        const cartLink = document.getElementById("cart-link");
-        const toast = document.getElementById("toast");
-        const toastMessage = document.getElementById("toast-message");
-        
-        // Show toast message
-        function showToast(message, isError = false) {
-            toastMessage.textContent = message;
-            toast.classList.remove("error");
-            if (isError) toast.classList.add("error");
-            toast.classList.add("show");
-            
-            setTimeout(() => {
-                toast.classList.remove("show");
-            }, 3000);
-        }
-        
-        // Search functionality
-        let searchTimeout;
-        
-        // Search with debounce and Enter key support
-        document.getElementById("search-input").addEventListener("input", (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                performSearch(e.target.value);
-            }, 300); // 300ms delay before searching
-        });
-        
-        // Add Enter key support
-        document.getElementById("search-input").addEventListener("keypress", (e) => {
-            if (e.key === 'Enter') {
-                clearTimeout(searchTimeout); // Clear any pending timeout
-                performSearch(e.target.value);
-            }
-        });
-        
-        function performSearch(searchTerm) {
-            const term = searchTerm.toLowerCase().trim();
-            
-            if (term === '') {
-                // When search is empty, show only in-stock items
-                filteredProducts = productsData.filter(product => product.stock > 0);
-            } else {
-                // When searching, show all matching products regardless of stock
-                filteredProducts = productsData.filter(product => 
-                    product.part.toLowerCase().includes(term) || 
-                    (product.desc && product.desc.toLowerCase().includes(term))
-                );
-            }
-            displayProducts();
-        }
-        // Load product data from CSV
-        function loadProducts() {
-            fetch("prices.csv")
-                .then(res => res.text())
-                .then(csv => {
-                    const rows = csv.split("\n").slice(1); // Skip header
-                    
-                    productsData = rows.map(r => {
-                        const cols = r.split(",");
-                        return {
-                            part: cols[0]?.trim(),
-                            desc: cols[1]?.trim() || "Auto Spare Part",
-                            List: parseFloat(cols[2] || 0),
-                            Mrp: parseFloat(cols[3] || 0),     
-                            price: parseFloat(cols[6] || 0),
-                            stock: parseInt(cols[7] || 0),
-                            boxQty: parseInt(cols[8] || 1), // Box quantity
-                            masterCarton: parseInt(cols[9] || 1) // Master carton quantity
-                        };
-                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
-// Add fixed products that might not be in CSV
-                    fixedProducts.forEach(part => {
-                        if (!productsData.some(p => p.part === part)) {
-                            productsData.push({
-                                part,
-                                desc: "Auto Spare Part",
-                                List: 0,
-                                Mrp: 0,
-                                price: 0,
-                                stock: 0,
-                                boxQty: 1,
-                                masterCarton: 1
-                            });
-                        }
-                    });
-                    
-                    // Initialize with only in-stock items shown by default
-                    filteredProducts = productsData.filter(product => product.stock > 0);
-                    displayProducts();
-                })
-                .catch(err => {
-                    console.error("Error loading CSV:", err);
-                    // Fallback to fixed products with default values
-                    productsData = fixedProducts.map(part => ({
-                        part,
-                        desc: "Auto Spare Part",
-                        List: 0,
-                        Mrp: 0,
-                        price: 0,
-                        stock: 0,
-                        boxQty: 1,
-                        masterCarton: 1
-                    }));
-                    filteredProducts = [...productsData];
-                    displayProducts();
-                    showToast("Error loading product data. Using fallback data.", true);
-                });
-        }
-
-        // Display filtered products
-        function displayProducts() {
-            const gallery = document.querySelector(".gallery");
-            gallery.innerHTML = "";
-            
-            if (filteredProducts.length === 0) {
-                gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
-                return;
-            }
-            
-            filteredProducts.forEach(product => {
-                const isInStock = product.stock > 0;
-                const isInSystem = productsData.some(p => p.part === product.part);
-                
-                gallery.insertAdjacentHTML('beforeend', `
-                    <div class="card" data-part="${product.part}">
-                        ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
-                            (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
-                        
-                        <img src="images/${product.part}.png" alt="${product.part}" 
-                             onerror="this.src='images/default.png';this.onerror=null;">
-                        
-                        <div class="part-number">${product.part}</div>
-                        <div class="part-desc">${product.desc}</div>
-                        
-                        <div class="price-container">
-                            <div>
-                                <div class="price-label">List Price:</div>
-                                <div class="price-value">${product.List > 0 ? '₹'+product.List.toFixed(2) : 'NA'}</div>
-                            </div>
-                            <div>
-                                <div class="price-label">MRP:</div>
-                                <div class="price-value">${product.Mrp > 0 ? '₹'+product.Mrp.toFixed(2) : 'NA'}</div>
-                            </div>
-                        </div>
-                        
-                        <div class="price">Our Price: ${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
-                        
-                        <div class="stock-info">
-                            <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
-                            ${isInStock ? `
-                                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
-                                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
-                            ` : ''}
-                        </div>
-                        
-                        ${isInStock ? `
-                            <div style="margin-top: 0.5rem;">
-                                <input class="qty-input" type="number" value="1" min="1" max="${product.stock}" 
-                                       onchange="updateProductQty('${product.part}', this.value)">
-                                <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">
-                                    <i class="fas fa-cart-plus"></i> Add to Cart
-                                </button>
-                            </div>
-                        ` : ''}
-                        
-                        <a class="btn whatsapp" href="https://wa.me/03369028606?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
-                            <i class="fab fa-whatsapp"></i> ${isInStock ? 'Enquire' : 'Notify Me'}
-                        </a>
-                    </div>
-                `);
-            });
-        }
-        // Update product quantity in the product card
-        function updateProductQty(part, qty) {
-            const card = document.querySelector(`.card[data-part="${part}"]`);
-            if (card) {
-                const input = card.querySelector('.qty-input');
-                if (input) {
-                    input.value = Math.max(1, Math.min(qty, parseInt(input.max)));
-                }
-            }
-        }
-
-        // Cart functions
-        function addToCart(part, price) {
-            const card = document.querySelector(`.card[data-part="${part}"]`);
-            const qtyInput = card ? card.querySelector('.qty-input') : null;
-            const qty = qtyInput ? parseInt(qtyInput.value) : 1;
-            
-            const existing = cart.find(item => item.part === part);
-            if (existing) {
-                existing.qty += qty;
-            } else {
-                const product = productsData.find(p => p.part === part);
-                cart.push({ 
-                    part, 
-                    price, 
-                    qty,
-                    desc: product?.desc || "Auto Spare Part",
-                    boxQty: product?.boxQty || 1,
-                    masterCarton: product?.masterCarton || 1
-                });
-            }
-            
-            updateCartUI();
-            showToast(`${part} added to cart!`);
-        }
-
-        function updateCartUI() {
-            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
-            document.getElementById("cart-count").textContent = cartCount;
-            
-            const itemsDiv = document.getElementById("cart-items");
-            let subtotal = 0;
-            
-            if (cart.length === 0) {
-                itemsDiv.innerHTML = `
-                    <div class="empty-cart">
-                        <i class="fas fa-shopping-cart"></i>
-                        <h3>Your cart is empty</h3>
-                        <p>Add products to your cart to continue</p>
-                    </div>
-                `;
-            } else {
-                itemsDiv.innerHTML = "";
-                cart.forEach(item => {
-                    const itemTotal = item.price * item.qty;
-                    subtotal += itemTotal;
-                    
-                    itemsDiv.innerHTML += `
-                        <div class="cart-item" data-part="${item.part}">
-                            <div class="cart-item-info">
-                                <div class="cart-item-title">${item.part}</div>
-                                <div class="cart-item-desc">${item.desc}</div>
-                                <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
-                            </div>
-                            <div class="qty-control">
-                                <button onclick="changeQty('${item.part}', -1)">-</button>
-                                <input class="qty-input" type="number" value="${item.qty}" min="1" 
-                                       onchange="updateCartItemQty('${item.part}', this.value)">
-                                <button onclick="changeQty('${item.part}', 1)">+</button>
-                                <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
-                                <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-            
-        // Load product data from CSV
-        function loadProducts() {
-            // Use the correct URL for your CSV file
-            fetch("https://autosparessolution.github.io/prices.csv")
-                .then(res => {
-                    if (!res.ok) throw new Error("Failed to fetch CSV");
-                    return res.text();
-                })
-                .then(csv => {
-                    const rows = csv.split("\n");
-                    const header = rows[0].split(",").map(h => h.trim().toLowerCase());
-                    
-                    // Find column indices
-                    const materialIndex = header.findIndex(h => h.includes("material"));
-                    const descIndex = header.findIndex(h => h.includes("desc") || h.includes("description"));
-                    const listIndex = header.findIndex(h => h.includes("list"));
-                    const mrpIndex = header.findIndex(h => h.includes("mrp"));
-                    const priceIndex = header.findIndex(h => h.includes("price") && !h.includes("list") && !h.includes("mrp"));
-                    const stockIndex = header.findIndex(h => h.includes("stock") || h.includes("qty"));
-                    
-                    // Process data rows
-                    productsData = rows.slice(1)
-                        .map(r => {
-                            const cols = r.split(",").map(c => c.trim().replace(/^"(.*)"$/, '$1'));
-                            
-                            // Skip empty rows
-                            if (cols.length < 2 || !cols[materialIndex] || cols[materialIndex] === '') return null;
-                            
-                            // Remove "Ex:" prefix if present
-                            let part = cols[materialIndex];
-                            if (part.startsWith("Ex:")) {
-                                part = part.substring(3);
-                            }
-                            
-                            return {
-                                part: part,
-                                desc: cols[descIndex] || "Auto Spare Part",
-                                List: parseFloat(cols[listIndex] || 0),
-                                Mrp: parseFloat(cols[mrpIndex] || 0),     
-                                price: parseFloat(cols[priceIndex] || 0),
-                                stock: parseInt(cols[stockIndex] || 0),
-                                boxQty: 1, // Default values
-                                masterCarton: 1
-                            };
-                        })
-                        .filter(p => p !== null && p.part && p.part.trim() !== "");
-
-                    // Initialize with only in-stock items shown by default
-                    filteredProducts = productsData.filter(product => product.stock > 0);
-                    displayProducts();
-                })
-                .catch(err => {
-                    console.error("Error loading CSV:", err);
-                    showToast("Error loading product data. Please check if the CSV file exists.", true);
-                    
-                    // Show error message
-                    const gallery = document.querySelector(".gallery");
-                    gallery.innerHTML = `
-                        <div class="loading">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <h3>Unable to Load Products</h3>
-                            <p>Error: ${err.message}</p>
-                            <p>CSV URL: https://autosparessolution.github.io/prices.csv</p>
-                            <p>Please ensure the CSV file is available at the above URL.</p>
-                            <button class="btn" onclick="location.reload()" style="margin-top: 20px; background: var(--primary);">
-                                <i class="fas fa-redo"></i> Try Again
-                            </button>
-                        </div>
-                    `;
-                });
-        }
-        
-        // Display filtered products
-        function displayProducts() {
-            const gallery = document.querySelector(".gallery");
-            gallery.innerHTML = "";
-            
-            if (filteredProducts.length === 0) {
-                gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
-                return;
-            }
-            
-            filteredProducts.forEach(product => {
-                const isInStock = product.stock > 0;
-                
-                gallery.insertAdjacentHTML('beforeend', `
-                    <div class="card" data-part="${product.part}">
-                        ${!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
-                        
-                        <img src="https://autosparessolution.github.io/images/${product.part}.png" alt="${product.part}" 
-                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIgeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg==';this.onerror=null;">
-                        
-                        <div class="part-number">${product.part}</div>
-                        <div class="part-desc">${product.desc}</div>
-                        
-                        <div class="price-container">
-                            <div>
-                                <div class="price-label">List Price:</div>
-                                <div class="price-value">${product.List > 0 ? '₹'+product.List.toFixed(2) : 'NA'}</div>
-                            </div>
-                            <div>
-                                <div class="price-label">MRP:</div>
-                                <div class="price-value">${product.Mrp > 0 ? '₹'+product.Mrp.toFixed(2) : 'NA'}</div>
-                            </div>
-                        </div>
-                        
-                        <div class="price">Our Price: ${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
-                        
-                        <div class="stock-info">
-                            <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
-                            ${isInStock ? `
-                                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
-                                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
-                            ` : ''}
-                        </div>
-                        
-                        ${isInStock ? `
-                            <div style="margin-top: 0.5rem;">
-                                <input class="qty-input" type="number" value="1" min="1" max="${product.stock}">
-                                <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">
-                                    <i class="fas fa-cart-plus"></i> Add to Cart
-                                </button>
-                            </div>
-                        ` : ''}
-                        
-                        <a class="btn whatsapp" href="https://wa.me/03369028606?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
-                            <i class="fab fa-whatsapp"></i> ${isInStock ? 'Enquire' : 'Notify Me'}
-                        </a>
-                    </div>
-                `);
-            });
-        }
-        
-        // Cart functions
-        function addToCart(part, price) {
-            const card = document.querySelector(`.card[data-part="${part}"]`);
-            const qtyInput = card ? card.querySelector('.qty-input') : null;
-            const qty = qtyInput ? parseInt(qtyInput.value) : 1;
-            
-            const existing = cart.find(item => item.part === part);
-            if (existing) {
-                existing.qty += qty;
-            } else {
-                const product = productsData.find(p => p.part === part);
-                cart.push({ 
-                    part, 
-                    price, 
-                    qty,
-                    desc: product?.desc || "Auto Spare Part"
-                });
-            }
-            
-            updateCartUI();
-            showToast(`${part} added to cart!`);
-        }
-        
-        function updateCartUI() {
-            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
-            document.getElementById("cart-count").textContent = cartCount;
-        }
-        
-        // Contact form submission
-        document.getElementById("contact-form").addEventListener("submit", function(e) {
-            e.preventDefault();
-            
-            const name = document.getElementById("name").value;
-            const email = document.getElementById("email").value;
-            const phone = document.getElementById("phone").value;
-            const message = document.getElementById("message").value;
-            
-            const subject = `Contact Form Submission from ${name}`;
-            const body = `Name: ${name}%0AEmail: ${email}%0APhone: ${phone}%0AMessage: ${message}`;
-            
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            
-            // Reset the form
-            this.reset();
-            showToast("Your message has been sent. We'll contact you soon!");
-        });
-        
-        // Smooth scrolling for navigation links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
-                e.preventDefault();
-                
-                const targetId = this.getAttribute('href');
-                if (targetId === '#') return;
-                
-                const targetElement = document.querySelector(targetId);
-                if (targetElement) {
-                    window.scrollTo({
-                        top: targetElement.offsetTop - 160,
-                        behavior: 'smooth'
-                    });
-                }
-            });
-        });
-        
-        // Initialize the page
-        loadProducts();
-    </script>
-    <body>
-     <!-- User Panel Toggle -->
-    <button class="user-toggle" id="user-toggle">
-        <i class="fas fa-user"></i>
-    </button>
-    <!-- User Panel -->
-    <div class="user-panel" id="user-panel">
-        <div class="user-form" id="login-form">
-            <h3><i class="fas fa-sign-in-alt"></i> Login</h3>
-            <div class="form-group">
-                <input type="email" id="login-email" class="form-control" placeholder="Email" required>
-            </div>
-            <div class="form-group">
-                <input type="password" id="login-password" class="form-control" placeholder="Password" required>
-            </div>
-            <button class="btn btn-block" onclick="login()" style="background: var(--primary);">Login</button>
-            <p style="text-align: center; margin-top: 150px; font-size: 0.9rem;">
-                Don't have an account? <a href="#" onclick="showRegisterForm()" style="color: var(--accent);">Register</a>
-            </p>
-        </div>
-        
-        <div class="user-form" id="register-form" style="display: none;">
-            <h3><i class="fas fa-user-plus"></i> Register</h3>
-            <div class="form-group">
-                <input type="text" id="register-name" class="form-control" placeholder="Full Name" required>
-            </div>
-            <div class="form-group">
-                <input type="email" id="register-email" class="form-control" placeholder="Email" required>
-            </div>
-            <div class="form-group">
-                <input type="password" id="register-password" class="form-control" placeholder="Password" required>
-            </div>
-            <div class="form-group">
-                <input type="tel" id="register-phone" class="form-control" placeholder="Phone Number" required>
-            </div>
-            <div class="form-group">
-                <input type="text" id="register-business" class="form-control" placeholder="Business Name">
-            </div>
-            <div class="form-group">
-                <input type="text" id="register-gstin" class="form-control" placeholder="GSTIN (Optional)">
-            </div>
-            <button class="btn btn-block" onclick="register()" style="background: var(--primary);">Register</button>
-            <p style="text-align: center; margin-top: 150px; font-size: 0.9rem;">
-                Already have an account? <a href="#" onclick="showLoginForm()" style="color: var(--accent);">Login</a>
-            </p>
-        </div>
-        
-        <div id="user-profile" style="display: none;">
-            <h3><i class="fas fa-user-circle"></i> Profile</h3>
-            <div id="profile-info"></div>
-            <button class="btn btn-block" onclick="logout()" style="background: var(--secondary); margin-top: 150px;">Logout</button>
-        </div>
-    </div>
-    
     <header>
         <div class="logo-container">
-            <img src="images/ASS.jpg" alt="Auto Spares Solution Logo" class="logo">
+            <img src="https://autosparessolution.github.io/images/ASS.jpg" alt="Auto Spares Solution Logo" class="logo">
             <div>
                 <h1>Auto Spares Solution</h1>
-                <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
+                <p class="tagline">Browse products by brand</p>
             </div>
         </div>
     </header>
     
     <nav>
-        <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
-        <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
-        <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
-        <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
-        <a href="#policies"><i class="fas fa-file-contract"></i> <span>Policies</span></a>
-        <a href="#consultancy"><i class="fas fa-robot"></i> <span>Consultancy</span></a>
-        <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
-        <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
-        <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span id="cart-count">0</span></a>
+        <a href="index.html"><i class="fas fa-arrow-left"></i> Back to Main Site</a>
+        <a href="#tvs"><i class="fas fa-tag"></i> TVS</a>
+        <a href="#stl"><i class="fas fa-tag"></i> STL</a>
+        <a href="#vrp"><i class="fas fa-tag"></i> VRP</a>
+        <a href="#other"><i class="fas fa-tag"></i> Other Brands</a>
     </nav>
 
     <div class="container">
-        <!-- Advertisement Space -->
-        <div class="<amp-auto-ads type="adsense"
-        data-ad-client="ca-pub-8126256456942389">
-</amp-auto-ads>
-            <h3><i class="fas fa-ad"></i> Featured Partners</h3>
-            <div class="ad-container">
-                <div class="ad-item">Advertisement Space 1</div>
-                <div class="ad-item">Advertisement Space 2</div>
-                <div class="ad-item">Advertisement Space 3</div>
-            </div>
-        </div>
-
-        <!-- Hero Section -->
-        <section id="home" class="hero">
-            <h2>Premium Auto Parts for Professionals</h2>
-            <p>Supplying high-quality automotive components to workshops, retailers, and distributors since 2020. Trusted by industry professionals for genuine parts and exceptional service.</p>
-            <a href="#products" class="cta-button">Explore Our Products</a>
-            <a href="brands.html" class="cta-button" target="_blank">Click the link for Brand wise product Display
-            <a href="bolt-generator.html" class="cta-button" target="_blank">Click the link to Generate TVS Hex and Inches Series Bolt/Screw Part Number And Fasteners Identification </a>
-        </section>
-
-        <!-- Business Stats -->
-        <div class="stats-container">
-            <div class="stat-card">
-                <div class="stat-number">5000+</div>
-                <div class="stat-label">Parts in Catalog</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">200+</div>
-                <div class="stat-label">Corporate Clients</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">98%</div>
-                <div class="stat-label">Customer Satisfaction</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">24H</div>
-                <div class="stat-label">Order Processing</div>
-            </div>
-        </div>
-
-        <!-- About Section -->
-        <section id="about" class="section">
-            <h2 class="section-title">About Auto Spares Solution</h2>
-            <div class="about-content">
-                <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We specialize in providing high-quality components that meet industry standards and ensure optimal vehicle performance.</p>
-                
-                <div style="margin: 1.5rem 0;">
-                    <p><strong>Our Specializations:</strong></p>
-                    <ul style="padding-left: 1.5rem; margin-top: 0.5rem;">
-                        <li>Specialist dealers of TVS & STL Fasteners (Nut & Bolt)</li>
-                        <li>Authorized distributors of Volume Rubber Products</li>
-                        <li>Wide range of OEM and aftermarket parts</li>
-                        <li>Bulk supply for workshops and retailers</li>
-                    </ul>
-                </div>
-                
-                <p>With our extensive network and industry expertise, we ensure timely delivery of genuine parts at competitive prices. Our commitment to quality and customer satisfaction has made us a trusted partner for automotive businesses across the region.</p>
+        <section class="section">
+            <h2 class="section-title">Browse by Brand</h2>
+            <p style="text-align: center; margin-bottom: 20px;">Select a brand to view their products</p>
+            
+            <div class="search-container">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="search-input" placeholder="Search by part number or description...">
             </div>
             
-            <div class="business-info">
-                <div class="business-card">
-                    <i class="fas fa-map-marked-alt"></i>
-                    <h3>Office</h3>
-                    <p>101, 1st floor, 57/5, Q Road<br>Howrah, West Bengal 711108</p>
-                </div>
-                
-                <div class="business-card">
-                    <i class="fas fa-warehouse"></i>
-                    <h3>Warehouse</h3>
-                    <p>1 no British Indian Street<br>Kolkata, West Bengal 700069</p>
-                </div>
-                
-                <div class="business-card">
-                    <i class="fas fa-file-invoice-dollar"></i>
-                    <h3>Business Details</h3>
-                    <p>GSTIN: 19ANOPD3300R1ZO<br>Established: 2020</p>
-                </div>
+            <div class="stock-filter">
+                <div class="stock-filter-btn active" data-stock="all">All Products</div>
+                <div class="stock-filter-btn" data-stock="in-stock">In Stock Only</div>
+                <div class="stock-filter-btn" data-stock="out-of-stock">Out of Stock</div>
             </div>
             
-            <div class="brand-logos">
-                <div class="brand-logo">TVS</div>
-                <div class="brand-logo">STL</div>
-                <div class="brand-logo">VRP</div>
-                <div class="brand-logo">OEM</div>
+            <div class="brands-container" id="brands-container">
+                <div class="brand-card active" data-brand="all">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiByeD0iMTAiIGZpbGw9IiMwYTdjNzEiLz4KPHRleHQgeD0iNDAiIHk9IjQ1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iYm9sZCI+QUxMPC90ZXh0Pgo8L3N2Zz4K" alt="All Brands" class="brand-logo">
+                    <div class="brand-name">All Brands</div>
+                </div>
+                <!-- Brands will be loaded dynamically from CSV -->
+            </div>
+        </section>
+        
+        <section class="section">
+            <div class="filter-info" id="filter-info">
+                <h3>Showing Products: <span id="current-brand">All Brands</span></h3>
+                <p id="product-count">Loading products...</p>
             </div>
             
-            <!-- Advertisement Space -->
-            <div class="ad-space">
-                <h3><i class="fas fa-ad"></i> Special Offers</h3>
-                <div class="ad-container">
-                    <div class="ad-item">Special Discount on Bulk Orders</div>
-                    <div class="ad-item">New Customer Offer - 5% Off</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Investor Section -->
-        <section id="investors" class="section">
-            <h2 class="section-title">Investor Information</h2>
-            <div class="investor-section">
-                <p>Auto Spares Solution presents an exceptional investment opportunity in the rapidly growing automotive aftermarket industry. With our established market presence and strategic growth plans, we offer investors a chance to participate in a profitable venture with strong growth potential.</p>
-                
-                <div class="investor-grid">
-                    <div class="investor-card">
-                        <h3><i class="fas fa-chart-line"></i> Growth Potential</h3>
-                        <p>India's automotive aftermarket is projected to reach $32 billion by 2027. We're positioned to capture a significant share of this market through strategic expansion and partnerships.</p>
-                    </div>
-                    
-                    <div class="investor-card">
-                        <h3><i class="fas fa-handshake"></i> Partnership Opportunities</h3>
-                        <p>We're seeking strategic investors for our expansion into new regions and development of our e-commerce platform. Investment opportunities range from ₹50 lakh to ₹5 crore.</p>
-                    </div>
-                    
-                    <div class="investor-card">
-                        <h3><i class="fas fa-file-invoice"></i> Financial Highlights</h3>
-                        <ul>
-                            <li>3-year CAGR: 28%</li>
-                            <li>Gross Margin: 42%</li>
-                            <li>Projected ROI: 25-30% annually</li>
-                            <li>Current Valuation: ₹5 crore</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin-top: 2rem;">
-                    <p>For detailed investment proposals and financial projections, please contact our CFO:</p>
-                    <p><strong>Mrs. Bipasa Pal(Dey)</strong><br>+91 03369 028606<br>investors@autosparessolution.com</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Policies Section -->
-        <section id="policies" class="section">
-            <h2 class="section-title">Our E-commerce Policies</h2>
-            <p style="text-align: center; margin-bottom: 2rem;">We are committed to transparent business practices and customer satisfaction. Review our policies below:</p>
-            
-            <div class="policy-grid">
-                <div class="policy-card">
-                    <h3><i class="fas fa-shield-alt"></i> Privacy Policy</h3>
-                    <div class="policy-content">
-                        <a href="https://www.iubenda.com/privacy-policy/97422320" class="iubenda-black iubenda-noiframe iubenda-embed iubenda-noiframe " title="Privacy Policy ">Privacy Policy</a><script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);</script>
-                        <p><strong>Data Collection</strong><br>We collect only essential information required to process your orders and improve our services.</p>
-                        <p><strong>Data Protection</strong><br>All customer data is encrypted and stored securely. We never share your information with third parties without consent.</p>
-                        <p><strong>Cookies</strong><br>We use cookies to enhance your browsing experience and analyze site traffic. You can manage cookie preferences in your browser settings.</p>
-                        <p><strong>Compliance</strong><br>We adhere to GDPR and Indian data protection regulations to ensure your privacy rights are respected.</p>
-                    </div>
-                </div>
-                
-                <div class="policy-card">
-                    <h3><i class="fas fa-truck"></i> Shipping Policy</h3>
-                    <div class="policy-content">
-                        <p><strong>Processing Time</strong><br>Orders are processed within 24 business hours. Large orders may require additional processing time.</p>
-                        <p><strong>Shipping Methods</strong><br>We partner with leading logistics providers including Blue Dart, Delhivery, and FedEx for reliable nationwide delivery.</p>
-                        <p><strong>Shipping Costs</strong><br>Shipping is free for orders above ₹25,000 for Kolkata( India) only. For smaller orders, charges are calculated based on weight and destination.</p>
-                        <p><strong>Delivery Time</strong><br>Metro cities: 2-4 business days<br>Non-metro cities: 4-7 business days</p>
-                    </div>
-                </div>
-                
-                <div class="policy-card">
-                    <h3><i class="fas fa-undo"></i> Return Policy</h3>
-                    <div class="policy-content">
-                        <p><strong>Eligibility</strong><br>Items can be returned within 15 days of delivery if defective, damaged, or incorrect.</p>
-                        <p><strong>Conditions</strong><br>Products must be in original packaging with all tags intact. Special order items are non-returnable.</p>
-                        <p><strong>Process</strong><br>Contact our support team to initiate a return. We'll provide a return authorization and shipping label.</p>
-                        <p><strong>Refunds</strong><br>Refunds are processed within 7 business days after we receive and inspect the returned items.</p>
-                    </div>
-                </div>
-                
-                <div class="policy-card">
-                    <h3><i class="fas fa-file-contract"></i> Terms & Conditions</h3>
-                    <div class="policy-content">
-                        <a href="https://www.iubenda.com/terms-and-conditions/97422320" class="iubenda-black iubenda-noiframe iubenda-embed iubenda-noiframe " title="Terms and Conditions ">Terms and Conditions</a><script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);</script>
-                        <p><strong>Pricing</strong><br>All prices are in Indian Rupees and inclusive of GST. We reserve the right to correct pricing errors.</p>
-                        <p><strong>Payment</strong><br>We accept all major credit/debit cards, UPI, net banking, and bank transfers.</p>
-                        <p><strong>Order Acceptance</strong><br>All orders are subject to stock availability. We may cancel orders if items are unavailable.</p>
-                        <p><strong>Governing Law</strong><br>These terms are governed by Indian law. Any disputes will be subject to the jurisdiction of Howrah courts.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Consultancy Service Section -->
-        <section id="consultancy" class="section">
-            <h2 class="section-title">AI-Powered Consultancy Service</h2>
-            <div class="consultancy-service">
-                <p>Get expert advice on auto parts selection, compatibility, and troubleshooting with our AI-powered consultancy service. Our system leverages extensive product data to provide accurate recommendations.</p>
-                
-                <div id="free-chat-container">
-                    <div class="ai-chat-container" id="chat-messages">
-                        <div class="chat-message ai-message">
-                            <p>Hello! I'm your auto parts consultant. How can I help you today? You can ask me 3 questions for free.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="chat-input">
-                        <input type="text" id="chat-input" placeholder="Ask your question about auto parts...">
-                        <button onclick="askQuestion()"><i class="fas fa-paper-plane"></i></button>
-                    </div>
-                    
-                    <div class="payment-required" id="payment-prompt" style="display: none;">
-                        <p>You've used your free questions. Please purchase a consultancy package to continue.</p>
-                        <button class="btn" onclick="initiateConsultancyPayment()" style="background: var(--primary);">
-                            <i class="fas fa-credit-card"></i> Purchase Consultancy Package (₹499)
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="paid-chat-container" style="display: none;">
-                    <div class="ai-chat-container" id="paid-chat-messages">
-                        <div class="chat-message ai-message">
-                            <p>Welcome to premium consultancy! You can now ask unlimited questions.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="chat-input">
-                        <input type="text" id="paid-chat-input" placeholder="Ask your question about auto parts...">
-                        <button onclick="askPaidQuestion()"><i class="fas fa-paper-plane"></i></button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Products Section -->
-        <div class="search-container">
-              <i class="fas fa-search search-icon"></i>
-            <input type="text" id="search-input" placeholder="Search by part number or description...">
-        </div>
-
-        <section id="products" class="section">
-            <h2 class="section-title">Our Products</h2>
-            <div class="gallery">
-                <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>
-            </div>
-        </section>
-
-        <!-- Cart Sidebar -->
-        <div id="cart-sidebar">
-            <button class="close-cart"><i class="fas fa-times"></i></button>
-            <h2><i class="fas fa-shopping-cart"></i> Your Cart</h2>
-            <div id="cart-items"></div>
-            <div class="cart-actions">
-                <div class="cart-summary">
-                    <div class="summary-row">
-                        <span>Subtotal:</span>
-                        <span>₹<span id="cart-subtotal">0.00</span></span>
-                    </div>
-                    <div class="summary-row">
-                        <span>GST (18%):</span>
-                        <span>₹<span id="cart-tax">0.00</span></span>
-                    </div>
-                    <div class="summary-row total-row">
-                        <span>Total:</span>
-                        <span>₹<span id="cart-total">0.00</span></span>
-                    </div>
-                </div>
-                <div class="terms-agreement">
-                    <input type="checkbox" id="agree-terms" required>
-                    <label for="agree-terms">I agree to the <a href="#policies" style="color: var(--accent);">Terms & Conditions</a></label>
-                </div>
-                <button class="btn buy btn-block" onclick="checkout()"><i class="fas fa-credit-card"></i> Checkout</button>
-                <button class="btn btn-block" onclick="sendOrderEmail()" style="background: #6c757d; margin-top: 10px;"><i class="fas fa-envelope"></i> Email Order</button>
-            </div>
-        </div>
-
-        <!-- Contact Section -->
-        <section id="contact" class="section">
-            <h2 class="section-title">Get In Touch</h2>
-            <div class="contact-grid">
-                <div class="contact-info">
-                    <h3><i class="fas fa-phone-alt"></i> Contact Details</h3>
-                    <p><i class="fas fa-phone"></i> +91 98303 00193</p>
-                    <p><i class="fas fa-envelope"></i> contact@autosparessolution.com</p>
-                    <p><i class="fas fa-clock"></i> Mon-Sat: 9:00 AM - 7:00 PM</p>
-                    
-                    <h3 style="margin-top: 1.5rem;"><i class="fas fa-file-invoice"></i> Business Information</h3>
-                    <p><i class="fas fa-id-card"></i> GSTIN: 19ANOPD3300R1ZO</p>
-                    
-                    <div class="social-links">
-                        <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
-                        <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
-                        <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
-                        <a href="https://wa.me/03369028606" title="WhatsApp" target="_blank"><i class="fab fa-whatsapp"></i></a>
-                    </div>
-                </div>
-                
-                <div>
-                    <form id="contact-form">
-                        <div class="form-group">
-                            <label for="name">Your Name</label>
-                            <input type="text" id="name" class="form-control" placeholder="Enter your name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="email">Email Address</label>
-                            <input type="email" id="email" class="form-control" placeholder="Enter your email" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="phone">Phone Number</label>
-                            <input type="tel" id="phone" class="form-control" placeholder="Enter your phone number" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="city">City</label>
-                            <input type="text" id="city" class="form-control" placeholder="Enter your city" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="message">How can we help you?</label>
-                            <textarea id="message" class="form-control" placeholder="Describe your requirements" required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-block" style="background: var(--primary);"><i class="fas fa-paper-plane"></i> Send Message</button>
-                    </form>
+            <div class="products-grid" id="products-container">
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <h3>Loading Products</h3>
+                    <p>Please wait while we load our product catalog</p>
                 </div>
             </div>
         </section>
@@ -1727,20 +661,20 @@
             <div class="footer-column">
                 <h3>Quick Links</h3>
                 <ul class="footer-links">
-                    <li><a href="#home"><i class="fas fa-chevron-right"></i> Home</a></li>
-                    <li><a href="#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
-                    <li><a href="#products"><i class="fas fa-chevron-right"></i> Products</a></li>
-                    <li><a href="#investors"><i class="fas fa-chevron-right"></i> Investors</a></li>
+                    <li><a href="index.html"><i class="fas fa-chevron-right"></i> Home</a></li>
+                    <li><a href="index.html#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
+                    <li><a href="index.html#products"><i class="fas fa-chevron-right"></i> Products</a></li>
+                    <li><a href="index.html#investors"><i class="fas fa-chevron-right"></i> Investors</a></li>
                 </ul>
             </div>
             
             <div class="footer-column">
                 <h3>Policy</h3>
                 <ul class="footer-links">
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Return Policy</a></li>
-                    <li><a href="#policies"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
+                    <li><a href="index.html#policies"><i class="fas fa-chevron-right"></i> Privacy Policy</a></li>
+                    <li><a href="index.html#policies"><i class="fas fa-chevron-right"></i> Terms & Conditions</a></li>
+                    <li><a href="index.html#policies"><i class="fas fa-chevron-right"></i> Return Policy</a></li>
+                    <li><a href="index.html#policies"><i class="fas fa-chevron-right"></i> Shipping Policy</a></li>
                 </ul>
             </div>
             
@@ -1770,69 +704,427 @@
     </div>
 
     <script>
-        // Initialize variables
+        // Global variables
         let productsData = [];
-        let filteredProducts = [];
+        let brandsData = [];
+        let currentBrand = 'all';
+        let currentStockFilter = 'all';
         let cart = [];
-        const fixedProducts = [
-            "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
-            "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-            "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
-            "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
-            "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
-            "M07520-0200"
-        ];
-
-        // User management variables
-        let currentUser = null;
-        let users = JSON.parse(localStorage.getItem('users')) || [];
-        let freeQuestionsAsked = 0;
-        const MAX_FREE_QUESTIONS = 3;
-        let hasPaidConsultancy = false;
-
-        // Consultancy knowledge base (in a real scenario, this would be loaded from a CSV or database)
-        const consultancyKnowledge = {
-            "engine parts": "We offer a wide range of engine components including pistons, gaskets, valves, and timing belts. For specific recommendations, please provide your vehicle make and model.",
-            "brake system": "Our brake parts include discs, pads, calipers, and master cylinders. We recommend replacing brake components in sets for optimal performance.",
-            "suspension": "We carry shock absorbers, struts, bushings, and control arms for most vehicle models. Let me know your specific requirements.",
-            "electrical": "We provide alternators, starters, batteries, and wiring harnesses. Many electrical components are vehicle-specific.",
-            "filters": "We stock air, oil, fuel, and cabin filters for all major vehicle brands. Filters should be replaced according to your vehicle's maintenance schedule.",
-            "bulb": "We have halogen, LED, and HID bulbs for headlights, brake lights, and indicators. Please specify your vehicle model for correct fitment.",
-            "bearing": "We offer wheel bearings, hub assemblies, and precision bearings for various applications. Quality bearings ensure smooth operation and safety.",
-            "fastener": "As specialists in TVS & STL fasteners, we provide high-quality nuts, bolts, and screws meeting OEM standards.",
-            "rubber": "We are authorized distributors of Volume Rubber Products, offering bushings, mounts, seals, and hoses.",
-            "default": "I'm here to help with your auto parts needs. For specific recommendations, please provide your vehicle make, model, and year, along with the part you're looking for."
-        };
-
+        let filteredProducts = [];
+        
+        // Updated references based on your information
+        const imageBaseUrl = 'https://autosparessolution.github.io/images/';
+        const csvFilePath = 'https://autosparessolution.github.io/prices.csv';
+        const whatsappNumber = '03369028606';
+        
         // DOM elements
-        const cartLink = document.getElementById("cart-link");
-        const cartSidebar = document.getElementById("cart-sidebar");
-        const closeCartBtn = document.querySelector(".close-cart");
-        const toast = document.getElementById("toast");
-        const toastMessage = document.getElementById("toast-message");
-        const userToggle = document.getElementById("user-toggle");
-        const userPanel = document.getElementById("user-panel");
-        const loginForm = document.getElementById("login-form");
-        const registerForm = document.getElementById("register-form");
-        const userProfile = document.getElementById("user-profile");
-        const profileInfo = document.getElementById("profile-info");
-
-        // Initialize cart toggle
-        cartLink.addEventListener("click", (e) => {
-            e.preventDefault();
-            cartSidebar.classList.toggle("active");
+        const brandsContainer = document.getElementById('brands-container');
+        const productsContainer = document.getElementById('products-container');
+        const currentBrandElement = document.getElementById('current-brand');
+        const productCountElement = document.getElementById('product-count');
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        const searchInput = document.getElementById('search-input');
+        const stockFilterBtns = document.querySelectorAll('.stock-filter-btn');
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProducts();
+            
+            // Add search functionality
+            searchInput.addEventListener('input', function() {
+                performSearch(this.value);
+            });
+            
+            // Add stock filter functionality
+            stockFilterBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    stockFilterBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentStockFilter = this.getAttribute('data-stock');
+                    applyFilters();
+                });
+            });
         });
+        
+        // Perform search
+        function performSearch(searchTerm) {
+            const term = searchTerm.toLowerCase().trim();
+            
+            if (term === '') {
+                applyFilters();
+            } else {
+                // When searching, show all matching products
+                filteredProducts = productsData.filter(product => 
+                    product.part.toLowerCase().includes(term) || 
+                    (product.desc && product.desc.toLowerCase().includes(term))
+                );
+                
+                displayProducts(filteredProducts);
+            }
+        }
+        
+        // Apply both brand and stock filters
+        function applyFilters() {
+            let tempProducts = productsData;
+            
+            // Apply brand filter
+            if (currentBrand !== 'all') {
+                tempProducts = tempProducts.filter(product => 
+                    product.brand && product.brand.toLowerCase() === currentBrand
+                );
+            }
+            
+            // Apply stock filter
+            if (currentStockFilter === 'in-stock') {
+                tempProducts = tempProducts.filter(product => product.stock > 0);
+            } else if (currentStockFilter === 'out-of-stock') {
+                tempProducts = tempProducts.filter(product => product.stock <= 0);
+            }
+            
+            filteredProducts = tempProducts;
+            displayProducts(filteredProducts);
+        }
+        
+        // Load product data from CSV
+        function loadProducts() {
+            // Show loading state
+            productsContainer.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <h3>Loading Products</h3>
+                    <p>Please wait while we load our product catalog</p>
+                </div>
+            `;
+            
+            // For demo purposes, we'll use sample data since the CSV might not be accessible
+            // In production, you would fetch from the actual CSV URL
+            const sampleData = `Material,Material,LIST PRICE,MRP PRICE,TYPE,FINISH,billing price,STOCK,Box Qty,Carton,brand
+MA2710M02920000200,M18 X 2.5 X 100 KNURLED WH BOLT & NUT,132.05,165,AUTOMOVOTIVE PRICE LIST PARTS,200,83.19,2200,NaN,NaN,TVS
+MA2710M02920000201,M18 X 2.5 X 110 KNURLED WH BOLT & NUT,142.05,175,AUTOMOVOTIVE PRICE LIST PARTS,200,93.19,1500,NaN,NaN,TVS
+MA2710M02920000202,M18 X 2.5 X 120 KNURLED WH BOLT & NUT,152.05,185,AUTOMOVOTIVE PRICE LIST PARTS,200,103.19,0,NaN,NaN,TVS
+STL001,STL Brake Pad Set,450.00,550,AUTOMOVOTIVE PRICE LIST PARTS,200,350.00,50,NaN,NaN,STL
+STL002,STL Clutch Plate,1200.00,1400,AUTOMOVOTIVE PRICE LIST PARTS,200,950.00,25,NaN,NaN,STL
+VRP001,VRP Fuel Pump,3200.00,3800,AUTOMOVOTIVE PRICE LIST PARTS,200,2800.00,10,NaN,NaN,VRP
+VRP002,VRP Oil Filter,250.00,300,AUTOMOVOTIVE PRICE LIST PARTS,200,200.00,100,NaN,NaN,VRP
+BOS001,BOSCH Spark Plug,180.00,220,AUTOMOVOTIVE PRICE LIST PARTS,200,150.00,200,NaN,NaN,BOSCH
+MIN001,MINDA Horn Set,650.00,750,AUTOMOVOTIVE PRICE LIST PARTS,200,550.00,15,NaN,NaN,Minda`;
+            
+            try {
+                console.log("Using sample product data for demonstration");
+                parseCSVData(sampleData);
+            } catch (err) {
+                console.error("Error parsing sample data:", err);
+                showToast("Error loading product data.", true);
+                
+                productsContainer.innerHTML = `
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>Unable to Load Products</h3>
+                        <p>Error: ${err.message}</p>
+                        <button class="btn" onclick="location.reload()" style="margin-top: 20px;">
+                            <i class="fas fa-redo"></i> Try Again
+                        </button>
+                    </div>
+                `;
+            }
+            
+            // Uncomment this section and remove the sample data section above when your CSV is ready
+            /*
+            fetch(csvFilePath)
+                .then(res => {
+                    if (!res.ok) throw new Error("Failed to fetch CSV file. Status: " + res.status);
+                    return res.text();
+                })
+                .then(csv => {
+                    parseCSVData(csv);
+                })
+                .catch(err => {
+                    console.error("Error loading CSV:", err);
+                    showToast("Error loading product data. Please check if the CSV file exists and is accessible.", true);
+                    
+                    productsContainer.innerHTML = `
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <h3>Unable to Load Products</h3>
+                            <p>Error: ${err.message}</p>
+                            <p>CSV URL: ${csvFilePath}</p>
+                            <p>Please ensure the CSV file is available at the above URL.</p>
+                            <button class="btn" onclick="location.reload()" style="margin-top: 20px;">
+                                <i class="fas fa-redo"></i> Try Again
+                            </button>
+                        </div>
+                    `;
+                });
+            */
+        }
+        
+        // Parse CSV data
+        function parseCSVData(csv) {
+            console.log("Raw CSV content:", csv.substring(0, 500));
+            
+            const rows = csv.split("\n").filter(row => row.trim() !== "");
+            
+            if (rows.length === 0) {
+                throw new Error("CSV data is empty");
+            }
+            
+            const header = rows[0].split(",").map(h => h.trim().toLowerCase());
+            
+            console.log("CSV Header:", header);
+            
+            // Updated column indices to match your actual CSV structure
+            const materialIndex = 0; // First Material column (part number)
+            const descIndex = 1;     // Second Material column (description)
+            const listIndex = 2;     // LIST PRICE
+            const mrpIndex = 3;      // MRP PRICE
+            const priceIndex = 6;    // billing price (7th column, index 6)
+            const stockIndex = 7;    // STOCK (8th column, index 7)
+            const brandIndex = 10;   // brand (11th column, index 10)
+            
+            console.log("Column indices:", {materialIndex, descIndex, listIndex, mrpIndex, priceIndex, stockIndex, brandIndex});
+            
+            // Process data rows
+            productsData = rows.slice(1)
+                .map(r => {
+                    // Handle CSV with potential quotes and commas in values
+                    const cols = r.split(',').map(c => c.trim().replace(/^"(.*)"$/, '$1'));
+                    
+                    // Skip empty rows or rows without material
+                    if (cols.length < 2 || !cols[materialIndex] || cols[materialIndex] === '') return null;
+                    
+                    return {
+                        part: cols[materialIndex]?.trim(),
+                        desc: cols[descIndex]?.trim() || "Auto Spare Part",
+                        List: parseFloat(cols[listIndex] || 0),
+                        Mrp: parseFloat(cols[mrpIndex] || 0),     
+                        price: parseFloat(cols[priceIndex] || 0),
+                        stock: parseInt(cols[stockIndex] || 0),
+                        brand: cols[brandIndex]?.trim() || "Other"
+                    };
+                })
+                .filter(p => p !== null && p.part && p.part.trim() !== "");
 
-        // Close cart sidebar
-        closeCartBtn.addEventListener("click", () => {
-            cartSidebar.classList.remove("active");
-        });
-
-        // Toggle user panel
-        userToggle.addEventListener("click", () => {
-            userPanel.classList.toggle("active");
-        });
-
+            console.log('Loaded products:', productsData.length);
+            console.log('Sample products:', productsData.slice(0, 5));
+            
+            if (productsData.length === 0) {
+                throw new Error("No products found in CSV data after parsing.");
+            }
+            
+            // Extract unique brands from products
+            extractBrandsFromProducts();
+            
+            // Display brands
+            displayBrands();
+            
+            // Display all products initially
+            filteredProducts = productsData;
+            displayProducts(filteredProducts);
+        }
+        
+        // Extract unique brands from products
+        function extractBrandsFromProducts() {
+            const brandSet = new Set();
+            
+            productsData.forEach(product => {
+                if (product.brand && product.brand.trim() !== "") {
+                    brandSet.add(product.brand.trim());
+                }
+            });
+            
+            brandsData = Array.from(brandSet).sort();
+            console.log('Extracted brands:', brandsData);
+        }
+        
+        // Display brands in the brands container
+        function displayBrands() {
+            // Clear existing brands (except "All Brands")
+            const allBrandsCard = brandsContainer.querySelector('[data-brand="all"]');
+            brandsContainer.innerHTML = '';
+            brandsContainer.appendChild(allBrandsCard);
+            
+            // Add brand cards for each brand
+            brandsData.forEach(brand => {
+                const brandCard = document.createElement('div');
+                brandCard.className = 'brand-card';
+                brandCard.setAttribute('data-brand', brand.toLowerCase());
+                
+                // Create optimized SVG logos instead of external images
+                let logoBgColor = '#0a7c71';
+                let logoText = brand.substring(0, 3).toUpperCase();
+                
+                // Set specific colors for known brands
+                const brandColors = {
+                    'tvs': '#0a7c71',
+                    'stl': '#e74c3c',
+                    'vrp': '#27ae60',
+                    'bosch': '#34495e',
+                    'minda': '#9b59b6',
+                    'asco': '#e67e22',
+                    'lucas': '#16a085',
+                    'other': '#7f8c8d'
+                };
+                
+                if (brandColors[brand.toLowerCase()]) {
+                    logoBgColor = brandColors[brand.toLowerCase()];
+                }
+                
+                // Create SVG logo as data URI for fast loading
+                const svgLogo = `<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="80" height="80" rx="10" fill="${logoBgColor}"/>
+                    <text x="40" y="45" text-anchor="middle" fill="white" font-family="Arial" font-size="14" font-weight="bold">${logoText}</text>
+                </svg>`;
+                
+                const svgDataUri = `data:image/svg+xml;base64,${btoa(svgLogo)}`;
+                
+                brandCard.innerHTML = `
+                    <img src="${svgDataUri}" alt="${brand}" class="brand-logo">
+                    <div class="brand-name">${brand}</div>
+                `;
+                
+                brandsContainer.appendChild(brandCard);
+            });
+            
+            // Add event listeners to brand cards
+            const brandCards = brandsContainer.querySelectorAll('.brand-card');
+            brandCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const brand = this.getAttribute('data-brand');
+                    
+                    // Update active state
+                    brandCards.forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Filter products
+                    filterProductsByBrand(brand);
+                });
+            });
+        }
+        
+        // Filter products by brand
+        function filterProductsByBrand(brand) {
+            currentBrand = brand;
+            searchInput.value = ''; // Clear search when filtering by brand
+            applyFilters();
+            
+            if (brand === 'all') {
+                currentBrandElement.textContent = 'All Brands';
+            } else {
+                const brandName = brandsContainer.querySelector(`[data-brand="${brand}"] .brand-name`).textContent;
+                currentBrandElement.textContent = brandName;
+            }
+        }
+        
+        // Display products in the grid
+        function displayProducts(productsArray) {
+            productsContainer.innerHTML = '';
+            
+            if (productsArray.length === 0) {
+                productsContainer.innerHTML = `
+                    <div class="no-products">
+                        <i class="fas fa-box-open"></i>
+                        <h3>No products found</h3>
+                        <p>Try selecting a different brand or search term</p>
+                    </div>
+                `;
+                productCountElement.textContent = '0 products found';
+                return;
+            }
+            
+            productCountElement.textContent = `${productsArray.length} products found`;
+            
+            productsArray.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'product-card';
+                
+                // Determine stock status
+                let stockStatus = '';
+                let stockClass = '';
+                if (product.stock > 10) {
+                    stockStatus = 'In Stock';
+                    stockClass = 'in-stock';
+                } else if (product.stock > 0) {
+                    stockStatus = 'Low Stock';
+                    stockClass = 'low-stock';
+                } else {
+                    stockStatus = 'Out of Stock';
+                    stockClass = 'out-of-stock';
+                }
+                
+                // Create image URL for the product (using part number as image name)
+                const imageUrl = `${imageBaseUrl}${product.part}.png`;
+                
+                productCard.innerHTML = `
+                    <div class="product-badge ${stockClass}">${stockStatus}</div>
+                    <img src="${imageUrl}" 
+                         alt="${product.part}" 
+                         class="product-image"
+                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIgeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg=='">
+                    <h3 class="product-name">${product.part}</h3>
+                    <p class="product-desc">${product.desc}</p>
+                    <div class="product-specs">
+                        <span><i class="fas fa-tag"></i> ${product.brand || 'Unknown Brand'}</span>
+                        <span><i class="fas fa-cubes"></i> Stock: ${product.stock || '0'}</span>
+                    </div>
+                    <div class="product-price">₹${product.price || '0'}</div>
+                    <div class="product-action">
+                        <button class="btn" onclick="addToCart('${product.part}')" ${product.stock <= 0 ? 'disabled' : ''}>
+                            <i class="fas fa-cart-plus"></i> ${product.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
+                        </button>
+                        <button class="btn btn-whatsapp" onclick="enquireOnWhatsApp('${product.part}', '${product.desc}')">
+                            <i class="fab fa-whatsapp"></i> ${product.stock <= 0 ? 'Notify Me' : 'Enquire'}
+                        </button>
+                    </div>
+                `;
+                
+                productsContainer.appendChild(productCard);
+            });
+        }
+        
+        // Add to cart function
+        function addToCart(part) {
+            const product = productsData.find(p => p.part === part);
+            if (!product) return;
+            
+            // Check if product is already in cart
+            const existingItem = cart.find(item => item.part === part);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({
+                    part: product.part,
+                    desc: product.desc,
+                    price: product.price,
+                    quantity: 1
+                });
+            }
+            
+            // Update cart count in navigation
+            const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
+            const cartLink = document.querySelector('nav a[href="#cart"]');
+            if (cartLink) {
+                let countElement = cartLink.querySelector('#cart-count');
+                if (!countElement) {
+                    countElement = document.createElement('span');
+                    countElement.id = 'cart-count';
+                    cartLink.appendChild(countElement);
+                }
+                countElement.textContent = cartCount;
+            }
+            
+            showToast(`${product.part} added to cart!`);
+        }
+        
+        // Enquire on WhatsApp function
+        function enquireOnWhatsApp(part, desc) {
+            const product = productsData.find(p => p.part === part);
+            const stockStatus = product.stock > 0 ? 'In Stock' : 'Out of Stock';
+            const message = `I want to enquire about ${part} (${desc}). Current stock: ${stockStatus}`;
+            const encodedMessage = encodeURIComponent(message);
+            window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
+        }
+        
         // Show toast message
         function showToast(message, isError = false) {
             toastMessage.textContent = message;
@@ -1844,1182 +1136,6 @@
                 toast.classList.remove("show");
             }, 3000);
         }
-
-        // User management functions
-        function showRegisterForm() {
-            loginForm.style.display = "none";
-            registerForm.style.display = "block";
-            userProfile.style.display = "none";
-        }
-
-        function showLoginForm() {
-            registerForm.style.display = "none";
-            loginForm.style.display = "block";
-            userProfile.style.display = "none";
-        }
-
-        function showUserProfile() {
-            registerForm.style.display = "none";
-            loginForm.style.display = "none";
-            userProfile.style.display = "block";
-            
-            profileInfo.innerHTML = `
-                <p><strong>Name:</strong> ${currentUser.name}</p>
-                <p><strong>Email:</strong> ${currentUser.email}</p>
-                <p><strong>Phone:</strong> ${currentUser.phone}</p>
-                ${currentUser.business ? `<p><strong>Business:</strong> ${currentUser.business}</p>` : ''}
-                ${currentUser.gstin ? `<p><strong>GSTIN:</strong> ${currentUser.gstin}</p>` : ''}
-            `;
-        }
-
-        function register() {
-            const name = document.getElementById("register-name").value;
-            const email = document.getElementById("register-email").value;
-            const password = document.getElementById("register-password").value;
-            const phone = document.getElementById("register-phone").value;
-            const business = document.getElementById("register-business").value;
-            const gstin = document.getElementById("register-gstin").value;
-            
-            if (!name || !email || !password || !phone) {
-                showToast("Please fill all required fields", true);
-                return;
-            }
-            
-            if (users.some(user => user.email === email)) {
-                showToast("Email already registered", true);
-                return;
-            }
-            
-            const newUser = {
-                name,
-                email,
-                password, // In a real application, this would be hashed
-                phone,
-                business,
-                gstin,
-                registrationDate: new Date().toISOString()
-            };
-            
-            users.push(newUser);
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            currentUser = newUser;
-            showUserProfile();
-            showToast("Registration successful!");
-            
-            // Clear form
-            document.getElementById("register-form").reset();
-        }
-
-        function login() {
-            const email = document.getElementById("login-email").value;
-            const password = document.getElementById("login-password").value;
-            
-            const user = users.find(u => u.email === email && u.password === password);
-            
-            if (user) {
-                currentUser = user;
-                showUserProfile();
-                showToast("Login successful!");
-            } else {
-                showToast("Invalid email or password", true);
-            }
-        }
-
-        function logout() {
-            currentUser = null;
-            showLoginForm();
-            showToast("Logged out successfully");
-        }
-
-        // Consultancy functions
-        function askQuestion() {
-            if (!currentUser) {
-                showToast("Please login to use the consultancy service", true);
-                return;
-            }
-            
-            if (hasPaidConsultancy) {
-                askPaidQuestion();
-                return;
-            }
-            
-            if (freeQuestionsAsked >= MAX_FREE_QUESTIONS) {
-                document.getElementById("payment-prompt").style.display = "block";
-                return;
-            }
-            
-            const input = document.getElementById("chat-input");
-            const question = input.value.trim();
-            
-            if (!question) return;
-            
-            // Add user question to chat
-            const chatMessages = document.getElementById("chat-messages");
-            chatMessages.innerHTML += `
-                <div class="chat-message user-message">
-                    <p>${question}</p>
-                </div>
-            `;
-            
-            // Process question and generate response
-            setTimeout(() => {
-                let response = "I'm not sure how to help with that. Could you provide more details about your vehicle or the specific part you need?";
-                
-                // Simple keyword matching for demo purposes
-                const lowerQuestion = question.toLowerCase();
-                for (const [keyword, answer] of Object.entries(consultancyKnowledge)) {
-                    if (lowerQuestion.includes(keyword)) {
-                        response = answer;
-                        break;
-                    }
-                }
-                
-                chatMessages.innerHTML += `
-                    <div class="chat-message ai-message">
-                        <p>${response}</p>
-                    </div>
-                `;
-                
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                freeQuestionsAsked++;
-                
-                if (freeQuestionsAsked >= MAX_FREE_QUESTIONS) {
-                    document.getElementById("payment-prompt").style.display = "block";
-                }
-            }, 1000);
-            
-            input.value = "";
-        }
-
-        function askPaidQuestion() {
-            if (!hasPaidConsultancy) return;
-            
-            const input = document.getElementById("paid-chat-input");
-            const question = input.value.trim();
-            
-            if (!question) return;
-            
-            // Add user question to chat
-            const chatMessages = document.getElementById("paid-chat-messages");
-            chatMessages.innerHTML += `
-                <div class="chat-message user-message">
-                    <p>${question}</p>
-                </div>
-            `;
-            
-            // Process question and generate response (more advanced in real implementation)
-            setTimeout(() => {
-                let response = consultancyKnowledge.default;
-                
-                // Simple keyword matching for demo purposes
-                const lowerQuestion = question.toLowerCase();
-                for (const [keyword, answer] of Object.entries(consultancyKnowledge)) {
-                    if (lowerQuestion.includes(keyword)) {
-                        response = answer;
-                        break;
-                    }
-                }
-                
-                chatMessages.innerHTML += `
-                    <div class="chat-message ai-message">
-                        <p>${response}</p>
-                    </div>
-                `;
-                
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }, 1000);
-            
-            input.value = "";
-        }
-
-        function initiateConsultancyPayment() {
-            const options = {
-                key: "rzp_live_90iWxpNYThOpyE",
-                amount: 49900, // ₹499 in paise
-                currency: "INR",
-                name: "Auto Spares Solution",
-                description: "AI Consultancy Service Package",
-                handler: function(response) {
-                    hasPaidConsultancy = true;
-                    document.getElementById("free-chat-container").style.display = "none";
-                    document.getElementById("paid-chat-container").style.display = "block";
-                    showToast("Consultancy package activated successfully!");
-                },
-                prefill: {
-                    name: currentUser ? currentUser.name : "Customer",
-                    email: currentUser ? currentUser.email : "customer@example.com",
-                    contact: currentUser ? currentUser.phone : "9999999999"
-                },
-                theme: {
-                    color: "#0a7c71"
-                }
-            };
-            
-            const rzp = new Razorpay(options);
-            rzp.open();
-        }
-
-        // Search functionality
-let searchTimeout;
-
-// Search with debounce and Enter key support
-document.getElementById("search-input").addEventListener("input", (e) => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        performSearch(e.target.value);
-    }, 5000); // 5000ms delay before searching
-});
-
-// Add Enter key support
-document.getElementById("search-input").addEventListener("keypress", (e) => {
-    if (e.key === 'Enter') {
-        clearTimeout(searchTimeout); // Clear any pending timeout
-        performSearch(e.target.value);
-    }
-});
-
-function performSearch(searchTerm) {
-    const term = searchTerm.toLowerCase().trim();
-    
-    if (term === '') {
-        // When search is empty, show only in-stock items
-        filteredProducts = productsData.filter(product => product.stock > 0);
-    } else {
-        // When searching, show all matching products regardless of stock
-        filteredProducts = productsData.filter(product => 
-            product.part.toLowerCase().includes(term) || 
-            (product.desc && product.desc.toLowerCase().includes(term))
-        );
-    }
-    displayProducts();
-}
-        // Load product data from CSV
-        function loadProducts() {
-            fetch("prices.csv")
-                .then(res => res.text())
-                .then(csv => {
-                    const rows = csv.split("\n").slice(1); // Skip header
-                    
-                    productsData = rows.map(r => {
-                        const cols = r.split(",");
-                        return {
-                            part: cols[0]?.trim(),
-                            desc: cols[1]?.trim() || "Auto Spare Part",
-                            List: parseFloat(cols[2] || 0),
-                            Mrp: parseFloat(cols[3] || 0),     
-                            price: parseFloat(cols[6] || 0),
-                            stock: parseInt(cols[7] || 0),
-                            boxQty: parseInt(cols[8] || 1), // Box quantity
-                            masterCarton: parseInt(cols[9] || 1) // Master carton quantity
-                        };
-                    }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
-
-                    // Add fixed products that might not be in CSV
-                    fixedProducts.forEach(part => {
-                        if (!productsData.some(p => p.part === part)) {
-                            productsData.push({
-                                part,
-                                desc: "Auto Spare Part",
-                                List: 0,
-                                Mrp: 0,
-                                price: 0,
-                                stock: 0,
-                                boxQty: 1,
-                                masterCarton: 1
-                            });
-                        }
-                    });
-                    
-                    // Initialize with only in-stock items shown by default
-                    filteredProducts = productsData.filter(product => product.stock > 0);
-                    displayProducts();
-                })
-                .catch(err => {
-                    console.error("Error loading CSV:", err);
-                    // Fallback to fixed products with default values
-                    productsData = fixedProducts.map(part => ({
-                        part,
-                        desc: "Auto Spare Part",
-                        List: 0,
-                        Mrp: 0,
-                        price: 0,
-                        stock: 0,
-                        boxQty: 1,
-                        masterCarton: 1
-                    }));
-                    filteredProducts = [...productsData];
-                    displayProducts();
-                    showToast("Error loading product data. Using fallback data.", true);
-                });
-        }
-
-        // Display filtered products
-        function displayProducts() {
-            const gallery = document.querySelector(".gallery");
-            gallery.innerHTML = "";
-            
-            if (filteredProducts.length === 0) {
-                gallery.innerHTML = '<div class="loading"><i class="fas fa-search"></i> No products found matching your search.</div>';
-                return;
-            }
-            
-            filteredProducts.forEach(product => {
-                const isInStock = product.stock > 0;
-                const isInSystem = productsData.some(p => p.part === product.part);
-                
-                gallery.insertAdjacentHTML('beforeend', `
-                    <div class="card" data-part="${product.part}">
-                        ${!isInSystem ? '<div class="not-available">NOT IN SYSTEM</div>' : 
-                            (!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : '')}
-                        
-                        <img src="images/${product.part}.png" alt="${product.part}" 
-                             onerror="this.src='images/default.png';this.onerror=null;">
-                        
-                        <div class="part-number">${product.part}</div>
-                        <div class="part-desc">${product.desc}</div>
-                        
-                        <div class="price-container">
-                            <div>
-                                <div class="price-label">List Price:</div>
-                                <div class="price-value">${product.List > 0 ? '₹'+product.List.toFixed(2) : 'NA'}</div>
-                            </div>
-                            <div>
-                                <div class="price-label">MRP:</div>
-                                <div class="price-value">${product.Mrp > 0 ? '₹'+product.Mrp.toFixed(2) : 'NA'}</div>
-                            </div>
-                        </div>
-                        
-                        <div class="price">Our Price: ${product.price > 0 ? '₹'+product.price.toFixed(2) : 'Price NA'}</div>
-                        
-                        <div class="stock-info">
-                            <span><i class="fas fa-box"></i> Stock: ${isInStock ? product.stock : '0'}</span>
-                            ${isInStock ? `
-                                <span><i class="fas fa-cube"></i> Box: ${product.boxQty}</span>
-                                <span><i class="fas fa-pallet"></i> Carton: ${product.masterCarton}</span>
-                            ` : ''}
-                        </div>
-                        
-                        ${isInStock ? `
-                            <div style="margin-top: 0.5rem;">
-                                <input class="qty-input" type="number" value="1" min="1" max="${product.stock}" 
-                                       onchange="updateProductQty('${product.part}', this.value)">
-                                <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">
-                                    <i class="fas fa-cart-plus"></i> Add to Cart
-                                </button>
-                            </div>
-                        ` : ''}
-                        
-                        <a class="btn whatsapp" href="https://wa.me/03369028606?text=I want to enquire about ${product.part} (${product.desc})" target="_blank">
-                            <i class="fab fa-whatsapp"></i> ${isInStock ? 'Enquire' : 'Notify Me'}
-                        </a>
-                    </div>
-                `);
-            });
-        }
-
-        // Update product quantity in the product card
-        function updateProductQty(part, qty) {
-            const card = document.querySelector(`.card[data-part="${part}"]`);
-            if (card) {
-                const input = card.querySelector('.qty-input');
-                if (input) {
-                    input.value = Math.max(1, Math.min(qty, parseInt(input.max)));
-                }
-            }
-        }
-
-        // Cart functions
-        function addToCart(part, price) {
-            const card = document.querySelector(`.card[data-part="${part}"]`);
-            const qtyInput = card ? card.querySelector('.qty-input') : null;
-            const qty = qtyInput ? parseInt(qtyInput.value) : 1;
-            
-            const existing = cart.find(item => item.part === part);
-            if (existing) {
-                existing.qty += qty;
-            } else {
-                const product = productsData.find(p => p.part === part);
-                cart.push({ 
-                    part, 
-                    price, 
-                    qty,
-                    desc: product?.desc || "Auto Spare Part",
-                    boxQty: product?.boxQty || 1,
-                    masterCarton: product?.masterCarton || 1
-                });
-            }
-            
-            updateCartUI();
-            showToast(`${part} added to cart!`);
-        }
-
-        function updateCartUI() {
-            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
-            document.getElementById("cart-count").textContent = cartCount;
-            
-            const itemsDiv = document.getElementById("cart-items");
-            let subtotal = 0;
-            
-            if (cart.length === 0) {
-                itemsDiv.innerHTML = `
-                    <div class="empty-cart">
-                        <i class="fas fa-shopping-cart"></i>
-                        <h3>Your cart is empty</h3>
-                        <p>Add products to your cart to continue</p>
-                    </div>
-                `;
-            } else {
-                itemsDiv.innerHTML = "";
-                cart.forEach(item => {
-                    const itemTotal = item.price * item.qty;
-                    subtotal += itemTotal;
-                    
-                    itemsDiv.innerHTML += `
-                        <div class="cart-item" data-part="${item.part}">
-                            <div class="cart-item-info">
-                                <div class="cart-item-title">${item.part}</div>
-                                <div class="cart-item-desc">${item.desc}</div>
-                                <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
-                            </div>
-                            <div class="qty-control">
-                                <button onclick="changeQty('${item.part}', -1)">-</button>
-                                <input class="qty-input" type="number" value="${item.qty}" min="1" 
-                                       onchange="updateCartItemQty('${item.part}', this.value)">
-                                <button onclick="changeQty('${item.part}', 1)">+</button>
-                                <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
-                                <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-            
-            const tax = subtotal * 0.18;
-            const total = subtotal + tax;
-            
-            document.getElementById("cart-subtotal").textContent = subtotal.toFixed(2);
-            document.getElementById("cart-tax").textContent = tax.toFixed(2);
-            document.getElementById("cart-total").textContent = total.toFixed(2);
-        }
-
-        function changeQty(part, delta) {
-            const item = cart.find(i => i.part === part);
-            if (!item) return;
-            
-            item.qty += delta;
-            if (item.qty <= 0) {
-                cart = cart.filter(i => i.part !== part);
-                showToast(`${part} removed from cart`);
-            } else {
-                // Ensure we don't exceed available stock
-                const product = productsData.find(p => p.part === part);
-                if (product) {
-                    item.qty = Math.min(item.qty, product.stock);
-                }
-            }
-            updateCartUI();
-        }
-
-        function updateCartItemQty(part, qty) {
-            const item = cart.find(i => i.part === part);
-            if (!item) return;
-            
-            qty = parseInt(qty) || 1;
-            // Ensure we don't exceed available stock
-            const product = productsData.find(p => p.part === part);
-            if (product) {
-                qty = Math.min(qty, product.stock);
-            }
-            
-            item.qty = Math.max(1, qty);
-            updateCartUI();
-        }
-        
-        function removeFromCart(part) {
-            cart = cart.filter(i => i.part !== part);
-            updateCartUI();
-            showToast(`${part} removed from cart`);
-        }
-
-        function checkout() {
-            if (!document.getElementById("agree-terms").checked) {
-                showToast("Please agree to the Terms & Conditions", true);
-                return;
-            }
-            
-            const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-            if (subtotal <= 0) {
-                showToast("Your cart is empty", true);
-                return;
-            }
-            
-            const tax = subtotal * 0.18;
-            const totalAmount = (subtotal + tax) * 100;
-            
-            const options = {
-                key: "rzp_live_90iWxpNYThOpyE",
-                amount: totalAmount,
-                currency: "INR",
-                name: "Auto Spares Solution",
-                description: "Purchase (Prices include 18% GST)",
-                handler: function(response) {
-                    showToast("Payment Successful! Order confirmed.");
-                    sendOrderConfirmation(response.razorpay_payment_id);
-                    cart = [];
-                    updateCartUI();
-                    cartSidebar.classList.remove("active");
-                },
-                prefill: {
-                    name: currentUser ? currentUser.name : "Customer Name",
-                    email: currentUser ? currentUser.email : "customer@example.com",
-                    contact: currentUser ? currentUser.phone : "9999999999"
-                },
-                theme: {
-                    color: "#0a7c71"
-                }
-            };
-            
-            const rzp = new Razorpay(options);
-            rzp.open();
-        }
-
-        function sendOrderConfirmation(paymentId) {
-            // In a real implementation, you would send this to your server
-            console.log("Order confirmation would be sent for payment:", paymentId);
-            console.log("Order details:", cart);
-            
-            // Generate PDF
-            generateOrderPDF(paymentId);
-            
-            // Generate Excel
-            generateOrderExcel(paymentId);
-        }
-
-        function generateOrderPDF(paymentId) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            // Header
-            doc.setFontSize(18);
-            doc.text('Auto Spares Solution', 105, 15, null, null, 'center');
-            doc.setFontSize(12);
-            doc.text('Office: 101, 1st floor, 57/5, Q Road, Howrah, WB 711108', 105, 22, null, null, 'center');
-            doc.text('Warehouse: 1 no British Indian Street, Kolkata, WB 700069', 105, 28, null, null, 'center');
-            doc.text('GSTIN: 19ANOPD3300R1ZO', 105, 34, null, null, 'center');
-            
-            // Order details
-            doc.setFontSize(16);
-            doc.text('Order Confirmation', 105, 45, null, null, 'center');
-            doc.setFontSize(12);
-            doc.text(`Order Date: ${new Date().toLocaleString()}`, 10, 55);
-            doc.text(`Payment ID: ${paymentId}`, 10, 62);
-            
-            doc.setFontSize(14);
-            doc.text('Order Items:', 10, 72);
-            
-            let y = 80;
-            doc.setFontSize(12);
-            cart.forEach(item => {
-                doc.text(`${item.part} - ${item.desc}`, 10, y);
-                doc.text(`Qty: ${item.qty} | Box: ${item.boxQty} | Carton: ${item.masterCarton}`, 10, y + 5);
-                doc.text(`Price: ₹${item.price.toFixed(2)} each | Total: ₹${(item.qty * item.price).toFixed(2)}`, 10, y + 10);
-                y += 20;
-            });
-            
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const tax = subtotal * 0.18;
-            const total = subtotal + tax;
-            
-            doc.setFontSize(14);
-            doc.text(`Subtotal: ₹${subtotal.toFixed(2)}`, 10, y + 10);
-            doc.text(`GST (18%): ₹${tax.toFixed(2)}`, 10, y + 20);
-            doc.text(`Total Amount: ₹${total.toFixed(2)}`, 10, y + 30);
-            
-            // Footer
-            doc.setFontSize(10);
-            doc.text('Terms: 1. Goods once sold will not be taken back. 2. Interest @24% on bills unpaid after 30 days.', 105, doc.internal.pageSize.height - 10, null, null, 'center');
-            
-            doc.save(`order_${paymentId}.pdf`);
-        }
-
-        function generateOrderExcel(paymentId) {
-            const wb = XLSX.utils.book_new();
-            
-            // Prepare order data
-            const orderData = cart.map(item => ({
-                'Part Number': item.part,
-                'Description': item.desc,
-                'Quantity': item.qty,
-                'Box Quantity': item.boxQty,
-                'Master Carton': item.masterCarton,
-                'Unit Price': item.price,
-                'Total': (item.qty * item.price).toFixed(2)
-            }));
-            
-            // Add total row
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const tax = subtotal * 0.18;
-            const total = subtotal + tax;
-            
-            orderData.push({
-                'Part Number': 'SUBTOTAL',
-                'Description': '',
-                'Quantity': '',
-                'Box Quantity': '',
-                'Master Carton': '',
-                'Unit Price': '',
-                'Total': subtotal.toFixed(2)
-            });
-            
-            orderData.push({
-                'Part Number': 'GST (18%)',
-                'Description': '',
-                'Quantity': '',
-                'Box Quantity': '',
-                'Master Carton': '',
-                'Unit Price': '',
-                'Total': tax.toFixed(2)
-            });
-            
-            orderData.push({
-                'Part Number': 'TOTAL',
-                'Description': '',
-                'Quantity': '',
-                'Box Quantity': '',
-                'Master Carton': '',
-                'Unit Price': '',
-                'Total': total.toFixed(2)
-            });
-            
-            const ws = XLSX.utils.json_to_sheet(orderData);
-            XLSX.utils.book_append_sheet(wb, ws, "Order");
-            
-            XLSX.writeFile(wb, `order_${paymentId}.xlsx`);
-        }
-
-        function sendOrderEmail() {
-            if (cart.length === 0) {
-                showToast("Your cart is empty", true);
-                return;
-            }
-            
-            const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
-            let body = "Please find below my order details:\n\n";
-            
-            cart.forEach(item => {
-                body += `${item.part} - ${item.desc}\n`;
-                body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
-                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
-            });
-            
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const tax = subtotal * 0.18;
-            const total = subtotal + tax;
-            
-            body += `\nSubtotal: ₹${subtotal.toFixed(2)}\n`;
-            body += `GST (18%): ₹${tax.toFixed(2)}\n`;
-            body += `Total Amount: ₹${total.toFixed(2)}\n\n`;
-            body += "Please confirm availability and provide payment instructions.\n\n";
-            body += "Regards,\n[Your Name]";
-            
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        }
-
-        // Contact form submission
-        document.getElementById("contact-form").addEventListener("submit", function(e) {
-            e.preventDefault();
-            
-            const name = document.getElementById("name").value;
-            const email = document.getElementById("email").value;
-            const phone = document.getElementById("phone").value;
-            const city = document.getElementById("city").value;
-            const message = document.getElementById("message").value;
-            
-            const subject = `Contact Form Submission from ${name}`;
-            const body = `Name: ${name}%0AEmail: ${email}%0APhone: ${phone}%0ACity: ${city}%0AMessage: ${message}`;
-            
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            
-            // Reset the form
-            this.reset();
-            showToast("Your message has been sent. We'll contact you soon!");
-        });
-
-        // Initialize the page
-        loadProducts();
-        
-        // Check if user is already logged in
-        const savedUser = localStorage.getItem('currentUser');
-        if (savedUser) {
-            currentUser = JSON.parse(savedUser);
-            showUserProfile();
-        }
-        
-        // Check if user has paid consultancy
-        const paidConsultancy = localStorage.getItem('hasPaidConsultancy');
-        if (paidConsultancy === 'true') {
-            hasPaidConsultancy = true;
-            document.getElementById("free-chat-container").style.display = "none";
-            document.getElementById("paid-chat-container").style.display = "block";
-        }
     </script>
-    <!-- Fixed Menu Solution -->
-<style>
-    /* Fix for menu bar hiding behind banner */
-    header {
-        z-index: 1000 !important;
-    }
-    
-    nav {
-        z-index: 999 !important;
-        position: sticky !important;
-        top: 150px !important; /* Adjust this value based on your header height */
-        transition: all 0.3s ease !important;
-    }
-    
-    /* Ensure content doesn't jump when menu becomes fixed */
-    body {
-        padding-top: 0 !important;
-    }
-    
-    /* Mobile responsiveness */
-    @media (max-width: 768px) {
-        nav {
-            top: 70px !important; /* Adjust for mobile header height */
-        }
-    }
-</style>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const header = document.querySelector('header');
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fixed Menu Solution - Auto Spares Solution</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            color: #f8f9fa;
-            line-height: 1.6;
-            padding-top: 160px; /* Adjust based on total header height */
-        }
-        
-        /* Fixed header solution */
-        .fixed-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 1000;
-            background: rgba(0, 0, 0, 0.95);
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.4);
-        }
-        
-        .header-content {
-            text-align: center;
-            padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .logo-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            margin-bottom: 10px;
-        }
-        
-        .logo {
-            height: 50px;
-            width: auto;
-            border-radius: 5px;
-        }
-        
-        .header-content h1 {
-            margin: 0;
-            font-size: 1.8rem;
-            color: #f1c40f;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-        }
-        
-        .tagline {
-            color: #a0d9d4;
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
-            max-width: 600px;
-        }
-        
-        .fixed-nav {
-            background: rgba(0, 0, 0, 0.9);
-            padding: 0.8rem 1rem;
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 1.5rem;
-            border-top: 1px solid #2c5364;
-        }
-        
-        .fixed-nav a {
-            color: white;
-            text-decoration: none;
-            font-weight: 500;
-            position: relative;
-            padding: 0.3rem 0;
-            transition: color 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-            font-size: 0.9rem;
-        }
-        
-        .fixed-nav a:hover {
-            color: #f1c40f;
-        }
-        
-        .fixed-nav a i {
-            font-size: 1rem;
-        }
-        
-        .cart-count {
-            background: #e74c3c;
-            color: white;
-            border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            position: absolute;
-            top: -8px;
-            right: -12px;
-        }
-        
-        .search-container {
-            padding: 0.5rem 1rem;
-            background: rgba(0,0,0,0.3);
-            display: flex;
-            justify-content: center;
-            border-bottom: 1px solid #2c5364;
-        }
-        
-        .search-box {
-            display: flex;
-            width: 100%;
-            max-width: 500px;
-            position: relative;
-        }
-        
-        .search-box input {
-            width: 100%;
-            padding: 0.8rem 1rem 0.8rem 2.5rem;
-            border-radius: 5px;
-            border: none;
-            font-size: 1rem;
-            background: rgba(255,255,255,0.1);
-            color: white;
-            transition: all 0.3s;
-        }
-        
-        .search-box input:focus {
-            outline: none;
-            background: rgba(255,255,255,0.15);
-            box-shadow: 0 0 0 2px #0a7c71;
-        }
-        
-        .search-icon {
-            position: absolute;
-            left: 0.8rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #aaa;
-        }
-        
-        /* Demo content */
-        .container {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-        }
-        
-        .section {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-        
-        .section-title {
-            color: #f1c40f;
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid #0a7c71;
-        }
-        
-        .product-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-top: 1.5rem;
-        }
-        
-        .product-card {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 1.2rem;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-        
-        .product-card:hover {
-            transform: translateY(-5px);
-            background: rgba(255, 255, 255, 0.12);
-        }
-        
-        .product-img {
-            width: 100%;
-            height: 150px;
-            object-fit: contain;
-            margin-bottom: 1rem;
-            background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            padding: 10px;
-        }
-        
-        .product-title {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #f1c40f;
-        }
-        
-        .product-price {
-            font-size: 1.2rem;
-            font-weight: 700;
-            margin: 0.5rem 0;
-            color: #0a7c71;
-        }
-        
-        .btn {
-            display: inline-block;
-            padding: 0.6rem 1.2rem;
-            background: #0a7c71;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: 600;
-            transition: all 0.3s;
-            margin-top: 0.5rem;
-            border: none;
-            cursor: pointer;
-        }
-        
-        .btn:hover {
-            background: #09645a;
-            transform: translateY(-2px);
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            body {
-                padding-top: 200px; /* More space for mobile */
-            }
-            
-            .fixed-nav {
-                gap: 1rem;
-                padding: 0.6rem 0.5rem;
-            }
-            
-            .fixed-nav a span {
-                display: none;
-            }
-            
-            .header-content h1 {
-                font-size: 1.5rem;
-            }
-            
-            .tagline {
-                font-size: 0.8rem;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            body {
-                padding-top: 220px;
-            }
-            
-            .fixed-nav {
-                gap: 0.8rem;
-            }
-            
-            .fixed-nav a {
-                font-size: 0.8rem;
-            }
-            
-            .logo {
-                height: 40px;
-            }
-            
-            .header-content h1 {
-                font-size: 1.3rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Fixed Header with Navigation -->
-    <div class="fixed-header">
-        <div class="header-content">
-            <div class="logo-container">
-                <img src="https://via.placeholder.com/50x50/0a7c71/ffffff?text=ASS" alt="Auto Spares Solution Logo" class="logo">
-                <div>
-                    <h1>Auto Spares Solution</h1>
-                    <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="search-container">
-            <div class="search-box">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" placeholder="Search by part number or description...">
-            </div>
-        </div>
-        
-        <nav class="fixed-nav">
-            <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
-            <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
-            <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
-            <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
-            <a href="#policies"><i class="fas fa-file-contract"></i> <span>Policies</span></a>
-            <a href="#consultancy"><i class="fas fa-robot"></i> <span>Consultancy</span></a>
-            <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
-            <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
-            <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span class="cart-count">3</span></a>
-        </nav>
-    </div>
-
-    <!-- Demo Content -->
-    <div class="container">
-        <div class="section">
-            <h2 class="section-title">Featured Products</h2>
-            <div class="product-grid">
-                <div class="product-card">
-                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Engine+Part" alt="Engine Part" class="product-img">
-                    <h3 class="product-title">Engine Cylinder Head</h3>
-                    <p>High-performance cylinder head for all major brands</p>
-                    <div class="product-price">₹12,499</div>
-                    <button class="btn">Add to Cart</button>
-                </div>
-                
-                <div class="product-card">
-                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Brake+System" alt="Brake System" class="product-img">
-                    <h3 class="product-title">Brake Caliper Assembly</h3>
-                    <p>Premium brake calipers with extended lifespan</p>
-                    <div class="product-price">₹8,299</div>
-                    <button class="btn">Add to Cart</button>
-                </div>
-                
-                <div class="product-card">
-                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Transmission" alt="Transmission" class="product-img">
-                    <h3 class="product-title">Automatic Transmission Kit</h3>
-                    <p>Complete kit for transmission overhaul</p>
-                    <div class="product-price">₹24,999</div>
-                    <button class="btn">Add to Cart</button>
-                </div>
-                
-                <div class="product-card">
-                    <img src="https://via.placeholder.com/200x150/333333/ffffff?text=Suspension" alt="Suspension" class="product-img">
-                    <h3 class="product-title">Shock Absorber Set</h3>
-                    <p>4-piece set for smooth ride quality</p>
-                    <div class="product-price">₹14,500</div>
-                    <button class="btn">Add to Cart</button>
-                </div>
-            </div>
-        </div>
-        
-        <div class="section">
-            <h2 class="section-title">About Auto Spares Solution</h2>
-            <p>Established in 2020, Auto Spares Solution is a premier wholesaler of original automobile spare parts for both commercial and private segments. We specialize in providing high-quality components that meet industry standards and ensure optimal vehicle performance.</p>
-            <p>With our extensive network and industry expertise, we ensure timely delivery of genuine parts at competitive prices. Our commitment to quality and customer satisfaction has made us a trusted partner for automotive businesses across the region.</p>
-        </div>
-        
-        <div class="section">
-            <h2 class="section-title">Our Services</h2>
-            <p>We offer a comprehensive range of services to meet all your automotive parts needs:</p>
-            <ul>
-                <li>Bulk supply of genuine auto parts</li>
-                <li>Import and distribution of specialized components</li>
-                <li>Technical support and consultancy services</li>
-                <li>Custom sourcing solutions for rare parts</li>
-                <li>Nationwide shipping and logistics</li>
-            </ul>
-        </div>
-    </div>
-
-    <script>
-        // Simple script to highlight the active menu item on scroll
-        document.addEventListener('DOMContentLoaded', function() {
-            const sections = document.querySelectorAll('.section');
-            const navLinks = document.querySelectorAll('.fixed-nav a');
-            
-            window.addEventListener('scroll', function() {
-                let current = '';
-                
-                sections.forEach(section => {
-                    const sectionTop = section.offsetTop;
-                    const sectionHeight = section.clientHeight;
-                    
-                    if (pageYOffset >= (sectionTop - 200)) {
-                        current = section.getAttribute('id');
-                    }
-                });
-                
-                navLinks.forEach(link => {
-                    link.classList.remove('active');
-                    if (link.getAttribute('href').substring(1) === current) {
-                        link.classList.add('active');
-                    }
-                });
-            });
-            
-            // Add smooth scrolling for navigation links
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-                anchor.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    const targetId = this.getAttribute('href');
-                    if (targetId === '#') return;
-                    
-                    const targetElement = document.querySelector(targetId);
-                    if (targetElement) {
-                        window.scrollTo({
-                            top: targetElement.offsetTop - 160,
-                            behavior: 'smooth'
-                        });
-                    }
-                });
-            });
-        });
-</script>  
 </body>
 </html>
-</body>
-    </html>
