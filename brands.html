@@ -1,12 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389" crossorigin="anonymous"></script>
+    <script async custom-element="amp-auto-ads" src="https://cdn.ampproject.org/v0/amp-auto-ads-0.1.js"></script>
+    <script type="text/javascript">
+        var _iub = _iub || [];
+        _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","storage":{"useSiteId":true}};
+    </script>
+    <script type="text/javascript" src="https://cs.iubenda.com/autoblocking/4209039.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/tcf/stub-v2.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/tcf/safe-tcf-v2.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/gpp/stub.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/iubenda_cs.js" charset="UTF-8" async></script>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        var _iub = _iub || [];
+        _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","storage":{"useSiteId":true}};
+    </script>
+    <script type="text/javascript" src="https://cs.iubenda.com/autoblocking/4209039.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/gpp/stub.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/iubenda_cs.js" charset="UTF-8" async></script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9GSY9Q5R5P"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-9GSY9Q5R5P');
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
+     
+    <!-- CDN Services -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <!-- WhatsApp Business Widget -->
     <script>
@@ -51,7 +82,7 @@
             color: var(--light);
             line-height: 1.6;
             overflow-x: hidden;
-            padding-top: 160px;
+            padding-top: 160px; /* Added for fixed header */
         }
         
         /* Fixed Header Styles */
@@ -1096,7 +1127,7 @@
         
         @media (max-width: 768px) {
             body {
-                padding-top: 200px;
+                padding-top: 200px; /* Adjust for mobile */
             }
             
             header h1 {
@@ -1493,7 +1524,7 @@
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 performSearch(e.target.value);
-            }, 300);
+            }, 300); // Reduced from 5000ms to 300ms
         });
 
         // Add Enter key support
@@ -1522,76 +1553,74 @@
 
         // Load product data from CSV
         function loadProducts() {
-            // Use sample data since we can't fetch from external URL in this environment
-            // In a real implementation, you would fetch from your CSV file
-            const sampleProducts = [
-                {
-                    part: "BOLT001",
-                    desc: "Engine Mounting Bolt",
-                    List: 45.00,
-                    Mrp: 52.00,
-                    price: 38.00,
-                    stock: 25,
-                    boxQty: 10,
-                    masterCarton: 50
-                },
-                {
-                    part: "NUT002",
-                    desc: "Wheel Nut M12",
-                    List: 12.00,
-                    Mrp: 15.00,
-                    price: 10.50,
-                    stock: 100,
-                    boxQty: 50,
-                    masterCarton: 200
-                },
-                {
-                    part: "FILTER003",
-                    desc: "Oil Filter",
-                    List: 180.00,
-                    Mrp: 220.00,
-                    price: 150.00,
-                    stock: 0,
-                    boxQty: 6,
-                    masterCarton: 24
-                },
-                {
-                    part: "BELT004",
-                    desc: "Timing Belt",
-                    List: 420.00,
-                    Mrp: 500.00,
-                    price: 380.00,
-                    stock: 15,
-                    boxQty: 5,
-                    masterCarton: 20
-                },
-                {
-                    part: "SPARK005",
-                    desc: "Spark Plug",
-                    List: 85.00,
-                    Mrp: 100.00,
-                    price: 75.00,
-                    stock: 50,
-                    boxQty: 4,
-                    masterCarton: 40
-                },
-                {
-                    part: "BRAKE006",
-                    desc: "Brake Pad Set",
-                    List: 650.00,
-                    Mrp: 750.00,
-                    price: 580.00,
-                    stock: 12,
-                    boxQty: 2,
-                    masterCarton: 10
-                }
-            ];
+            // Use the correct URL for your CSV file
+            fetch("https://autosparessolution.github.io/prices.csv")
+                .then(res => {
+                    if (!res.ok) throw new Error("Failed to fetch CSV");
+                    return res.text();
+                })
+                .then(csv => {
+                    const rows = csv.split("\n");
+                    const header = rows[0].split(",").map(h => h.trim().toLowerCase());
+                    
+                    // Find column indices
+                    const materialIndex = header.findIndex(h => h.includes("material"));
+                    const descIndex = header.findIndex(h => h.includes("desc") || h.includes("description"));
+                    const listIndex = header.findIndex(h => h.includes("list"));
+                    const mrpIndex = header.findIndex(h => h.includes("mrp"));
+                    const priceIndex = header.findIndex(h => h.includes("price") && !h.includes("list") && !h.includes("mrp"));
+                    const stockIndex = header.findIndex(h => h.includes("stock") || h.includes("qty"));
+                    
+                    // Process data rows
+                    productsData = rows.slice(1)
+                        .map(r => {
+                            const cols = r.split(",").map(c => c.trim().replace(/^"(.*)"$/, '$1'));
+                            
+                            // Skip empty rows
+                            if (cols.length < 2 || !cols[materialIndex] || cols[materialIndex] === '') return null;
+                            
+                            // Remove "Ex:" prefix if present
+                            let part = cols[materialIndex];
+                            if (part.startsWith("Ex:")) {
+                                part = part.substring(3);
+                            }
+                            
+                            return {
+                                part: part,
+                                desc: cols[descIndex] || "Auto Spare Part",
+                                List: parseFloat(cols[listIndex] || 0),
+                                Mrp: parseFloat(cols[mrpIndex] || 0),     
+                                price: parseFloat(cols[priceIndex] || 0),
+                                stock: parseInt(cols[stockIndex] || 0),
+                                boxQty: 1, // Default values
+                                masterCarton: 1
+                            };
+                        })
+                        .filter(p => p !== null && p.part && p.part.trim() !== "");
 
-            productsData = sampleProducts;
-            
-            // Initialize with only in-stock items shown by default
-            filteredProducts = productsData.filter(product => product.stock > 0);
-            displayProducts();
+                    // Initialize with only in-stock items shown by default
+                    filteredProducts = productsData.filter(product => product.stock > 0);
+                    displayProducts();
+                })
+                .catch(err => {
+                    console.error("Error loading CSV:", err);
+                    showToast("Error loading product data. Please check if the CSV file exists.", true);
+                    
+                    // Show error message
+                    const gallery = document.querySelector(".gallery");
+                    gallery.innerHTML = `
+                        <div class="loading">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <h3>Unable to Load Products</h3>
+                            <p>Error: ${err.message}</p>
+                            <p>CSV URL: https://autosparessolution.github.io/prices.csv</p>
+                            <p>Please ensure the CSV file is available at the above URL.</p>
+                            <button class="btn" onclick="location.reload()" style="margin-top: 20px; background: var(--primary);">
+                                <i class="fas fa-redo"></i> Try Again
+                            </button>
+                        </div>
+                    `;
+                });
         }
 
         // Display filtered products
@@ -1611,7 +1640,8 @@
                     <div class="card" data-part="${product.part}">
                         ${!isInStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
                         
-                        <img src="https://via.placeholder.com/250x180/2c5364/f1c40f?text=${product.part}" alt="${product.part}">
+                        <img src="https://autosparessolution.github.io/images/${product.part}.png" alt="${product.part}" 
+                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIgeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg==';this.onerror=null;">
                         
                         <div class="part-number">${product.part}</div>
                         <div class="part-desc">${product.desc}</div>
@@ -1654,25 +1684,22 @@
             });
         }
 
-        // Cart functions - FIXED VERSION
+        // Cart functions
         function addToCart(part, price) {
             const card = document.querySelector(`.card[data-part="${part}"]`);
             const qtyInput = card ? card.querySelector('.qty-input') : null;
             const qty = qtyInput ? parseInt(qtyInput.value) : 1;
             
-            // Find the product details
-            const product = productsData.find(p => p.part === part);
-            if (!product) return;
-            
             const existing = cart.find(item => item.part === part);
             if (existing) {
                 existing.qty += qty;
             } else {
+                const product = productsData.find(p => p.part === part);
                 cart.push({ 
                     part, 
                     price, 
                     qty,
-                    desc: product.desc || "Auto Spare Part"
+                    desc: product?.desc || "Auto Spare Part"
                 });
             }
             
@@ -1683,188 +1710,6 @@
         function updateCartUI() {
             const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
             document.getElementById("cart-count").textContent = cartCount;
-            
-            const itemsDiv = document.getElementById("cart-items");
-            let subtotal = 0;
-            
-            if (cart.length === 0) {
-                itemsDiv.innerHTML = `
-                    <div class="empty-cart">
-                        <i class="fas fa-shopping-cart"></i>
-                        <h3>Your cart is empty</h3>
-                        <p>Add products to your cart to continue</p>
-                    </div>
-                `;
-            } else {
-                itemsDiv.innerHTML = "";
-                cart.forEach(item => {
-                    const itemTotal = item.price * item.qty;
-                    subtotal += itemTotal;
-                    
-                    const itemHTML = `
-                        <div class="cart-item" data-part="${item.part}">
-                            <div class="cart-item-info">
-                                <div class="cart-item-title">${item.part}</div>
-                                <div class="cart-item-desc">${item.desc}</div>
-                                <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
-                            </div>
-                            <div class="qty-control">
-                                <button onclick="changeQty('${item.part}', -1)">-</button>
-                                <input class="qty-input" type="number" value="${item.qty}" min="1" 
-                                       onchange="updateCartItemQty('${item.part}', this.value)">
-                                <button onclick="changeQty('${item.part}', 1)">+</button>
-                                <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
-                                <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </div>
-                    `;
-                    itemsDiv.innerHTML += itemHTML;
-                });
-            }
-            
-            const tax = subtotal * 0.18;
-            const total = subtotal + tax;
-            
-            document.getElementById("cart-subtotal").textContent = subtotal.toFixed(2);
-            document.getElementById("cart-tax").textContent = tax.toFixed(2);
-            document.getElementById("cart-total").textContent = total.toFixed(2);
-        }
-
-        function changeQty(part, delta) {
-            const item = cart.find(i => i.part === part);
-            if (!item) return;
-            
-            item.qty += delta;
-            if (item.qty <= 0) {
-                cart = cart.filter(i => i.part !== part);
-                showToast(`${part} removed from cart`);
-            } else {
-                // Ensure we don't exceed available stock
-                const product = productsData.find(p => p.part === part);
-                if (product) {
-                    item.qty = Math.min(item.qty, product.stock);
-                }
-            }
-            updateCartUI();
-        }
-
-        function updateCartItemQty(part, qty) {
-            const item = cart.find(i => i.part === part);
-            if (!item) return;
-            
-            qty = parseInt(qty) || 1;
-            // Ensure we don't exceed available stock
-            const product = productsData.find(p => p.part === part);
-            if (product) {
-                qty = Math.min(qty, product.stock);
-            }
-            
-            item.qty = Math.max(1, qty);
-            updateCartUI();
-        }
-        
-        function removeFromCart(part) {
-            cart = cart.filter(i => i.part !== part);
-            updateCartUI();
-            showToast(`${part} removed from cart`);
-        }
-
-        function checkout() {
-            if (!document.getElementById("agree-terms").checked) {
-                showToast("Please agree to the Terms & Conditions", true);
-                return;
-            }
-            
-            const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-            if (subtotal <= 0) {
-                showToast("Your cart is empty", true);
-                return;
-            }
-            
-            showToast("Checkout functionality would be implemented here!");
-            // In a real implementation, you would integrate with a payment gateway
-        }
-
-        function sendOrderEmail() {
-            if (cart.length === 0) {
-                showToast("Your cart is empty", true);
-                return;
-            }
-            
-            const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
-            let body = "Please find below my order details:\n\n";
-            
-            cart.forEach(item => {
-                body += `${item.part} - ${item.desc}\n`;
-                body += `Quantity: ${item.qty}\n`;
-                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
-            });
-            
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const tax = subtotal * 0.18;
-            const total = subtotal + tax;
-            
-            body += `\nSubtotal: ₹${subtotal.toFixed(2)}\n`;
-            body += `GST (18%): ₹${tax.toFixed(2)}\n`;
-            body += `Total Amount: ₹${total.toFixed(2)}\n\n`;
-            body += "Please confirm availability and provide payment instructions.\n\n";
-            body += "Regards,\n[Your Name]";
-            
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        }
-
-        // User panel functions
-        function showRegisterForm() {
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('register-form').style.display = 'block';
-        }
-
-        function showLoginForm() {
-            document.getElementById('register-form').style.display = 'none';
-            document.getElementById('login-form').style.display = 'block';
-        }
-
-        function login() {
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            
-            // Simple validation
-            if (!email || !password) {
-                showToast('Please enter email and password', true);
-                return;
-            }
-            
-            // In a real implementation, you would validate against a backend
-            showToast('Login successful!');
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('user-profile').style.display = 'block';
-            document.getElementById('profile-info').innerHTML = `
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Status:</strong> Logged In</p>
-            `;
-        }
-
-        function register() {
-            const name = document.getElementById('register-name').value;
-            const email = document.getElementById('register-email').value;
-            const password = document.getElementById('register-password').value;
-            const phone = document.getElementById('register-phone').value;
-            
-            // Simple validation
-            if (!name || !email || !password || !phone) {
-                showToast('Please fill all required fields', true);
-                return;
-            }
-            
-            // In a real implementation, you would send to a backend
-            showToast('Registration successful! Please login.');
-            showLoginForm();
-        }
-
-        function logout() {
-            document.getElementById('user-profile').style.display = 'none';
-            document.getElementById('login-form').style.display = 'block';
-            showToast('Logged out successfully');
         }
 
         // Initialize the page
