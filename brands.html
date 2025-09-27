@@ -1,64 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389" crossorigin="anonymous"></script>
-    <script async custom-element="amp-auto-ads" src="https://cdn.ampproject.org/v0/amp-auto-ads-0.1.js"></script>
-    <script type="text/javascript">
-        var _iub = _iub || [];
-        _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","storage":{"useSiteId":true}};
-    </script>
-    <script type="text/javascript" src="https://cs.iubenda.com/autoblocking/4209039.js"></script>
-    <script type="text/javascript" src="//cdn.iubenda.com/cs/tcf/stub-v2.js"></script>
-    <script type="text/javascript" src="//cdn.iubenda.com/cs/tcf/safe-tcf-v2.js"></script>
-    <script type="text/javascript" src="//cdn.iubenda.com/cs/gpp/stub.js"></script>
-    <script type="text/javascript" src="//cdn.iubenda.com/cs/iubenda_cs.js" charset="UTF-8" async></script>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389" crossorigin="anonymous"></script>
-    <script type="text/javascript">
-        var _iub = _iub || [];
-        _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","storage":{"useSiteId":true}};
-    </script>
-    <script type="text/javascript" src="https://cs.iubenda.com/autoblocking/4209039.js"></script>
-    <script type="text/javascript" src="//cdn.iubenda.com/cs/gpp/stub.js"></script>
-    <script type="text/javascript" src="//cdn.iubenda.com/cs/iubenda_cs.js" charset="UTF-8" async></script>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9GSY9Q5R5P"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-9GSY9Q5R5P');
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
-     
-    <!-- CDN Services -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
-    <!-- WhatsApp Business Widget -->
-    <script>
-        var whWidgetSettings = {
-            phone: '03369028606',
-            message: 'Hello, I have a question about Auto Spares Solution',
-            size: '60px',
-            position: 'right',
-            color: '#25D366',
-            title: 'Chat with us',
-            description: 'Typically replies within minutes',
-            backgroundColor: '#075E54'
-        };
-        (function() {
-            var w = document.createElement('script');
-            w.src = 'https://cdn.fastly.widgetpack.com/widget.js';
-            w.async = true;
-            document.head.appendChild(w);
-        })();
-    </script>
-    
     <style>
         :root {
             --primary: #0a7c71;
@@ -68,6 +15,7 @@
             --light: #f8f9fa;
             --gray: #6c757d;
             --success: #27ae60;
+            --warning: #f39c12;
         }
         
         * {
@@ -82,10 +30,9 @@
             color: var(--light);
             line-height: 1.6;
             overflow-x: hidden;
-            padding-top: 160px; /* Added for fixed header */
+            padding-top: 160px;
         }
         
-        /* Fixed Header Styles */
         .fixed-header {
             position: fixed;
             top: 0;
@@ -115,14 +62,6 @@
             height: 60px;
             width: auto;
             border-radius: 5px;
-        }
-        
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
         
         header h1 {
@@ -166,10 +105,6 @@
         
         nav a:hover {
             color: var(--accent);
-        }
-        
-        nav a i {
-            font-size: 1.1rem;
         }
         
         #cart-count {
@@ -297,80 +232,6 @@
         .stat-label {
             font-size: 1.1rem;
             color: #ddd;
-        }
-        
-        .investor-section {
-            background: rgba(0,0,0,0.3);
-            border-radius: 10px;
-            padding: 2rem;
-            margin: 3rem 0;
-        }
-        
-        .investor-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-        
-        .investor-card {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 1.5rem;
-        }
-        
-        .investor-card h3 {
-            color: var(--accent);
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-        
-        .policy-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-        
-        .policy-card {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 1.5rem;
-            transition: transform 0.3s ease;
-        }
-        
-        .policy-card:hover {
-            transform: translateY(-5px);
-            background: rgba(255, 255, 255, 0.12);
-        }
-        
-        .policy-card h3 {
-            color: var(--accent);
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-        
-        .policy-content {
-            max-height: 200px;
-            overflow-y: auto;
-            padding-right: 10px;
-        }
-        
-        .policy-content::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        .policy-content::-webkit-scrollbar-track {
-            background: rgba(0,0,0,0.1);
-        }
-        
-        .policy-content::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 3px;
         }
         
         .search-container {
@@ -670,19 +531,6 @@
             z-index: 2;
         }
         
-        .not-available {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 165, 0, 0.85);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 5px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            z-index: 2;
-        }
-        
         .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
@@ -748,97 +596,6 @@
             font-size: 3rem;
             margin-bottom: 1rem;
             opacity: 0.3;
-        }
-        
-        .contact-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-        
-        .contact-info {
-            background: rgba(0,0,0,0.2);
-            padding: 1.5rem;
-            border-radius: 8px;
-        }
-        
-        .contact-info h3 {
-            color: var(--accent);
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-        
-        .contact-info p {
-            margin-bottom: 1.2rem;
-            display: flex;
-            align-items: flex-start;
-            gap: 0.8rem;
-        }
-        
-        .contact-info i {
-            color: var(--primary);
-            min-width: 20px;
-        }
-        
-        .form-group {
-            margin-bottom: 1.2rem;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #ddd;
-        }
-        
-        .form-control {
-            width: 100%;
-            padding: 0.8rem 1rem;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid #444;
-            border-radius: 5px;
-            color: white;
-            font-size: 1rem;
-        }
-        
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary);
-            background: rgba(255,255,255,0.12);
-        }
-        
-        textarea.form-control {
-            min-height: 120px;
-            resize: vertical;
-        }
-        
-        .btn-block {
-            display: block;
-            width: 100%;
-            text-align: center;
-        }
-        
-        .brand-logos {
-            display: flex;
-            justify-content: center;
-            gap: 2rem;
-            flex-wrap: wrap;
-            margin: 2rem 0;
-        }
-        
-        .brand-logo {
-            width: 120px;
-            height: 80px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
         
         .business-info {
@@ -974,160 +731,216 @@
             gap: 0.5rem;
         }
         
-        /* New Styles for Additional Features */
-        
-        /* User Panel */
-        .user-panel {
-            position: fixed;
-            top: 150px;
-            left: -300px;
-            width: 300px;
-            height: calc(100% - 80px);
-            background: #1a1a1a;
-            z-index: 999;
-            padding: 20px;
-            transition: left 0.3s ease;
-            overflow-y: auto;
-        }
-        
-        .user-panel.active {
-            left: 0;
-        }
-        
-        .user-toggle {
-            position: fixed;
-            top: 150px;
-            left: 10px;
-            z-index: 1000;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
+        /* Brands Section Styles */
+        .brands-container {
             display: flex;
-            align-items: center;
             justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        
-        .user-form {
-            margin-bottom: 20px;
-        }
-        
-        .user-form h3 {
-            color: var(--accent);
-            margin-bottom: 15px;
-            text-align: center;
-        }
-        
-        /* Advertisement Space */
-        .ad-space {
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: center;
-        }
-        
-        .ad-space h3 {
-            color: var(--accent);
-            margin-bottom: 10px;
-        }
-        
-        .ad-container {
-            display: flex;
             flex-wrap: wrap;
-            gap: 15px;
-            justify-content: center;
+            gap: 25px;
+            margin-top: 20px;
         }
         
-        .ad-item {
-            width: 250px;
-            height: 150px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #aaa;
-            font-size: 14px;
-        }
-        
-        /* Consultancy Service */
-        .consultancy-service {
-            background: rgba(0,0,0,0.3);
+        .brand-card {
+            background: rgba(255, 255, 255, 0.08);
             border-radius: 10px;
             padding: 20px;
-            margin: 30px 0;
-        }
-        
-        .consultancy-service h3 {
-            color: var(--accent);
-            margin-bottom: 15px;
+            width: 160px;
             text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
         }
         
-        .ai-chat-container {
-            background: rgba(255,255,255,0.08);
+        .brand-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+            background: rgba(255, 255, 255, 0.12);
+        }
+        
+        .brand-card.active {
+            border-color: var(--primary);
+            background: rgba(10, 124, 113, 0.2);
+        }
+        
+        .brand-logo-img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            margin: 0 auto 15px;
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        .brand-name {
+            font-weight: 600;
+            color: var(--accent);
+            font-size: 1.1rem;
+        }
+        
+        .filter-info {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(10, 124, 113, 0.2);
+            border-radius: 8px;
+        }
+        
+        .filter-info h3 {
+            color: var(--accent);
+            margin-bottom: 5px;
+        }
+        
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+        
+        .product-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .product-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .in-stock {
+            background: var(--success);
+        }
+        
+        .low-stock {
+            background: var(--warning);
+        }
+        
+        .out-of-stock {
+            background: var(--secondary);
+        }
+        
+        .product-image {
+            width: 100%;
+            height: 180px;
+            object-fit: contain;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             padding: 15px;
-            margin-top: 15px;
-            max-height: 300px;
-            overflow-y: auto;
         }
         
-        .chat-message {
+        .product-name {
+            font-weight: 600;
             margin-bottom: 10px;
-            padding: 10px;
-            border-radius: 8px;
-            max-width: 80%;
+            color: var(--accent);
+            font-size: 1.2rem;
         }
         
-        .user-message {
-            background: var(--primary);
-            margin-left: auto;
+        .product-desc {
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            color: #ddd;
+            min-height: 40px;
         }
         
-        .ai-message {
-            background: rgba(255,255,255,0.1);
+        .product-price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin: 10px 0;
+            color: var(--primary);
         }
         
-        .chat-input {
+        .product-specs {
             display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+        
+        .product-action {
             margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
         }
         
-        .chat-input input {
-            flex-grow: 1;
-            padding: 10px;
-            border-radius: 5px 0 0 5px;
-            border: none;
-            background: rgba(255,255,255,0.1);
-            color: white;
+        .btn-whatsapp {
+            background: #25D366;
         }
         
-        .chat-input button {
-            padding: 10px 15px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 0 5px 5px 0;
-            cursor: pointer;
+        .btn-whatsapp:hover {
+            background: #1ebd5b;
         }
         
-        .payment-required {
+        .no-products {
             text-align: center;
-            padding: 20px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 8px;
-            margin-top: 15px;
+            padding: 40px;
+            grid-column: 1 / -1;
+            color: #aaa;
+        }
+        
+        .no-products i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        .error-message {
+            text-align: center;
+            padding: 40px;
+            grid-column: 1 / -1;
+            color: var(--secondary);
+        }
+        
+        .error-message i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        
+        .stock-filter {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .stock-filter-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .stock-filter-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
         }
         
         @media (max-width: 768px) {
             body {
-                padding-top: 200px; /* Adjust for mobile */
+                padding-top: 200px;
             }
             
             header h1 {
@@ -1158,8 +971,23 @@
                 font-size: 1rem;
             }
             
-            .user-panel {
-                width: 250px;
+            .brands-container {
+                gap: 15px;
+            }
+            
+            .brand-card {
+                width: 140px;
+                padding: 15px;
+            }
+            
+            .brand-logo-img {
+                width: 70px;
+                height: 70px;
+            }
+            
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 20px;
             }
         }
         
@@ -1176,10 +1004,6 @@
                 grid-template-columns: 1fr;
             }
             
-            .contact-grid {
-                grid-template-columns: 1fr;
-            }
-            
             nav {
                 padding: 0.6rem 0.5rem;
                 gap: 0.8rem;
@@ -1193,9 +1017,31 @@
                 font-size: 2.2rem;
             }
             
-            .user-panel {
-                width: 100%;
-                left: -100%;
+            .brands-container {
+                gap: 10px;
+            }
+            
+            .brand-card {
+                width: 120px;
+                padding: 10px;
+            }
+            
+            .brand-logo-img {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .product-action {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .btn {
+                margin: 0;
             }
         }
     </style>
@@ -1217,87 +1063,22 @@
             <a href="#home"><i class="fas fa-home"></i> <span>Home</span></a>
             <a href="#about"><i class="fas fa-info-circle"></i> <span>About Us</span></a>
             <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
+            <a href="#brands"><i class="fas fa-tag"></i> <span>Brands</span></a>
             <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
             <a href="#policies"><i class="fas fa-file-contract"></i> <span>Policies</span></a>
-            <a href="#consultancy"><i class="fas fa-robot"></i> <span>Consultancy</span></a>
             <a href="#contact"><i class="fas fa-envelope"></i> <span>Contact</span></a>
             <a href="https://razorpay.me/@autosparessolution" target="_blank"><i class="fas fa-money-bill-wave"></i> <span>Pay</span></a>
             <a href="#" id="cart-link"><i class="fas fa-shopping-cart"></i> <span>Cart</span> <span id="cart-count">0</span></a>
         </nav>
     </div>
 
-    <!-- User Panel Toggle -->
-    <button class="user-toggle" id="user-toggle">
-        <i class="fas fa-user"></i>
-    </button>
-    
-    <!-- User Panel -->
-    <div class="user-panel" id="user-panel">
-        <div class="user-form" id="login-form">
-            <h3><i class="fas fa-sign-in-alt"></i> Login</h3>
-            <div class="form-group">
-                <input type="email" id="login-email" class="form-control" placeholder="Email" required>
-            </div>
-            <div class="form-group">
-                <input type="password" id="login-password" class="form-control" placeholder="Password" required>
-            </div>
-            <button class="btn btn-block" onclick="login()" style="background: var(--primary);">Login</button>
-            <p style="text-align: center; margin-top: 150px; font-size: 0.9rem;">
-                Don't have an account? <a href="#" onclick="showRegisterForm()" style="color: var(--accent);">Register</a>
-            </p>
-        </div>
-        
-        <div class="user-form" id="register-form" style="display: none;">
-            <h3><i class="fas fa-user-plus"></i> Register</h3>
-            <div class="form-group">
-                <input type="text" id="register-name" class="form-control" placeholder="Full Name" required>
-            </div>
-            <div class="form-group">
-                <input type="email" id="register-email" class="form-control" placeholder="Email" required>
-            </div>
-            <div class="form-group">
-                <input type="password" id="register-password" class="form-control" placeholder="Password" required>
-            </div>
-            <div class="form-group">
-                <input type="tel" id="register-phone" class="form-control" placeholder="Phone Number" required>
-            </div>
-            <div class="form-group">
-                <input type="text" id="register-business" class="form-control" placeholder="Business Name">
-            </div>
-            <div class="form-group">
-                <input type="text" id="register-gstin" class="form-control" placeholder="GSTIN (Optional)">
-            </div>
-            <button class="btn btn-block" onclick="register()" style="background: var(--primary);">Register</button>
-            <p style="text-align: center; margin-top: 150px; font-size: 0.9rem;">
-                Already have an account? <a href="#" onclick="showLoginForm()" style="color: var(--accent);">Login</a>
-            </p>
-        </div>
-        
-        <div id="user-profile" style="display: none;">
-            <h3><i class="fas fa-user-circle"></i> Profile</h3>
-            <div id="profile-info"></div>
-            <button class="btn btn-block" onclick="logout()" style="background: var(--secondary); margin-top: 150px;">Logout</button>
-        </div>
-    </div>
-
     <div class="container">
-        <!-- Advertisement Space -->
-        <div class="ad-space">
-            <h3><i class="fas fa-ad"></i> Featured Partners</h3>
-            <div class="ad-container">
-                <div class="ad-item">Advertisement Space 1</div>
-                <div class="ad-item">Advertisement Space 2</div>
-                <div class="ad-item">Advertisement Space 3</div>
-            </div>
-        </div>
-
         <!-- Hero Section -->
         <section id="home" class="hero">
             <h2>Premium Auto Parts for Professionals</h2>
             <p>Supplying high-quality automotive components to workshops, retailers, and distributors since 2020. Trusted by industry professionals for genuine parts and exceptional service.</p>
             <a href="#products" class="cta-button">Explore Our Products</a>
-            <a href="brands.html" class="cta-button" target="_blank">Browse by Brand</a>
-            <a href="bolt-generator.html" class="cta-button" target="_blank">Bolt Generator Tool</a>
+            <a href="#brands" class="cta-button">Browse by Brand</a>
         </section>
 
         <!-- Business Stats -->
@@ -1358,26 +1139,10 @@
                     <p>GSTIN: 19ANOPD3300R1ZO<br>Established: 2020</p>
                 </div>
             </div>
-            
-            <div class="brand-logos">
-                <div class="brand-logo">TVS</div>
-                <div class="brand-logo">STL</div>
-                <div class="brand-logo">VRP</div>
-                <div class="brand-logo">OEM</div>
-            </div>
-            
-            <!-- Advertisement Space -->
-            <div class="ad-space">
-                <h3><i class="fas fa-ad"></i> Special Offers</h3>
-                <div class="ad-container">
-                    <div class="ad-item">Special Discount on Bulk Orders</div>
-                    <div class="ad-item">New Customer Offer - 5% Off</div>
-                </div>
-            </div>
         </section>
 
         <!-- Products Section -->
-        <div class="search-container">
+        <div class="search-container" id="products-search">
             <i class="fas fa-search search-icon"></i>
             <input type="text" id="search-input" placeholder="Search by part number or description...">
         </div>
@@ -1386,6 +1151,44 @@
             <h2 class="section-title">Our Products</h2>
             <div class="gallery">
                 <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>
+            </div>
+        </section>
+
+        <!-- Brands Section -->
+        <section id="brands" class="section">
+            <h2 class="section-title">Browse by Brand</h2>
+            <p style="text-align: center; margin-bottom: 20px;">Select a brand to view their products</p>
+            
+            <div class="search-container" id="brands-search">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="brands-search-input" placeholder="Search by part number or description...">
+            </div>
+            
+            <div class="stock-filter">
+                <div class="stock-filter-btn active" data-stock="all">All Products</div>
+                <div class="stock-filter-btn" data-stock="in-stock">In Stock Only</div>
+                <div class="stock-filter-btn" data-stock="out-of-stock">Out of Stock</div>
+            </div>
+            
+            <div class="brands-container" id="brands-container">
+                <div class="brand-card active" data-brand="all">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiByeD0iMTAiIGZpbGw9IiMwYTdjNzEiLz4KPHRleHQgeD0iNDAiIHk9IjQ1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iYm9sZCI+QUxMPC90ZXh0Pgo8L3N2Zz4K" alt="All Brands" class="brand-logo-img">
+                    <div class="brand-name">All Brands</div>
+                </div>
+                <!-- Brands will be loaded dynamically from CSV -->
+            </div>
+            
+            <div class="filter-info" id="filter-info">
+                <h3>Showing Products: <span id="current-brand">All Brands</span></h3>
+                <p id="product-count">Loading products...</p>
+            </div>
+            
+            <div class="products-grid" id="products-container">
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <h3>Loading Products</h3>
+                    <p>Please wait while we load our product catalog</p>
+                </div>
             </div>
         </section>
 
@@ -1434,7 +1237,7 @@
                     <li><a href="#home"><i class="fas fa-chevron-right"></i> Home</a></li>
                     <li><a href="#about"><i class="fas fa-chevron-right"></i> About Us</a></li>
                     <li><a href="#products"><i class="fas fa-chevron-right"></i> Products</a></li>
-                    <li><a href="#investors"><i class="fas fa-chevron-right"></i> Investors</a></li>
+                    <li><a href="#brands"><i class="fas fa-chevron-right"></i> Brands</a></li>
                 </ul>
             </div>
             
@@ -1478,6 +1281,9 @@
         let productsData = [];
         let filteredProducts = [];
         let cart = [];
+        let brandsData = [];
+        let currentBrand = 'all';
+        let currentStockFilter = 'all';
         
         // DOM elements
         const cartLink = document.getElementById("cart-link");
@@ -1485,8 +1291,13 @@
         const closeCartBtn = document.querySelector(".close-cart");
         const toast = document.getElementById("toast");
         const toastMessage = document.getElementById("toast-message");
-        const userToggle = document.getElementById("user-toggle");
-        const userPanel = document.getElementById("user-panel");
+        const searchInput = document.getElementById("search-input");
+        const brandsSearchInput = document.getElementById("brands-search-input");
+        const stockFilterBtns = document.querySelectorAll('.stock-filter-btn');
+        const brandsContainer = document.getElementById('brands-container');
+        const productsContainer = document.getElementById('products-container');
+        const currentBrandElement = document.getElementById('current-brand');
+        const productCountElement = document.getElementById('product-count');
 
         // Initialize cart toggle
         cartLink.addEventListener("click", (e) => {
@@ -1497,11 +1308,6 @@
         // Close cart sidebar
         closeCartBtn.addEventListener("click", () => {
             cartSidebar.classList.remove("active");
-        });
-
-        // Toggle user panel
-        userToggle.addEventListener("click", () => {
-            userPanel.classList.toggle("active");
         });
 
         // Show toast message
@@ -1516,19 +1322,17 @@
             }, 3000);
         }
 
-        // Search functionality
+        // Search functionality for products section
         let searchTimeout;
 
-        // Search with debounce and Enter key support
-        document.getElementById("search-input").addEventListener("input", (e) => {
+        searchInput.addEventListener("input", (e) => {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 performSearch(e.target.value);
-            }, 300); // Reduced from 5000ms to 300ms
+            }, 300);
         });
 
-        // Add Enter key support
-        document.getElementById("search-input").addEventListener("keypress", (e) => {
+        searchInput.addEventListener("keypress", (e) => {
             if (e.key === 'Enter') {
                 clearTimeout(searchTimeout);
                 performSearch(e.target.value);
@@ -1539,10 +1343,8 @@
             const term = searchTerm.toLowerCase().trim();
             
             if (term === '') {
-                // When search is empty, show only in-stock items
                 filteredProducts = productsData.filter(product => product.stock > 0);
             } else {
-                // When searching, show all matching products regardless of stock
                 filteredProducts = productsData.filter(product => 
                     product.part.toLowerCase().includes(term) || 
                     (product.desc && product.desc.toLowerCase().includes(term))
@@ -1551,69 +1353,80 @@
             displayProducts();
         }
 
+        // Search functionality for brands section
+        brandsSearchInput.addEventListener("input", function() {
+            performBrandsSearch(this.value);
+        });
+        
+        function performBrandsSearch(searchTerm) {
+            const term = searchTerm.toLowerCase().trim();
+            
+            if (term === '') {
+                applyFilters();
+            } else {
+                filteredProducts = productsData.filter(product => 
+                    product.part.toLowerCase().includes(term) || 
+                    (product.desc && product.desc.toLowerCase().includes(term))
+                );
+                
+                displayBrandProducts(filteredProducts);
+            }
+        }
+        
+        // Stock filter functionality
+        stockFilterBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                stockFilterBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentStockFilter = this.getAttribute('data-stock');
+                applyFilters();
+            });
+        });
+        
+        // Apply both brand and stock filters
+        function applyFilters() {
+            let tempProducts = productsData;
+            
+            // Apply brand filter
+            if (currentBrand !== 'all') {
+                tempProducts = tempProducts.filter(product => 
+                    product.brand && product.brand.toLowerCase() === currentBrand
+                );
+            }
+            
+            // Apply stock filter
+            if (currentStockFilter === 'in-stock') {
+                tempProducts = tempProducts.filter(product => product.stock > 0);
+            } else if (currentStockFilter === 'out-of-stock') {
+                tempProducts = tempProducts.filter(product => product.stock <= 0);
+            }
+            
+            filteredProducts = tempProducts;
+            displayBrandProducts(filteredProducts);
+        }
+        
         // Load product data from CSV
         function loadProducts() {
-            // Use the correct URL for your CSV file
-            fetch("https://autosparessolution.github.io/prices.csv")
+            // Use the correct path to your CSV file
+            fetch("prices.csv")
                 .then(res => {
-                    if (!res.ok) throw new Error("Failed to fetch CSV");
+                    if (!res.ok) throw new Error("Failed to fetch CSV file. Status: " + res.status);
                     return res.text();
                 })
                 .then(csv => {
-                    const rows = csv.split("\n");
-                    const header = rows[0].split(",").map(h => h.trim().toLowerCase());
-                    
-                    // Find column indices
-                    const materialIndex = header.findIndex(h => h.includes("material"));
-                    const descIndex = header.findIndex(h => h.includes("desc") || h.includes("description"));
-                    const listIndex = header.findIndex(h => h.includes("list"));
-                    const mrpIndex = header.findIndex(h => h.includes("mrp"));
-                    const priceIndex = header.findIndex(h => h.includes("price") && !h.includes("list") && !h.includes("mrp"));
-                    const stockIndex = header.findIndex(h => h.includes("stock") || h.includes("qty"));
-                    
-                    // Process data rows
-                    productsData = rows.slice(1)
-                        .map(r => {
-                            const cols = r.split(",").map(c => c.trim().replace(/^"(.*)"$/, '$1'));
-                            
-                            // Skip empty rows
-                            if (cols.length < 2 || !cols[materialIndex] || cols[materialIndex] === '') return null;
-                            
-                            // Remove "Ex:" prefix if present
-                            let part = cols[materialIndex];
-                            if (part.startsWith("Ex:")) {
-                                part = part.substring(3);
-                            }
-                            
-                            return {
-                                part: part,
-                                desc: cols[descIndex] || "Auto Spare Part",
-                                List: parseFloat(cols[listIndex] || 0),
-                                Mrp: parseFloat(cols[mrpIndex] || 0),     
-                                price: parseFloat(cols[priceIndex] || 0),
-                                stock: parseInt(cols[stockIndex] || 0),
-                                boxQty: 1, // Default values
-                                masterCarton: 1
-                            };
-                        })
-                        .filter(p => p !== null && p.part && p.part.trim() !== "");
-
-                    // Initialize with only in-stock items shown by default
-                    filteredProducts = productsData.filter(product => product.stock > 0);
-                    displayProducts();
+                    parseCSVData(csv);
                 })
                 .catch(err => {
                     console.error("Error loading CSV:", err);
-                    showToast("Error loading product data. Please check if the CSV file exists.", true);
+                    showToast("Error loading product data. Please check if the CSV file exists and is accessible.", true);
                     
-                    // Show error message
                     const gallery = document.querySelector(".gallery");
                     gallery.innerHTML = `
-                        <div class="loading">
+                        <div class="error-message">
                             <i class="fas fa-exclamation-triangle"></i>
                             <h3>Unable to Load Products</h3>
                             <p>Error: ${err.message}</p>
-                            <p>CSV URL: https://autosparessolution.github.io/prices.csv</p>
+                            <p>CSV URL: prices.csv</p>
                             <p>Please ensure the CSV file is available at the above URL.</p>
                             <button class="btn" onclick="location.reload()" style="margin-top: 20px; background: var(--primary);">
                                 <i class="fas fa-redo"></i> Try Again
@@ -1622,8 +1435,151 @@
                     `;
                 });
         }
+        
+        // Parse CSV data - Your improved function
+        function parseCSVData(csv) {
+            const rows = csv.split("\n").filter(row => row.trim() !== "");
+            if (rows.length === 0) {
+                throw new Error("CSV data is empty");
+            }
 
-        // Display filtered products
+            // Extract headers
+            const headers = rows[0].split(",").map(h => h.trim().toLowerCase());
+
+            // Dynamically find column indexes
+            const materialIndex = headers.indexOf("material");
+            const descIndex = headers.indexOf("description") !== -1 ? headers.indexOf("description") : 1;
+            const listIndex = headers.indexOf("list price");
+            const mrpIndex = headers.indexOf("mrp price");
+            const priceIndex = headers.indexOf("billing price");
+            const stockIndex = headers.indexOf("stock");
+            const brandIndex = headers.indexOf("brand");
+            const boxQtyIndex = headers.indexOf("box qty");
+            const cartonIndex = headers.indexOf("carton");
+
+            // Build product objects
+            productsData = rows.slice(1).map(r => {
+                const cols = r.split(",").map(c => c.trim().replace(/^"(.*)"$/, '$1'));
+
+                if (cols.length < 2 || !cols[materialIndex]) return null;
+
+                return {
+                    part: cols[materialIndex]?.trim(),
+                    desc: cols[descIndex] || "Auto Spare Part",
+                    List: parseFloat(cols[listIndex] || 0),
+                    Mrp: parseFloat(cols[mrpIndex] || 0),
+                    price: parseFloat(cols[priceIndex] || 0),
+                    stock: parseInt(cols[stockIndex] || 0),
+                    brand: cols[brandIndex]?.trim() || "Other",
+                    boxQty: parseInt(cols[boxQtyIndex] || 1),
+                    masterCarton: parseInt(cols[cartonIndex] || 1)
+                };
+            }).filter(p => p !== null && p.part && p.part.trim() !== "");
+
+            console.log("Loaded products:", productsData.length);
+
+            // ✅ Preview first 5 products in console
+            console.log("Sample products:", productsData.slice(0, 5));
+
+            if (productsData.length === 0) {
+                throw new Error("No products found in CSV data after parsing.");
+            }
+
+            extractBrandsFromProducts();
+            displayBrands();
+
+            // Show in-stock products by default
+            filteredProducts = productsData.filter(product => product.stock > 0);
+            displayProducts();
+            displayBrandProducts(filteredProducts);
+        }
+        
+        // Extract unique brands from products
+        function extractBrandsFromProducts() {
+            const brandSet = new Set();
+            
+            productsData.forEach(product => {
+                if (product.brand && product.brand.trim() !== "") {
+                    brandSet.add(product.brand.trim());
+                }
+            });
+            
+            brandsData = Array.from(brandSet).sort();
+            console.log('Extracted brands:', brandsData);
+        }
+        
+        // Display brands in the brands container
+        function displayBrands() {
+            const allBrandsCard = brandsContainer.querySelector('[data-brand="all"]');
+            brandsContainer.innerHTML = '';
+            brandsContainer.appendChild(allBrandsCard);
+            
+            brandsData.forEach(brand => {
+                const brandCard = document.createElement('div');
+                brandCard.className = 'brand-card';
+                brandCard.setAttribute('data-brand', brand.toLowerCase());
+                
+                let logoBgColor = '#0a7c71';
+                let logoText = brand.substring(0, 3).toUpperCase();
+                
+                const brandColors = {
+                    'tvs': '#0a7c71',
+                    'stl': '#e74c3c',
+                    'vrp': '#27ae60',
+                    'bosch': '#34495e',
+                    'minda': '#9b59b6',
+                    'asco': '#e67e22',
+                    'lucas': '#16a085',
+                    'other': '#7f8c8d'
+                };
+                
+                if (brandColors[brand.toLowerCase()]) {
+                    logoBgColor = brandColors[brand.toLowerCase()];
+                }
+                
+                const svgLogo = `<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="80" height="80" rx="10" fill="${logoBgColor}"/>
+                    <text x="40" y="45" text-anchor="middle" fill="white" font-family="Arial" font-size="14" font-weight="bold">${logoText}</text>
+                </svg>`;
+                
+                const svgDataUri = `data:image/svg+xml;base64,${btoa(svgLogo)}`;
+                
+                brandCard.innerHTML = `
+                    <img src="${svgDataUri}" alt="${brand}" class="brand-logo-img">
+                    <div class="brand-name">${brand}</div>
+                `;
+                
+                brandsContainer.appendChild(brandCard);
+            });
+            
+            const brandCards = brandsContainer.querySelectorAll('.brand-card');
+            brandCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const brand = this.getAttribute('data-brand');
+                    
+                    brandCards.forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    filterProductsByBrand(brand);
+                });
+            });
+        }
+        
+        // Filter products by brand
+        function filterProductsByBrand(brand) {
+            currentBrand = brand;
+            brandsSearchInput.value = '';
+            applyFilters();
+            
+            if (brand === 'all') {
+                currentBrandElement.textContent = 'All Brands';
+            } else {
+                const brandName = brandsContainer.querySelector(`[data-brand="${brand}"] .brand-name`).textContent;
+                currentBrandElement.textContent = brandName;
+            }
+        }
+        
+        // Display products in the main products section
         function displayProducts() {
             const gallery = document.querySelector(".gallery");
             gallery.innerHTML = "";
@@ -1683,9 +1639,76 @@
                 `);
             });
         }
+        
+        // Display products in the brands section
+        function displayBrandProducts(productsArray) {
+            productsContainer.innerHTML = '';
+            
+            if (productsArray.length === 0) {
+                productsContainer.innerHTML = `
+                    <div class="no-products">
+                        <i class="fas fa-box-open"></i>
+                        <h3>No products found</h3>
+                        <p>Try selecting a different brand or search term</p>
+                    </div>
+                `;
+                productCountElement.textContent = '0 products found';
+                return;
+            }
+            
+            productCountElement.textContent = `${productsArray.length} products found`;
+            
+            productsArray.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'product-card';
+                
+                let stockStatus = '';
+                let stockClass = '';
+                if (product.stock > 10) {
+                    stockStatus = 'In Stock';
+                    stockClass = 'in-stock';
+                } else if (product.stock > 0) {
+                    stockStatus = 'Low Stock';
+                    stockClass = 'low-stock';
+                } else {
+                    stockStatus = 'Out of Stock';
+                    stockClass = 'out-of-stock';
+                }
+                
+                const imageUrl = `https://autosparessolution.github.io/images/${product.part}.png`;
+                
+                productCard.innerHTML = `
+                    <div class="product-badge ${stockClass}">${stockStatus}</div>
+                    <img src="${imageUrl}" 
+                         alt="${product.part}" 
+                         class="product-image"
+                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDI1MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTAiIGhlaWdodD0iMTgwIiByeD0iOCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+CjxyZWN0IHg9IjMwIiB5PSIzMCIgd2lkdGg9IjE5MCIgaGVpZ2h0PSIxMjAiIHJ4PSI1IiBmaWxsPSIjMmM1MzY0Ii8+Cjx0ZXh0IHg9IjEyNSIgeT0iMTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZjFjNDBmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSJib2xkIj4ke3Byb2R1Y3QucGFydH08L3RleHQ+Cjx0ZXh0IHg9IjEyNSIgeT0iMTIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiPkF1dG8gUGFydDwvdGV4dD4KPC9zdmc+Cg=='">
+                    <h3 class="product-name">${product.part}</h3>
+                    <p class="product-desc">${product.desc}</p>
+                    <div class="product-specs">
+                        <span><i class="fas fa-tag"></i> ${product.brand || 'Unknown Brand'}</span>
+                        <span><i class="fas fa-cubes"></i> Stock: ${product.stock || '0'}</span>
+                    </div>
+                    <div class="product-price">₹${product.price || '0'}</div>
+                    <div class="product-action">
+                        <button class="btn" onclick="addToCart('${product.part}', ${product.price})" ${product.stock <= 0 ? 'disabled' : ''}>
+                            <i class="fas fa-cart-plus"></i> ${product.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
+                        </button>
+                        <button class="btn btn-whatsapp" onclick="enquireOnWhatsApp('${product.part}', '${product.desc}')">
+                            <i class="fab fa-whatsapp"></i> ${product.stock <= 0 ? 'Notify Me' : 'Enquire'}
+                        </button>
+                    </div>
+                `;
+                
+                productsContainer.appendChild(productCard);
+            });
+        }
 
         // Cart functions
         function addToCart(part, price) {
+            const product = productsData.find(p => p.part === part);
+            if (!product) return;
+            
             const card = document.querySelector(`.card[data-part="${part}"]`);
             const qtyInput = card ? card.querySelector('.qty-input') : null;
             const qty = qtyInput ? parseInt(qtyInput.value) : 1;
@@ -1694,7 +1717,6 @@
             if (existing) {
                 existing.qty += qty;
             } else {
-                const product = productsData.find(p => p.part === part);
                 cart.push({ 
                     part, 
                     price, 
@@ -1706,6 +1728,14 @@
             updateCartUI();
             showToast(`${part} added to cart!`);
         }
+        
+        function enquireOnWhatsApp(part, desc) {
+            const product = productsData.find(p => p.part === part);
+            const stockStatus = product.stock > 0 ? 'In Stock' : 'Out of Stock';
+            const message = `I want to enquire about ${part} (${desc}). Current stock: ${stockStatus}`;
+            const encodedMessage = encodeURIComponent(message);
+            window.open(`https://wa.me/03369028606?text=${encodedMessage}`, '_blank');
+        }
 
         function updateCartUI() {
             const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
@@ -1716,4 +1746,4 @@
         loadProducts();
     </script>
 </body>
-</html>
+    </html>
