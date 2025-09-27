@@ -1822,52 +1822,160 @@ function removeFromCart(part) {
         loadProducts();
     </script>
     <script>
-// Basic visitor tracking for Auto Spares Solution
-function trackBasicAnalytics() {
-    const analyticsData = {
-        // Page information
-        page: window.location.pathname,
-        referrer: document.referrer || 'direct',
-        
-        // Visitor information
-        timestamp: new Date().toISOString(),
-        screen: `${screen.width}x${screen.height}`,
-        language: navigator.language,
-        
-        // Business-specific data
-        business: 'Auto Spares Solution',
-        type: 'auto_parts_wholesale'
-    };
-    
-    // Log to console (for testing)
-    console.log('🔍 Visitor Analytics:', analyticsData);
-    
-    // Store in localStorage for basic tracking
-    const visitCount = parseInt(localStorage.getItem('visitCount') || '0') + 1;
-    localStorage.setItem('visitCount', visitCount.toString());
-    localStorage.setItem('lastVisit', new Date().toISOString());
-    
-    // Simple tracking of product views
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.card') || e.target.closest('.product-card')) {
-            const productElement = e.target.closest('.card') || e.target.closest('.product-card');
-            const partNumber = productElement.querySelector('.part-number, .product-name')?.textContent;
-            if (partNumber) {
-                console.log('📊 Product Viewed:', partNumber);
-            }
+<!-- Add this RIGHT BEFORE </body> tag -->
+<div id="cookie-consent" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; text-align: center; z-index: 10000;">
+    <p>We use cookies to improve your experience and analyze site traffic. 
+       <a href="#privacy-policy" style="color: #f1c40f;">Learn more</a></p>
+    <button id="accept-cookies" style="background: #0a7c71; color: white; border: none; padding: 8px 20px; margin: 0 10px; border-radius: 4px; cursor: pointer;">
+        Accept
+    </button>
+    <button id="decline-cookies" style="background: #6c757d; color: white; border: none; padding: 8px 20px; margin: 0 10px; border-radius: 4px; cursor: pointer;">
+        Decline
+    </button>
+</div>
+
+<script>
+// Auto Spares Solution - Visitor Analytics
+class AutoSparesAnalytics {
+    constructor() {
+        this.sessionId = this.generateSessionId();
+        this.timeOnPage = 0;
+        this.init();
+    }
+
+    generateSessionId() {
+        if (!localStorage.getItem('sessionId')) {
+            localStorage.setItem('sessionId', Date.now().toString());
         }
-    });
+        return localStorage.getItem('sessionId');
+    }
+
+    init() {
+        this.setupConsentBanner();
+        this.trackBasicMetrics();
+        
+        if (this.hasConsent()) {
+            this.trackEnhancedBehavior();
+        }
+    }
+
+    setupConsentBanner() {
+        const consentBanner = document.getElementById('cookie-consent');
+        const acceptBtn = document.getElementById('accept-cookies');
+        const declineBtn = document.getElementById('decline-cookies');
+        
+        if (!localStorage.getItem('cookieConsent')) {
+            consentBanner.style.display = 'block';
+        }
+        
+        acceptBtn.addEventListener('click', () => {
+            localStorage.setItem('cookieConsent', 'accepted');
+            localStorage.setItem('trackingConsent', 'true');
+            consentBanner.style.display = 'none';
+            this.trackEnhancedBehavior();
+        });
+        
+        declineBtn.addEventListener('click', () => {
+            localStorage.setItem('cookieConsent', 'declined');
+            localStorage.setItem('trackingConsent', 'false');
+            consentBanner.style.display = 'none';
+        });
+    }
+
+    hasConsent() {
+        return localStorage.getItem('trackingConsent') === 'true';
+    }
+
+    trackBasicMetrics() {
+        // Basic visit count (no consent needed)
+        const visitCount = parseInt(localStorage.getItem('visitCount') || '0') + 1;
+        localStorage.setItem('visitCount', visitCount.toString());
+        localStorage.setItem('lastVisit', new Date().toISOString());
+
+        console.log('🏁 Auto Spares Solution - Visit #' + visitCount);
+
+        // Track time on page
+        setInterval(() => {
+            this.timeOnPage += 5;
+        }, 5000);
+    }
+
+    trackEnhancedBehavior() {
+        if (!this.hasConsent()) return;
+
+        console.log('🔍 Starting enhanced tracking...');
+
+        // Track product views
+        document.addEventListener('click', (e) => {
+            const card = e.target.closest('.card') || e.target.closest('.product-card');
+            if (card) {
+                const partNumber = card.querySelector('.part-number, .product-name')?.textContent;
+                if (partNumber) {
+                    console.log('👀 Product Viewed:', partNumber);
+                    this.logEvent('product_view', { partNumber: partNumber });
+                }
+            }
+
+            // Track cart additions
+            if (e.target.classList.contains('cart') || e.target.closest('.cart')) {
+                const card = e.target.closest('.card');
+                if (card) {
+                    const partNumber = card.querySelector('.part-number')?.textContent;
+                    const price = card.querySelector('.price')?.textContent;
+                    console.log('🛒 Added to Cart:', partNumber, price);
+                    this.logEvent('add_to_cart', { 
+                        partNumber: partNumber, 
+                        price: price 
+                    });
+                }
+            }
+        });
+
+        // Track searches
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    if (e.target.value.length > 2) {
+                        console.log('🔍 Search:', e.target.value);
+                        this.logEvent('search', { query: e.target.value });
+                    }
+                }, 1000);
+            });
+        }
+    }
+
+    logEvent(eventType, data) {
+        const eventData = {
+            event: eventType,
+            sessionId: this.sessionId,
+            timestamp: new Date().toISOString(),
+            page: window.location.pathname,
+            ...data
+        };
+        
+        console.log('📊 Event:', eventData);
+        
+        // Here you can send to your server if you have one
+        // this.sendToServer(eventData);
+    }
+
+    sendToServer(data) {
+        // Example: Send to your backend if you have one
+        // fetch('/api/analytics', {
+        //     method: 'POST',
+        //     headers: { 'Content-Type': 'application/json' },
+        //     body: JSON.stringify(data)
+        // });
+    }
 }
 
-// Initialize basic tracking
-trackBasicAnalytics();
-
-// Track cart additions
-const originalAddToCart = addToCart;
-addToCart = function(part, price) {
-    console.log('🛒 Product Added to Cart:', part, 'Price:', price);
-    return originalAddToCart(part, price);
-};
-</script>
+// Initialize analytics when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    new AutoSparesAnalytics();
+});
+    </script>
 </body>
     </html>
