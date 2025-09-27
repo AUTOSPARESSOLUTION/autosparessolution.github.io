@@ -1729,18 +1729,94 @@
             showToast(`${part} added to cart!`);
         }
         
-        function enquireOnWhatsApp(part, desc) {
-            const product = productsData.find(p => p.part === part);
-            const stockStatus = product.stock > 0 ? 'In Stock' : 'Out of Stock';
-            const message = `I want to enquire about ${part} (${desc}). Current stock: ${stockStatus}`;
-            const encodedMessage = encodeURIComponent(message);
-            window.open(`https://wa.me/03369028606?text=${encodedMessage}`, '_blank');
-        }
-
         function updateCartUI() {
-            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
-            document.getElementById("cart-count").textContent = cartCount;
+    const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+    document.getElementById("cart-count").textContent = cartCount;
+    
+    const itemsDiv = document.getElementById("cart-items");
+    let subtotal = 0;
+    
+    if (cart.length === 0) {
+        itemsDiv.innerHTML = `
+            <div class="empty-cart">
+                <i class="fas fa-shopping-cart"></i>
+                <h3>Your cart is empty</h3>
+                <p>Add products to your cart to continue</p>
+            </div>
+        `;
+    } else {
+        itemsDiv.innerHTML = "";
+        cart.forEach(item => {
+            const itemTotal = item.price * item.qty;
+            subtotal += itemTotal;
+            
+            const itemHTML = `
+                <div class="cart-item" data-part="${item.part}">
+                    <div class="cart-item-info">
+                        <div class="cart-item-title">${item.part}</div>
+                        <div class="cart-item-desc">${item.desc}</div>
+                        <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
+                    </div>
+                    <div class="qty-control">
+                        <button onclick="changeQty('${item.part}', -1)">-</button>
+                        <input class="qty-input" type="number" value="${item.qty}" min="1" 
+                               onchange="updateCartItemQty('${item.part}', this.value)">
+                        <button onclick="changeQty('${item.part}', 1)">+</button>
+                        <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
+                        <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            `;
+            itemsDiv.innerHTML += itemHTML;
+        });
+    }
+    
+    const tax = subtotal * 0.18;
+    const total = subtotal + tax;
+    
+    document.getElementById("cart-subtotal").textContent = subtotal.toFixed(2);
+    document.getElementById("cart-tax").textContent = tax.toFixed(2);
+    document.getElementById("cart-total").textContent = total.toFixed(2);
+}
+
+function changeQty(part, delta) {
+    const item = cart.find(i => i.part === part);
+    if (!item) return;
+    
+    item.qty += delta;
+    if (item.qty <= 0) {
+        cart = cart.filter(i => i.part !== part);
+        showToast(`${part} removed from cart`);
+    } else {
+        // Ensure we don't exceed available stock
+        const product = productsData.find(p => p.part === part);
+        if (product) {
+            item.qty = Math.min(item.qty, product.stock);
         }
+    }
+    updateCartUI();
+}
+
+function updateCartItemQty(part, qty) {
+    const item = cart.find(i => i.part === part);
+    if (!item) return;
+    
+    qty = parseInt(qty) || 1;
+    // Ensure we don't exceed available stock
+    const product = productsData.find(p => p.part === part);
+    if (product) {
+        qty = Math.min(qty, product.stock);
+    }
+    
+    item.qty = Math.max(1, qty);
+    updateCartUI();
+}
+
+function removeFromCart(part) {
+    cart = cart.filter(i => i.part !== part);
+    updateCartUI();
+    showToast(`${part} removed from cart`);
+}
 
         // Initialize the page
         loadProducts();
