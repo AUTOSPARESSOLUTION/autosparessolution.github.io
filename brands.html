@@ -1821,5 +1821,53 @@ function removeFromCart(part) {
         // Initialize the page
         loadProducts();
     </script>
+    <script>
+// Basic visitor tracking for Auto Spares Solution
+function trackBasicAnalytics() {
+    const analyticsData = {
+        // Page information
+        page: window.location.pathname,
+        referrer: document.referrer || 'direct',
+        
+        // Visitor information
+        timestamp: new Date().toISOString(),
+        screen: `${screen.width}x${screen.height}`,
+        language: navigator.language,
+        
+        // Business-specific data
+        business: 'Auto Spares Solution',
+        type: 'auto_parts_wholesale'
+    };
+    
+    // Log to console (for testing)
+    console.log('🔍 Visitor Analytics:', analyticsData);
+    
+    // Store in localStorage for basic tracking
+    const visitCount = parseInt(localStorage.getItem('visitCount') || '0') + 1;
+    localStorage.setItem('visitCount', visitCount.toString());
+    localStorage.setItem('lastVisit', new Date().toISOString());
+    
+    // Simple tracking of product views
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.card') || e.target.closest('.product-card')) {
+            const productElement = e.target.closest('.card') || e.target.closest('.product-card');
+            const partNumber = productElement.querySelector('.part-number, .product-name')?.textContent;
+            if (partNumber) {
+                console.log('📊 Product Viewed:', partNumber);
+            }
+        }
+    });
+}
+
+// Initialize basic tracking
+trackBasicAnalytics();
+
+// Track cart additions
+const originalAddToCart = addToCart;
+addToCart = function(part, price) {
+    console.log('🛒 Product Added to Cart:', part, 'Price:', price);
+    return originalAddToCart(part, price);
+};
+</script>
 </body>
     </html>
