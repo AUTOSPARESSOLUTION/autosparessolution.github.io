@@ -1817,7 +1817,81 @@ function removeFromCart(part) {
     updateCartUI();
     showToast(`${part} removed from cart`);
 }
+                    color: "#0a7c71"
+                }
+            };
+            
+            const rzp = new Razorpay(options);
+            rzp.open();
+            
+            // Handle payment failure
+            rzp.on('payment.failed', function(response) {
+                showToast("Payment failed. Please try again.", true);
+                console.error("Payment failed:", response.error);
+            });
+        }
 
+        // Send order via WhatsApp
+        function sendOrderViaWhatsApp() {
+            if (cart.length === 0) {
+                showToast("Your cart is empty", true);
+                return;
+            }
+            
+            if (!validateCustomerInfo()) {
+                return;
+            }
+            
+            const customerInfo = getCustomerInfo();
+            const message = buildOrderMessage(customerInfo);
+            const encodedMessage = encodeURIComponent(message);
+            const phoneNumber = "03369028606"; // Your WhatsApp number
+            
+            window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+            showToast("Opening WhatsApp with order details...");
+        }
+
+        // Send order via Email
+        function sendOrderViaEmail() {
+            if (cart.length === 0) {
+                showToast("Your cart is empty", true);
+                return;
+            }
+            
+            if (!validateCustomerInfo()) {
+                return;
+            }
+            
+            const customerInfo = getCustomerInfo();
+            const subject = `Order Inquiry - ${customerInfo.name} - ${new Date().toLocaleDateString()}`;
+            const body = buildEmailContent(customerInfo);
+            
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            showToast("Opening email client with order details...");
+        }
+
+        // Send order confirmation after payment
+        function sendOrderConfirmation(paymentId, customerInfo) {
+            // In a real implementation, you would send this to your server
+            console.log("Order confirmation would be sent for payment:", paymentId);
+            console.log("Customer info:", customerInfo);
+            console.log("Order details:", cart);
+            
+            // Send WhatsApp confirmation
+            const whatsappMessage = `✅ *Payment Successful!* ✅\n\nThank you for your order, ${customerInfo.name}!\n\nPayment ID: ${paymentId}\n\nWe will process your order shortly and contact you for shipping details.\n\nOrder Total: ₹${document.getElementById("cart-total").textContent}`;
+            const encodedWhatsAppMessage = encodeURIComponent(whatsappMessage);
+            window.open(`https://wa.me/${customerInfo.phone}?text=${encodedWhatsAppMessage}`, '_blank');
+            
+            // You can also generate PDF/Excel like in your main page
+            // generateOrderPDF(paymentId, customerInfo);
+            // generateOrderExcel(paymentId, customerInfo);
+        }
+
+        // Initialize the page
+        loadProducts();
+    </script>
+</body>
+</html>
         // Initialize the page
         loadProducts();
     </script>
@@ -1963,81 +2037,7 @@ function removeFromCart(part) {
                     contact: document.getElementById("customer-phone").value.trim()
                 },
                 theme: {
-                    color: "#0a7c71"
-                }
-            };
-            
-            const rzp = new Razorpay(options);
-            rzp.open();
-            
-            // Handle payment failure
-            rzp.on('payment.failed', function(response) {
-                showToast("Payment failed. Please try again.", true);
-                console.error("Payment failed:", response.error);
-            });
-        }
 
-        // Send order via WhatsApp
-        function sendOrderViaWhatsApp() {
-            if (cart.length === 0) {
-                showToast("Your cart is empty", true);
-                return;
-            }
-            
-            if (!validateCustomerInfo()) {
-                return;
-            }
-            
-            const customerInfo = getCustomerInfo();
-            const message = buildOrderMessage(customerInfo);
-            const encodedMessage = encodeURIComponent(message);
-            const phoneNumber = "03369028606"; // Your WhatsApp number
-            
-            window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
-            showToast("Opening WhatsApp with order details...");
-        }
-
-        // Send order via Email
-        function sendOrderViaEmail() {
-            if (cart.length === 0) {
-                showToast("Your cart is empty", true);
-                return;
-            }
-            
-            if (!validateCustomerInfo()) {
-                return;
-            }
-            
-            const customerInfo = getCustomerInfo();
-            const subject = `Order Inquiry - ${customerInfo.name} - ${new Date().toLocaleDateString()}`;
-            const body = buildEmailContent(customerInfo);
-            
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            showToast("Opening email client with order details...");
-        }
-
-        // Send order confirmation after payment
-        function sendOrderConfirmation(paymentId, customerInfo) {
-            // In a real implementation, you would send this to your server
-            console.log("Order confirmation would be sent for payment:", paymentId);
-            console.log("Customer info:", customerInfo);
-            console.log("Order details:", cart);
-            
-            // Send WhatsApp confirmation
-            const whatsappMessage = `✅ *Payment Successful!* ✅\n\nThank you for your order, ${customerInfo.name}!\n\nPayment ID: ${paymentId}\n\nWe will process your order shortly and contact you for shipping details.\n\nOrder Total: ₹${document.getElementById("cart-total").textContent}`;
-            const encodedWhatsAppMessage = encodeURIComponent(whatsappMessage);
-            window.open(`https://wa.me/${customerInfo.phone}?text=${encodedWhatsAppMessage}`, '_blank');
-            
-            // You can also generate PDF/Excel like in your main page
-            // generateOrderPDF(paymentId, customerInfo);
-            // generateOrderExcel(paymentId, customerInfo);
-        }
-
-        // Initialize the page
-        loadProducts();
-    </script>
-</body>
-</html>
     <script>
 <!-- Add this RIGHT BEFORE </body> tag -->
 <div id="cookie-consent" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; text-align: center; z-index: 10000;">
