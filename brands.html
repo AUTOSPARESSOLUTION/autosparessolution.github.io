@@ -1821,6 +1821,223 @@ function removeFromCart(part) {
         // Initialize the page
         loadProducts();
     </script>
+      // Validate customer information
+        function validateCustomerInfo() {
+            const name = document.getElementById("customer-name").value.trim();
+            const phone = document.getElementById("customer-phone").value.trim();
+            const address = document.getElementById("customer-address").value.trim();
+            
+            if (!name) {
+                showToast("Please enter your full name", true);
+                return false;
+            }
+            
+            if (!phone) {
+                showToast("Please enter your phone number", true);
+                return false;
+            }
+            
+            if (!address) {
+                showToast("Please enter your shipping address", true);
+                return false;
+            }
+            
+            return true;
+        }
+
+        // Get customer information
+        function getCustomerInfo() {
+            return {
+                name: document.getElementById("customer-name").value.trim(),
+                phone: document.getElementById("customer-phone").value.trim(),
+                email: document.getElementById("customer-email").value.trim(),
+                address: document.getElementById("customer-address").value.trim(),
+                gstin: document.getElementById("customer-gstin").value.trim(),
+                date: new Date().toLocaleString()
+            };
+        }
+
+        // Build order message
+        function buildOrderMessage(customerInfo) {
+            let message = `🛒 *Auto Spares Solution - Order Details* 🛒\n\n`;
+            message += `*Customer Information:*\n`;
+            message += `👤 Name: ${customerInfo.name}\n`;
+            message += `📞 Phone: ${customerInfo.phone}\n`;
+            if (customerInfo.email) message += `📧 Email: ${customerInfo.email}\n`;
+            message += `🏠 Address: ${customerInfo.address}\n`;
+            if (customerInfo.gstin) message += `📋 GSTIN: ${customerInfo.gstin}\n`;
+            message += `📅 Order Date: ${customerInfo.date}\n\n`;
+            
+            message += `*Order Items:*\n`;
+            cart.forEach((item, index) => {
+                message += `${index + 1}. ${item.part} - ${item.desc}\n`;
+                message += `   Quantity: ${item.qty}\n`;
+                message += `   Price: ₹${item.price.toFixed(2)} each\n`;
+                message += `   Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
+            });
+            
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+            
+            message += `*Order Summary:*\n`;
+            message += `Subtotal: ₹${subtotal.toFixed(2)}\n`;
+            message += `GST (18%): ₹${tax.toFixed(2)}\n`;
+            message += `*Total Amount: ₹${total.toFixed(2)}*\n\n`;
+            message += `Please confirm this order and provide payment instructions.`;
+            
+            return message;
+        }
+
+        // Build email content
+        function buildEmailContent(customerInfo) {
+            let content = `Auto Spares Solution - Order Details\n\n`;
+            content += `Customer Information:\n`;
+            content += `Name: ${customerInfo.name}\n`;
+            content += `Phone: ${customerInfo.phone}\n`;
+            if (customerInfo.email) content += `Email: ${customerInfo.email}\n`;
+            content += `Address: ${customerInfo.address}\n`;
+            if (customerInfo.gstin) content += `GSTIN: ${customerInfo.gstin}\n`;
+            content += `Order Date: ${customerInfo.date}\n\n`;
+            
+            content += `Order Items:\n`;
+            cart.forEach((item, index) => {
+                content += `${index + 1}. ${item.part} - ${item.desc}\n`;
+                content += `   Quantity: ${item.qty}\n`;
+                content += `   Price: ₹${item.price.toFixed(2)} each\n`;
+                content += `   Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
+            });
+            
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+            
+            content += `Order Summary:\n`;
+            content += `Subtotal: ₹${subtotal.toFixed(2)}\n`;
+            content += `GST (18%): ₹${tax.toFixed(2)}\n`;
+            content += `Total Amount: ₹${total.toFixed(2)}\n\n`;
+            content += `Please confirm this order and provide payment instructions.\n\n`;
+            content += `Thank you,\n${customerInfo.name}`;
+            
+            return content;
+        }
+
+        // Initiate checkout process
+        function initiateCheckout() {
+            if (!document.getElementById("agree-terms").checked) {
+                showToast("Please agree to the Terms & Conditions", true);
+                return;
+            }
+            
+            if (!validateCustomerInfo()) {
+                return;
+            }
+            
+            const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+            if (subtotal <= 0) {
+                showToast("Your cart is empty", true);
+                return;
+            }
+            
+            const tax = subtotal * 0.18;
+            const totalAmount = (subtotal + tax) * 100; // Convert to paise
+            
+            // Using your live Razorpay key
+            const options = {
+                key: "rzp_live_90iWxpNYThOpyE", // Your live Razorpay key
+                amount: totalAmount,
+                currency: "INR",
+                name: "Auto Spares Solution",
+                description: "Purchase (Prices include 18% GST)",
+                handler: function(response) {
+                    showToast("Payment Successful! Order confirmed.");
+                    const customerInfo = getCustomerInfo();
+                    sendOrderConfirmation(response.razorpay_payment_id, customerInfo);
+                    cart = [];
+                    updateCartUI();
+                    cartSidebar.classList.remove("active");
+                },
+                prefill: {
+                    name: document.getElementById("customer-name").value.trim(),
+                    email: document.getElementById("customer-email").value.trim() || "customer@example.com",
+                    contact: document.getElementById("customer-phone").value.trim()
+                },
+                theme: {
+                    color: "#0a7c71"
+                }
+            };
+            
+            const rzp = new Razorpay(options);
+            rzp.open();
+            
+            // Handle payment failure
+            rzp.on('payment.failed', function(response) {
+                showToast("Payment failed. Please try again.", true);
+                console.error("Payment failed:", response.error);
+            });
+        }
+
+        // Send order via WhatsApp
+        function sendOrderViaWhatsApp() {
+            if (cart.length === 0) {
+                showToast("Your cart is empty", true);
+                return;
+            }
+            
+            if (!validateCustomerInfo()) {
+                return;
+            }
+            
+            const customerInfo = getCustomerInfo();
+            const message = buildOrderMessage(customerInfo);
+            const encodedMessage = encodeURIComponent(message);
+            const phoneNumber = "03369028606"; // Your WhatsApp number
+            
+            window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+            showToast("Opening WhatsApp with order details...");
+        }
+
+        // Send order via Email
+        function sendOrderViaEmail() {
+            if (cart.length === 0) {
+                showToast("Your cart is empty", true);
+                return;
+            }
+            
+            if (!validateCustomerInfo()) {
+                return;
+            }
+            
+            const customerInfo = getCustomerInfo();
+            const subject = `Order Inquiry - ${customerInfo.name} - ${new Date().toLocaleDateString()}`;
+            const body = buildEmailContent(customerInfo);
+            
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            showToast("Opening email client with order details...");
+        }
+
+        // Send order confirmation after payment
+        function sendOrderConfirmation(paymentId, customerInfo) {
+            // In a real implementation, you would send this to your server
+            console.log("Order confirmation would be sent for payment:", paymentId);
+            console.log("Customer info:", customerInfo);
+            console.log("Order details:", cart);
+            
+            // Send WhatsApp confirmation
+            const whatsappMessage = `✅ *Payment Successful!* ✅\n\nThank you for your order, ${customerInfo.name}!\n\nPayment ID: ${paymentId}\n\nWe will process your order shortly and contact you for shipping details.\n\nOrder Total: ₹${document.getElementById("cart-total").textContent}`;
+            const encodedWhatsAppMessage = encodeURIComponent(whatsappMessage);
+            window.open(`https://wa.me/${customerInfo.phone}?text=${encodedWhatsAppMessage}`, '_blank');
+            
+            // You can also generate PDF/Excel like in your main page
+            // generateOrderPDF(paymentId, customerInfo);
+            // generateOrderExcel(paymentId, customerInfo);
+        }
+
+        // Initialize the page
+        loadProducts();
+    </script>
+</body>
+</html>
     <script>
 <!-- Add this RIGHT BEFORE </body> tag -->
 <div id="cookie-consent" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; text-align: center; z-index: 10000;">
