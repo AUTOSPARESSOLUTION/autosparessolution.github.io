@@ -6,7 +6,9 @@
     <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
+        /* Your existing CSS remains exactly the same */
         :root {
             --primary: #0a7c71;
             --secondary: #e74c3c;
@@ -938,6 +940,121 @@
             border-color: var(--primary);
         }
         
+        /* Customer Information Form Styles */
+        .customer-info-form {
+            background: rgba(0,0,0,0.3);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #ddd;
+            font-weight: 500;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #444;
+            border-radius: 5px;
+            color: white;
+            font-size: 1rem;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255,255,255,0.15);
+        }
+        
+        .checkout-options {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+        
+        .checkout-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            padding: 1rem;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .checkout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        
+        .checkout-btn.payment {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .checkout-btn.whatsapp {
+            background: #25D366;
+            color: white;
+        }
+        
+        .checkout-btn.email {
+            background: #6c757d;
+            color: white;
+        }
+        
+        /* Payment Processing Styles */
+        .payment-processing {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .payment-processing i {
+            font-size: 3rem;
+            color: var(--accent);
+            margin-bottom: 15px;
+        }
+        
+        .payment-success {
+            text-align: center;
+            padding: 20px;
+            background: rgba(39, 174, 96, 0.2);
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .payment-success i {
+            font-size: 3rem;
+            color: var(--success);
+            margin-bottom: 15px;
+        }
+        
+        .payment-error {
+            text-align: center;
+            padding: 20px;
+            background: rgba(231, 76, 60, 0.2);
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .payment-error i {
+            font-size: 3rem;
+            color: var(--secondary);
+            margin-bottom: 15px;
+        }
+        
         @media (max-width: 768px) {
             body {
                 padding-top: 200px;
@@ -1212,12 +1329,48 @@
                         <span>₹<span id="cart-total">0.00</span></span>
                     </div>
                 </div>
+                
+                <!-- Customer Information Form -->
+                <div class="customer-info-form" id="customer-info-form" style="display: none;">
+                    <h3 style="margin-bottom: 1rem; color: var(--accent);">Customer Information</h3>
+                    <div class="form-group">
+                        <label for="customer-name">Full Name *</label>
+                        <input type="text" id="customer-name" class="form-control" placeholder="Enter your full name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="customer-phone">Phone Number *</label>
+                        <input type="tel" id="customer-phone" class="form-control" placeholder="Enter your phone number" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="customer-email">Email Address</label>
+                        <input type="email" id="customer-email" class="form-control" placeholder="Enter your email address">
+                    </div>
+                    <div class="form-group">
+                        <label for="customer-address">Shipping Address *</label>
+                        <textarea id="customer-address" class="form-control" placeholder="Enter complete shipping address" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="customer-gstin">GSTIN (Optional)</label>
+                        <input type="text" id="customer-gstin" class="form-control" placeholder="Enter GSTIN for business orders">
+                    </div>
+                </div>
+                
                 <div class="terms-agreement">
                     <input type="checkbox" id="agree-terms" required>
                     <label for="agree-terms">I agree to the <a href="#policies" style="color: var(--accent);">Terms & Conditions</a></label>
                 </div>
-                <button class="btn buy btn-block" onclick="checkout()"><i class="fas fa-credit-card"></i> Checkout</button>
-                <button class="btn btn-block" onclick="sendOrderEmail()" style="background: #6c757d; margin-top: 10px;"><i class="fas fa-envelope"></i> Email Order</button>
+                
+                <div class="checkout-options" id="checkout-options">
+                    <button class="checkout-btn payment" onclick="initiateCheckout()">
+                        <i class="fas fa-credit-card"></i> Proceed to Payment
+                    </button>
+                    <button class="checkout-btn whatsapp" onclick="sendOrderViaWhatsApp()">
+                        <i class="fab fa-whatsapp"></i> Order via WhatsApp
+                    </button>
+                    <button class="checkout-btn email" onclick="sendOrderViaEmail()">
+                        <i class="fas fa-envelope"></i> Order via Email
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1298,6 +1451,8 @@
         const productsContainer = document.getElementById('products-container');
         const currentBrandElement = document.getElementById('current-brand');
         const productCountElement = document.getElementById('product-count');
+        const customerInfoForm = document.getElementById('customer-info-form');
+        const checkoutOptions = document.getElementById('checkout-options');
 
         // Initialize cart toggle
         cartLink.addEventListener("click", (e) => {
@@ -1730,172 +1885,106 @@
         }
         
         function updateCartUI() {
-    const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
-    document.getElementById("cart-count").textContent = cartCount;
-    
-    const itemsDiv = document.getElementById("cart-items");
-    let subtotal = 0;
-    
-    if (cart.length === 0) {
-        itemsDiv.innerHTML = `
-            <div class="empty-cart">
-                <i class="fas fa-shopping-cart"></i>
-                <h3>Your cart is empty</h3>
-                <p>Add products to your cart to continue</p>
-            </div>
-        `;
-    } else {
-        itemsDiv.innerHTML = "";
-        cart.forEach(item => {
-            const itemTotal = item.price * item.qty;
-            subtotal += itemTotal;
+            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+            document.getElementById("cart-count").textContent = cartCount;
             
-            const itemHTML = `
-                <div class="cart-item" data-part="${item.part}">
-                    <div class="cart-item-info">
-                        <div class="cart-item-title">${item.part}</div>
-                        <div class="cart-item-desc">${item.desc}</div>
-                        <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
+            const itemsDiv = document.getElementById("cart-items");
+            let subtotal = 0;
+            
+            if (cart.length === 0) {
+                itemsDiv.innerHTML = `
+                    <div class="empty-cart">
+                        <i class="fas fa-shopping-cart"></i>
+                        <h3>Your cart is empty</h3>
+                        <p>Add products to your cart to continue</p>
                     </div>
-                    <div class="qty-control">
-                        <button onclick="changeQty('${item.part}', -1)">-</button>
-                        <input class="qty-input" type="number" value="${item.qty}" min="1" 
-                               onchange="updateCartItemQty('${item.part}', this.value)">
-                        <button onclick="changeQty('${item.part}', 1)">+</button>
-                        <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
-                        <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>
-            `;
-            itemsDiv.innerHTML += itemHTML;
-        });
-    }
-    
-    const tax = subtotal * 0.18;
-    const total = subtotal + tax;
-    
-    document.getElementById("cart-subtotal").textContent = subtotal.toFixed(2);
-    document.getElementById("cart-tax").textContent = tax.toFixed(2);
-    document.getElementById("cart-total").textContent = total.toFixed(2);
-}
-
-function changeQty(part, delta) {
-    const item = cart.find(i => i.part === part);
-    if (!item) return;
-    
-    item.qty += delta;
-    if (item.qty <= 0) {
-        cart = cart.filter(i => i.part !== part);
-        showToast(`${part} removed from cart`);
-    } else {
-        // Ensure we don't exceed available stock
-        const product = productsData.find(p => p.part === part);
-        if (product) {
-            item.qty = Math.min(item.qty, product.stock);
+                `;
+                customerInfoForm.style.display = 'none';
+            } else {
+                itemsDiv.innerHTML = "";
+                cart.forEach(item => {
+                    const itemTotal = item.price * item.qty;
+                    subtotal += itemTotal;
+                    
+                    const itemHTML = `
+                        <div class="cart-item" data-part="${item.part}">
+                            <div class="cart-item-info">
+                                <div class="cart-item-title">${item.part}</div>
+                                <div class="cart-item-desc">${item.desc}</div>
+                                <div class="cart-item-price">₹${item.price.toFixed(2)} each</div>
+                            </div>
+                            <div class="qty-control">
+                                <button onclick="changeQty('${item.part}', -1)">-</button>
+                                <input class="qty-input" type="number" value="${item.qty}" min="1" 
+                                       onchange="updateCartItemQty('${item.part}', this.value)">
+                                <button onclick="changeQty('${item.part}', 1)">+</button>
+                                <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
+                                <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    `;
+                    itemsDiv.innerHTML += itemHTML;
+                });
+                
+                // Show customer info form when cart has items
+                customerInfoForm.style.display = 'block';
+            }
+            
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+            
+            document.getElementById("cart-subtotal").textContent = subtotal.toFixed(2);
+            document.getElementById("cart-tax").textContent = tax.toFixed(2);
+            document.getElementById("cart-total").textContent = total.toFixed(2);
         }
-    }
-    updateCartUI();
-}
 
-function updateCartItemQty(part, qty) {
-    const item = cart.find(i => i.part === part);
-    if (!item) return;
-    
-    qty = parseInt(qty) || 1;
-    // Ensure we don't exceed available stock
-    const product = productsData.find(p => p.part === part);
-    if (product) {
-        qty = Math.min(qty, product.stock);
-    }
-    
-    item.qty = Math.max(1, qty);
-    updateCartUI();
-}
-
-function removeFromCart(part) {
-    cart = cart.filter(i => i.part !== part);
-    updateCartUI();
-    showToast(`${part} removed from cart`);
-}
-                    color: "#0a7c71"
+        function changeQty(part, delta) {
+            const item = cart.find(i => i.part === part);
+            if (!item) return;
+            
+            item.qty += delta;
+            if (item.qty <= 0) {
+                cart = cart.filter(i => i.part !== part);
+                showToast(`${part} removed from cart`);
+            } else {
+                // Ensure we don't exceed available stock
+                const product = productsData.find(p => p.part === part);
+                if (product) {
+                    item.qty = Math.min(item.qty, product.stock);
                 }
-            };
-            
-            const rzp = new Razorpay(options);
-            rzp.open();
-            
-            // Handle payment failure
-            rzp.on('payment.failed', function(response) {
-                showToast("Payment failed. Please try again.", true);
-                console.error("Payment failed:", response.error);
-            });
+            }
+            updateCartUI();
         }
 
-        // Send order via WhatsApp
-        function sendOrderViaWhatsApp() {
-            if (cart.length === 0) {
-                showToast("Your cart is empty", true);
-                return;
+        function updateCartItemQty(part, qty) {
+            const item = cart.find(i => i.part === part);
+            if (!item) return;
+            
+            qty = parseInt(qty) || 1;
+            // Ensure we don't exceed available stock
+            const product = productsData.find(p => p.part === part);
+            if (product) {
+                qty = Math.min(qty, product.stock);
             }
             
-            if (!validateCustomerInfo()) {
-                return;
-            }
-            
-            const customerInfo = getCustomerInfo();
-            const message = buildOrderMessage(customerInfo);
+            item.qty = Math.max(1, qty);
+            updateCartUI();
+        }
+
+        function removeFromCart(part) {
+            cart = cart.filter(i => i.part !== part);
+            updateCartUI();
+            showToast(`${part} removed from cart`);
+        }
+
+        // WhatsApp enquiry function
+        function enquireOnWhatsApp(part, desc) {
+            const message = `I want to enquire about ${part} (${desc})`;
             const encodedMessage = encodeURIComponent(message);
-            const phoneNumber = "03369028606"; // Your WhatsApp number
-            
-            window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
-            showToast("Opening WhatsApp with order details...");
+            window.open(`https://wa.me/03369028606?text=${encodedMessage}`, '_blank');
         }
 
-        // Send order via Email
-        function sendOrderViaEmail() {
-            if (cart.length === 0) {
-                showToast("Your cart is empty", true);
-                return;
-            }
-            
-            if (!validateCustomerInfo()) {
-                return;
-            }
-            
-            const customerInfo = getCustomerInfo();
-            const subject = `Order Inquiry - ${customerInfo.name} - ${new Date().toLocaleDateString()}`;
-            const body = buildEmailContent(customerInfo);
-            
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            showToast("Opening email client with order details...");
-        }
-
-        // Send order confirmation after payment
-        function sendOrderConfirmation(paymentId, customerInfo) {
-            // In a real implementation, you would send this to your server
-            console.log("Order confirmation would be sent for payment:", paymentId);
-            console.log("Customer info:", customerInfo);
-            console.log("Order details:", cart);
-            
-            // Send WhatsApp confirmation
-            const whatsappMessage = `✅ *Payment Successful!* ✅\n\nThank you for your order, ${customerInfo.name}!\n\nPayment ID: ${paymentId}\n\nWe will process your order shortly and contact you for shipping details.\n\nOrder Total: ₹${document.getElementById("cart-total").textContent}`;
-            const encodedWhatsAppMessage = encodeURIComponent(whatsappMessage);
-            window.open(`https://wa.me/${customerInfo.phone}?text=${encodedWhatsAppMessage}`, '_blank');
-            
-            // You can also generate PDF/Excel like in your main page
-            // generateOrderPDF(paymentId, customerInfo);
-            // generateOrderExcel(paymentId, customerInfo);
-        }
-
-        // Initialize the page
-        loadProducts();
-    </script>
-</body>
-</html>
-        // Initialize the page
-        loadProducts();
-    </script>
-      // Validate customer information
+        // Customer Information Validation
         function validateCustomerInfo() {
             const name = document.getElementById("customer-name").value.trim();
             const phone = document.getElementById("customer-phone").value.trim();
@@ -1919,7 +2008,7 @@ function removeFromCart(part) {
             return true;
         }
 
-        // Get customer information
+        // Get Customer Information
         function getCustomerInfo() {
             return {
                 name: document.getElementById("customer-name").value.trim(),
@@ -1931,7 +2020,7 @@ function removeFromCart(part) {
             };
         }
 
-        // Build order message
+        // Build Order Message for WhatsApp
         function buildOrderMessage(customerInfo) {
             let message = `🛒 *Auto Spares Solution - Order Details* 🛒\n\n`;
             message += `*Customer Information:*\n`;
@@ -1963,7 +2052,7 @@ function removeFromCart(part) {
             return message;
         }
 
-        // Build email content
+        // Build Email Content
         function buildEmailContent(customerInfo) {
             let content = `Auto Spares Solution - Order Details\n\n`;
             content += `Customer Information:\n`;
@@ -1996,10 +2085,10 @@ function removeFromCart(part) {
             return content;
         }
 
-        // Initiate checkout process
-        function initiateCheckout() {
-            if (!document.getElementById("agree-terms").checked) {
-                showToast("Please agree to the Terms & Conditions", true);
+        // Send Order via WhatsApp
+        function sendOrderViaWhatsApp() {
+            if (cart.length === 0) {
+                showToast("Your cart is empty", true);
                 return;
             }
             
@@ -2007,192 +2096,231 @@ function removeFromCart(part) {
                 return;
             }
             
-            const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-            if (subtotal <= 0) {
+            const customerInfo = getCustomerInfo();
+            const message = buildOrderMessage(customerInfo);
+            const encodedMessage = encodeURIComponent(message);
+            const phoneNumber = "03369028606";
+            
+            window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+            showToast("Opening WhatsApp with order details...");
+        }
+
+        // Send Order via Email
+        function sendOrderViaEmail() {
+            if (cart.length === 0) {
                 showToast("Your cart is empty", true);
                 return;
             }
             
-            const tax = subtotal * 0.18;
-            const totalAmount = (subtotal + tax) * 100; // Convert to paise
+            if (!validateCustomerInfo()) {
+                return;
+            }
             
-            // Using your live Razorpay key
+            const customerInfo = getCustomerInfo();
+            const subject = `Order Inquiry - ${customerInfo.name} - ${new Date().toLocaleDateString()}`;
+            const body = buildEmailContent(customerInfo);
+            
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            showToast("Opening email client with order details...");
+        }
+
+        // Proper Razorpay Integration
+        function initiateCheckout() {
+            if (cart.length === 0) {
+                showToast("Your cart is empty", true);
+                return;
+            }
+            
+            if (!validateCustomerInfo()) {
+                return;
+            }
+            
+            if (!document.getElementById("agree-terms").checked) {
+                showToast("Please agree to the Terms & Conditions", true);
+                return;
+            }
+            
+            const customerInfo = getCustomerInfo();
+            const totalAmount = parseFloat(document.getElementById("cart-total").textContent);
+            
+            // Convert to paise (Razorpay expects amount in smallest currency unit)
+            const amountInPaise = Math.round(totalAmount * 100);
+            
+            // Create order details
+            const orderItems = cart.map(item => `${item.part} (Qty: ${item.qty})`).join(', ');
+            
+            // Razorpay options
             const options = {
-                key: "rzp_live_90iWxpNYThOpyE", // Your live Razorpay key
-                amount: totalAmount,
-                currency: "INR",
-                name: "Auto Spares Solution",
-                description: "Purchase (Prices include 18% GST)",
-                handler: function(response) {
-                    showToast("Payment Successful! Order confirmed.");
-                    const customerInfo = getCustomerInfo();
-                    sendOrderConfirmation(response.razorpay_payment_id, customerInfo);
-                    cart = [];
-                    updateCartUI();
-                    cartSidebar.classList.remove("active");
+                "key": "rzp_live_90iWxpNYThOpyE", // Your live Razorpay key
+                "amount": amountInPaise,
+                "currency": "INR",
+                "name": "Auto Spares Solution",
+                "description": `Order for ${cart.length} item(s)`,
+                "image": "https://autosparessolution.github.io/images/ASS.jpg",
+                "handler": function (response) {
+                    // Payment successful
+                    handlePaymentSuccess(response, customerInfo, totalAmount);
                 },
-                prefill: {
-                    name: document.getElementById("customer-name").value.trim(),
-                    email: document.getElementById("customer-email").value.trim() || "customer@example.com",
-                    contact: document.getElementById("customer-phone").value.trim()
+                "prefill": {
+                    "name": customerInfo.name,
+                    "email": customerInfo.email || 'customer@example.com',
+                    "contact": customerInfo.phone
                 },
-                theme: {
-
-    <script>
-<!-- Add this RIGHT BEFORE </body> tag -->
-<div id="cookie-consent" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; text-align: center; z-index: 10000;">
-    <p>We use cookies to improve your experience and analyze site traffic. 
-       <a href="#privacy-policy" style="color: #f1c40f;">Learn more</a></p>
-    <button id="accept-cookies" style="background: #0a7c71; color: white; border: none; padding: 8px 20px; margin: 0 10px; border-radius: 4px; cursor: pointer;">
-        Accept
-    </button>
-    <button id="decline-cookies" style="background: #6c757d; color: white; border: none; padding: 8px 20px; margin: 0 10px; border-radius: 4px; cursor: pointer;">
-        Decline
-    </button>
-</div>
-
-<script>
-// Auto Spares Solution - Visitor Analytics
-class AutoSparesAnalytics {
-    constructor() {
-        this.sessionId = this.generateSessionId();
-        this.timeOnPage = 0;
-        this.init();
-    }
-
-    generateSessionId() {
-        if (!localStorage.getItem('sessionId')) {
-            localStorage.setItem('sessionId', Date.now().toString());
-        }
-        return localStorage.getItem('sessionId');
-    }
-
-    init() {
-        this.setupConsentBanner();
-        this.trackBasicMetrics();
-        
-        if (this.hasConsent()) {
-            this.trackEnhancedBehavior();
-        }
-    }
-
-    setupConsentBanner() {
-        const consentBanner = document.getElementById('cookie-consent');
-        const acceptBtn = document.getElementById('accept-cookies');
-        const declineBtn = document.getElementById('decline-cookies');
-        
-        if (!localStorage.getItem('cookieConsent')) {
-            consentBanner.style.display = 'block';
-        }
-        
-        acceptBtn.addEventListener('click', () => {
-            localStorage.setItem('cookieConsent', 'accepted');
-            localStorage.setItem('trackingConsent', 'true');
-            consentBanner.style.display = 'none';
-            this.trackEnhancedBehavior();
-        });
-        
-        declineBtn.addEventListener('click', () => {
-            localStorage.setItem('cookieConsent', 'declined');
-            localStorage.setItem('trackingConsent', 'false');
-            consentBanner.style.display = 'none';
-        });
-    }
-
-    hasConsent() {
-        return localStorage.getItem('trackingConsent') === 'true';
-    }
-
-    trackBasicMetrics() {
-        // Basic visit count (no consent needed)
-        const visitCount = parseInt(localStorage.getItem('visitCount') || '0') + 1;
-        localStorage.setItem('visitCount', visitCount.toString());
-        localStorage.setItem('lastVisit', new Date().toISOString());
-
-        console.log('🏁 Auto Spares Solution - Visit #' + visitCount);
-
-        // Track time on page
-        setInterval(() => {
-            this.timeOnPage += 5;
-        }, 5000);
-    }
-
-    trackEnhancedBehavior() {
-        if (!this.hasConsent()) return;
-
-        console.log('🔍 Starting enhanced tracking...');
-
-        // Track product views
-        document.addEventListener('click', (e) => {
-            const card = e.target.closest('.card') || e.target.closest('.product-card');
-            if (card) {
-                const partNumber = card.querySelector('.part-number, .product-name')?.textContent;
-                if (partNumber) {
-                    console.log('👀 Product Viewed:', partNumber);
-                    this.logEvent('product_view', { partNumber: partNumber });
+                "notes": {
+                    "address": customerInfo.address,
+                    "customer_gstin": customerInfo.gstin || 'Not provided',
+                    "order_details": orderItems
+                },
+                "theme": {
+                    "color": "#0a7c71"
                 }
-            }
-
-            // Track cart additions
-            if (e.target.classList.contains('cart') || e.target.closest('.cart')) {
-                const card = e.target.closest('.card');
-                if (card) {
-                    const partNumber = card.querySelector('.part-number')?.textContent;
-                    const price = card.querySelector('.price')?.textContent;
-                    console.log('🛒 Added to Cart:', partNumber, price);
-                    this.logEvent('add_to_cart', { 
-                        partNumber: partNumber, 
-                        price: price 
-                    });
-                }
-            }
-        });
-
-        // Track searches
-        const searchInput = document.getElementById('search-input');
-        if (searchInput) {
-            let searchTimeout;
-            searchInput.addEventListener('input', (e) => {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => {
-                    if (e.target.value.length > 2) {
-                        console.log('🔍 Search:', e.target.value);
-                        this.logEvent('search', { query: e.target.value });
-                    }
-                }, 1000);
+            };
+            
+            // Create Razorpay instance and open checkout
+            const rzp = new Razorpay(options);
+            rzp.open();
+            
+            // Handle payment failure
+            rzp.on('payment.failed', function (response) {
+                handlePaymentFailure(response, customerInfo, totalAmount);
             });
         }
-    }
 
-    logEvent(eventType, data) {
-        const eventData = {
-            event: eventType,
-            sessionId: this.sessionId,
-            timestamp: new Date().toISOString(),
-            page: window.location.pathname,
-            ...data
-        };
-        
-        console.log('📊 Event:', eventData);
-        
-        // Here you can send to your server if you have one
-        // this.sendToServer(eventData);
-    }
+        // Handle successful payment
+        function handlePaymentSuccess(response, customerInfo, totalAmount) {
+            console.log("Payment successful:", response);
+            
+            // Create order summary
+            const orderSummary = {
+                payment_id: response.razorpay_payment_id,
+                order_id: response.razorpay_order_id,
+                signature: response.razorpay_signature,
+                customer: customerInfo,
+                items: [...cart],
+                total: totalAmount,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Show success message
+            showToast("Payment successful! Order confirmed.");
+            
+            // Update UI to show success
+            const cartItems = document.getElementById("cart-items");
+            cartItems.innerHTML = `
+                <div class="payment-success">
+                    <i class="fas fa-check-circle"></i>
+                    <h3>Payment Successful!</h3>
+                    <p>Your order has been confirmed.</p>
+                    <p><strong>Payment ID:</strong> ${response.razorpay_payment_id}</p>
+                    <p><strong>Amount Paid:</strong> ₹${totalAmount.toFixed(2)}</p>
+                    <p>We will process your order shortly.</p>
+                </div>
+            `;
+            
+            // You can send this data to your server for processing
+            sendOrderToServer(orderSummary);
+            
+            // Clear cart after successful payment
+            setTimeout(() => {
+                cart = [];
+                updateCartUI();
+                cartSidebar.classList.remove("active");
+            }, 5000);
+        }
 
-    sendToServer(data) {
-        // Example: Send to your backend if you have one
-        // fetch('/api/analytics', {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify(data)
-        // });
-    }
-}
+        // Handle payment failure
+        function handlePaymentFailure(response, customerInfo, totalAmount) {
+            console.error("Payment failed:", response);
+            
+            const error = response.error;
+            showToast(`Payment failed: ${error.description}`, true);
+            
+            // Update UI to show error
+            const cartItems = document.getElementById("cart-items");
+            cartItems.innerHTML += `
+                <div class="payment-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Payment Failed</h3>
+                    <p>${error.description}</p>
+                    <p>Please try again or contact support.</p>
+                </div>
+            `;
+            
+            // Log the error for debugging
+            console.error("Razorpay payment failed:", {
+                code: error.code,
+                description: error.description,
+                source: error.source,
+                step: error.step,
+                reason: error.reason,
+                metadata: error.metadata
+            });
+        }
 
-// Initialize analytics when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    new AutoSparesAnalytics();
-});
+        // Send order data to server (you can implement this)
+        function sendOrderToServer(orderData) {
+            // This is where you would send the order data to your backend
+            // For now, we'll just log it and potentially send an email
+            console.log("Order data to be sent to server:", orderData);
+            
+            // You can implement AJAX call to your backend here
+            /*
+            fetch('/api/orders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(orderData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Order saved successfully:', data);
+            })
+            .catch(error => {
+                console.error('Error saving order:', error);
+            });
+            */
+            
+            // Send confirmation email (optional)
+            sendOrderConfirmationEmail(orderData);
+        }
+
+        // Send order confirmation email
+        function sendOrderConfirmationEmail(orderData) {
+            const subject = `Order Confirmation - ${orderData.payment_id}`;
+            const body = `
+Order Confirmation - Auto Spares Solution
+
+Thank you for your order!
+
+Order Details:
+Payment ID: ${orderData.payment_id}
+Order Date: ${new Date(orderData.timestamp).toLocaleString()}
+Total Amount: ₹${orderData.total.toFixed(2)}
+
+Customer Information:
+Name: ${orderData.customer.name}
+Phone: ${orderData.customer.phone}
+Email: ${orderData.customer.email}
+Address: ${orderData.customer.address}
+${orderData.customer.gstin ? `GSTIN: ${orderData.customer.gstin}` : ''}
+
+Order Items:
+${orderData.items.map(item => `- ${item.part} (${item.desc}) - Qty: ${item.qty} - ₹${item.price.toFixed(2)} each`).join('\n')}
+
+We will process your order and ship it to you shortly.
+
+Thank you for choosing Auto Spares Solution!
+            `;
+            
+            // This would typically be handled by your backend
+            // For now, we'll create a mailto link
+            const mailtoLink = `mailto:${orderData.customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            // window.location.href = mailtoLink; // Uncomment if you want to open email client
+        }
+
+        // Initialize the page
+        loadProducts();
     </script>
 </body>
-    </html>
+</html>
