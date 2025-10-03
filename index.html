@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+// === BACKEND CONNECTION SETUP ===
+const BACKEND_URL = 'https://your-railway-app.railway.app'; // ← YOUR URL HERE
+
+console.log('🔄 Backend URL set to:', BACKEND_URL);
+
+// Test connection
+fetch(BACKEND_URL + '/api/health')
+    .then(response => response.json())
+    .then(data => console.log('✅ Backend connected:', data))
+    .catch(error => console.log('❌ Backend connection failed:', error));
+</script>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389"
      crossorigin="anonymous"></script>
     <script async custom-element="amp-auto-ads"
