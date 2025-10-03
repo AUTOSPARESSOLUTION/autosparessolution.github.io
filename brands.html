@@ -1498,7 +1498,7 @@ fetch(BACKEND_URL + '/api/health')
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 performSearch(e.target.value);
-            }, 300);
+            }, 5000);
         });
 
         searchInput.addEventListener("keypress", (e) => {
