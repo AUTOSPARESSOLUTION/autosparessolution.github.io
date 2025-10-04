@@ -1,6 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    // === KEEP BACKEND AWAKE ===
+function keepBackendAwake() {
+    // Ping immediately when page loads
+    fetch(`${BACKEND_URL}/api/health`)
+        .then(() => console.log('✅ Backend is awake'))
+        .catch(() => console.log('💤 Backend is sleeping...'));
+    
+    // Ping every 5 minutes to keep awake
+    setInterval(() => {
+        fetch(`${BACKEND_URL}/api/health`)
+            .then(() => console.log('🔔 Backend pinged - keeping awake'))
+            .catch(() => console.log('⚠️ Backend not responding'));
+    }, 5 * 60 * 1000); // 5 minutes
+}
+
+// Start when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    keepBackendAwake();
+});
     <script>
 // === BACKEND CONNECTION SETUP ===
 const BACKEND_URL = 'https://ideal-bravery-production.up.railway.app';
