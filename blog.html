@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auto Spares Solution Blog</title>
+  <link rel="icon" href="logo.png" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Poppins", sans-serif;
+    }
+
+    body {
+      background: #f9f9f9;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0a2351 0%, #1a3a7a 100%);
+      color: #fff;
+      padding: 1.5rem 0;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    header h1 {
+      margin-bottom: 0.3rem;
+      font-size: 2.2rem;
+      font-weight: 700;
+    }
+
+    header p {
+      font-size: 1.1rem;
+      color: #e0e0e0;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    nav {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+
+    nav a {
+      display: inline-block;
+      padding: 0.9rem 1.5rem;
+      color: #0a2351;
+      font-weight: 600;
+      text-decoration: none;
+      transition: 0.3s;
+      position: relative;
+    }
+
+    nav a:hover, nav a.active {
+      color: #ff6600;
+    }
+
+    nav a.active:after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 15%;
+      width: 70%;
+      height: 3px;
+      background: #ff6600;
+      border-radius: 2px;
+    }
+
+    .breadcrumb {
+      max-width: 1200px;
+      margin: 1rem auto;
+      padding: 0 1rem;
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .breadcrumb a {
+      color: #0a2351;
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+
+    .main-content {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .sidebar {
+      width: 300px;
+    }
+
+    .search-box {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      margin-bottom: 1.5rem;
+    }
+
+    .search-box h3 {
+      color: #0a2351;
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+    }
+
+    .search-form {
+      display: flex;
+    }
+
+    .search-form input {
+      flex: 1;
+      padding: 0.8rem;
+      border: 1px solid #ddd;
+      border-radius: 5px 0 0 5px;
+      outline: none;
+    }
+
+    .search-form button {
+      background: #0a2351;
+      color: white;
+      border: none;
+      padding: 0 1.2rem;
+      border-radius: 0 5px 5px 0;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .search-form button:hover {
+      background: #ff6600;
+    }
+
+    .blog-card {
+      background: #fff;
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      transition: 0.3s;
+      overflow: hidden;
+    }
+
+    .blog-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .blog-card img {
+      width: 100%;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      height: 200px;
+      object-fit: cover;
+    }
+
+    .blog-card h2 {
+      color: #0a2351;
+      margin-bottom: 0.5rem;
+      font-size: 1.4rem;
+      line-height: 1.3;
+    }
+
+    .blog-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    .blog-category {
+      background: #e6efff;
+      color: #0a2351;
+      padding: 0.2rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .blog-card p {
+      margin-bottom: 1.5rem;
+      color: #444;
+    }
+
+    .blog-card a {
+      color: #0a2351;
+      text-decoration: none;
+      font-weight: 600;
+      transition: 0.3s;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .blog-card a:hover {
+      color: #ff6600;
+    }
+
+    .blog-card a i {
+      margin-left: 0.5rem;
+      transition: 0.3s;
+    }
+
+    .blog-card a:hover i {
+      transform: translateX(5px);
+    }
+
+    /* Video Styles */
+    .video-container {
+      position: relative;
+      width: 100%;
+      height: 0;
+      padding-bottom: 56.25%; /* 16:9 aspect ratio */
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .video-container iframe,
+    .video-container video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .video-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 0.3rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      z-index: 10;
+    }
+
+    .video-badge i {
+      margin-right: 0.3rem;
+    }
+
+    .video-card {
+      background: #fff;
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      transition: 0.3s;
+      overflow: hidden;
+    }
+
+    .video-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .video-card h2 {
+      color: #0a2351;
+      margin-bottom: 0.5rem;
+      font-size: 1.4rem;
+      line-height: 1.3;
+    }
+
+    .video-card p {
+      margin-bottom: 1.5rem;
+      color: #444;
+    }
+
+    .section-title {
+      color: #0a2351;
+      margin: 2rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #e6efff;
+      font-size: 1.5rem;
+    }
+
+    .sidebar-widget {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      margin-bottom: 1.5rem;
+    }
+
+    .sidebar-widget h3 {
+      color: #0a2351;
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .popular-post {
+      display: flex;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .popular-post:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .popular-post img {
+      width: 70px;
+      height: 70px;
+      border-radius: 5px;
+      object-fit: cover;
+      margin-right: 1rem;
+    }
+
+    .popular-post-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .popular-post-content h4 a {
+      color: #333;
+      text-decoration: none;
+      transition: 0.3s;
+    }
+
+    .popular-post-content h4 a:hover {
+      color: #ff6600;
+    }
+
+    .popular-post-content span {
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    .categories-list {
+      list-style: none;
+    }
+
+    .categories-list li {
+      margin-bottom: 0.8rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .categories-list li:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .categories-list a {
+      color: #333;
+      text-decoration: none;
+      display: flex;
+      justify-content: space-between;
+      transition: 0.3s;
+    }
+
+    .categories-list a:hover {
+      color: #ff6600;
+    }
+
+    .categories-list span {
+      background: #f0f0f0;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+    }
+
+    .newsletter {
+      background: linear-gradient(135deg, #0a2351 0%, #1a3a7a 100%);
+      color: white;
+      padding: 1.5rem;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .newsletter h3 {
+      margin-bottom: 1rem;
+    }
+
+    .newsletter p {
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    .newsletter-form input {
+      width: 100%;
+      padding: 0.8rem;
+      margin-bottom: 1rem;
+      border: none;
+      border-radius: 5px;
+      outline: none;
+    }
+
+    .newsletter-form button {
+      width: 100%;
+      background: #ff6600;
+      color: white;
+      border: none;
+      padding: 0.8rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.3s;
+    }
+
+    .newsletter-form button:hover {
+      background: #e55a00;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      margin-top: 2rem;
+    }
+
+    .pagination a {
+      display: inline-block;
+      padding: 0.6rem 1rem;
+      margin: 0 0.2rem;
+      background: #fff;
+      color: #0a2351;
+      text-decoration: none;
+      border-radius: 5px;
+      transition: 0.3s;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+
+    .pagination a:hover, .pagination a.active {
+      background: #0a2351;
+      color: white;
+    }
+
+    footer {
+      text-align: center;
+      background: #0a2351;
+      color: #fff;
+      padding: 2rem 0;
+      margin-top: 3rem;
+    }
+
+    .footer-content {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    .social-links {
+      margin: 1rem 0;
+    }
+
+    .social-links a {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border-radius: 50%;
+      line-height: 40px;
+      margin: 0 0.3rem;
+      transition: 0.3s;
+    }
+
+    .social-links a:hover {
+      background: #ff6600;
+      transform: translateY(-3px);
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 1rem 0;
+    }
+
+    .footer-links a {
+      color: #ddd;
+      text-decoration: none;
+      margin: 0 1rem;
+      transition: 0.3s;
+    }
+
+    .footer-links a:hover {
+      color: #ff6600;
+    }
+
+    /* Recent Blogs Section */
+    #recent-blogs {
+      background: #f8f9fa;
+      padding: 50px 5%;
+    }
+
+    #recent-blogs h2 {
+      text-align: center;
+      color: #0a2351;
+      margin-bottom: 40px;
+      font-size: 2rem;
+    }
+
+    #blogs-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .recent-blog-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .recent-blog-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .recent-blog-card img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+    }
+
+    .recent-blog-card-content {
+      padding: 20px;
+    }
+
+    .recent-blog-card h3 {
+      color: #0a2351;
+      margin-bottom: 10px;
+      font-size: 1.2rem;
+    }
+
+    .recent-blog-card p {
+      color: #444;
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+    }
+
+    .recent-blog-card a {
+      display: inline-block;
+      margin-top: 15px;
+      padding: 10px 20px;
+      background: #0a2351;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      transition: background 0.3s;
+      font-weight: 500;
+    }
+
+    .recent-blog-card a:hover {
+      background: #ff6600;
+    }
+
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 1.8rem;
+      }
+      
+      .container {
+        flex-direction: column;
+      }
+      
+      .sidebar {
+        width: 100%;
+      }
+      
+      nav a {
+        padding: 0.8rem 1rem;
+        font-size: 0.9rem;
+      }
+
+      #recent-blogs h2 {
+        font-size: 1.6rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Auto Spares Solution Blog</h1>
+    <p>Insights, News & Inspiration for Daily Life, Business & Jobs</p>
+  </header>
+
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="blog.html" class="active">Blogs</a>
+    <a href="videos.html">Videos</a>
+    <a href="about.html">About</a>
+    <a href="contact.html">Contact</a>
+  </nav>
+
+  <div class="breadcrumb">
+    <a href="index.html">Home</a> &gt; <a href="blog.html">Blog</a>
+  </div>
+
+  <div class="container">
+    <div class="main-content">
+      <h2 class="section-title">Latest Articles</h2>
+      
+      <!-- Dynamic Blog Posts will be inserted here -->
+      <div id="blog-posts-container"></div>
+
+      <h2 class="section-title">Featured Videos</h2>
+      
+      <!-- Video 1 -->
+      <div class="video-card">
+        <div class="video-container">
+          <div class="video-badge"><i class="fas fa-play"></i> Video</div>
+          <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <div class="blog-meta">
+          <span><i class="far fa-calendar"></i> March 12, 2025</span>
+          <span class="blog-category">Tutorial</span>
+        </div>
+        <h2>How to Identify Quality Auto Parts - Complete Guide</h2>
+        <p>Learn how to distinguish between genuine and counterfeit auto parts with our comprehensive video guide. Save money and ensure your vehicle's performance with these expert tips.</p>
+        <a href="#">Watch Full Video <i class="fas fa-arrow-right"></i></a>
+      </div>
+
+      <!-- Video 2 -->
+      <div class="video-card">
+        <div class="video-container">
+          <div class="video-badge"><i class="fas fa-play"></i> Video</div>
+          <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <div class="blog-meta">
+          <span><i class="far fa-calendar"></i> March 8, 2025</span>
+          <span class="blog-category">Maintenance</span>
+        </div>
+        <h2>Essential Car Maintenance Tips for 2025</h2>
+        <p>Watch our step-by-step guide to basic car maintenance that every vehicle owner should know. From oil changes to brake inspections, we cover it all in this detailed video.</p>
+        <a href="#">Watch Full Video <i class="fas fa-arrow-right"></i></a>
+      </div>
+
+      <div class="pagination">
+        <a href="#" class="active">1</a>
+        <a href="#">2</a>
+        <a href="#">3</a>
+        <a href="#">Next <i class="fas fa-chevron-right"></i></a>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="search-box">
+        <h3>Search Blog</h3>
+        <form class="search-form">
+          <input type="text" placeholder="Search articles...">
+          <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+      </div>
+
+      <div class="sidebar-widget">
+        <h3>Popular Posts</h3>
+        <div class="popular-post">
+          <img src="https://images.unsplash.com/photo-1553440569-bcc63803a83d" alt="Car Maintenance">
+          <div class="popular-post-content">
+            <h4><a href="#">Essential Car Maintenance Tips for 2025</a></h4>
+            <span>March 12, 2025</span>
+          </div>
+        </div>
+        <div class="popular-post">
+          <img src="https://images.unsplash.com/photo-1565689228864-0c6e928927b1" alt="Auto Parts">
+          <div class="popular-post-content">
+            <h4><a href="#">How to Identify Quality Auto Parts</a></h4>
+            <span>March 8, 2025</span>
+          </div>
+        </div>
+        <div class="popular-post">
+          <img src="https://images.unsplash.com/photo-1581094794329-c8112a89af12" alt="Electric Vehicles">
+          <div class="popular-post-content">
+            <h4><a href="#">The Future of Electric Vehicles in India</a></h4>
+            <span>March 3, 2025</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-widget">
+        <h3>Video Categories</h3>
+        <ul class="categories-list">
+          <li><a href="#">Tutorials <span>8</span></a></li>
+          <li><a href="#">Product Reviews <span>5</span></a></li>
+          <li><a href="#">Maintenance Guides <span>12</span></a></li>
+          <li><a href="#">Industry News <span>7</span></a></li>
+          <li><a href="#">Expert Interviews <span>3</span></a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-widget">
+        <h3>Categories</h3>
+        <ul class="categories-list">
+          <li><a href="#">Industry Trends <span>12</span></a></li>
+          <li><a href="#">Business <span>8</span></a></li>
+          <li><a href="#">Career <span>5</span></a></li>
+          <li><a href="#">Auto Parts <span>15</span></a></li>
+          <li><a href="#">Maintenance <span>7</span></a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-widget newsletter">
+        <h3>Newsletter</h3>
+        <p>Subscribe to get the latest updates and offers</p>
+        <form class="newsletter-form">
+          <input type="email" placeholder="Your email address" required>
+          <button type="submit">Subscribe</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Blogs Section -->
+  <section id="recent-blogs">
+    <div>
+      <h2>📚 Recent Blogs</h2>
+      <div id="blogs-container">
+        <!-- Blogs will be inserted here dynamically -->
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-content">
+      <div class="social-links">
+        <a href="#"><i class="fab fa-facebook-f"></i></a>
+        <a href="#"><i class="fab fa-twitter"></i></a>
+        <a href="#"><i class="fab fa-instagram"></i></a>
+        <a href="#"><i class="fab fa-linkedin-in"></i></a>
+        <a href="#"><i class="fab fa-youtube"></i></a>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="blog.html">Blog</a>
+        <a href="videos.html">Videos</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+      </div>
+      <p>© 2025 Auto Spares Solution | Designed by Dipankar Dey</p>
+    </div>
+  </footer>
+
+  <script>
+    // Blog data from your JSON
+    const blogData = [
+      {
+        "title": "How Festive Season 2025 is Impacting Car Spare Prices",
+        "image": "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1000&q=80",
+        "link": "blogs/festive-prices-2025.html",
+        "description": "Learn how the festive season affects auto spare prices and how to grab the best deals on genuine car parts this year."
+      },
+      {
+        "title": "Top 5 Growing Job Roles in Automobile Industry (2025)",
+        "image": "https://images.unsplash.com/photo-1616129923478-ecf3a048b0e8?auto=format&fit=crop&w=1000&q=80",
+        "link": "blogs/auto-jobs-2025.html",
+        "description": "Discover the fastest-growing automobile jobs in India for 2025, from EV engineers to spare parts analysts and more."
+      },
+      {
+        "title": "How to Start an Auto Spare Parts Business from Home (2025 Guide)",
+        "image": "https://images.unsplash.com/photo-1606112219348-204d7d8b94ee?auto=format&fit=crop&w=1000&q=80",
+        "link": "blogs/start-auto-business-2025.html",
+        "description": "Step-by-step guide to starting your own auto spare business from home with minimum investment and online tools."
+      }
+    ];
+
+    // Function to generate blog posts
+    function generateBlogPosts() {
+      const container = document.getElementById('blog-posts-container');
+      
+      blogData.forEach(blog => {
+        const blogCard = document.createElement('div');
+        blogCard.className = 'blog-card';
+        
+        // Generate random date for demo purposes
+        const randomDate = new Date();
+        randomDate.setDate(randomDate.getDate() - Math.floor(Math.random() * 30));
+        const formattedDate = randomDate.toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+        
+        // Generate random category for demo purposes
+        const categories = ['Industry Trends', 'Business', 'Career', 'Auto Parts'];
+        const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+        
+        blogCard.innerHTML = `
+          <img src="${blog.image}" alt="${blog.title}">
+          <div class="blog-meta">
+            <span><i class="far fa-calendar"></i> ${formattedDate}</span>
+            <span class="blog-category">${randomCategory}</span>
+          </div>
+          <h2>${blog.title}</h2>
+          <p>${blog.description}</p>
+          <a href="${blog.link}">Read More <i class="fas fa-arrow-right"></i></a>
+        `;
+        
+        container.appendChild(blogCard);
+      });
+    }
+
+    // Function to generate recent blogs
+    function generateRecentBlogs() {
+      const container = document.getElementById('blogs-container');
+      
+      // Sort blogs by newest first (assumes last added is newest)
+      const sortedBlogs = blogData.slice().reverse();
+      
+      // Show only 3 latest blogs on homepage
+      const latestBlogs = sortedBlogs.slice(0, 3);
+      
+      latestBlogs.forEach(blog => {
+        const card = document.createElement('div');
+        card.className = 'recent-blog-card';
+        card.innerHTML = `
+          <img src="${blog.image}" alt="${blog.title}">
+          <div class="recent-blog-card-content">
+            <h3>${blog.title}</h3>
+            <p>${blog.description}</p>
+            <a href="${blog.link}">Read More</a>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Initialize the blog when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      generateBlogPosts();
+      generateRecentBlogs();
+    });
+  </script>
+</body>
+</html>
