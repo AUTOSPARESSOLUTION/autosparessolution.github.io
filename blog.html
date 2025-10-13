@@ -1,31 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389"
-     crossorigin="anonymous"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Auto Spares Solution Blog - Automotive Insights & News</title>
   <meta name="description" content="Expert insights on auto parts, car maintenance, and industry trends. Your trusted source for automotive knowledge.">
-  <meta name="keywords" content="auto parts, car maintenance, automotive blog, car repair, auto industry">
-  <meta property="og:title" content="Auto Spares Solution Blog">
-  <meta property="og:description" content="Insights, News & Inspiration for Daily Life, Business & Jobs">
-  <meta property="og:type" content="website">
-  <link rel="icon" href="logo.png" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Blog",
-    "name": "Auto Spares Solution Blog",
-    "description": "Insights, News & Inspiration for Daily Life, Business & Jobs",
-    "publisher": {
-      "@type": "Organization",
-      "name": "Auto Spares Solution"
-    }
-  }
-  </script>
   <style>
     :root {
       --primary-color: #0a2351;
@@ -53,29 +34,7 @@
       line-height: 1.6;
     }
 
-    /* Skip link for accessibility */
-    .skip-link {
-      position: absolute;
-      top: -40px;
-      left: 6px;
-      background: var(--secondary-color);
-      color: white;
-      padding: 8px;
-      z-index: 1000;
-      text-decoration: none;
-      border-radius: 4px;
-    }
-
-    .skip-link:focus {
-      top: 0;
-    }
-
-    /* Focus styles for accessibility */
-    :focus {
-      outline: 2px solid var(--secondary-color);
-      outline-offset: 2px;
-    }
-
+    /* Header & Navigation */
     header {
       background: linear-gradient(135deg, var(--primary-color) 0%, #1a3a7a 100%);
       color: #fff;
@@ -167,46 +126,7 @@
       width: 300px;
     }
 
-    .search-box {
-      background: #fff;
-      padding: 1.5rem;
-      border-radius: 10px;
-      box-shadow: var(--card-shadow);
-      margin-bottom: 1.5rem;
-    }
-
-    .search-box h3 {
-      color: var(--primary-color);
-      margin-bottom: 1rem;
-      font-size: 1.2rem;
-    }
-
-    .search-form {
-      display: flex;
-    }
-
-    .search-form input {
-      flex: 1;
-      padding: 0.8rem;
-      border: 1px solid #ddd;
-      border-radius: 5px 0 0 5px;
-      outline: none;
-    }
-
-    .search-form button {
-      background: var(--primary-color);
-      color: white;
-      border: none;
-      padding: 0 1.2rem;
-      border-radius: 0 5px 5px 0;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-
-    .search-form button:hover {
-      background: var(--secondary-color);
-    }
-
+    /* Blog Cards */
     .blog-card {
       background: #fff;
       margin-bottom: 2rem;
@@ -220,11 +140,6 @@
     .blog-card:hover {
       transform: translateY(-5px);
       box-shadow: var(--hover-shadow);
-    }
-
-    .blog-card:focus-within {
-      outline: 2px solid var(--secondary-color);
-      outline-offset: 2px;
     }
 
     .blog-card img {
@@ -286,70 +201,95 @@
       transform: translateX(5px);
     }
 
-    /* Video Styles */
-    .video-container {
-      position: relative;
-      width: 100%;
-      height: 0;
-      padding-bottom: 56.25%; /* 16:9 aspect ratio */
-      margin-bottom: 1rem;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .video-container iframe,
-    .video-container video {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
-    .video-badge {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 0.3rem 0.8rem;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      z-index: 10;
-    }
-
-    .video-badge i {
-      margin-right: 0.3rem;
-    }
-
-    .video-card {
+    /* Article Content Styling */
+    .article-content {
       background: #fff;
-      margin-bottom: 2rem;
-      padding: 1.5rem;
+      padding: 2rem;
       border-radius: 10px;
       box-shadow: var(--card-shadow);
-      transition: 0.3s;
-      overflow: hidden;
+      margin-bottom: 2rem;
     }
 
-    .video-card:hover {
-      transform: translateY(-5px);
-      box-shadow: var(--hover-shadow);
-    }
-
-    .video-card h2 {
+    .article-content h1 {
       color: var(--primary-color);
-      margin-bottom: 0.5rem;
-      font-size: 1.4rem;
+      font-size: 2rem;
+      margin-bottom: 1rem;
       line-height: 1.3;
+      border-bottom: 2px solid #e6efff;
+      padding-bottom: 0.5rem;
     }
 
-    .video-card p {
-      margin-bottom: 1.5rem;
+    .article-content h2 {
+      color: var(--primary-color);
+      font-size: 1.6rem;
+      margin: 1.5rem 0 1rem;
+    }
+
+    .article-content h3 {
+      color: var(--primary-color);
+      font-size: 1.3rem;
+      margin: 1.3rem 0 0.8rem;
+    }
+
+    .article-content p {
+      margin-bottom: 1.2rem;
       color: #444;
     }
 
+    .article-content ul, .article-content ol {
+      margin: 1rem 0 1rem 2rem;
+    }
+
+    .article-content li {
+      margin-bottom: 0.5rem;
+    }
+
+    .key-point {
+      background: #e6efff;
+      border-left: 4px solid var(--primary-color);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .case-study {
+      background: #fff8e6;
+      border-left: 4px solid var(--secondary-color);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .conclusion {
+      background: #f0f8f0;
+      border-left: 4px solid #28a745;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .article-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+    }
+
+    .article-content th, .article-content td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .article-content th {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .article-content tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    /* Section Titles */
     .section-title {
       color: var(--primary-color);
       margin: 2rem 0 1rem;
@@ -358,6 +298,7 @@
       font-size: 1.5rem;
     }
 
+    /* Sidebar Widgets */
     .sidebar-widget {
       background: #fff;
       padding: 1.5rem;
@@ -372,6 +313,40 @@
       font-size: 1.2rem;
       padding-bottom: 0.5rem;
       border-bottom: 2px solid #f0f0f0;
+    }
+
+    .search-box {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 10px;
+      box-shadow: var(--card-shadow);
+      margin-bottom: 1.5rem;
+    }
+
+    .search-form {
+      display: flex;
+    }
+
+    .search-form input {
+      flex: 1;
+      padding: 0.8rem;
+      border: 1px solid #ddd;
+      border-radius: 5px 0 0 5px;
+      outline: none;
+    }
+
+    .search-form button {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 0 1.2rem;
+      border-radius: 0 5px 5px 0;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .search-form button:hover {
+      background: var(--secondary-color);
     }
 
     .popular-post {
@@ -493,29 +468,6 @@
       background: #e55a00;
     }
 
-    .pagination {
-      display: flex;
-      justify-content: center;
-      margin-top: 2rem;
-    }
-
-    .pagination a {
-      display: inline-block;
-      padding: 0.6rem 1rem;
-      margin: 0 0.2rem;
-      background: #fff;
-      color: var(--primary-color);
-      text-decoration: none;
-      border-radius: 5px;
-      transition: 0.3s;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-    }
-
-    .pagination a:hover, .pagination a.active {
-      background: var(--primary-color);
-      color: white;
-    }
-
     /* Recent Blogs Section */
     #recent-blogs {
       background: #f8f9fa;
@@ -588,79 +540,31 @@
       background: var(--secondary-color);
     }
 
-    /* Article styling for long content */
-    .key-point {
-      background: #e6efff;
-      border-left: 4px solid var(--primary-color);
-      padding: 1.5rem;
-      margin: 1.5rem 0;
-      border-radius: 0 8px 8px 0;
+    /* Pagination */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      margin-top: 2rem;
     }
 
-    .case-study {
-      background: #fff8e6;
-      border-left: 4px solid var(--secondary-color);
-      padding: 1.5rem;
-      margin: 1.5rem 0;
-      border-radius: 0 8px 8px 0;
-    }
-
-    .conclusion {
-      background: #f0f8f0;
-      border-left: 4px solid #28a745;
-      padding: 1.5rem;
-      margin: 1.5rem 0;
-      border-radius: 0 8px 8px 0;
-    }
-
-    .article-content h1, .article-content h2, .article-content h3 {
+    .pagination a {
+      display: inline-block;
+      padding: 0.6rem 1rem;
+      margin: 0 0.2rem;
+      background: #fff;
       color: var(--primary-color);
-      margin: 1.5rem 0 1rem;
+      text-decoration: none;
+      border-radius: 5px;
+      transition: 0.3s;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
     }
 
-    .article-content h1 {
-      font-size: 2rem;
-      border-bottom: 2px solid #e6efff;
-      padding-bottom: 0.5rem;
-    }
-
-    .article-content h2 {
-      font-size: 1.6rem;
-    }
-
-    .article-content h3 {
-      font-size: 1.3rem;
-    }
-
-    .article-content ul, .article-content ol {
-      margin: 1rem 0 1rem 2rem;
-    }
-
-    .article-content li {
-      margin-bottom: 0.5rem;
-    }
-
-    .article-content table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1.5rem 0;
-    }
-
-    .article-content th, .article-content td {
-      padding: 12px;
-      text-align: left;
-      border-bottom: 1px solid #ddd;
-    }
-
-    .article-content th {
+    .pagination a:hover, .pagination a.active {
       background: var(--primary-color);
       color: white;
     }
 
-    .article-content tr:nth-child(even) {
-      background: #f9f9f9;
-    }
-
+    /* Footer */
     footer {
       text-align: center;
       background: var(--primary-color);
@@ -714,60 +618,7 @@
       color: var(--secondary-color);
     }
 
-    /* Dark mode support */
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --background-color: #1a1a1a;
-        --text-color: #ffffff;
-      }
-      
-      body {
-        background: var(--background-color);
-        color: var(--text-color);
-      }
-      
-      .blog-card, .sidebar-widget, .search-box, .recent-blog-card {
-        background: #2d2d2d;
-        color: var(--text-color);
-      }
-
-      .blog-card h2, .sidebar-widget h3, .search-box h3 {
-        color: #e0e0e0;
-      }
-
-      .blog-card p, .sidebar-widget, .categories-list a {
-        color: #cccccc;
-      }
-
-      .blog-category {
-        background: #3a3a3a;
-        color: #e0e0e0;
-      }
-    }
-
-    /* Print styles */
-    @media print {
-      .sidebar, nav, .pagination, .social-links, .video-container, .video-badge {
-        display: none;
-      }
-      
-      .main-content {
-        width: 100%;
-      }
-
-      .blog-card, .video-card {
-        break-inside: avoid;
-        box-shadow: none;
-        border: 1px solid #ddd;
-      }
-    }
-
-    /* Loading state */
-    .loading {
-      opacity: 0.6;
-      pointer-events: none;
-    }
-
+    /* Responsive Design */
     @media (max-width: 768px) {
       header h1 {
         font-size: 1.8rem;
@@ -790,6 +641,10 @@
         font-size: 1.6rem;
       }
 
+      .article-content {
+        padding: 1.5rem;
+      }
+
       .article-content h1 {
         font-size: 1.6rem;
       }
@@ -805,8 +660,6 @@
   </style>
 </head>
 <body>
-  <a href="#main-content" class="skip-link">Skip to main content</a>
-
   <header>
     <h1>Auto Spares Solution Blog</h1>
     <p>Insights, News & Inspiration for Daily Life, Business & Jobs</p>
@@ -825,176 +678,11 @@
   </div>
 
   <div class="container">
-    <div class="main-content" id="main-content">
+    <div class="main-content">
       <h2 class="section-title">Latest Articles</h2>
       
       <!-- Dynamic Blog Posts will be inserted here -->
       <div id="blog-posts-container"></div>
-      
-      <!-- Long Article -->
-      <div class="blog-card article-content">
-        <h1>AI in Auto Diagnostics: Revolutionizing Car Repairs in 2025</h1>
-
-        <p><strong>The Future of Vehicle Diagnostics is Here - Powered by Artificial Intelligence</strong></p>
-
-        <p>Artificial Intelligence is transforming automotive diagnostics from an art to a science. In 2025, AI-powered tools are no longer futuristic concepts but essential equipment for every modern workshop and auto parts business.</p>
-
-        <h2>The AI Diagnostic Revolution</h2>
-
-        <p>AI diagnostics represent the most significant advancement in automotive repair since computerized systems. Here's what's changing:</p>
-
-        <div class="key-point">
-          <h3>AI Diagnostic Capabilities in 2025:</h3>
-          <ul>
-            <li><strong>Predictive Maintenance</strong>: Identify issues 2-3 weeks before failure</li>
-            <li><strong>Fault Prediction Accuracy</strong>: 94% accurate diagnosis vs. 65% human average</li>
-            <li><strong>Repair Time Reduction</strong>: 40% faster diagnostics and repairs</li>
-            <li><strong>First-time Fix Rate</strong>: 92% success vs. 68% traditional methods</li>
-          </ul>
-        </div>
-
-        <h2>AI Diagnostic Tools Available Today</h2>
-
-        <h3>1. Predictive Maintenance Systems</h3>
-
-        <p>These AI systems analyze vehicle data to predict failures before they happen:</p>
-
-        <ul>
-          <li><strong>Engine Performance Monitoring</strong>: Real-time analysis of 200+ engine parameters</li>
-          <li><strong>Component Wear Prediction</strong>: Forecast brake, battery, and transmission failure</li>
-          <li><strong>Fluid Quality Analysis</strong>: Monitor oil, coolant, and transmission fluid degradation</li>
-          <li><strong>Electrical System Health</strong>: Predict alternator and starter motor failures</li>
-        </ul>
-
-        <div class="case-study">
-          <h4>Case Study: Smart Garage Mumbai</h4>
-          <p>Implemented AI predictive maintenance in 2024. Results: 35% reduction in emergency repairs, 28% increase in customer satisfaction, and 45% growth in preventive maintenance revenue.</p>
-        </div>
-
-        <h3>2. Computer Vision for Vehicle Inspection</h3>
-
-        <p>AI-powered cameras and sensors that can:</p>
-
-        <ul>
-          <li><strong>Visual Component Inspection</strong>: Identify worn belts, hoses, and brakes</li>
-          <li><strong>Fluid Leak Detection</strong>: Pinpoint oil, coolant, and transmission leaks</li>
-          <li><strong>Tire Wear Analysis</strong>: Measure tread depth and identify wear patterns</li>
-          <li><strong>Undercarriage Inspection</strong>: Detect rust, damage, and suspension issues</li>
-        </ul>
-
-        <h3>3. Voice-Activated Diagnostic Assistants</h3>
-
-        <p>Hands-free AI assistants for technicians:</p>
-
-        <ul>
-          <li><strong>Voice Commands</strong>: Run diagnostics through voice instructions</li>
-          <li><strong>Real-time Guidance</strong>: Step-by-step repair instructions</li>
-          <li><strong>Technical Database Access</strong>: Instant access to repair manuals and specifications</li>
-          <li><strong>Documentation</strong>: Voice-to-text repair documentation</li>
-        </ul>
-
-        <h2>Implementation Guide for Workshops</h2>
-
-        <h3>Phase 1: Basic AI Tools (₹2-5 Lakhs Investment)</h3>
-
-        <ul>
-          <li><strong>AI Diagnostic Scanner</strong>: Basic predictive maintenance capabilities</li>
-          <li><strong>Cloud-based Software</strong>: Subscription-based diagnostic platforms</li>
-          <li><strong>Mobile App Integration</strong>: Technician and customer-facing apps</li>
-        </ul>
-
-        <h3>Phase 2: Intermediate AI Systems (₹5-15 Lakhs Investment)</h3>
-
-        <ul>
-          <li><strong>Computer Vision Systems</strong>: Automated visual inspection tools</li>
-          <li><strong>Voice Assistants</strong>: Hands-free diagnostic assistance</li>
-          <li><strong>Data Analytics</strong>: Advanced pattern recognition and forecasting</li>
-        </ul>
-
-        <h3>Phase 3: Advanced AI Integration (₹15-30 Lakhs Investment)</h3>
-
-        <ul>
-          <li><strong>Full Workshop Automation</strong>: Integrated AI systems across all operations</li>
-          <li><strong>Custom AI Solutions</strong>: Tailored systems for specific workshop needs</li>
-          <li><strong>Predictive Inventory Management</strong>: AI-driven parts forecasting</li>
-        </ul>
-
-        <h2>Skills Development for Technicians</h2>
-
-        <h3>Essential AI Skills for 2025:</h3>
-
-        <div class="key-point">
-          <h3>Training Requirements:</h3>
-          <ul>
-            <li><strong>AI System Operation</strong>: Using AI diagnostic tools effectively</li>
-            <li><strong>Data Interpretation</strong>: Understanding AI-generated insights</li>
-            <li><strong>Software Troubleshooting</strong>: Basic AI system maintenance</li>
-            <li><strong>Traditional Mechanical Skills</strong>: Foundation remains critical</li>
-          </ul>
-        </div>
-
-        <h2>Business Impact and ROI</h2>
-
-        <h3>Financial Benefits of AI Diagnostics:</h3>
-
-        <ul>
-          <li><strong>Increased Efficiency</strong>: 40% more vehicles serviced per technician</li>
-          <li><strong>Higher Customer Satisfaction</strong>: 95% first-time fix rate</li>
-          <li><strong>Reduced Comebacks</strong>: 80% decrease in repeat repairs</li>
-          <li><strong>New Revenue Streams</strong>: Predictive maintenance subscriptions</li>
-        </ul>
-
-        <h2>Future AI Developments (2026-2028)</h2>
-
-        <h3>Coming Soon to Auto Repair:</h3>
-
-        <ul>
-          <li><strong>Augmented Reality Repairs</strong>: AR glasses showing repair instructions</li>
-          <li><strong>Autonomous Repair Bots</strong>: Robots performing routine maintenance</li>
-          <li><strong>Blockchain Service Records</strong>: Tamper-proof vehicle service history</li>
-          <li><strong>Quantum Computing Diagnostics</strong>: Instant analysis of complex problems</li>
-        </ul>
-
-        <div class="conclusion">
-          <h3>The Future is AI-Powered</h3>
-          
-          <p>AI in auto diagnostics isn't about replacing technicians—it's about empowering them with superhuman capabilities. The workshops that embrace AI technology today will lead the industry tomorrow.</p>
-          
-          <p><strong>Action Step:</strong> Start with one AI tool this quarter. The learning curve is shorter than you think, and the competitive advantage is substantial.</p>
-        </div>
-      </div>
-
-      <h2 class="section-title">Featured Videos</h2>
-      
-      <!-- Video 1 -->
-      <div class="video-card">
-        <div class="video-container">
-          <div class="video-badge"><i class="fas fa-play"></i> Video</div>
-          <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        </div>
-        <div class="blog-meta">
-          <span><i class="far fa-calendar"></i> March 12, 2025</span>
-          <span class="blog-category">Tutorial</span>
-        </div>
-        <h2>How to Identify Quality Auto Parts - Complete Guide</h2>
-        <p>Learn how to distinguish between genuine and counterfeit auto parts with our comprehensive video guide. Save money and ensure your vehicle's performance with these expert tips.</p>
-        <a href="#">Watch Full Video <i class="fas fa-arrow-right"></i></a>
-      </div>
-
-      <!-- Video 2 -->
-      <div class="video-card">
-        <div class="video-container">
-          <div class="video-badge"><i class="fas fa-play"></i> Video</div>
-          <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        </div>
-        <div class="blog-meta">
-          <span><i class="far fa-calendar"></i> March 8, 2025</span>
-          <span class="blog-category">Maintenance</span>
-        </div>
-        <h2>Essential Car Maintenance Tips for 2025</h2>
-        <p>Watch our step-by-step guide to basic car maintenance that every vehicle owner should know. From oil changes to brake inspections, we cover it all in this detailed video.</p>
-        <a href="#">Watch Full Video <i class="fas fa-arrow-right"></i></a>
-      </div>
 
       <div class="pagination">
         <a href="#" class="active">1</a>
@@ -1018,17 +706,6 @@
         <div id="popular-posts-container">
           <!-- Popular posts will be inserted here dynamically -->
         </div>
-      </div>
-
-      <div class="sidebar-widget">
-        <h3>Video Categories</h3>
-        <ul class="categories-list">
-          <li><a href="#">Tutorials <span>8</span></a></li>
-          <li><a href="#">Product Reviews <span>5</span></a></li>
-          <li><a href="#">Maintenance Guides <span>12</span></a></li>
-          <li><a href="#">Industry News <span>7</span></a></li>
-          <li><a href="#">Expert Interviews <span>3</span></a></li>
-        </ul>
       </div>
 
       <div class="sidebar-widget">
@@ -1086,72 +763,163 @@
   </footer>
 
   <script>
-    // Blog data from your JSON
-    const blogData = [
-      {
-        "title": "How Festive Season 2025 is Impacting Car Spare Prices",
-        "image": "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1000&q=80",
-        "link": "blogs/festive-prices-2025.html",
-        "description": "Learn how the festive season affects auto spare prices and how to grab the best deals on genuine car parts this year."
+    // Article Management System
+    const articleDatabase = {
+      articles: [
+        {
+          id: 1,
+          title: "AI in Auto Diagnostics: Revolutionizing Car Repairs in 2025",
+          image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1000&q=80",
+          excerpt: "The Future of Vehicle Diagnostics is Here - Powered by Artificial Intelligence. Learn how AI is transforming automotive diagnostics and what it means for your business.",
+          category: "Technology",
+          date: "March 15, 2025",
+          readTime: "8 min read",
+          featured: true,
+          fullContent: `
+            <h1>AI in Auto Diagnostics: Revolutionizing Car Repairs in 2025</h1>
+            <p><strong>The Future of Vehicle Diagnostics is Here - Powered by Artificial Intelligence</strong></p>
+            <p>Artificial Intelligence is transforming automotive diagnostics from an art to a science. In 2025, AI-powered tools are no longer futuristic concepts but essential equipment for every modern workshop and auto parts business.</p>
+            <h2>The AI Diagnostic Revolution</h2>
+            <p>AI diagnostics represent the most significant advancement in automotive repair since computerized systems. Here's what's changing:</p>
+            <div class="key-point">
+              <h3>AI Diagnostic Capabilities in 2025:</h3>
+              <ul>
+                <li><strong>Predictive Maintenance</strong>: Identify issues 2-3 weeks before failure</li>
+                <li><strong>Fault Prediction Accuracy</strong>: 94% accurate diagnosis vs. 65% human average</li>
+                <li><strong>Repair Time Reduction</strong>: 40% faster diagnostics and repairs</li>
+                <li><strong>First-time Fix Rate</strong>: 92% success vs. 68% traditional methods</li>
+              </ul>
+            </div>
+            <p>... [rest of the AI article content] ...</p>
+          `
         },
-      {
-        "title": "Top 5 Growing Job Roles in Automobile Industry (2025)",
-        "image": "https://images.unsplash.com/photo-1616129923478-ecf3a048b0e8?auto=format&fit=crop&w=1000&q=80",
-        "link": "blogs/auto-jobs-2025.html",
-        "description": "Discover the fastest-growing automobile jobs in India for 2025, from EV engineers to spare parts analysts and more."
+        {
+          id: 2,
+          title: "Auto Expo 2025 Highlights: Key Takeaways for Parts Businesses",
+          image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1000&q=80",
+          excerpt: "Inside India's Biggest Auto Show: Trends That Will Shape Our Industry for years to come. Discover groundbreaking technologies and trends that will redefine the automotive parts industry.",
+          category: "Industry News",
+          date: "March 12, 2025",
+          readTime: "6 min read",
+          featured: true,
+          fullContent: `
+            <h1>Auto Expo 2025 Highlights: Key Takeaways for Parts Businesses</h1>
+            <p><strong>Inside India's Biggest Auto Show: Trends That Will Shape Our Industry</strong></p>
+            <p>The recently concluded Auto Expo 2025 revealed groundbreaking technologies and trends that will redefine the automotive parts industry for years to come. Here's what every parts business needs to know from the biggest auto show of the year.</p>
+            <h2>Major Vehicle Launches and Implications</h2>
+            <h3>Electric Vehicle Dominance</h3>
+            <p>Over 25 new EV models launched, featuring significant changes for parts businesses:</p>
+            <div class="key-point">
+              <h3>EV Launch Highlights:</h3>
+              <ul>
+                <li><strong>Tata Curvv EV</strong>: Modular battery system (easier replacement business)</li>
+                <li><strong>Mahindra XUV.e9</strong>: Standardized charging port across models</li>
+                <li><strong>Hyundai Ioniq 7</strong>: 8-year battery warranty (service opportunity)</li>
+                <li><strong>Maruti Suzuki eVX</strong>: Service-friendly design with accessible components</li>
+              </ul>
+            </div>
+            <p>... [rest of the Auto Expo article content] ...</p>
+          `
+        },
+        {
+          id: 3,
+          title: "BS7 Emission Norms 2025: How They Affect Auto Parts Compatibility",
+          image: "https://images.unsplash.com/photo-1565689228864-0c6e928927b1?auto=format&fit=crop&w=1000&q=80",
+          excerpt: "The Most Significant Emission Regulation Change in a Decade - What You Need to Know. Understanding BS7 changes is crucial for inventory planning and future business strategy.",
+          category: "Regulations",
+          date: "March 10, 2025",
+          readTime: "7 min read",
+          featured: true,
+          fullContent: `
+            <h1>BS7 Emission Norms 2025: How They Affect Auto Parts Compatibility</h1>
+            <p><strong>The Most Significant Emission Regulation Change in a Decade - What You Need to Know</strong></p>
+            <p>The Bharat Stage 7 (BS7) emission standards coming into effect in 2025 represent the most comprehensive update to vehicle emission regulations since BS6. For auto parts businesses, understanding these changes is crucial for inventory planning and future business strategy.</p>
+            <h2>BS7 Implementation Timeline</h2>
+            <p>The phased implementation of BS7 norms:</p>
+            <div class="key-point">
+              <h3>Rollout Schedule:</h3>
+              <ul>
+                <li><strong>April 2025</strong>: BS7 norms effective for new vehicle models</li>
+                <li><strong>October 2025</strong>: All new vehicles must comply with BS7</li>
+                <li><strong>April 2026</strong>: BS7 replacement parts availability mandatory</li>
+                <li><strong>January 2027</strong>: BS6 parts manufacturing phase-out begins</li>
+              </ul>
+            </div>
+            <p>... [rest of the BS7 article content] ...</p>
+          `
+        },
+        {
+          id: 4,
+          title: "How Festive Season 2025 is Impacting Car Spare Prices",
+          image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1000&q=80",
+          excerpt: "Learn how the festive season affects auto spare prices and how to grab the best deals on genuine car parts this year.",
+          category: "Market Trends",
+          date: "March 5, 2025",
+          readTime: "5 min read",
+          featured: false,
+          fullContent: "<p>Full content for festive season article...</p>"
+        },
+        {
+          id: 5,
+          title: "Top 5 Growing Job Roles in Automobile Industry (2025)",
+          image: "https://images.unsplash.com/photo-1616129923478-ecf3a048b0e8?auto=format&fit=crop&w=1000&q=80",
+          excerpt: "Discover the fastest-growing automobile jobs in India for 2025, from EV engineers to spare parts analysts and more.",
+          category: "Career",
+          date: "March 1, 2025",
+          readTime: "6 min read",
+          featured: false,
+          fullContent: "<p>Full content for job roles article...</p>"
+        }
+      ],
+      
+      // Get featured articles
+      getFeaturedArticles: function() {
+        return this.articles.filter(article => article.featured);
       },
-      {
-        "title": "How to Start an Auto Spare Parts Business from Home (2025 Guide)",
-        "image": "https://images.unsplash.com/photo-1606112219348-204d7d8b94ee?auto=format&fit=crop&w=1000&q=80",
-        "link": "blogs/start-auto-business-2025.html",
-        "description": "Step-by-step guide to starting your own auto spare business from home with minimum investment and online tools."
+      
+      // Get recent articles (excluding the current one if provided)
+      getRecentArticles: function(excludeId = null, limit = 3) {
+        let recent = [...this.articles];
+        if (excludeId) {
+          recent = recent.filter(article => article.id !== excludeId);
+        }
+        return recent.slice(0, limit);
       },
-      {
-        "title": "Auto Parts Supply Chain Crisis 2025: Latest Developments & Solutions",
-        "image": "https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&w=1000&q=80",
-        "link": "blogs/supply-chain-2025.html",
-        "description": "Navigating the perfect storm in auto parts supply chain with proven solutions for businesses."
+      
+      // Get article by ID
+      getArticleById: function(id) {
+        return this.articles.find(article => article.id === id);
       },
-      {
-        "title": "Auto Expo 2025 Highlights: Key Takeaways for Parts Businesses",
-        "image": "https://images.unsplash.com/photo-1565689228864-0c6e928927b1?auto=format&fit=crop&w=1000&q=80",
-        "link": "blogs/auto-expo-2025.html",
-        "description": "Inside India's biggest auto show: Trends that will shape our industry for years to come."
+      
+      // Search articles
+      searchArticles: function(query) {
+        const lowerQuery = query.toLowerCase();
+        return this.articles.filter(article => 
+          article.title.toLowerCase().includes(lowerQuery) || 
+          article.excerpt.toLowerCase().includes(lowerQuery) ||
+          article.category.toLowerCase().includes(lowerQuery)
+        );
       }
-    ];
+    };
 
     // Function to generate blog posts
     function generateBlogPosts() {
       const container = document.getElementById('blog-posts-container');
+      const featuredArticles = articleDatabase.getFeaturedArticles();
       
-      blogData.forEach(blog => {
+      featuredArticles.forEach(article => {
         const blogCard = document.createElement('div');
         blogCard.className = 'blog-card';
-        
-        // Generate random date for demo purposes
-        const randomDate = new Date();
-        randomDate.setDate(randomDate.getDate() - Math.floor(Math.random() * 30));
-        const formattedDate = randomDate.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        });
-        
-        // Generate random category for demo purposes
-        const categories = ['Industry Trends', 'Business', 'Career', 'Auto Parts'];
-        const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-        
         blogCard.innerHTML = `
-          <img src="${blog.image}" alt="${blog.title}" loading="lazy">
+          <img src="${article.image}" alt="${article.title}" loading="lazy">
           <div class="blog-meta">
-            <span><i class="far fa-calendar"></i> ${formattedDate}</span>
-            <span class="blog-category">${randomCategory}</span>
+            <span><i class="far fa-calendar"></i> ${article.date} • ${article.readTime}</span>
+            <span class="blog-category">${article.category}</span>
           </div>
-          <h2>${blog.title}</h2>
-          <p>${blog.description}</p>
-          <a href="${blog.link}">Read More <i class="fas fa-arrow-right"></i></a>
+          <h2>${article.title}</h2>
+          <p>${article.excerpt}</p>
+          <a href="#" data-article-id="${article.id}" class="read-more">Read More <i class="fas fa-arrow-right"></i></a>
         `;
-        
         container.appendChild(blogCard);
       });
     }
@@ -1159,30 +927,18 @@
     // Function to generate popular posts
     function generatePopularPosts() {
       const container = document.getElementById('popular-posts-container');
+      const popularArticles = articleDatabase.getRecentArticles(null, 3);
       
-      // Get first 3 posts for popular section
-      const popularPosts = blogData.slice(0, 3);
-      
-      popularPosts.forEach(blog => {
-        // Generate random date for demo purposes
-        const randomDate = new Date();
-        randomDate.setDate(randomDate.getDate() - Math.floor(Math.random() * 30));
-        const formattedDate = randomDate.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
-        });
-        
+      popularArticles.forEach(article => {
         const postElement = document.createElement('div');
         postElement.className = 'popular-post';
         postElement.innerHTML = `
-          <img src="${blog.image}" alt="${blog.title}" loading="lazy">
+          <img src="${article.image}" alt="${article.title}" loading="lazy">
           <div class="popular-post-content">
-            <h4><a href="${blog.link}">${blog.title}</a></h4>
-            <span>${formattedDate}</span>
+            <h4><a href="#" data-article-id="${article.id}">${article.title}</a></h4>
+            <span>${article.date}</span>
           </div>
         `;
-        
         container.appendChild(postElement);
       });
     }
@@ -1190,26 +946,52 @@
     // Function to generate recent blogs
     function generateRecentBlogs() {
       const container = document.getElementById('blogs-container');
+      const recentArticles = articleDatabase.getRecentArticles(null, 3);
       
-      // Sort blogs by newest first (assumes last added is newest)
-      const sortedBlogs = [...blogData].reverse();
-      
-      // Show only 3 latest blogs on homepage
-      const latestBlogs = sortedBlogs.slice(0, 3);
-      
-      latestBlogs.forEach(blog => {
+      recentArticles.forEach(article => {
         const card = document.createElement('div');
         card.className = 'recent-blog-card';
         card.innerHTML = `
-          <img src="${blog.image}" alt="${blog.title}" loading="lazy">
+          <img src="${article.image}" alt="${article.title}" loading="lazy">
           <div class="recent-blog-card-content">
-            <h3>${blog.title}</h3>
-            <p>${blog.description}</p>
-            <a href="${blog.link}">Read More</a>
+            <h3>${article.title}</h3>
+            <p>${article.excerpt}</p>
+            <a href="#" data-article-id="${article.id}">Read More</a>
           </div>
         `;
         container.appendChild(card);
       });
+    }
+
+    // Function to display full article
+    function displayFullArticle(articleId) {
+      const article = articleDatabase.getArticleById(articleId);
+      if (!article) return;
+      
+      const container = document.getElementById('blog-posts-container');
+      container.innerHTML = '';
+      
+      const articleElement = document.createElement('div');
+      articleElement.className = 'article-content';
+      articleElement.innerHTML = article.fullContent;
+      
+      // Add back button
+      const backButton = document.createElement('a');
+      backButton.href = '#';
+      backButton.className = 'blog-card';
+      backButton.innerHTML = '&larr; Back to All Articles';
+      backButton.style.display = 'inline-block';
+      backButton.style.marginBottom = '2rem';
+      backButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        location.reload();
+      });
+      
+      container.appendChild(backButton);
+      container.appendChild(articleElement);
+      
+      // Update page title
+      document.title = `${article.title} - Auto Spares Solution Blog`;
     }
 
     // Search functionality
@@ -1219,17 +1001,49 @@
       
       searchForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        const searchTerm = searchInput.value.trim().toLowerCase();
+        const searchTerm = searchInput.value.trim();
         
         if (searchTerm) {
-          // In a real implementation, this would search through all blog content
-          // For now, we'll just show an alert
-          alert(`Searching for: ${searchTerm}`);
-          console.log('Search term:', searchTerm);
-          
-          // Here you would typically filter blog posts based on the search term
-          // and update the display accordingly
+          const results = articleDatabase.searchArticles(searchTerm);
+          displaySearchResults(results, searchTerm);
         }
+      });
+    }
+
+    // Display search results
+    function displaySearchResults(results, searchTerm) {
+      const container = document.getElementById('blog-posts-container');
+      container.innerHTML = '';
+      
+      if (results.length === 0) {
+        container.innerHTML = `
+          <div class="blog-card">
+            <h2>No results found for "${searchTerm}"</h2>
+            <p>Try different keywords or browse our categories.</p>
+          </div>
+        `;
+        return;
+      }
+      
+      const resultsTitle = document.createElement('h2');
+      resultsTitle.className = 'section-title';
+      resultsTitle.textContent = `Search Results for "${searchTerm}" (${results.length} articles)`;
+      container.appendChild(resultsTitle);
+      
+      results.forEach(article => {
+        const blogCard = document.createElement('div');
+        blogCard.className = 'blog-card';
+        blogCard.innerHTML = `
+          <img src="${article.image}" alt="${article.title}" loading="lazy">
+          <div class="blog-meta">
+            <span><i class="far fa-calendar"></i> ${article.date} • ${article.readTime}</span>
+            <span class="blog-category">${article.category}</span>
+          </div>
+          <h2>${article.title}</h2>
+          <p>${article.excerpt}</p>
+          <a href="#" data-article-id="${article.id}" class="read-more">Read More <i class="fas fa-arrow-right"></i></a>
+        `;
+        container.appendChild(blogCard);
       });
     }
 
@@ -1253,28 +1067,39 @@
       });
     }
 
-    // Simple analytics for blog engagement
-    function trackBlogEngagement() {
-      const blogCards = document.querySelectorAll('.blog-card, .video-card, .recent-blog-card');
-      
-      blogCards.forEach(card => {
-        card.addEventListener('click', function() {
-          const title = this.querySelector('h2, h3, h4').textContent;
-          console.log('Blog post clicked:', title);
-          // In a real implementation, you would send this data to your analytics service
-        });
+    // Handle article clicks
+    function handleArticleClicks() {
+      document.addEventListener('click', function(e) {
+        if (e.target.matches('.read-more, .recent-blog-card a, .popular-post-content a')) {
+          e.preventDefault();
+          const articleId = parseInt(e.target.getAttribute('data-article-id') || 
+                                  e.target.closest('a').getAttribute('data-article-id'));
+          if (articleId) {
+            displayFullArticle(articleId);
+            window.scrollTo(0, 0);
+          }
+        }
       });
     }
 
     // Initialize everything when the page loads
     document.addEventListener('DOMContentLoaded', function() {
-      generateBlogPosts();
+      // Check if we're viewing a specific article from URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const articleId = urlParams.get('article');
+      
+      if (articleId) {
+        displayFullArticle(parseInt(articleId));
+      } else {
+        generateBlogPosts();
+      }
+      
       generatePopularPosts();
       generateRecentBlogs();
       implementSearch();
       handleNewsletter();
-      trackBlogEngagement();
+      handleArticleClicks();
     });
   </script>
 </body>
-</html>
+  </html>
