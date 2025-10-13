@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,11 +5,37 @@
      crossorigin="anonymous"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Auto Spares Solution Blog</title>
+  <title>Auto Spares Solution Blog - Automotive Insights & News</title>
+  <meta name="description" content="Expert insights on auto parts, car maintenance, and industry trends. Your trusted source for automotive knowledge.">
+  <meta name="keywords" content="auto parts, car maintenance, automotive blog, car repair, auto industry">
+  <meta property="og:title" content="Auto Spares Solution Blog">
+  <meta property="og:description" content="Insights, News & Inspiration for Daily Life, Business & Jobs">
+  <meta property="og:type" content="website">
   <link rel="icon" href="logo.png" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    "name": "Auto Spares Solution Blog",
+    "description": "Insights, News & Inspiration for Daily Life, Business & Jobs",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Auto Spares Solution"
+    }
+  }
+  </script>
   <style>
+    :root {
+      --primary-color: #0a2351;
+      --secondary-color: #ff6600;
+      --text-color: #333;
+      --background-color: #f9f9f9;
+      --card-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      --hover-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -18,14 +43,41 @@
       font-family: "Poppins", sans-serif;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
-      background: #f9f9f9;
-      color: #333;
+      background: var(--background-color);
+      color: var(--text-color);
       line-height: 1.6;
     }
 
+    /* Skip link for accessibility */
+    .skip-link {
+      position: absolute;
+      top: -40px;
+      left: 6px;
+      background: var(--secondary-color);
+      color: white;
+      padding: 8px;
+      z-index: 1000;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+
+    .skip-link:focus {
+      top: 0;
+    }
+
+    /* Focus styles for accessibility */
+    :focus {
+      outline: 2px solid var(--secondary-color);
+      outline-offset: 2px;
+    }
+
     header {
-      background: linear-gradient(135deg, #0a2351 0%, #1a3a7a 100%);
+      background: linear-gradient(135deg, var(--primary-color) 0%, #1a3a7a 100%);
       color: #fff;
       padding: 1.5rem 0;
       text-align: center;
@@ -40,7 +92,7 @@
 
     header p {
       font-size: 1.1rem;
-      color: #e0e0e0;
+      color: #f0f0f0;
       max-width: 600px;
       margin: 0 auto;
     }
@@ -58,7 +110,7 @@
     nav a {
       display: inline-block;
       padding: 0.9rem 1.5rem;
-      color: #0a2351;
+      color: var(--primary-color);
       font-weight: 600;
       text-decoration: none;
       transition: 0.3s;
@@ -66,7 +118,7 @@
     }
 
     nav a:hover, nav a.active {
-      color: #ff6600;
+      color: var(--secondary-color);
     }
 
     nav a.active:after {
@@ -76,7 +128,7 @@
       left: 15%;
       width: 70%;
       height: 3px;
-      background: #ff6600;
+      background: var(--secondary-color);
       border-radius: 2px;
     }
 
@@ -89,7 +141,7 @@
     }
 
     .breadcrumb a {
-      color: #0a2351;
+      color: var(--primary-color);
       text-decoration: none;
     }
 
@@ -119,12 +171,12 @@
       background: #fff;
       padding: 1.5rem;
       border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      box-shadow: var(--card-shadow);
       margin-bottom: 1.5rem;
     }
 
     .search-box h3 {
-      color: #0a2351;
+      color: var(--primary-color);
       margin-bottom: 1rem;
       font-size: 1.2rem;
     }
@@ -142,7 +194,7 @@
     }
 
     .search-form button {
-      background: #0a2351;
+      background: var(--primary-color);
       color: white;
       border: none;
       padding: 0 1.2rem;
@@ -152,7 +204,7 @@
     }
 
     .search-form button:hover {
-      background: #ff6600;
+      background: var(--secondary-color);
     }
 
     .blog-card {
@@ -160,14 +212,19 @@
       margin-bottom: 2rem;
       padding: 1.5rem;
       border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      box-shadow: var(--card-shadow);
       transition: 0.3s;
       overflow: hidden;
     }
 
     .blog-card:hover {
       transform: translateY(-5px);
-      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+      box-shadow: var(--hover-shadow);
+    }
+
+    .blog-card:focus-within {
+      outline: 2px solid var(--secondary-color);
+      outline-offset: 2px;
     }
 
     .blog-card img {
@@ -179,7 +236,7 @@
     }
 
     .blog-card h2 {
-      color: #0a2351;
+      color: var(--primary-color);
       margin-bottom: 0.5rem;
       font-size: 1.4rem;
       line-height: 1.3;
@@ -195,7 +252,7 @@
 
     .blog-category {
       background: #e6efff;
-      color: #0a2351;
+      color: var(--primary-color);
       padding: 0.2rem 0.8rem;
       border-radius: 20px;
       font-size: 0.8rem;
@@ -208,7 +265,7 @@
     }
 
     .blog-card a {
-      color: #0a2351;
+      color: var(--primary-color);
       text-decoration: none;
       font-weight: 600;
       transition: 0.3s;
@@ -217,7 +274,7 @@
     }
 
     .blog-card a:hover {
-      color: #ff6600;
+      color: var(--secondary-color);
     }
 
     .blog-card a i {
@@ -271,18 +328,18 @@
       margin-bottom: 2rem;
       padding: 1.5rem;
       border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      box-shadow: var(--card-shadow);
       transition: 0.3s;
       overflow: hidden;
     }
 
     .video-card:hover {
       transform: translateY(-5px);
-      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+      box-shadow: var(--hover-shadow);
     }
 
     .video-card h2 {
-      color: #0a2351;
+      color: var(--primary-color);
       margin-bottom: 0.5rem;
       font-size: 1.4rem;
       line-height: 1.3;
@@ -294,7 +351,7 @@
     }
 
     .section-title {
-      color: #0a2351;
+      color: var(--primary-color);
       margin: 2rem 0 1rem;
       padding-bottom: 0.5rem;
       border-bottom: 2px solid #e6efff;
@@ -305,12 +362,12 @@
       background: #fff;
       padding: 1.5rem;
       border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      box-shadow: var(--card-shadow);
       margin-bottom: 1.5rem;
     }
 
     .sidebar-widget h3 {
-      color: #0a2351;
+      color: var(--primary-color);
       margin-bottom: 1rem;
       font-size: 1.2rem;
       padding-bottom: 0.5rem;
@@ -350,7 +407,7 @@
     }
 
     .popular-post-content h4 a:hover {
-      color: #ff6600;
+      color: var(--secondary-color);
     }
 
     .popular-post-content span {
@@ -383,7 +440,7 @@
     }
 
     .categories-list a:hover {
-      color: #ff6600;
+      color: var(--secondary-color);
     }
 
     .categories-list span {
@@ -394,7 +451,7 @@
     }
 
     .newsletter {
-      background: linear-gradient(135deg, #0a2351 0%, #1a3a7a 100%);
+      background: linear-gradient(135deg, var(--primary-color) 0%, #1a3a7a 100%);
       color: white;
       padding: 1.5rem;
       border-radius: 10px;
@@ -422,7 +479,7 @@
 
     .newsletter-form button {
       width: 100%;
-      background: #ff6600;
+      background: var(--secondary-color);
       color: white;
       border: none;
       padding: 0.8rem;
@@ -447,7 +504,7 @@
       padding: 0.6rem 1rem;
       margin: 0 0.2rem;
       background: #fff;
-      color: #0a2351;
+      color: var(--primary-color);
       text-decoration: none;
       border-radius: 5px;
       transition: 0.3s;
@@ -455,61 +512,8 @@
     }
 
     .pagination a:hover, .pagination a.active {
-      background: #0a2351;
+      background: var(--primary-color);
       color: white;
-    }
-
-    footer {
-      text-align: center;
-      background: #0a2351;
-      color: #fff;
-      padding: 2rem 0;
-      margin-top: 3rem;
-    }
-
-    .footer-content {
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 0 1rem;
-    }
-
-    .social-links {
-      margin: 1rem 0;
-    }
-
-    .social-links a {
-      display: inline-block;
-      width: 40px;
-      height: 40px;
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      border-radius: 50%;
-      line-height: 40px;
-      margin: 0 0.3rem;
-      transition: 0.3s;
-    }
-
-    .social-links a:hover {
-      background: #ff6600;
-      transform: translateY(-3px);
-    }
-
-    .footer-links {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin: 1rem 0;
-    }
-
-    .footer-links a {
-      color: #ddd;
-      text-decoration: none;
-      margin: 0 1rem;
-      transition: 0.3s;
-    }
-
-    .footer-links a:hover {
-      color: #ff6600;
     }
 
     /* Recent Blogs Section */
@@ -520,7 +524,7 @@
 
     #recent-blogs h2 {
       text-align: center;
-      color: #0a2351;
+      color: var(--primary-color);
       margin-bottom: 40px;
       font-size: 2rem;
     }
@@ -557,7 +561,7 @@
     }
 
     .recent-blog-card h3 {
-      color: #0a2351;
+      color: var(--primary-color);
       margin-bottom: 10px;
       font-size: 1.2rem;
     }
@@ -572,7 +576,7 @@
       display: inline-block;
       margin-top: 15px;
       padding: 10px 20px;
-      background: #0a2351;
+      background: var(--primary-color);
       color: white;
       text-decoration: none;
       border-radius: 5px;
@@ -581,7 +585,187 @@
     }
 
     .recent-blog-card a:hover {
-      background: #ff6600;
+      background: var(--secondary-color);
+    }
+
+    /* Article styling for long content */
+    .key-point {
+      background: #e6efff;
+      border-left: 4px solid var(--primary-color);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .case-study {
+      background: #fff8e6;
+      border-left: 4px solid var(--secondary-color);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .conclusion {
+      background: #f0f8f0;
+      border-left: 4px solid #28a745;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .article-content h1, .article-content h2, .article-content h3 {
+      color: var(--primary-color);
+      margin: 1.5rem 0 1rem;
+    }
+
+    .article-content h1 {
+      font-size: 2rem;
+      border-bottom: 2px solid #e6efff;
+      padding-bottom: 0.5rem;
+    }
+
+    .article-content h2 {
+      font-size: 1.6rem;
+    }
+
+    .article-content h3 {
+      font-size: 1.3rem;
+    }
+
+    .article-content ul, .article-content ol {
+      margin: 1rem 0 1rem 2rem;
+    }
+
+    .article-content li {
+      margin-bottom: 0.5rem;
+    }
+
+    .article-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+    }
+
+    .article-content th, .article-content td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .article-content th {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .article-content tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    footer {
+      text-align: center;
+      background: var(--primary-color);
+      color: #fff;
+      padding: 2rem 0;
+      margin-top: 3rem;
+    }
+
+    .footer-content {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    .social-links {
+      margin: 1rem 0;
+    }
+
+    .social-links a {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border-radius: 50%;
+      line-height: 40px;
+      margin: 0 0.3rem;
+      transition: 0.3s;
+    }
+
+    .social-links a:hover {
+      background: var(--secondary-color);
+      transform: translateY(-3px);
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 1rem 0;
+    }
+
+    .footer-links a {
+      color: #ddd;
+      text-decoration: none;
+      margin: 0 1rem;
+      transition: 0.3s;
+    }
+
+    .footer-links a:hover {
+      color: var(--secondary-color);
+    }
+
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background-color: #1a1a1a;
+        --text-color: #ffffff;
+      }
+      
+      body {
+        background: var(--background-color);
+        color: var(--text-color);
+      }
+      
+      .blog-card, .sidebar-widget, .search-box, .recent-blog-card {
+        background: #2d2d2d;
+        color: var(--text-color);
+      }
+
+      .blog-card h2, .sidebar-widget h3, .search-box h3 {
+        color: #e0e0e0;
+      }
+
+      .blog-card p, .sidebar-widget, .categories-list a {
+        color: #cccccc;
+      }
+
+      .blog-category {
+        background: #3a3a3a;
+        color: #e0e0e0;
+      }
+    }
+
+    /* Print styles */
+    @media print {
+      .sidebar, nav, .pagination, .social-links, .video-container, .video-badge {
+        display: none;
+      }
+      
+      .main-content {
+        width: 100%;
+      }
+
+      .blog-card, .video-card {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+      }
+    }
+
+    /* Loading state */
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
     }
 
     @media (max-width: 768px) {
@@ -605,10 +789,24 @@
       #recent-blogs h2 {
         font-size: 1.6rem;
       }
+
+      .article-content h1 {
+        font-size: 1.6rem;
+      }
+
+      .article-content h2 {
+        font-size: 1.4rem;
+      }
+
+      .article-content h3 {
+        font-size: 1.2rem;
+      }
     }
   </style>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
   <header>
     <h1>Auto Spares Solution Blog</h1>
     <p>Insights, News & Inspiration for Daily Life, Business & Jobs</p>
@@ -627,142 +825,144 @@
   </div>
 
   <div class="container">
-    <div class="main-content">
+    <div class="main-content" id="main-content">
       <h2 class="section-title">Latest Articles</h2>
       
       <!-- Dynamic Blog Posts will be inserted here -->
       <div id="blog-posts-container"></div>
-      <!-- PASTE YOUR ENTIRE LONG ARTICLE STARTING FROM HERE -->
-<h1>AI in Auto Diagnostics: Revolutionizing Car Repairs in 2025</h1>
+      
+      <!-- Long Article -->
+      <div class="blog-card article-content">
+        <h1>AI in Auto Diagnostics: Revolutionizing Car Repairs in 2025</h1>
 
-<p><strong>The Future of Vehicle Diagnostics is Here - Powered by Artificial Intelligence</strong></p>
+        <p><strong>The Future of Vehicle Diagnostics is Here - Powered by Artificial Intelligence</strong></p>
 
-<p>Artificial Intelligence is transforming automotive diagnostics from an art to a science. In 2025, AI-powered tools are no longer futuristic concepts but essential equipment for every modern workshop and auto parts business.</p>
+        <p>Artificial Intelligence is transforming automotive diagnostics from an art to a science. In 2025, AI-powered tools are no longer futuristic concepts but essential equipment for every modern workshop and auto parts business.</p>
 
-<h2>The AI Diagnostic Revolution</h2>
+        <h2>The AI Diagnostic Revolution</h2>
 
-<p>AI diagnostics represent the most significant advancement in automotive repair since computerized systems. Here's what's changing:</p>
+        <p>AI diagnostics represent the most significant advancement in automotive repair since computerized systems. Here's what's changing:</p>
 
-<div class="key-point">
-  <h3>AI Diagnostic Capabilities in 2025:</h3>
-  <ul>
-    <li><strong>Predictive Maintenance</strong>: Identify issues 2-3 weeks before failure</li>
-    <li><strong>Fault Prediction Accuracy</strong>: 94% accurate diagnosis vs. 65% human average</li>
-    <li><strong>Repair Time Reduction</strong>: 40% faster diagnostics and repairs</li>
-    <li><strong>First-time Fix Rate</strong>: 92% success vs. 68% traditional methods</li>
-  </ul>
-</div>
+        <div class="key-point">
+          <h3>AI Diagnostic Capabilities in 2025:</h3>
+          <ul>
+            <li><strong>Predictive Maintenance</strong>: Identify issues 2-3 weeks before failure</li>
+            <li><strong>Fault Prediction Accuracy</strong>: 94% accurate diagnosis vs. 65% human average</li>
+            <li><strong>Repair Time Reduction</strong>: 40% faster diagnostics and repairs</li>
+            <li><strong>First-time Fix Rate</strong>: 92% success vs. 68% traditional methods</li>
+          </ul>
+        </div>
 
-<h2>AI Diagnostic Tools Available Today</h2>
+        <h2>AI Diagnostic Tools Available Today</h2>
 
-<h3>1. Predictive Maintenance Systems</h3>
+        <h3>1. Predictive Maintenance Systems</h3>
 
-<p>These AI systems analyze vehicle data to predict failures before they happen:</p>
+        <p>These AI systems analyze vehicle data to predict failures before they happen:</p>
 
-<ul>
-  <li><strong>Engine Performance Monitoring</strong>: Real-time analysis of 200+ engine parameters</li>
-  <li><strong>Component Wear Prediction</strong>: Forecast brake, battery, and transmission failure</li>
-  <li><strong>Fluid Quality Analysis</strong>: Monitor oil, coolant, and transmission fluid degradation</li>
-  <li><strong>Electrical System Health</strong>: Predict alternator and starter motor failures</li>
-</ul>
+        <ul>
+          <li><strong>Engine Performance Monitoring</strong>: Real-time analysis of 200+ engine parameters</li>
+          <li><strong>Component Wear Prediction</strong>: Forecast brake, battery, and transmission failure</li>
+          <li><strong>Fluid Quality Analysis</strong>: Monitor oil, coolant, and transmission fluid degradation</li>
+          <li><strong>Electrical System Health</strong>: Predict alternator and starter motor failures</li>
+        </ul>
 
-<div class="case-study">
-  <h4>Case Study: Smart Garage Mumbai</h4>
-  <p>Implemented AI predictive maintenance in 2024. Results: 35% reduction in emergency repairs, 28% increase in customer satisfaction, and 45% growth in preventive maintenance revenue.</p>
-</div>
+        <div class="case-study">
+          <h4>Case Study: Smart Garage Mumbai</h4>
+          <p>Implemented AI predictive maintenance in 2024. Results: 35% reduction in emergency repairs, 28% increase in customer satisfaction, and 45% growth in preventive maintenance revenue.</p>
+        </div>
 
-<h3>2. Computer Vision for Vehicle Inspection</h3>
+        <h3>2. Computer Vision for Vehicle Inspection</h3>
 
-<p>AI-powered cameras and sensors that can:</p>
+        <p>AI-powered cameras and sensors that can:</p>
 
-<ul>
-  <li><strong>Visual Component Inspection</strong>: Identify worn belts, hoses, and brakes</li>
-  <li><strong>Fluid Leak Detection</strong>: Pinpoint oil, coolant, and transmission leaks</li>
-  <li><strong>Tire Wear Analysis</strong>: Measure tread depth and identify wear patterns</li>
-  <li><strong>Undercarriage Inspection</strong>: Detect rust, damage, and suspension issues</li>
-</ul>
+        <ul>
+          <li><strong>Visual Component Inspection</strong>: Identify worn belts, hoses, and brakes</li>
+          <li><strong>Fluid Leak Detection</strong>: Pinpoint oil, coolant, and transmission leaks</li>
+          <li><strong>Tire Wear Analysis</strong>: Measure tread depth and identify wear patterns</li>
+          <li><strong>Undercarriage Inspection</strong>: Detect rust, damage, and suspension issues</li>
+        </ul>
 
-<h3>3. Voice-Activated Diagnostic Assistants</h3>
+        <h3>3. Voice-Activated Diagnostic Assistants</h3>
 
-<p>Hands-free AI assistants for technicians:</p>
+        <p>Hands-free AI assistants for technicians:</p>
 
-<ul>
-  <li><strong>Voice Commands</strong>: Run diagnostics through voice instructions</li>
-  <li><strong>Real-time Guidance</strong>: Step-by-step repair instructions</li>
-  <li><strong>Technical Database Access</strong>: Instant access to repair manuals and specifications</li>
-  <li><strong>Documentation</strong>: Voice-to-text repair documentation</li>
-</ul>
+        <ul>
+          <li><strong>Voice Commands</strong>: Run diagnostics through voice instructions</li>
+          <li><strong>Real-time Guidance</strong>: Step-by-step repair instructions</li>
+          <li><strong>Technical Database Access</strong>: Instant access to repair manuals and specifications</li>
+          <li><strong>Documentation</strong>: Voice-to-text repair documentation</li>
+        </ul>
 
-<h2>Implementation Guide for Workshops</h2>
+        <h2>Implementation Guide for Workshops</h2>
 
-<h3>Phase 1: Basic AI Tools (₹2-5 Lakhs Investment)</h3>
+        <h3>Phase 1: Basic AI Tools (₹2-5 Lakhs Investment)</h3>
 
-<ul>
-  <li><strong>AI Diagnostic Scanner</strong>: Basic predictive maintenance capabilities</li>
-  <li><strong>Cloud-based Software</strong>: Subscription-based diagnostic platforms</li>
-  <li><strong>Mobile App Integration</strong>: Technician and customer-facing apps</li>
-</ul>
+        <ul>
+          <li><strong>AI Diagnostic Scanner</strong>: Basic predictive maintenance capabilities</li>
+          <li><strong>Cloud-based Software</strong>: Subscription-based diagnostic platforms</li>
+          <li><strong>Mobile App Integration</strong>: Technician and customer-facing apps</li>
+        </ul>
 
-<h3>Phase 2: Intermediate AI Systems (₹5-15 Lakhs Investment)</h3>
+        <h3>Phase 2: Intermediate AI Systems (₹5-15 Lakhs Investment)</h3>
 
-<ul>
-  <li><strong>Computer Vision Systems</strong>: Automated visual inspection tools</li>
-  <li><strong>Voice Assistants</strong>: Hands-free diagnostic assistance</li>
-  <li><strong>Data Analytics</strong>: Advanced pattern recognition and forecasting</li>
-</ul>
+        <ul>
+          <li><strong>Computer Vision Systems</strong>: Automated visual inspection tools</li>
+          <li><strong>Voice Assistants</strong>: Hands-free diagnostic assistance</li>
+          <li><strong>Data Analytics</strong>: Advanced pattern recognition and forecasting</li>
+        </ul>
 
-<h3>Phase 3: Advanced AI Integration (₹15-30 Lakhs Investment)</h3>
+        <h3>Phase 3: Advanced AI Integration (₹15-30 Lakhs Investment)</h3>
 
-<ul>
-  <li><strong>Full Workshop Automation</strong>: Integrated AI systems across all operations</li>
-  <li><strong>Custom AI Solutions</strong>: Tailored systems for specific workshop needs</li>
-  <li><strong>Predictive Inventory Management</strong>: AI-driven parts forecasting</li>
-</ul>
+        <ul>
+          <li><strong>Full Workshop Automation</strong>: Integrated AI systems across all operations</li>
+          <li><strong>Custom AI Solutions</strong>: Tailored systems for specific workshop needs</li>
+          <li><strong>Predictive Inventory Management</strong>: AI-driven parts forecasting</li>
+        </ul>
 
-<h2>Skills Development for Technicians</h2>
+        <h2>Skills Development for Technicians</h2>
 
-<h3>Essential AI Skills for 2025:</h3>
+        <h3>Essential AI Skills for 2025:</h3>
 
-<div class="key-point">
-  <h3>Training Requirements:</h3>
-  <ul>
-    <li><strong>AI System Operation</strong>: Using AI diagnostic tools effectively</li>
-    <li><strong>Data Interpretation</strong>: Understanding AI-generated insights</li>
-    <li><strong>Software Troubleshooting</strong>: Basic AI system maintenance</li>
-    <li><strong>Traditional Mechanical Skills</strong>: Foundation remains critical</li>
-  </ul>
-</div>
+        <div class="key-point">
+          <h3>Training Requirements:</h3>
+          <ul>
+            <li><strong>AI System Operation</strong>: Using AI diagnostic tools effectively</li>
+            <li><strong>Data Interpretation</strong>: Understanding AI-generated insights</li>
+            <li><strong>Software Troubleshooting</strong>: Basic AI system maintenance</li>
+            <li><strong>Traditional Mechanical Skills</strong>: Foundation remains critical</li>
+          </ul>
+        </div>
 
-<h2>Business Impact and ROI</h2>
+        <h2>Business Impact and ROI</h2>
 
-<h3>Financial Benefits of AI Diagnostics:</h3>
+        <h3>Financial Benefits of AI Diagnostics:</h3>
 
-<ul>
-  <li><strong>Increased Efficiency</strong>: 40% more vehicles serviced per technician</li>
-  <li><strong>Higher Customer Satisfaction</strong>: 95% first-time fix rate</li>
-  <li><strong>Reduced Comebacks</strong>: 80% decrease in repeat repairs</li>
-  <li><strong>New Revenue Streams</strong>: Predictive maintenance subscriptions</li>
-</ul>
+        <ul>
+          <li><strong>Increased Efficiency</strong>: 40% more vehicles serviced per technician</li>
+          <li><strong>Higher Customer Satisfaction</strong>: 95% first-time fix rate</li>
+          <li><strong>Reduced Comebacks</strong>: 80% decrease in repeat repairs</li>
+          <li><strong>New Revenue Streams</strong>: Predictive maintenance subscriptions</li>
+        </ul>
 
-<h2>Future AI Developments (2026-2028)</h2>
+        <h2>Future AI Developments (2026-2028)</h2>
 
-<h3>Coming Soon to Auto Repair:</h3>
+        <h3>Coming Soon to Auto Repair:</h3>
 
-<ul>
-  <li><strong>Augmented Reality Repairs</strong>: AR glasses showing repair instructions</li>
-  <li><strong>Autonomous Repair Bots</strong>: Robots performing routine maintenance</li>
-  <li><strong>Blockchain Service Records</strong>: Tamper-proof vehicle service history</li>
-  <li><strong>Quantum Computing Diagnostics</strong>: Instant analysis of complex problems</li>
-</ul>
+        <ul>
+          <li><strong>Augmented Reality Repairs</strong>: AR glasses showing repair instructions</li>
+          <li><strong>Autonomous Repair Bots</strong>: Robots performing routine maintenance</li>
+          <li><strong>Blockchain Service Records</strong>: Tamper-proof vehicle service history</li>
+          <li><strong>Quantum Computing Diagnostics</strong>: Instant analysis of complex problems</li>
+        </ul>
 
-<div class="conclusion">
-  <h3>The Future is AI-Powered</h3>
-  
-  <p>AI in auto diagnostics isn't about replacing technicians—it's about empowering them with superhuman capabilities. The workshops that embrace AI technology today will lead the industry tomorrow.</p>
-  
-  <p><strong>Action Step:</strong> Start with one AI tool this quarter. The learning curve is shorter than you think, and the competitive advantage is substantial.</p>
-</div>
-<!-- END OF LONG ARTICLE -->
+        <div class="conclusion">
+          <h3>The Future is AI-Powered</h3>
+          
+          <p>AI in auto diagnostics isn't about replacing technicians—it's about empowering them with superhuman capabilities. The workshops that embrace AI technology today will lead the industry tomorrow.</p>
+          
+          <p><strong>Action Step:</strong> Start with one AI tool this quarter. The learning curve is shorter than you think, and the competitive advantage is substantial.</p>
+        </div>
+      </div>
 
       <h2 class="section-title">Featured Videos</h2>
       
@@ -807,177 +1007,16 @@
     <div class="sidebar">
       <div class="search-box">
         <h3>Search Blog</h3>
-        <form class="search-form">
-          <input type="text" placeholder="Search articles...">
+        <form class="search-form" id="search-form">
+          <input type="text" placeholder="Search articles..." id="search-input">
           <button type="submit"><i class="fas fa-search"></i></button>
         </form>
       </div>
 
       <div class="sidebar-widget">
         <h3>Popular Posts</h3>
-        <div class="popular-post">
-          <!-- PASTE YOUR ENTIRE LONG ARTICLE STARTING FROM HERE -->
-<h1>Auto Expo 2025 Highlights: Key Takeaways for Parts Businesses</h1>
-
-<p><strong>Inside India's Biggest Auto Show: Trends That Will Shape Our Industry</strong></p>
-
-<p>The recently concluded Auto Expo 2025 revealed groundbreaking technologies and trends that will redefine the automotive parts industry for years to come. Here's what every parts business needs to know from the biggest auto show of the year.</p>
-
-<h2>Major Vehicle Launches and Implications</h2>
-
-<h3>Electric Vehicle Dominance</h3>
-
-<p>Over 25 new EV models launched, featuring significant changes for parts businesses:</p>
-
-<div class="key-point">
-  <h3>EV Launch Highlights:</h3>
-  <ul>
-    <li><strong>Tata Curvv EV</strong>: Modular battery system (easier replacement business)</li>
-    <li><strong>Mahindra XUV.e9</strong>:
-Standardized charging port across models</li>
-    <li><strong>Hyundai Ioniq 7</strong>: 8-year battery warranty (service opportunity)</li>
-    <li><strong>Maruti Suzuki eVX</strong>: Service-friendly design with accessible components</li>
-  </ul>
-</div>
-
-<h3>Connected Car Technology</h3>
-
-<p>New vehicles feature advanced telematics requiring specialized support:</p>
-
-<ul>
-  <li><strong>5G Vehicle Connectivity</strong>: Real-time data transmission capabilities</li>
-  <li><strong>Over-the-Air Updates</strong>: Remote software and ECU updates</li>
-  <li><strong>Vehicle-to-Everything (V2X)</strong>: Car-to-car and car-to-infrastructure communication</li>
-  <li><strong>Cybersecurity Systems</strong>: Enhanced protection against digital threats</li>
-</ul>
-
-<h2>New Parts and Components Showcased</h2>
-
-<h3>Innovative Components for 2025-2026</h3>
-
-<div class="case-study">
-  <h4>Expo Innovation Award Winners:</h4>
-  <p><strong>Smart Battery Systems</strong>: Self-diagnosing batteries with mobile app connectivity<br>
-  <strong>Regenerative Braking 2.0</strong>: 40% more energy recovery efficiency<br>
-  <strong>Carbon Fiber Components</strong>: 50% weight reduction in structural parts</p>
-</div>
-
-<h3>Component Compatibility Analysis</h3>
-
-<table style="width:100%; border-collapse: collapse; margin: 1.5rem 0;">
-  <thead>
-    <tr style="background: #0a2351; color: white;">
-      <th style="padding: 12px; text-align: left;">Component Type</th>
-      <th style="padding: 12px; text-align: left;">Innovation</th>
-      <th style="padding: 12px; text-align: left;">Business Opportunity</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr style="border-bottom: 1px solid #ddd;">
-      <td style="padding: 12px;"><strong>Smart Batteries</strong></td>
-      <td style="padding: 12px;">Self-diagnosing with mobile app connectivity</td>
-      <td style="padding: 12px;">Battery health monitoring services</td>
-    </tr>
-    <tr style="border-bottom: 1px solid #ddd;">
-      <td style="padding: 12px;"><strong>Regenerative Braking</strong></td>
-      <td style="padding: 12px;">Improved energy recovery efficiency</td>
-      <td style="padding: 12px;">Specialized repair and replacement services</td>
-    </tr>
-    <tr style="border-bottom: 1px solid #ddd;">
-      <td style="padding: 12px;"><strong>Lightweight Materials</strong></td>
-      <td style="padding: 12px;">Carbon fiber and advanced composites</td>
-      <td style="padding: 12px;">New repair techniques and training</td>
-    </tr>
-  </tbody>
-</table>
-
-<h2>Service and Maintenance Trends</h2>
-
-<h3>"Servicability by Design" Movement</h3>
-
-<p>Manufacturers are focusing on making vehicles easier to repair and maintain:</p>
-
-<ul>
-  <li><strong>Modular Components</strong>: Easy replacement without specialized tools</li>
-  <li><strong>Standardized Interfaces</strong>: Common connections across brands</li>
-  <li><strong>Diagnostic Port Standardization</strong>: Universal OBD-III ports</li>
-  <li><strong>Online Service Manuals</strong>: Free digital repair documentation</li>
-</ul>
-
-<h3>New Service Opportunities</h3>
-
-<div class="key-point">
-  <h3>Emerging Service Areas:</h3>
-  <ul>
-    <li><strong>Software Subscription Services</strong>: Monthly updates and features</li>
-    <li><strong>Battery Health Management</strong>: Regular monitoring and optimization</li>
-    <li><strong>Connectivity Services</strong>: 5G and V2X system maintenance</li>
-    <li><strong>Cybersecurity Updates</strong>: Regular security patch installations</li>
-  </ul>
-</div>
-
-<h2>Technology Partnerships Announced</h2>
-
-<h3>Major Industry Collaborations</h3>
-
-<ul>
-  <li><strong>Tata Motors + Microsoft</strong>: AI-powered predictive maintenance</li>
-  <li><strong>Mahindra + Bosch</strong>: Integrated EV component systems</li>
-  <li><strong>Maruti Suzuki + LG</strong>: Battery technology and recycling</li>
-  <li><strong>Hyundai + Qualcomm</strong>: 5G vehicle connectivity solutions</li>
-</ul>
-
-<h2>Parts Business Action Plan</h2>
-
-<h3>Immediate Actions (Next 30 Days)</h3>
-
-<ul>
-  <li>Update component catalogs with 2025 model specifications</li>
-  <li>Train staff on new EV and connected car technologies</li>
-  <li>Establish partnerships with new component manufacturers</li>
-  <li>Attend manufacturer training programs announced at Expo</li>
-</ul>
-
-<h3>Medium-term Strategy (6-12 Months)</h3>
-
-<ul>
-  <li>Invest in diagnostic tools for new vehicle systems</li>
-  <li>Develop specialized service packages for new technologies</li>
-  <li>Create digital service records and customer portals</li>
-  <li>Explore subscription-based service models</li>
-</ul>
-
-<h2>Expo Key Takeaways</h2>
-
-<div class="conclusion">
-  <h3>The Big Picture: 2025 Industry Outlook</h3>
-  
-  <p>Auto Expo 2025 confirmed that the automotive industry is undergoing its most significant transformation in a century. The shift toward electric, connected, and service-friendly vehicles creates unprecedented opportunities for forward-thinking parts businesses.</p>
-  
-  <p><strong>Critical Insight:</strong> The biggest trend wasn't any single technology, but the industry-wide move toward "servicability by design." Manufacturers are finally making vehicles easier to repair, creating massive opportunities for independent workshops and parts suppliers.</p>
-  
-  <p><strong>Next Steps:</strong> Identify one new technology from the Expo to specialize in this year. Build your expertise now to capture the emerging market.</p>
-</div>
-<!-- END OF LONG ARTICLE -->
-          <img src="https://images.unsplash.com/photo-1553440569-bcc63803a83d" alt="Car Maintenance">
-          <div class="popular-post-content">
-            <h4><a href="#">Essential Car Maintenance Tips for 2025</a></h4>
-            <span>March 12, 2025</span>
-          </div>
-        </div>
-        <div class="popular-post">
-          <img src="https://images.unsplash.com/photo-1565689228864-0c6e928927b1" alt="Auto Parts">
-          <div class="popular-post-content">
-            <h4><a href="#">How to Identify Quality Auto Parts</a></h4>
-            <span>March 8, 2025</span>
-          </div>
-        </div>
-        <div class="popular-post">
-          <img src="https://images.unsplash.com/photo-1581094794329-c8112a89af12" alt="Electric Vehicles">
-          <div class="popular-post-content">
-            <h4><a href="#">The Future of Electric Vehicles in India</a></h4>
-            <span>March 3, 2025</span>
-          </div>
+        <div id="popular-posts-container">
+          <!-- Popular posts will be inserted here dynamically -->
         </div>
       </div>
 
@@ -1006,8 +1045,8 @@ Standardized charging port across models</li>
       <div class="sidebar-widget newsletter">
         <h3>Newsletter</h3>
         <p>Subscribe to get the latest updates and offers</p>
-        <form class="newsletter-form">
-          <input type="email" placeholder="Your email address" required>
+        <form class="newsletter-form" id="newsletter-form">
+          <input type="email" placeholder="Your email address" required id="newsletter-email">
           <button type="submit">Subscribe</button>
         </form>
       </div>
@@ -1019,134 +1058,7 @@ Standardized charging port across models</li>
     <div>
       <h2>📚 Recent Blogs</h2>
       <div id="blogs-container">
-        <a href="ev-policy-2025.html" class="cta-button">Explore Our Blog</a>
-        <<!-- PASTE YOUR ENTIRE LONG ARTICLE STARTING FROM HERE -->
-<h1>Auto Parts Supply Chain Crisis 2025: Latest Developments & Solutions</h1>
-
-<p><strong>Navigating the Perfect Storm in Auto Parts Supply Chain</strong></p>
-
-<p>The global supply chain disruptions that began in recent years have evolved into a complex crisis affecting every aspect of the auto parts industry. In 2025, businesses face unprecedented challenges that require innovative solutions and strategic thinking to survive and thrive.</p>
-
-<h2>Current Supply Chain Landscape</h2>
-
-<p>The auto parts supply chain in 2025 continues to face multiple pressure points simultaneously:</p>
-
-<div class="key-point">
-  <h3>Critical Statistics for 2025:</h3>
-  <ul>
-    <li><strong>Shipping Costs</strong>: 40% higher than 2023 levels</li>
-    <li><strong>Delivery Times</strong>: 8-12 weeks for international components</li>
-    <li><strong>Electronic Components</strong>: 25% price increase year-over-year</li>
-    <li><strong>Raw Material Costs</strong>: 18-30% increase across metals and plastics</li>
-  </ul>
-</div>
-
-<h2>Major Challenges in 2025</h2>
-
-<h3>1. Geopolitical Disruptions</h3>
-
-<p>Ongoing trade tensions and regional conflicts continue to disrupt key shipping routes and manufacturing hubs:</p>
-
-<ul>
-  <li><strong>Red Sea Route Closures</strong>: 15% increase in shipping times for Europe-Asia trade</li>
-  <li><strong>US-China Trade Restrictions</strong>: Limited access to critical electronic components</li>
-  <li><strong>Regional Manufacturing Hubs</strong>: Southeast Asian factories facing labor shortages</li>
-</ul>
-
-<h3>2. Logistics and Transportation</h3>
-
-<p>The transportation sector faces multiple bottlenecks:</p>
-
-<ul>
-  <li><strong>Container Shortages</strong>: 30% deficit in available shipping containers</li>
-  <li><strong>Port Congestion</strong>: Major ports operating at 85-95% capacity</li>
-  <li><strong>Trucking Shortages</strong>: 15% driver shortage affecting domestic distribution</li>
-</ul>
-
-<h2>Proven Solutions for Auto Parts Businesses</h2>
-
-<h3>1. Local Sourcing Strategy</h3>
-
-<p>Building robust local supplier networks has become essential:</p>
-
-<div class="case-study">
-  <h4>Success Story: Pune Auto Components</h4>
-  <p>By shifting 60% of their sourcing to local manufacturers within 300km radius, they reduced delivery times from 10 weeks to 2 weeks and cut costs by 18%.</p>
-</div>
-
-<p><strong>Local Sourcing Action Plan:</strong></p>
-
-<ul>
-  <li><strong>Identify Critical Components</strong>: Map which parts can be sourced locally</li>
-  <li><strong>Supplier Development</strong>: Help local suppliers upgrade capabilities</li>
-  <li><strong>Quality Assurance</strong>: Implement rigorous local quality control</li>
-  <li><strong>Long-term Contracts</strong>: Secure supply with 2-3 year agreements</li>
-</ul>
-
-<h3>2. Inventory Management Revolution</h3>
-
-<p>Smart inventory practices are no longer optional:</p>
-
-<div class="key-point">
-  <h3>Inventory Optimization Strategy:</h3>
-  <ul>
-    <li><strong>Buffer Stock</strong>: Maintain 60-day supply for critical components</li>
-    <li><strong>ABC Analysis</strong>: Classify inventory by criticality and cost</li>
-    <li><strong>Cross-training Suppliers</strong>: Multiple sources for each critical component</li>
-    <li><strong>Digital Tracking</strong>: Real-time inventory monitoring systems</li>
-  </ul>
-</div>
-
-<h3>3. Technology Integration</h3>
-
-<p>Leveraging technology for supply chain resilience:</p>
-
-<ul>
-  <li><strong>AI Demand Forecasting</strong>: Predict component needs with 92% accuracy</li>
-  <li><strong>Blockchain Tracking</strong>: Real-time component tracing from factory to customer</li>
-  <li><strong>IoT Sensors</strong>: Monitor inventory conditions and movement</li>
-  <li><strong>Cloud-based ERP</strong>: Integrated supply chain management</li>
-</ul>
-
-<h2>Financial Impact and Cost Management</h2>
-
-<h3>Cost Control Strategies:</h3>
-
-<ul>
-  <li><strong>Bulk Purchasing Consortiums</strong>: Join forces with other businesses for better pricing</li>
-  <li><strong>Forward Buying</strong>: Lock in prices for 6-12 month requirements</li>
-  <li><strong>Alternative Materials</strong>: Explore cost-effective material substitutions</li>
-  <li><strong>Waste Reduction</strong>: Implement lean manufacturing principles</li>
-</ul>
-
-<h2>Future Outlook and Preparation</h2>
-
-<h3>Short-term Actions (Next 6 Months):</h3>
-
-<ul>
-  <li>Diversify supplier base across different regions</li>
-  <li>Implement inventory management software</li>
-  <li>Develop contingency plans for critical components</li>
-  <li>Train staff in supply chain risk management</li>
-</ul>
-
-<h3>Long-term Strategy (2026-2027):</h3>
-
-<ul>
-  <li>Establish regional manufacturing partnerships</li>
-  <li>Invest in predictive analytics capabilities</li>
-  <li>Develop in-house component manufacturing</li>
-  <li>Create supply chain resilience fund</li>
-</ul>
-
-<div class="conclusion">
-  <h3>Key Takeaways for 2025</h3>
-  
-  <p>The supply chain crisis represents both a challenge and an opportunity for auto parts businesses. Those who adapt quickly by localizing supply chains, leveraging technology, and building resilient operations will not only survive but emerge stronger.</p>
-  
-  <p><strong>Remember:</strong> In times of crisis, the most adaptable businesses become the industry leaders of tomorrow. Start your supply chain transformation today.</p>
-</div>
-<!-- END OF LONG ARTICLE -->-- Blogs will be inserted here dynamically -->
+        <!-- Recent blogs will be inserted here dynamically -->
       </div>
     </div>
   </section>
@@ -1193,6 +1105,18 @@ Standardized charging port across models</li>
         "image": "https://images.unsplash.com/photo-1606112219348-204d7d8b94ee?auto=format&fit=crop&w=1000&q=80",
         "link": "blogs/start-auto-business-2025.html",
         "description": "Step-by-step guide to starting your own auto spare business from home with minimum investment and online tools."
+      },
+      {
+        "title": "Auto Parts Supply Chain Crisis 2025: Latest Developments & Solutions",
+        "image": "https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&w=1000&q=80",
+        "link": "blogs/supply-chain-2025.html",
+        "description": "Navigating the perfect storm in auto parts supply chain with proven solutions for businesses."
+      },
+      {
+        "title": "Auto Expo 2025 Highlights: Key Takeaways for Parts Businesses",
+        "image": "https://images.unsplash.com/photo-1565689228864-0c6e928927b1?auto=format&fit=crop&w=1000&q=80",
+        "link": "blogs/auto-expo-2025.html",
+        "description": "Inside India's biggest auto show: Trends that will shape our industry for years to come."
       }
     ];
 
@@ -1218,7 +1142,7 @@ Standardized charging port across models</li>
         const randomCategory = categories[Math.floor(Math.random() * categories.length)];
         
         blogCard.innerHTML = `
-          <img src="${blog.image}" alt="${blog.title}">
+          <img src="${blog.image}" alt="${blog.title}" loading="lazy">
           <div class="blog-meta">
             <span><i class="far fa-calendar"></i> ${formattedDate}</span>
             <span class="blog-category">${randomCategory}</span>
@@ -1232,12 +1156,43 @@ Standardized charging port across models</li>
       });
     }
 
+    // Function to generate popular posts
+    function generatePopularPosts() {
+      const container = document.getElementById('popular-posts-container');
+      
+      // Get first 3 posts for popular section
+      const popularPosts = blogData.slice(0, 3);
+      
+      popularPosts.forEach(blog => {
+        // Generate random date for demo purposes
+        const randomDate = new Date();
+        randomDate.setDate(randomDate.getDate() - Math.floor(Math.random() * 30));
+        const formattedDate = randomDate.toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric' 
+        });
+        
+        const postElement = document.createElement('div');
+        postElement.className = 'popular-post';
+        postElement.innerHTML = `
+          <img src="${blog.image}" alt="${blog.title}" loading="lazy">
+          <div class="popular-post-content">
+            <h4><a href="${blog.link}">${blog.title}</a></h4>
+            <span>${formattedDate}</span>
+          </div>
+        `;
+        
+        container.appendChild(postElement);
+      });
+    }
+
     // Function to generate recent blogs
     function generateRecentBlogs() {
       const container = document.getElementById('blogs-container');
       
       // Sort blogs by newest first (assumes last added is newest)
-      const sortedBlogs = blogData.slice().reverse();
+      const sortedBlogs = [...blogData].reverse();
       
       // Show only 3 latest blogs on homepage
       const latestBlogs = sortedBlogs.slice(0, 3);
@@ -1246,7 +1201,7 @@ Standardized charging port across models</li>
         const card = document.createElement('div');
         card.className = 'recent-blog-card';
         card.innerHTML = `
-          <img src="${blog.image}" alt="${blog.title}">
+          <img src="${blog.image}" alt="${blog.title}" loading="lazy">
           <div class="recent-blog-card-content">
             <h3>${blog.title}</h3>
             <p>${blog.description}</p>
@@ -1257,11 +1212,69 @@ Standardized charging port across models</li>
       });
     }
 
-    // Initialize the blog when the page loads
+    // Search functionality
+    function implementSearch() {
+      const searchForm = document.getElementById('search-form');
+      const searchInput = document.getElementById('search-input');
+      
+      searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const searchTerm = searchInput.value.trim().toLowerCase();
+        
+        if (searchTerm) {
+          // In a real implementation, this would search through all blog content
+          // For now, we'll just show an alert
+          alert(`Searching for: ${searchTerm}`);
+          console.log('Search term:', searchTerm);
+          
+          // Here you would typically filter blog posts based on the search term
+          // and update the display accordingly
+        }
+      });
+    }
+
+    // Newsletter subscription
+    function handleNewsletter() {
+      const newsletterForm = document.getElementById('newsletter-form');
+      const emailInput = document.getElementById('newsletter-email');
+      
+      newsletterForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const email = emailInput.value.trim();
+        
+        if (email) {
+          // In a real implementation, this would send the email to your server
+          alert(`Thank you for subscribing with: ${email}`);
+          console.log('Newsletter subscription:', email);
+          
+          // Reset the form
+          newsletterForm.reset();
+        }
+      });
+    }
+
+    // Simple analytics for blog engagement
+    function trackBlogEngagement() {
+      const blogCards = document.querySelectorAll('.blog-card, .video-card, .recent-blog-card');
+      
+      blogCards.forEach(card => {
+        card.addEventListener('click', function() {
+          const title = this.querySelector('h2, h3, h4').textContent;
+          console.log('Blog post clicked:', title);
+          // In a real implementation, you would send this data to your analytics service
+        });
+      });
+    }
+
+    // Initialize everything when the page loads
     document.addEventListener('DOMContentLoaded', function() {
       generateBlogPosts();
+      generatePopularPosts();
       generateRecentBlogs();
+      implementSearch();
+      handleNewsletter();
+      trackBlogEngagement();
     });
   </script>
 </body>
-  </html>
+</html>
