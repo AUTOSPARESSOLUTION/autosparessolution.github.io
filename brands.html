@@ -1524,59 +1524,48 @@ fetch(BACKEND_URL + '/api/health')
         }
 
         // Search functionality for brands section
-        brandsSearchInput.addEventListener("input", function() {
+        // Search functionality for brands section - WITH LONGER DELAY
+let brandsSearchTimeout;
+
+brandsSearchInput.addEventListener("input", function() {
     clearTimeout(brandsSearchTimeout);
     brandsSearchTimeout = setTimeout(() => {
         performBrandsSearch(this.value);
-    }, 5000); // 5 seconds delay - you can adjust this
+    }, 1500); // 1.5 seconds delay - you can adjust this
 });
+
+function performBrandsSearch(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (term === '') {
+        applyFilters();
+    } else {
+        // Filter based on current brand selection and search term
+        let tempProducts = productsData;
         
-        function performBrandsSearch(searchTerm) {
-            const term = searchTerm.toLowerCase().trim();
-            
-            if (term === '') {
-                applyFilters();
-            } else {
-                filteredProducts = productsData.filter(product => 
-                    product.part.toLowerCase().includes(term) || 
-                    (product.desc && product.desc.toLowerCase().includes(term))
-                );
-                
-                displayBrandProducts(filteredProducts);
-            }
+        // Apply brand filter first
+        if (currentBrand !== 'all') {
+            tempProducts = tempProducts.filter(product => 
+                product.brand && product.brand.toLowerCase() === currentBrand
+            );
         }
         
-        // Stock filter functionality
-        stockFilterBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                stockFilterBtns.forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                currentStockFilter = this.getAttribute('data-stock');
-                applyFilters();
-            });
-        });
+        // Then apply search filter
+        tempProducts = tempProducts.filter(product => 
+            product.part.toLowerCase().includes(term) || 
+            (product.desc && product.desc.toLowerCase().includes(term))
+        );
         
-        // Apply both brand and stock filters
-        function applyFilters() {
-            let tempProducts = productsData;
-            
-            // Apply brand filter
-            if (currentBrand !== 'all') {
-                tempProducts = tempProducts.filter(product => 
-                    product.brand && product.brand.toLowerCase() === currentBrand
-                );
-            }
-            
-            // Apply stock filter
-            if (currentStockFilter === 'in-stock') {
-                tempProducts = tempProducts.filter(product => product.stock > 0);
-            } else if (currentStockFilter === 'out-of-stock') {
-                tempProducts = tempProducts.filter(product => product.stock <= 0);
-            }
-            
-            filteredProducts = tempProducts;
-            displayBrandProducts(filteredProducts);
+        // Apply stock filter
+        if (currentStockFilter === 'in-stock') {
+            tempProducts = tempProducts.filter(product => product.stock > 0);
+        } else if (currentStockFilter === 'out-of-stock') {
+            tempProducts = tempProducts.filter(product => product.stock <= 0);
         }
+        
+        displayBrandProducts(tempProducts);
+    }
+}
         
         // Load product data from CSV
         function loadProducts() {
