@@ -1545,7 +1545,7 @@ stockFilterBtns.forEach(btn => {
     });
 });
 
-// Apply both brand and stock filters - ENSURE THIS FUNCTION EXISTS
+// Apply both brand and stock filters - ADD THIS FUNCTION
 function applyFilters() {
     let tempProducts = productsData;
     
@@ -1563,8 +1563,46 @@ function applyFilters() {
         tempProducts = tempProducts.filter(product => product.stock <= 0);
     }
     
+    // Update the filtered products and display them
     filteredProducts = tempProducts;
     displayBrandProducts(filteredProducts);
+    
+    // Update the product count
+    productCountElement.textContent = `${filteredProducts.length} products found`;
+}
+
+function performBrandsSearch(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (term === '') {
+        applyFilters(); // This will now work
+    } else {
+        // Filter based on current brand selection and search term
+        let tempProducts = productsData;
+        
+        // Apply brand filter first
+        if (currentBrand !== 'all') {
+            tempProducts = tempProducts.filter(product => 
+                product.brand && product.brand.toLowerCase() === currentBrand
+            );
+        }
+        
+        // Then apply search filter
+        tempProducts = tempProducts.filter(product => 
+            product.part.toLowerCase().includes(term) || 
+            (product.desc && product.desc.toLowerCase().includes(term))
+        );
+        
+        // Apply stock filter
+        if (currentStockFilter === 'in-stock') {
+            tempProducts = tempProducts.filter(product => product.stock > 0);
+        } else if (currentStockFilter === 'out-of-stock') {
+            tempProducts = tempProducts.filter(product => product.stock <= 0);
+        }
+        
+        displayBrandProducts(tempProducts);
+        productCountElement.textContent = `${tempProducts.length} products found`;
+    }
 }
         
         // Load product data from CSV
