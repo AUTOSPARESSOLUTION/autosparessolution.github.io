@@ -1525,8 +1525,11 @@ fetch(BACKEND_URL + '/api/health')
 
         // Search functionality for brands section
         brandsSearchInput.addEventListener("input", function() {
-            performBrandsSearch(this.value);
-        });
+    clearTimeout(brandsSearchTimeout);
+    brandsSearchTimeout = setTimeout(() => {
+        performBrandsSearch(this.value);
+    }, 5000); // 5 seconds delay - you can adjust this
+});
         
         function performBrandsSearch(searchTerm) {
             const term = searchTerm.toLowerCase().trim();
