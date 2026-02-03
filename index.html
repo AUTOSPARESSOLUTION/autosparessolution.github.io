@@ -1971,7 +1971,7 @@ function performSearch(searchTerm) {
     
     if (term === '') {
         // When search is empty, show only in-stock items
-        filteredProducts = productsData.filter(product => product.stock > 0);
+        filteredProducts = productsData.filter(product => product.stock > 0).slice(0,20);
     } else {
         // When searching, show all matching products regardless of stock
         filteredProducts = productsData.filter(product => 
