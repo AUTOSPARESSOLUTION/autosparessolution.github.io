@@ -2019,7 +2019,7 @@ function performSearch(searchTerm) {
                     });
                     
                     // Initialize with only in-stock items shown by default
-                    filteredProducts = productsData.filter(product => product.stock > 0);
+                    filteredProducts = productsData.filter(product => product.stock > 0).slice(0, 20);
                     displayProducts();
                 })
                 .catch(err => {
