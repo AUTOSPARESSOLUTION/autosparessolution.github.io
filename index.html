@@ -1204,6 +1204,71 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                 left: -100%;
             }
         }
+        <style>
+    /* ... all your existing CSS ... */
+    
+    /* ... your existing CSS continues ... */
+    
+    .chat-input button {
+        padding: 10px 15px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 0 5px 5px 0;
+        cursor: pointer;
+    }
+    
+    .payment-required {
+        text-align: center;
+        padding: 20px;
+        background: rgba(0,0,0,0.2);
+        border-radius: 8px;
+        margin-top: 15px;
+    }
+    
+    /* ====================================== */
+    /* NEW CSS ADDED FOR SEARCH BAR POSITION */
+    /* ====================================== */
+    
+    /* Style for search bar when placed after ad-space */
+    .ad-space + .search-container {
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .ad-space + .search-container:hover {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+    
+    .ad-space + .search-container input {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .ad-space + .search-container input:focus {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(10, 124, 113, 0.3);
+    }
+    
+    /* Responsive adjustments for the new layout */
+    @media (max-width: 768px) {
+        .ad-space + .search-container {
+            margin-top: 15px;
+            padding: 12px;
+        }
+    }
+    
+    /* ====================================== */
+    /* END OF NEW CSS */
+    /* ====================================== */
+    
+</style>
     </style>
 </head>
 <body>
