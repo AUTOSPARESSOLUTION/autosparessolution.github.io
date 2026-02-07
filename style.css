@@ -129,3 +129,30 @@ button.buy {
     /* ====================================== */
     
 </style>
+/* Add to your CSS at the end of the <style> section */
+
+/* ====================================== */
+/* CSS for Search Bar -> Products Flow */
+/* ====================================== */
+
+/* Make sure Products section has proper spacing after Search Bar */
+.search-container + #products.section {
+    margin-top: 0;
+    padding-top: 1rem;
+}
+
+/* Style for when user searches and products appear */
+#products.section .section-title {
+    margin-bottom: 1.5rem;
+}
+
+/* Optional: Add a separator between Search Bar and Products */
+.search-container {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0;
+    padding-bottom: 1.5rem;
+}
+
+.search-container + #products.section {
+    padding-top: 0.5rem;
+}
