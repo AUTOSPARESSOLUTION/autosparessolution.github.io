@@ -2074,7 +2074,7 @@ function performSearch(searchTerm) {
     
     if (term === '') {
         // When search is empty, show only in-stock items
-        filteredProducts = productsData.filter(product => product.stock > 0).slice(0, 20);
+        filteredProducts = productsData.filter(product => product.stock > 0).slice(0, 21);
     } else {
         // When searching, show all matching products regardless of stock
         filteredProducts = productsData.filter(product => 
@@ -2122,7 +2122,7 @@ function performSearch(searchTerm) {
                     });
                     
                     // Initialize with only in-stock items shown by default
-                    filteredProducts = productsData.filter(product => product.stock > 0).slice(0, 20);
+                    filteredProducts = productsData.filter(product => product.stock > 0).slice(0, 21);
                     displayProducts();
                 })
                 .catch(err => {
