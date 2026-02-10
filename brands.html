@@ -1513,7 +1513,7 @@ fetch(BACKEND_URL + '/api/health')
             const term = searchTerm.toLowerCase().trim();
             
             if (term === '') {
-                filteredProducts = productsData.filter(product => product.stock > 0);
+                filteredProducts = productsData.filter(product => product.stock > 0).slice(0, 21);
             } else {
                 filteredProducts = productsData.filter(product => 
                     product.part.toLowerCase().includes(term) || 
@@ -1558,7 +1558,7 @@ function applyFilters() {
     
     // Apply stock filter
     if (currentStockFilter === 'in-stock') {
-        tempProducts = tempProducts.filter(product => product.stock > 0);
+        tempProducts = tempProducts.filter(product => product.stock > 0).slice(0, 21);
     } else if (currentStockFilter === 'out-of-stock') {
         tempProducts = tempProducts.filter(product => product.stock <= 0);
     }
@@ -1595,7 +1595,7 @@ function performBrandsSearch(searchTerm) {
         
         // Apply stock filter
         if (currentStockFilter === 'in-stock') {
-            tempProducts = tempProducts.filter(product => product.stock > 0);
+            tempProducts = tempProducts.filter(product => product.stock > 0).slice(0, 21);
         } else if (currentStockFilter === 'out-of-stock') {
             tempProducts = tempProducts.filter(product => product.stock <= 0);
         }
@@ -1689,7 +1689,7 @@ function performBrandsSearch(searchTerm) {
             displayBrands();
 
             // Show in-stock products by default
-            filteredProducts = productsData.filter(product => product.stock > 0);
+            filteredProducts = productsData.filter(product => product.stock > 0).slice(0, 21);
             displayProducts();
             displayBrandProducts(filteredProducts);
         }
