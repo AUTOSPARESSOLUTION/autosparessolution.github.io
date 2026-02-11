@@ -2195,7 +2195,7 @@ function performSearch(searchTerm) {
                                 <input class="qty-input" type="number" value="1" min="1" max="${product.stock}" 
                                        onchange="updateProductQty('${product.part}', this.value)">
                                 <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})">
-                                    <i class="fas fa-cart-plus"></i> ${isInstock ? 'Add to Cart' : 'Pre-order'}
+                                    <i class="fas fa-cart-plus"></i> Add to Cart
                                 </button>
                             </div>
                         ` : ''}
