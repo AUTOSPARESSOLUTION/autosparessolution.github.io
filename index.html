@@ -2363,10 +2363,10 @@ function displayProducts() {
                 showToast(`${part} removed from cart`);
             } else {
                 // Ensure we don't exceed available stock
-                const product = productsData.find(p => p.part === part);
-                if (product) {
-                    item.qty = Math.min(item.qty, product.stock);
-                }
+               // const product = productsData.find(p => p.part === part);
+              //  if (product) {
+                  //  item.qty = Math.min(item.qty, product.stock);
+              //  }
             }
             updateCartUI();
         }
@@ -2377,10 +2377,10 @@ function displayProducts() {
             
             qty = parseInt(qty) || 1;
             // Ensure we don't exceed available stock
-            const product = productsData.find(p => p.part === part);
-            if (product) {
-                qty = Math.min(qty, product.stock);
-            }
+          //  const product = productsData.find(p => p.part === part);
+          //  if (product) {
+              //  qty = Math.min(qty, product.stock);
+          //  }
             
             item.qty = Math.max(1, qty);
             updateCartUI();
