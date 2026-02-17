@@ -156,3 +156,84 @@ button.buy {
 .search-container + #products.section {
     padding-top: 0.5rem;
 }
+/* Search container with brand dropdown */
+.search-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    margin: 1rem 0 2rem;
+    position: relative;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    color: #aaa;
+    pointer-events: none;
+    z-index: 1;
+}
+
+#brand-select {
+    padding: 0.7rem 1rem 0.7rem 2.5rem;
+    border-radius: 5px;
+    border: none;
+    font-size: 1rem;
+    background: rgba(0,0,0,0.3);
+    color: white;
+    min-width: 150px;
+    cursor: pointer;
+}
+
+#brand-select option {
+    background: #1a1a1a;
+    color: white;
+}
+
+#search-input {
+    flex: 1;
+    padding: 0.7rem 1rem;
+    border-radius: 5px;
+    border: none;
+    font-size: 1rem;
+    background: rgba(0,0,0,0.3);
+    color: white;
+}
+
+#search-input:focus,
+#brand-select:focus {
+    outline: none;
+    background: rgba(255,255,255,0.15);
+    box-shadow: 0 0 0 2px var(--primary);
+}
+
+#search-button {
+    padding: 0.7rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+#search-button:hover {
+    background: #09645a;
+    transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+    .search-container {
+        flex-wrap: wrap;
+    }
+    #brand-select {
+        width: 100%;
+        padding-left: 2.5rem;
+    }
+    #search-button {
+        width: 100%;
+    }
+}
