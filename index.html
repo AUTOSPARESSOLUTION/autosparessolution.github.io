@@ -2112,7 +2112,7 @@ function performSearch(searchTerm) {
                             stock: parseInt(cols[7] || 0),
                             boxQty: parseInt(cols[8] || 1), // Box quantity
                             masterCarton: parseInt(cols[9] || 1) // Master carton quantity
-                             brand: cols[10]?.trim() || "Unknown",  // Column K = index 10
+                             //brand: cols[10]?.trim() || "Unknown",  // Column K = index 10
         // ... other fields if you have them
                         };
                     }).filter(p => p.part); // Remove empty rows but keep all products (including zero stock)
@@ -2129,7 +2129,7 @@ function performSearch(searchTerm) {
                                 stock: 0,
                                 boxQty: 1,
                                 masterCarton: 1
-                                brand: "Unknown"
+                               // brand: "Unknown"
                             });
                         }
                     });
@@ -2163,7 +2163,7 @@ function performSearch(searchTerm) {
                         stock: 0,
                         boxQty: 1,
                         masterCarton: 1
-                         brand: "Unknown"
+                        // brand: "Unknown"
                     }));
                     filteredProducts = [...productsData];
                     displayProducts();
