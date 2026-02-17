@@ -2129,10 +2129,24 @@ function performSearch(searchTerm) {
                                 stock: 0,
                                 boxQty: 1,
                                 masterCarton: 1
+                                brand: "Unknown"
                             });
                         }
                     });
-                    
+                    // ===== NEW CODE TO ADD HERE =====
+// Calculate score for each product (for best-seller sorting)
+productsData.forEach(p => {
+    p.score = (p.price || 0) * (p.stock || 0);
+});
+
+allProducts = productsData;
+
+// Populate brand dropdown from actual data
+populateBrandDropdown();
+
+// Show top 21 diverse products initially
+filteredProducts = selectTopDiverseProducts(allProducts, 21);
+// ===== END NEW CODE =====
                     // Initialize with only in-stock items shown by default
                     filteredProducts = productsData.filter(product => product.stock > 0).slice(0, 21);
                     displayProducts();
@@ -2149,6 +2163,7 @@ function performSearch(searchTerm) {
                         stock: 0,
                         boxQty: 1,
                         masterCarton: 1
+                         brand: "Unknown"
                     }));
                     filteredProducts = [...productsData];
                     displayProducts();
