@@ -2651,6 +2651,60 @@ function displayProducts() {
 
         // Initialize the page
         loadProducts();
+        // ===== NEW ORDER CONFIRMATION FUNCTIONS =====
+
+// Function to confirm order and show payment options
+function confirmOrder() {
+    // Check if terms are agreed
+    if (!document.getElementById("agree-terms").checked) {
+        showToast("Please agree to the Terms & Conditions first", true);
+        return;
+    }
+    
+    // Check if cart is empty
+    if (cart.length === 0) {
+        showToast("Your cart is empty", true);
+        return;
+    }
+    
+    // Disable the confirm button to prevent double-click
+    const confirmBtn = document.getElementById("confirm-order-btn");
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Order Confirmed';
+    }
+    
+    // Show payment section
+    const paymentSection = document.getElementById("payment-section");
+    if (paymentSection) {
+        paymentSection.style.display = "block";
+    }
+    
+    // Optional: Scroll to payment section smoothly
+    setTimeout(() => {
+        if (paymentSection) {
+            paymentSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }, 100);
+    
+    showToast("Order confirmed! Please proceed with payment.", false);
+}
+
+// Function to reset order confirmation if cart changes
+function resetOrderConfirmation() {
+    const confirmBtn = document.getElementById("confirm-order-btn");
+    if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm Order';
+    }
+    
+    const paymentSection = document.getElementById("payment-section");
+    if (paymentSection) {
+        paymentSection.style.display = "none";
+    }
+}
+
+// ===== END NEW FUNCTIONS =====
         
         // Check if user is already logged in
         const savedUser = localStorage.getItem('currentUser');
