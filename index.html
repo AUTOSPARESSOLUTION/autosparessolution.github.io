@@ -2356,7 +2356,12 @@ function displayProducts() {
             showToast(`${part} added to cart!`);
         }
 
-        function updateCartUI() {
+        function updateCartUI() { // ===== ADD THIS LINE =====
+    resetOrderConfirmation(); // Reset order confirmation when cart changes
+    // ===== END ADDED LINE =====
+    
+    const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+    document.getElementById("cart-count").textContent = cartCount;
             const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
             document.getElementById("cart-count").textContent = cartCount;
             
