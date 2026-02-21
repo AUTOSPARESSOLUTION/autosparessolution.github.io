@@ -2419,15 +2419,16 @@ function displayProducts() {
             
             const tax = subtotal * 0.18;
             const totalAmount = (subtotal + tax) * 100;
-            <button class="checkout-btn whatsapp" onclick="sendOrderViaWhatsApp()">
-                        <i class="fab fa-whatsapp"></i> Order via WhatsApp
-                    </button>
+            
             const options = {
                 key: "rzp_live_90iWxpNYThOpyE",
                 amount: totalAmount,
                 currency: "INR",
                 name: "Auto Spares Solution",
                 description: "Purchase (Prices include 18% GST)",
+                <button class="checkout-btn whatsapp" onclick="sendOrderViaWhatsApp()">
+                        <i class="fab fa-whatsapp"></i> Order via WhatsApp
+                    </button>
                 handler: function(response) {
                     showToast("Payment Successful! Order confirmed.");
                     sendOrderConfirmation(response.razorpay_payment_id);
