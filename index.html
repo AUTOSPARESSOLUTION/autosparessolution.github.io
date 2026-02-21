@@ -1631,7 +1631,7 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
             <button class="close-cart"><i class="fas fa-times"></i></button>
             <h2><i class="fas fa-shopping-cart"></i> Your Cart</h2>
             <div id="cart-items"></div>
-            <div class="cart-actions">
+           <!-- <div class="cart-actions">
                 <div class="cart-summary">
                     <div class="summary-row">
                         <span>Subtotal:</span>
@@ -1656,7 +1656,42 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                     </button>
                 <button class="btn buy btn-block" onclick="checkout()"><i class="fas fa-credit-card"></i> Checkout</button>
                 <button class="btn btn-block" onclick="sendOrderEmail()" style="background: #6c757d; margin-top: 10px;"><i class="fas fa-envelope"></i> Email Order</button>
-            </div>
+            </div> -->
+            <div class="cart-actions">
+    <div class="cart-summary">
+        <div class="summary-row">
+            <span>Subtotal:</span>
+            <span>₹<span id="cart-subtotal">0.00</span></span>
+        </div>
+        <div class="summary-row">
+            <span>GST (18%):</span>
+            <span>₹<span id="cart-tax">0.00</span></span>
+        </div>
+        <div class="summary-row total-row">
+            <span>Total:</span>
+            <span>₹<span id="cart-total">0.00</span></span>
+        </div>
+    </div>
+    
+    <div class="terms-agreement">
+        <input type="checkbox" id="agree-terms" required>
+        <label for="agree-terms">I agree to the <a href="#policies" style="color: var(--accent);">Terms & Conditions</a></label>
+    </div>
+    
+    <!-- NEW: Order Confirmation Button -->
+    <button class="btn confirm-order-btn btn-block" onclick="confirmOrder()" id="confirm-order-btn">
+        <i class="fas fa-check-circle"></i> Confirm Order
+    </button>
+    
+    <div class="payment-section" id="payment-section" style="display: none;">
+        <button class="btn buy btn-block" onclick="checkout()">
+            <i class="fas fa-credit-card"></i> Proceed to Payment
+        </button>
+        <button class="btn btn-block" onclick="sendOrderEmail()" style="background: #6c757d; margin-top: 10px;">
+            <i class="fas fa-envelope"></i> Email Order
+        </button>
+    </div>
+</div>
         </div>
 
         <!-- Contact Section -->
