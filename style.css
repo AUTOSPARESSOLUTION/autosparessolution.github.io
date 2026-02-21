@@ -237,3 +237,45 @@ button.buy {
         width: 100%;
     }
 }
+/* Order Confirmation Button */
+.confirm-order-btn {
+    background: #27ae60;  /* Green color for confirmation */
+    color: white;
+    border: none;
+    margin: 15px 0 10px;
+    transition: all 0.3s ease;
+}
+
+.confirm-order-btn:hover {
+    background: #219a52;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.confirm-order-btn:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.payment-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Optional: Add animation for the payment section appearing */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.payment-section[style*="display: block"] {
+    animation: slideDown 0.3s ease;
+}
