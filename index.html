@@ -2360,10 +2360,10 @@ function displayProducts() {
   //  resetOrderConfirmation(); // Reset order confirmation when cart changes
     // ===== END ADDED LINE =====
     
-    //const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
-   // document.getElementById("cart-count").textContent = cartCount;
-          //  const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
-          //  document.getElementById("cart-count").textContent = cartCount;
+    const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+    document.getElementById("cart-count").textContent = cartCount;
+            const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+            document.getElementById("cart-count").textContent = cartCount;
             
             const itemsDiv = document.getElementById("cart-items");
             let subtotal = 0;
