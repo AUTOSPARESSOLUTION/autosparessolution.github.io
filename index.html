@@ -1672,6 +1672,11 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                 <button class="checkout-btn whatsapp" onclick="sendOrderViaWhatsApp()">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
                     </button>
+                const whatsappBtn = document.getElementById('whatsapp-order-btn');
+    if (whatsappBtn) {
+        whatsappBtn.disabled = false;
+        whatsappBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Confirm via WhatsApp';
+    }
                 <button class="btn buy btn-block" onclick="checkout()"><i class="fas fa-credit-card"></i> Checkout</button>
                 <button class="btn btn-block" onclick="sendOrderEmail()" style="background: #6c757d; margin-top: 10px;"><i class="fas fa-envelope"></i> Email Order</button>
             </div> 
@@ -2415,11 +2420,7 @@ function displayProducts() {
                                 <span style="margin-left: 10px; min-width: 70px; text-align: right;">₹${itemTotal.toFixed(2)}</span>
                                 <button class="remove-item" onclick="removeFromCart('${item.part}')"><i class="fas fa-trash"></i></button>
                             </div>
-                            const whatsappBtn = document.getElementById('whatsapp-order-btn');
-    if (whatsappBtn) {
-        whatsappBtn.disabled = false;
-        whatsappBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Confirm via WhatsApp';
-    }
+                        
                         </div>
                     `;
                 });
