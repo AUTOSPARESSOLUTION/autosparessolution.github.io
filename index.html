@@ -1672,11 +1672,10 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                 <button class="checkout-btn whatsapp" onclick="sendOrderViaWhatsApp()">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
                     </button>
-                const whatsappBtn = document.getElementById('whatsapp-order-btn');
-    if (whatsappBtn) {
-        whatsappBtn.disabled = false;
-        whatsappBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Confirm via WhatsApp';
-    }
+                <!-- NEW: WhatsApp Order Confirmation Button -->
+    <button class="btn whatsapp-order-btn btn-block" onclick="whatsappOrderConfirmation()" id="whatsapp-order-btn">
+        <i class="fab fa-whatsapp"></i> Confirm via WhatsApp
+    </button>
                 <button class="btn buy btn-block" onclick="checkout()"><i class="fas fa-credit-card"></i> Checkout</button>
                 <button class="btn btn-block" onclick="sendOrderEmail()" style="background: #6c757d; margin-top: 10px;"><i class="fas fa-envelope"></i> Email Order</button>
             </div> 
