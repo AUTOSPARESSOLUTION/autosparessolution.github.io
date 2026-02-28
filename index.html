@@ -2488,41 +2488,7 @@ function whatsappOrderConfirmation() {
         showToast("Your cart is empty", true);
         return;
     }
-            // 2. Optional: check terms agreement (remove if not needed)
-   // if (!document.getElementById("agree-terms").checked) {
-      //  showToast("Please agree to Terms & Conditions first", true);
-     //   return;
-    }
-    // 3. Prepare email details
-    const recipient = "contact@autosparessolution.com";
-    const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
-
-    // 4. Build email body with order summary
-    let body = "Hello, I would like to confirm my order:\n\n";
-    let subtotal = 0;
-
-    cart.forEach(item => {
-        const itemTotal = item.price * item.qty;
-        subtotal += itemTotal;
-        body += `${item.part} - ${item.desc} x ${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
-    });
-
-    const tax = subtotal * 0.18;
-    const total = subtotal + tax;
-    body += `\nSubtotal: ₹${subtotal.toFixed(2)}`;
-    body += `\nGST (18%): ₹${tax.toFixed(2)}`;
-    body += `\nTotal: ₹${total.toFixed(2)}`;
-    body += `\n\nPlease confirm and provide payment instructions.`;
-
-    // 5. Encode for mailto link
-    const mailtoLink = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-
-    // 6. Open default email client
-    window.location.href = mailtoLink;
-
-    // 7. Optional feedback
-    showToast("Email client opened – please send the email to confirm.");
-}
+           
     // Rest of the function as above...
 }
         function changeQty(part, delta) {
