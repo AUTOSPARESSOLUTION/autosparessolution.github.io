@@ -2572,59 +2572,7 @@ function whatsappOrderConfirmation() {
             const rzp = new Razorpay(options);
             rzp.open();
         }
-// ===== EMAIL ORDER CONFIRMATION - FIXED VERSION =====
-function sendOrderEmail() {
-    // Safety check: make sure cart exists
-    if (typeof cart === 'undefined' || cart.length === 0) {
-        // Use alert if showToast isn't available
-        alert("Your cart is empty");
-        return;
-    }
-    
-    // Safety check: terms checkbox might not exist
-    const termsCheckbox = document.getElementById('agree-terms');
-    if (termsCheckbox && !termsCheckbox.checked) {
-        alert("Please agree to Terms & Conditions first");
-        return;
-    }
-    
-    try {
-        // Calculate totals
-        let subtotal = 0;
-        let body = "Hello, I would like to confirm my order:\n\n";
-        
-        for (let i = 0; i < cart.length; i++) {
-            const item = cart[i];
-            const itemTotal = item.price * item.qty;
-            subtotal += itemTotal;
-            body += item.part + " - " + (item.desc || "Auto Part") + " x " + item.qty + " = ₹" + itemTotal.toFixed(2) + "\n";
-        }
-        
-        const tax = subtotal * 0.18;
-        const total = subtotal + tax;
-        
-        body += "\nSubtotal: ₹" + subtotal.toFixed(2);
-        body += "\nGST (18%): ₹" + tax.toFixed(2);
-        body += "\nTotal: ₹" + total.toFixed(2);
-        body += "\n\nPlease confirm and provide payment instructions.";
-        
-        // Create mailto link
-        const recipient = "contact@autosparessolution.com";
-        const subject = "Order Inquiry - " + new Date().toLocaleDateString();
-        const mailtoLink = "mailto:" + recipient + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-        
-        // Open email client
-        window.location.href = mailtoLink;
-        
-        // Show success message if showToast exists
-        if (typeof showToast === 'function') {
-            showToast("Email client opened");
-        }
-    } catch (error) {
-        console.error("Email error:", error);
-        alert("Could not open email. Please check console for errors.");
-    }
-}    
+
         function sendOrderConfirmation(paymentId) {
             // In a real implementation, you would send this to your server
             console.log("Order confirmation would be sent for payment:", paymentId);
@@ -2739,32 +2687,32 @@ function sendOrderEmail() {
             XLSX.writeFile(wb, `order_${paymentId}.xlsx`);
         }
 
-        function sendOrderEmail() {
-            if (cart.length === 0) {
+       // function sendOrderEmail() {
+           // if (cart.length === 0) {
                 showToast("Your cart is empty", true);
-                return;
+               // return;
             }
             
-            const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
-            let body = "Please find below my order details:\n\n";
+          //  const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
+           // let body = "Please find below my order details:\n\n";
             
-            cart.forEach(item => {
-                body += `${item.part} - ${item.desc}\n`;
-                body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
-                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
+          //  cart.forEach(item => {
+               // body += `${item.part} - ${item.desc}\n`;
+               // body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
+               // body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
             });
             
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const tax = subtotal * 0.18;
-            const total = subtotal + tax;
+           // const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+           // const tax = subtotal * 0.18;
+            //const total = subtotal + tax;
             
-            body += `\nSubtotal: ₹${subtotal.toFixed(2)}\n`;
-            body += `GST (18%): ₹${tax.toFixed(2)}\n`;
-            body += `Total Amount: ₹${total.toFixed(2)}\n\n`;
-            body += "Please confirm availability and provide payment instructions.\n\n";
-            body += "Regards,\n[Your Name]";
+           // body += `\nSubtotal: ₹${subtotal.toFixed(2)}\n`;
+           // body += `GST (18%): ₹${tax.toFixed(2)}\n`;
+          //  body += `Total Amount: ₹${total.toFixed(2)}\n\n`;
+          //  body += "Please confirm availability and provide payment instructions.\n\n";
+          //  body += "Regards,\n[Your Name]";
             
-            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+           // window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         }
 
         // Contact form submission
@@ -2786,6 +2734,59 @@ function sendOrderEmail() {
             this.reset();
             showToast("Your message has been sent. We'll contact you soon!");
         });
+        // ===== EMAIL ORDER CONFIRMATION - FIXED VERSION =====
+function sendOrderEmail() {
+    // Safety check: make sure cart exists
+    if (typeof cart === 'undefined' || cart.length === 0) {
+        // Use alert if showToast isn't available
+        alert("Your cart is empty");
+        return;
+    }
+    
+    // Safety check: terms checkbox might not exist
+    const termsCheckbox = document.getElementById('agree-terms');
+    if (termsCheckbox && !termsCheckbox.checked) {
+        alert("Please agree to Terms & Conditions first");
+        return;
+    }
+    
+    try {
+        // Calculate totals
+        let subtotal = 0;
+        let body = "Hello, I would like to confirm my order:\n\n";
+        
+        for (let i = 0; i < cart.length; i++) {
+            const item = cart[i];
+            const itemTotal = item.price * item.qty;
+            subtotal += itemTotal;
+            body += item.part + " - " + (item.desc || "Auto Part") + " x " + item.qty + " = ₹" + itemTotal.toFixed(2) + "\n";
+        }
+        
+        const tax = subtotal * 0.18;
+        const total = subtotal + tax;
+        
+        body += "\nSubtotal: ₹" + subtotal.toFixed(2);
+        body += "\nGST (18%): ₹" + tax.toFixed(2);
+        body += "\nTotal: ₹" + total.toFixed(2);
+        body += "\n\nPlease confirm and provide payment instructions.";
+        
+        // Create mailto link
+        const recipient = "contact@autosparessolution.com";
+        const subject = "Order Inquiry - " + new Date().toLocaleDateString();
+        const mailtoLink = "mailto:" + recipient + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+        
+        // Open email client
+        window.location.href = mailtoLink;
+        
+        // Show success message if showToast exists
+        if (typeof showToast === 'function') {
+            showToast("Email client opened");
+        }
+    } catch (error) {
+        console.error("Email error:", error);
+        alert("Could not open email. Please check console for errors.");
+    }
+}    
 
         // Initialize the page
         loadProducts();
