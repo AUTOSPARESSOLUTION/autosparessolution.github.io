@@ -2482,11 +2482,11 @@ function whatsappOrderConfirmation() {
     // You can uncomment the next line if you want WhatsApp confirmation to also enable payment
     // document.getElementById('payment-section').style.display = 'block';
 }
-      //  function sendOrderEmail() {
-   // console.log("Email function triggered"); // Debug line
-   // if (cart.length === 0) {
+        function sendOrderEmail() {
+    console.log("Email function triggered"); // Debug line
+    if (cart.length === 0) {
         showToast("Your cart is empty", true);
-    // return;
+     return;
     }
        
     // Rest of the function as above...
@@ -2687,32 +2687,32 @@ function whatsappOrderConfirmation() {
             XLSX.writeFile(wb, `order_${paymentId}.xlsx`);
         }
 
-       // function sendOrderEmail() {
-           // if (cart.length === 0) {
+        function sendOrderEmail() {
+            if (cart.length === 0) {
                 showToast("Your cart is empty", true);
-               // return;
+                return;
             }
             
-          //  const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
-           // let body = "Please find below my order details:\n\n";
+            const subject = `Order Inquiry - ${new Date().toLocaleDateString()}`;
+            let body = "Please find below my order details:\n\n";
             
-          //  cart.forEach(item => {
-               // body += `${item.part} - ${item.desc}\n`;
-               // body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
-               // body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
+            cart.forEach(item => {
+                body += `${item.part} - ${item.desc}\n`;
+                body += `Quantity: ${item.qty}, Box Qty: ${item.boxQty}, Master Carton: ${item.masterCarton}\n`;
+                body += `Price: ₹${item.price.toFixed(2)} each, Total: ₹${(item.price * item.qty).toFixed(2)}\n\n`;
             });
             
-           // const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-           // const tax = subtotal * 0.18;
-            //const total = subtotal + tax;
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
             
-           // body += `\nSubtotal: ₹${subtotal.toFixed(2)}\n`;
-           // body += `GST (18%): ₹${tax.toFixed(2)}\n`;
-          //  body += `Total Amount: ₹${total.toFixed(2)}\n\n`;
-          //  body += "Please confirm availability and provide payment instructions.\n\n";
-          //  body += "Regards,\n[Your Name]";
+            body += `\nSubtotal: ₹${subtotal.toFixed(2)}\n`;
+            body += `GST (18%): ₹${tax.toFixed(2)}\n`;
+            body += `Total Amount: ₹${total.toFixed(2)}\n\n`;
+            body += "Please confirm availability and provide payment instructions.\n\n";
+            body += "Regards,\n[Your Name]";
             
-           // window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            window.location.href = `mailto:contact@autosparessolution.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         }
 
         // Contact form submission
