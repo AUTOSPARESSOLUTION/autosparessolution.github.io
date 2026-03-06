@@ -1945,45 +1945,77 @@ _iub.csConfiguration = {"siteId":4209039,"cookiePolicyId":97422320,"lang":"en","
                 ${currentUser.gstin ? `<p><strong>GSTIN:</strong> ${currentUser.gstin}</p>` : ''}
             `;
         }
+function register() {
+    const name = document.getElementById("register-name").value;
+    const email = document.getElementById("register-email").value;
+    const password = document.getElementById("register-password").value;
+    const phone = document.getElementById("register-phone").value;
+    const business = document.getElementById("register-business").value;
+    const gstin = document.getElementById("register-gstin").value;
+    const address = document.getElementById("register-address").value;    // new
+    const pincode = document.getElementById("register-pincode").value;   // new
 
-        function register() {
-            const name = document.getElementById("register-name").value;
-            const email = document.getElementById("register-email").value;
-            const password = document.getElementById("register-password").value;
-            const phone = document.getElementById("register-phone").value;
-            const business = document.getElementById("register-business").value;
-            const gstin = document.getElementById("register-gstin").value;
+    if (!name || !email || !password || !phone || !address || !pincode) {
+        showToast("Please fill all required fields", true);
+        return;
+    }
+
+    if (users.some(user => user.email === email)) {
+        showToast("Email already registered", true);
+        return;
+    }
+
+    const newUser = {
+        name, email, password, phone, business, gstin,
+        address, pincode,   // store address and pincode
+        registrationDate: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    localStorage.setItem('users', JSON.stringify(users));
+    currentUser = newUser;
+    showUserProfile();
+    showToast("Registration successful!");
+    document.getElementById("register-form").reset();
+}
+     //   function register() {
+       //     const name = document.getElementById("register-name").value;
+       //     const email = document.getElementById("register-email").value;
+        //    const password = document.getElementById("register-password").value;
+        //    const phone = document.getElementById("register-phone").value;
+        //    const business = document.getElementById("register-business").value;
+       //     const gstin = document.getElementById("register-gstin").value;
             
-            if (!name || !email || !password || !phone) {
-                showToast("Please fill all required fields", true);
-                return;
-            }
+       //     if (!name || !email || !password || !phone) {
+          //      showToast("Please fill all required fields", true);
+         //       return;
+        //    }
             
-            if (users.some(user => user.email === email)) {
-                showToast("Email already registered", true);
-                return;
-            }
+        //    if (users.some(user => user.email === email)) {
+         //       showToast("Email already registered", true);
+         //       return;
+        //    }
             
-            const newUser = {
-                name,
-                email,
-                password, // In a real application, this would be hashed
-                phone,
-                business,
-                gstin,
-                registrationDate: new Date().toISOString()
-            };
+        //    const newUser = {
+         //       name,
+         //       email,
+         //       password, // In a real application, this would be hashed
+        //        phone,
+         //       business,
+         //       gstin,
+         //       registrationDate: new Date().toISOString()
+        //    };
             
-            users.push(newUser);
-            localStorage.setItem('users', JSON.stringify(users));
+        //    users.push(newUser);
+        //    localStorage.setItem('users', JSON.stringify(users));
             
-            currentUser = newUser;
-            showUserProfile();
-            showToast("Registration successful!");
+          //  currentUser = newUser;
+           // showUserProfile();
+          //  showToast("Registration successful!");
             
             // Clear form
-            document.getElementById("register-form").reset();
-        }
+         //   document.getElementById("register-form").reset();
+     //   } 
 
         function login() {
             const email = document.getElementById("login-email").value;
