@@ -2499,6 +2499,7 @@ function whatsappOrderConfirmation() {
     // ... rest of the function (opening WhatsApp) ...
 }
     // Build order summary
+    let currentUser = null;   
     let orderSummary = 'Hello, I would like to confirm my order:\n\n';
     let subtotal = 0;
     cart.forEach(item => {
