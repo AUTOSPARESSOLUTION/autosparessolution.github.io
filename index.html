@@ -2479,6 +2479,65 @@ function displayProducts() {
             document.getElementById("cart-tax").textContent = tax.toFixed(2);
             document.getElementById("cart-total").textContent = total.toFixed(2);
         }
+//function whatsappOrderConfirmation() {
+    // Check terms
+  //  if (!document.getElementById('agree-terms').checked) {
+    //    showToast('Please agree to Terms & Conditions first', true);
+    //    return;
+  //  }
+  //  if (cart.length === 0) {
+   //     showToast('Cart is empty', true);
+   //     return;
+   // }
+
+    // Disable button to prevent double-click
+ //   const btn = document.getElementById('whatsapp-order-btn');
+ //   btn.disabled = true;
+ //   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening WhatsApp...';
+
+
+    // ... rest of the function (opening WhatsApp) ...
+}
+    // Build order summary
+  //  let currentUser = null;   
+ //   let orderSummary = 'Hello, I would like to confirm my order:\n\n';
+ //   let subtotal = 0;
+ //   cart.forEach(item => {
+  //      const itemTotal = item.price * item.qty;
+    //    subtotal += itemTotal;
+    //    orderSummary += `${item.part} - ${item.desc} x ${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
+  //  });
+   // const tax = subtotal * 0.18;
+   // const total = subtotal + tax;
+  //  orderSummary += `\nSubtotal: ₹${subtotal.toFixed(2)}`;
+  //  orderSummary += `\nGST (18%): ₹${tax.toFixed(2)}`;
+ //   orderSummary += `\nTotal: ₹${total.toFixed(2)}`;
+ //   orderSummary += `\n\nPlease confirm and I will proceed to payment.`;
+// if (currentUser) {
+      //  message += `Customer Name: ${currentUser.name}\n`;
+      //  message += `Email: ${currentUser.email}\n`;
+      //  message += `Phone: ${currentUser.phone}\n`;
+       // if (currentUser.business) message += `Business: ${currentUser.business}\n`;
+       // if (currentUser.gstin) message += `GSTIN: ${currentUser.gstin}\n`;
+        
+        // 👇 ADD THESE TWO LINES HERE
+       // if (currentUser.address) {
+         //   message += `Delivery Address: ${currentUser.address}\n`;
+         //   message += `PIN Code: ${currentUser.pincode}\n`;
+     //   }
+    // Encode for URL
+ //   const encoded = encodeURIComponent(orderSummary);
+
+    // Open WhatsApp (replace with your business number)
+ //   const phone = '9830300193'; // Your WhatsApp number
+  //  const url = `https://wa.me/${phone}?text=${encoded}`;
+  //  window.open(url, '_blank');
+
+    // Re-enable button after a short delay (in case user returns)
+  //  setTimeout(() => {
+   //     btn.disabled = false;
+    //    btn.innerHTML = '<i class="fab fa-whatsapp"></i> Confirm via WhatsApp';
+  //  }, 5000); // 5 seconds
 function whatsappOrderConfirmation() {
     // Check terms
     if (!document.getElementById('agree-terms').checked) {
@@ -2490,55 +2549,57 @@ function whatsappOrderConfirmation() {
         return;
     }
 
-    // Disable button to prevent double-click
+    // Disable button
     const btn = document.getElementById('whatsapp-order-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening WhatsApp...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening WhatsApp...';
+    }
 
-
-    // ... rest of the function (opening WhatsApp) ...
-}
     // Build order summary
-    let currentUser = null;   
-    let orderSummary = 'Hello, I would like to confirm my order:\n\n';
+    let message = 'Hello, I would like to confirm my order:\n\n';
     let subtotal = 0;
+    
     cart.forEach(item => {
         const itemTotal = item.price * item.qty;
         subtotal += itemTotal;
-        orderSummary += `${item.part} - ${item.desc} x ${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
+        message += `${item.part} - ${item.desc} x ${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
     });
+    
     const tax = subtotal * 0.18;
     const total = subtotal + tax;
-    orderSummary += `\nSubtotal: ₹${subtotal.toFixed(2)}`;
-    orderSummary += `\nGST (18%): ₹${tax.toFixed(2)}`;
-    orderSummary += `\nTotal: ₹${total.toFixed(2)}`;
-    orderSummary += `\n\nPlease confirm and I will proceed to payment.`;
- if (currentUser) {
+    message += `\nSubtotal: ₹${subtotal.toFixed(2)}`;
+    message += `\nGST (18%): ₹${tax.toFixed(2)}`;
+    message += `\nTotal: ₹${total.toFixed(2)}\n\n`;
+
+    // Add customer details
+    if (currentUser) {
         message += `Customer Name: ${currentUser.name}\n`;
         message += `Email: ${currentUser.email}\n`;
         message += `Phone: ${currentUser.phone}\n`;
         if (currentUser.business) message += `Business: ${currentUser.business}\n`;
         if (currentUser.gstin) message += `GSTIN: ${currentUser.gstin}\n`;
-        
-        // 👇 ADD THESE TWO LINES HERE
         if (currentUser.address) {
             message += `Delivery Address: ${currentUser.address}\n`;
             message += `PIN Code: ${currentUser.pincode}\n`;
         }
-    // Encode for URL
-    const encoded = encodeURIComponent(orderSummary);
+    }
 
-    // Open WhatsApp (replace with your business number)
-    const phone = '9830300193'; // Your WhatsApp number
-    const url = `https://wa.me/${phone}?text=${encoded}`;
+    message += `\nPlease confirm and I will proceed to payment.`;
+
+    // Open WhatsApp
+    const encoded = encodeURIComponent(message);
+    const url = `https://wa.me/9830300193?text=${encoded}`;
     window.open(url, '_blank');
 
-    // Re-enable button after a short delay (in case user returns)
+    // Re-enable button
     setTimeout(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fab fa-whatsapp"></i> Confirm via WhatsApp';
-    }, 5000); // 5 seconds
-
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fab fa-whatsapp"></i> Confirm via WhatsApp';
+        }
+    }, 5000);
+}
     // Optionally, also reveal payment section (if you want both methods to lead to payment)
     // You can uncomment the next line if you want WhatsApp confirmation to also enable payment
     // document.getElementById('payment-section').style.display = 'block';
