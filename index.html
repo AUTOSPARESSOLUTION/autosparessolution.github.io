@@ -916,7 +916,7 @@
                             <img src="images/brand-${(product.brand||'default').toLowerCase()}.png" alt="${product.brand}" onerror="this.src='images/brand-default.png'">
                         </div>
                         ${!inStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
-                        //<img src="images/${product.part}.png" alt="${product.part}" onerror="this.src='images/default.png'">
+                        
                         <img src="images/${product.part}.png" alt="${product.part}" 
      onerror="fallbackImage(this, '${product.brand}')">
                         <div class="part-number">${product.part}</div>
