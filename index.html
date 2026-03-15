@@ -800,6 +800,24 @@
             document.getElementById("register-form").reset();
             updateDeliveryEstimator();
         }
+        function fallbackImage(img, brand) {
+    // If already tried brand logo, stop recursion and show company logo
+    if (img.getAttribute('data-fallback') === 'brand') {
+        img.src = 'images/ASS.jpg';  // your company logo
+        img.onerror = null;           // prevent infinite loop
+        return;
+    }
+    // First fallback: brand logo
+    if (brand && brand !== 'Unknown') {
+        img.setAttribute('data-fallback', 'brand');
+        img.src = `images/brand-${brand.toLowerCase()}.png`;
+        // Keep onerror active for the next fallback
+    } else {
+        // No brand info, go directly to company logo
+        img.src = 'images/ASS.jpg';
+        img.onerror = null;
+    }
+}
         function login() {
             const email = document.getElementById("login-email").value;
             const password = document.getElementById("login-password").value;
@@ -898,7 +916,9 @@
                             <img src="images/brand-${(product.brand||'default').toLowerCase()}.png" alt="${product.brand}" onerror="this.src='images/brand-default.png'">
                         </div>
                         ${!inStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
-                        <img src="images/${product.part}.png" alt="${product.part}" onerror="this.src='images/default.png'">
+                        //<img src="images/${product.part}.png" alt="${product.part}" onerror="this.src='images/default.png'">
+                        <img src="images/${product.part}.png" alt="${product.part}" 
+     onerror="fallbackImage(this, '${product.brand}')">
                         <div class="part-number">${product.part}</div>
                         <div class="part-desc">${product.desc}</div>
                         <div class="price-container">
