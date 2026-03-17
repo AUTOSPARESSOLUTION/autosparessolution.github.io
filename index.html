@@ -1171,6 +1171,11 @@
             } else {
                 container.innerHTML = `<img src="${url}" style="max-width:100%; max-height:100%; object-fit:contain;">`;
             }
+            function extractYouTubeId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
             // thumbnails
             const thumbDiv = document.getElementById('gallery-thumbnails');
             thumbDiv.innerHTML = '';
