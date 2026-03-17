@@ -1164,6 +1164,11 @@
             container.innerHTML = '';
             if (url.match(/\.(mp4|webm|ogg)$/i) || url.includes('youtube') || url.includes('vimeo')) {
                 let embed = url;
+                            function extractYouTubeId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
                 if (url.includes('youtube.com/watch')) embed = `https://www.youtube.com/embed/${new URL(url).searchParams.get('v')}`;
                 else if (url.includes('youtu.be')) embed = `https://www.youtube.com/embed/${url.split('/').pop()}`;
                 else if (url.includes('vimeo.com')) embed = `https://player.vimeo.com/video/${url.split('/').pop()}`;
@@ -1171,11 +1176,7 @@
             } else {
                 container.innerHTML = `<img src="${url}" style="max-width:100%; max-height:100%; object-fit:contain;">`;
             }
-            function extractYouTubeId(url) {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-}
+
             // thumbnails
             const thumbDiv = document.getElementById('gallery-thumbnails');
             thumbDiv.innerHTML = '';
