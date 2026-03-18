@@ -910,6 +910,7 @@
             }
             filteredProducts.forEach(product => {
                 const inStock = product.stock > 0;
+                const hasVideo = product.video && product.video.trim() !== ''; 
                 gallery.insertAdjacentHTML('beforeend', `
                     <div class="card" data-part="${product.part}" data-media='${JSON.stringify(product.media).replace(/'/g,"&apos;")}'>
                         <div class="brand-logo-container">
