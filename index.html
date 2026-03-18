@@ -933,6 +933,7 @@
                             <button class="btn cart" onclick="addToCart('${product.part}', ${product.price})"><i class="fas fa-cart-plus"></i> ${inStock ? 'Add to Cart' : 'Pre-order'}</button>
                         </div>
                         <div class="card-actions" style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                        ${hasVideo ? `<button class="btn video-btn" onclick="openVideoModal('${product.video}', '${product.part}')"><i class="fas fa-play-circle"></i> Watch Video</button>` : ''}
                             ${product.media && product.media.length ? `<button class="btn gallery-btn" onclick="openGalleryFromCard(this)"><i class="fas fa-images"></i> Gallery</button>` : ''}
                             <a class="btn whatsapp" href="https://wa.me/9830300193?text=I want to enquire about ${product.part}" target="_blank"><i class="fab fa-whatsapp"></i> Enquire</a>
                         </div>
