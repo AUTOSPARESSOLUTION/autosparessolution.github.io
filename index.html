@@ -568,6 +568,18 @@
         width: 100%;
     }
         }
+        /* Make buttons share space inside product card */
+.card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+.card-actions .btn {
+    flex: 1;
+    min-width: 100px;
+    text-align: center;
+}
     </style>
 </head>
 <body>
