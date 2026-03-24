@@ -580,9 +580,68 @@
     min-width: 100px;
     text-align: center;
 }
+        /* Preloader overlay */
+#preloader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--dark);
+    background: linear-gradient(135deg, #0f2027, #203a43);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.8s ease;
+}
+
+/* Spinner */
+.loader {
+    width: 60px;
+    height: 60px;
+    border: 6px solid rgba(255,255,255,0.3);
+    border-top: 6px solid var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+.loader-text {
+    color: var(--accent);
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+    font-weight: 500;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Fade-in animation for main content */
+.container, header, nav, footer {
+    animation: fadeInUp 0.8s ease forwards;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
     </style>
 </head>
 <body>
+    <div id="preloader">
+    <div class="loader"></div>
+    <div class="loader-text">Loading Auto Spares...</div>
+</div>
     <!-- User Panel Toggle -->
     <button class="user-toggle" id="user-toggle"><i class="fas fa-user"></i></button>
     <div class="user-panel" id="user-panel">
