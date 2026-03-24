@@ -952,12 +952,28 @@ function extractYouTubeId(url) {
                     // Initial display: top 21 diverse products (you can use selectTopDiverseProducts if defined)
                     filteredProducts = productsData.filter(p => p.stock > 0).slice(0,21);
                     displayProducts();
+                    // Hide preloader
+const preloader = document.getElementById('preloader');
+if (preloader) {
+    preloader.style.opacity = '0';
+    setTimeout(() => {
+        preloader.style.display = 'none';
+    }, 800);
+}
                 })
                 .catch(err => {
                     console.error("CSV error", err);
                     productsData = fixedProducts.map(part => ({ part, desc:"Auto Spare Part", List:0, Mrp:0, price:0, stock:0, boxQty:1, masterCarton:1, brand:"Unknown", video:"", media:[] }));
                     filteredProducts = productsData;
                     displayProducts();
+                    // Hide preloader
+const preloader = document.getElementById('preloader');
+if (preloader) {
+    preloader.style.opacity = '0';
+    setTimeout(() => {
+        preloader.style.display = 'none';
+    }, 800);
+}
                     showToast("Error loading product data. Using fallback.", true);
                 });
         }
