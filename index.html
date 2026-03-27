@@ -1033,7 +1033,18 @@ function extractYouTubeId(url) {
                             masterCarton: parseInt(cols[9] || 1),
                             brand: cols[10]?.trim() || "Unknown",
                             video: cols[16]?.trim() || "",
-                            media: cols[17] ? cols[17].split(';').map(u => u.trim()).filter(u => u) : []
+                            //media: cols[17] ? cols[17].split(';').map(u => u.trim()).filter(u => u) : []
+                            media: (() => {
+    if (!cols[17]) return [];
+    const items = cols[17].split(';').map(u => u.trim()).filter(u => u);
+    return items.map(item => {
+        // If it's not a full URL (http) and doesn't already contain a slash, add "images/"
+        if (!item.match(/^https?:\/\//) && !item.includes('/')) {
+            return 'images/' + item;
+        }
+        return item;
+    });
+})()
                         };
                     }).filter(p => p.part);
                     fixedProducts.forEach(part => {
