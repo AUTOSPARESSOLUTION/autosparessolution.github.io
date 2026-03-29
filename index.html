@@ -1151,9 +1151,12 @@ if (preloader) {
                             <img src="images/brand-${(product.brand||'default').toLowerCase()}.png" alt="${product.brand}" onerror="this.src='images/brand-default.png'">
                         </div>
                         ${!inStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
-                        
-                        <img src="images/${product.part}.png" alt="${product.part}" 
+                        <img src="images/${product.image}" alt="${product.part}" 
+     onclick="openProductImage('${product.part}', this)"
      onerror="fallbackImage(this, '${product.brand}')">
+                        
+                       // <img src="images/${product.part}.png" alt="${product.part}" 
+    // onerror="fallbackImage(this, '${product.brand}')">
                         <div class="part-number">${product.part}</div>
                         <div class="part-desc">${product.desc}</div>
                         <div class="price-container">
@@ -1389,6 +1392,30 @@ if (preloader) {
                 openGallery(arr,0);
             } catch(e){ console.error(e); }
         }
+        function openProductImage(part, imgElement) {
+    // Find the product
+    const product = allProducts.find(p => p.part === part);
+    if (!product) return;
+
+    // Build an array of media to show in the gallery
+    let mediaList = [];
+
+    // Add the main image
+    if (product.image && product.image !== 'default.png') {
+        mediaList.push(`images/${product.image}`);
+    } else {
+        // Fallback: use the current img.src if the image property is missing
+        mediaList.push(imgElement.src);
+    }
+
+    // If the product has additional media (from column R), add them too
+    if (product.media && product.media.length) {
+        mediaList = mediaList.concat(product.media);
+    }
+
+    // Open the gallery at the first item (the main image)
+    openGallery(mediaList, 0);
+}
         // ========== VIDEO MODAL ==========
 function openVideoModal(url, part) {
     // Create a temporary gallery with just this video
