@@ -1155,8 +1155,9 @@ if (preloader) {
                         </div>
                         ${!inStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
                         <img src="images/${product.image}" alt="${product.part}" 
-     //onclick="openProductImage('${product.part}', this)"
-     onerror="this.onerror=null; this.src='images/default.png';">
+     onclick="openProductImage('${product.part}', this)"
+     onerror="fallbackImage(this, '${product.brand}')">
+                      
                         
                        
                         <div class="part-number">${product.part}</div>
