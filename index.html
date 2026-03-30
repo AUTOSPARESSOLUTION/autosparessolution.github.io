@@ -1402,6 +1402,20 @@ function openVideoModal(url, part) {
     const mediaArray = [url];
     openGallery(mediaArray, 0);
 }
+        // ========== CLICK TO ENLARGE ==========
+function openProductImage(part, imgElement) {
+    // Build a media list starting with the clicked image
+    let mediaList = [imgElement.src];
+
+    // If you have extra media (from CSV column R), add them too
+    if (window.productMediaMap && window.productMediaMap[part]) {
+        const extra = window.productMediaMap[part].filter(url => url !== imgElement.src);
+        mediaList = mediaList.concat(extra);
+    }
+
+    // Open the gallery at the first item
+    openGallery(mediaList, 0);
+}
         let currentGallery = [], currentGalleryIndex = 0;
         function openGallery(media, idx) { currentGallery = media; currentGalleryIndex = idx; updateGallery(); document.getElementById('galleryModal').style.display='block'; }
         function closeGallery() { document.getElementById('galleryModal').style.display='none'; document.getElementById('gallery-media').innerHTML=''; }
