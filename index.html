@@ -740,6 +740,26 @@
         .card img {
     cursor: pointer;
 }
+        /* Most Selling Badge */
+.most-selling-badge {
+    position: absolute;
+    top: 70px;          /* below the brand logo circle */
+    left: 10px;
+    background: #f1c40f;
+    color: #2c3e50;
+    font-size: 0.7rem;
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 20px;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.most-selling-badge i {
+    font-size: 0.7rem;
+}
     </style>
 </head>
 <body>
@@ -1055,6 +1075,7 @@ function extractYouTubeId(url) {
                             masterCarton: parseInt(cols[9] || 1),
                             brand: cols[10]?.trim() || "Unknown",
                             video: cols[16]?.trim() || "",
+                            mostSelling: cols[18]?.trim() === '1',   // true if the cell contains "1"
                             //media: cols[17] ? cols[17].split(';').map(u => u.trim()).filter(u => u) : []
                             media: (() => {
     if (!cols[17]) return [];
@@ -1153,6 +1174,11 @@ if (preloader) {
                         <div class="brand-logo-container">
                             <img src="images/brand-${(product.brand||'default').toLowerCase()}.png" alt="${product.brand}" onerror="this.src='images/brand-default.png'">
                         </div>
+                        ${product.mostSelling ? `
+    <div class="most-selling-badge">
+        <i class="fas fa-star"></i> Best Seller
+    </div>
+` : ''}
                         ${!inStock ? '<div class="out-of-stock">OUT OF STOCK</div>' : ''}
                         <img src="images/${product.part}.png" alt="${product.part}" 
      onclick="openProductImage('${product.part}', this)"
