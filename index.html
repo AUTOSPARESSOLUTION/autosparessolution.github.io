@@ -1506,6 +1506,9 @@ function openProductImage(part, imgElement) {
         let currentGallery = [], currentGalleryIndex = 0;
         function openGallery(media, idx) { currentGallery = media; currentGalleryIndex = idx; updateGallery(); document.getElementById('galleryModal').style.display='block'; }
         function closeGallery() { document.getElementById('galleryModal').style.display='none'; document.getElementById('gallery-media').innerHTML=''; }
+        function closeInfoModal() {
+    document.getElementById('infoModal').style.display = 'none';
+}
         function galleryNext() { if (currentGalleryIndex < currentGallery.length-1) { currentGalleryIndex++; updateGallery(); } }
         function galleryPrev() { if (currentGalleryIndex > 0) { currentGalleryIndex--; updateGallery(); } }
        function updateGallery() {
