@@ -760,6 +760,13 @@
 .most-selling-badge i {
     font-size: 0.7rem;
 }
+        .info-btn {
+    background: #3498db;
+    color: white;
+}
+.info-btn:hover {
+    background: #2980b9;
+}
     </style>
 </head>
 <body>
@@ -1202,6 +1209,7 @@ if (preloader) {
                         <div class="card-actions" style="display:flex; gap:0.5rem; margin-top:0.5rem;">
                         ${hasVideo ? `<button class="btn video-btn" onclick="openVideoModal('${product.video}', '${product.part}')"><i class="fas fa-play-circle"></i> Watch Video</button>` : ''}
                             ${product.media && product.media.length ? `<button class="btn gallery-btn" onclick="openGalleryFromCard(this)"><i class="fas fa-images"></i> Gallery</button>` : ''}
+                           <button class="btn info-btn" onclick="showProductInfo('${product.part}')"><i class="fas fa-info-circle"></i> Info</button>
                             <a class="btn whatsapp" href="https://wa.me/9830300193?text=I want to enquire about ${product.part}" target="_blank"><i class="fab fa-whatsapp"></i> Enquire</a>
                         </div>
                     </div>
@@ -1422,6 +1430,50 @@ if (preloader) {
                 openGallery(arr,0);
             } catch(e){ console.error(e); }
         }
+        function showProductInfo(part) {
+    const product = allProducts.find(p => p.part === part);
+    if (!product) return;
+
+    // Check if we have any local application info
+    const hasLocalInfo = (product.make && product.make !== '') ||
+                         (product.model && product.model !== '') ||
+                         (product.year_start && product.year_start !== '') ||
+                         (product.segment && product.segment !== '');
+
+    let html = `
+        <p><strong>Part Number:</strong> ${product.part}</p>
+        <p><strong>Description:</strong> ${product.desc}</p>
+        <p><strong>Brand:</strong> ${product.brand}</p>
+        <p><strong>Stock:</strong> ${product.stock}</p>
+        <p><strong>Price:</strong> ₹${product.price.toFixed(2)}</p>
+    `;
+
+    if (hasLocalInfo) {
+        // Show local application data
+        if (product.make) html += `<p><strong>Make:</strong> ${product.make}</p>`;
+        if (product.model) html += `<p><strong>Model:</strong> ${product.model}</p>`;
+        if (product.year_start || product.year_end) {
+            let yearRange = product.year_start || '';
+            if (product.year_end) yearRange += ` - ${product.year_end}`;
+            html += `<p><strong>Year:</strong> ${yearRange}</p>`;
+        }
+        if (product.segment) html += `<p><strong>Segment:</strong> ${product.segment}</p>`;
+        if (product.engine) html += `<p><strong>Engine:</strong> ${product.engine}</p>`;
+        if (product.notes) html += `<p><strong>Notes:</strong> ${product.notes}</p>`;
+    } else {
+        // No local data – offer online search
+        html += `<p><strong>Application info not available in our database.</strong></p>`;
+        html += `<p>You can search online using the part number:</p>`;
+        html += `<div style="display: flex; gap: 1rem; margin-top: 1rem;">`;
+        html += `<a href="https://www.google.com/search?q=auto+part+${encodeURIComponent(product.part)}+${encodeURIComponent(product.brand)}" target="_blank" class="btn" style="background:#4285f4;">Search Google</a>`;
+        html += `<a href="https://boodmo.com/search/?q=${encodeURIComponent(product.part)}" target="_blank" class="btn" style="background:#ff6b6b;">Search Boodmo</a>`;
+        html += `</div>`;
+        // You can add more sites like Amazon, eBay, etc.
+    }
+
+    document.getElementById('infoModalBody').innerHTML = html;
+    document.getElementById('infoModal').style.display = 'block';
+}
    
         // ========== VIDEO MODAL ==========
 function openVideoModal(url, part) {
@@ -1554,11 +1606,25 @@ function openProductImage(part, imgElement) {
             if (e.target.closest('.cart-controls')) return;
             if (this.classList.contains('minimized')) this.classList.remove('minimized');
         });
+        window.addEventListener('click', function(e) {
+    const modal = document.getElementById('infoModal');
+    if (e.target === modal) {
+        closeInfoModal();
+    }
+});
 
         // ========== INIT ==========
         loadProducts();
         const savedUser = localStorage.getItem('currentUser');
         if (savedUser) { currentUser = JSON.parse(savedUser); showUserProfile(); updateDeliveryEstimator(); }
     </script>
+    <!-- Product Info Modal -->
+<div id="infoModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeInfoModal()">&times;</span>
+        <h3>Product Information</h3>
+        <div id="infoModalBody"></div>
+    </div>
+</div>
 </body>
 </html>
