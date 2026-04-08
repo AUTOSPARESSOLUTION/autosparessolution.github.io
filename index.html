@@ -1626,54 +1626,7 @@ function openProductImage(part, imgElement) {
         const savedUser = localStorage.getItem('currentUser');
         if (savedUser) { currentUser = JSON.parse(savedUser); showUserProfile(); updateDeliveryEstimator(); }
     </script>
-    <!-- Product Info Modal -->
-    function showProductInfo(part) {
-    const product = allProducts.find(p => p.part === part);
-    if (!product) return;
-
-    // Check if we have any local application info
-    const hasLocalInfo = (product.make && product.make !== '') ||
-                         (product.model && product.model !== '') ||
-                         (product.year_start && product.year_start !== '') ||
-                         (product.segment && product.segment !== '');
-
-    let html = `
-        <p><strong>Part Number:</strong> ${product.part}</p>
-        <p><strong>Description:</strong> ${product.desc}</p>
-        <p><strong>Brand:</strong> ${product.brand}</p>
-        <p><strong>Stock:</strong> ${product.stock}</p>
-        <p><strong>Price:</strong> ₹${product.price.toFixed(2)}</p>
-    `;
-
-    if (hasLocalInfo) {
-        // Show local application data
-        if (product.make) html += `<p><strong>Make:</strong> ${product.make}</p>`;
-        if (product.model) html += `<p><strong>Model:</strong> ${product.model}</p>`;
-        if (product.year_start || product.year_end) {
-            let yearRange = product.year_start || '';
-            if (product.year_end) yearRange += ` - ${product.year_end}`;
-            html += `<p><strong>Year:</strong> ${yearRange}</p>`;
-        }
-        if (product.segment) html += `<p><strong>Segment:</strong> ${product.segment}</p>`;
-        if (product.engine) html += `<p><strong>Engine:</strong> ${product.engine}</p>`;
-        if (product.notes) html += `<p><strong>Notes:</strong> ${product.notes}</p>`;
-    } else {
-        // No local data – offer online search
-        html += `<p><strong>Application info not available in our database.</strong></p>`;
-        html += `<p>You can search online using the part number:</p>`;
-        html += `<div style="display: flex; gap: 1rem; margin-top: 1rem;">`;
-        html += `<a href="https://www.google.com/search?q=auto+part+${encodeURIComponent(product.part)}+${encodeURIComponent(product.brand)}" target="_blank" class="btn" style="background:#4285f4;">Search Google</a>`;
-        html += `<a href="https://boodmo.com/search/?q=${encodeURIComponent(product.part)}" target="_blank" class="btn" style="background:#ff6b6b;">Search Boodmo</a>`;
-        html += `</div>`;
-        // You can add more sites like Amazon, eBay, etc.
-    }
-    
-    document.getElementById('infoModalBody').innerHTML = html;
-    document.getElementById('infoModal').style.display = 'block';
-}
-function closeInfoModal() {
-    document.getElementById('infoModal').style.display = 'none';
-}
+   
     </div>
 </div>
 </body>
