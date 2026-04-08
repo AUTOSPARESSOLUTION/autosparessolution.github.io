@@ -931,6 +931,14 @@
             <div id="gallery-thumbnails"></div>
         </div>
     </div>
+       <!-- Info Modal -->
+<div id="infoModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeInfoModal()">&times;</span>
+        <h3>Product Information</h3>
+        <div id="infoModalBody"></div>
+    </div>
+</div>
 
     <!-- Toast Notification -->
     <div class="toast" id="toast"><i class="fas fa-check-circle"></i><span id="toast-message"></span></div>
@@ -1474,14 +1482,7 @@ if (preloader) {
     document.getElementById('infoModalBody').innerHTML = html;
     document.getElementById('infoModal').style.display = 'block';
 }
-   <!-- Info Modal -->
-<div id="infoModal" class="modal">
-    <div class="modal-content">
-        <span class="close-modal" onclick="closeInfoModal()">&times;</span>
-        <h3>Product Information</h3>
-        <div id="infoModalBody"></div>
-    </div>
-</div>
+
         // ========== VIDEO MODAL ==========
 function openVideoModal(url, part) {
     // Create a temporary gallery with just this video
@@ -1666,13 +1667,13 @@ function openProductImage(part, imgElement) {
         html += `</div>`;
         // You can add more sites like Amazon, eBay, etc.
     }
-    function closeInfoModal() {
-    document.getElementById('infoModal').style.display = 'none';
-}
+    
     document.getElementById('infoModalBody').innerHTML = html;
     document.getElementById('infoModal').style.display = 'block';
 }
-
+function closeInfoModal() {
+    document.getElementById('infoModal').style.display = 'none';
+}
     </div>
 </div>
 </body>
