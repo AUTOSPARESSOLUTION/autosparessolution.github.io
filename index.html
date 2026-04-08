@@ -1619,11 +1619,33 @@ function openProductImage(part, imgElement) {
         if (savedUser) { currentUser = JSON.parse(savedUser); showUserProfile(); updateDeliveryEstimator(); }
     </script>
     <!-- Product Info Modal -->
-<div id="infoModal" class="modal">
-    <div class="modal-content">
-        <span class="close-modal" onclick="closeInfoModal()">&times;</span>
-        <h3>Product Information</h3>
-        <div id="infoModalBody"></div>
+    function showProductInfo(part) {
+    const product = allProducts.find(p => p.part === part);
+    if (!product) return;
+
+    const modalBody = document.getElementById('infoModalBody');
+    modalBody.innerHTML = ''; // clear old content
+
+    let html = `
+        <p><strong>Part Number:</strong> ${product.part}</p>
+        <p><strong>Description:</strong> ${product.desc}</p>
+        <p><strong>Brand:</strong> ${product.brand}</p>
+        <p><strong>Stock:</strong> ${product.stock}</p>
+        <p><strong>Price:</strong> ₹${product.price.toFixed(2)}</p>
+    `;
+    if (product.make) html += `<p><strong>Make:</strong> ${product.make}</p>`;
+    if (product.model) html += `<p><strong>Model:</strong> ${product.model}</p>`;
+    if (product.year_start) html += `<p><strong>Year:</strong> ${product.year_start}${product.year_end ? `-${product.year_end}` : ''}</p>`;
+    if (product.segment) html += `<p><strong>Segment:</strong> ${product.segment}</p>`;
+
+    modalBody.innerHTML = html;
+    document.getElementById('infoModal').style.display = 'block';
+}
+
+function closeInfoModal() {
+    document.getElementById('infoModal').style.display = 'none';
+}
+
     </div>
 </div>
 </body>
