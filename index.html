@@ -1607,10 +1607,10 @@ function openProductImage(part, imgElement) {
             if (this.classList.contains('minimized')) this.classList.remove('minimized');
         });
         window.addEventListener('click', function(e) {
-    const modal = document.getElementById('infoModal');
-    if (e.target === modal) {
-        closeInfoModal();
-    }
+    const infoModal = document.getElementById('infoModal');
+    const appModal = document.getElementById('appModal');
+    if (e.target === infoModal) closeInfoModal();
+    if (e.target === appModal) closeAppModal();
 });
 
         // ========== INIT ==========
