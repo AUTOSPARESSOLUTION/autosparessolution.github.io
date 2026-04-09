@@ -1630,7 +1630,11 @@ function openProductImage(part, imgElement) {
     if (e.target === infoModal) closeInfoModal();
     if (e.target === appModal) closeAppModal();
 });
-
+// Ensure gallery close button works
+const galleryCloseBtn = document.querySelector('#galleryModal .close-modal');
+if (galleryCloseBtn) {
+    galleryCloseBtn.addEventListener('click', closeGallery);
+}
         // ========== INIT ==========
         loadProducts();
         const savedUser = localStorage.getItem('currentUser');
