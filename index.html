@@ -1637,11 +1637,7 @@ if (galleryCloseBtn) {
         document.getElementById('gallery-media').innerHTML = '';
     });
 }
-// Ensure gallery close button works
-const galleryCloseBtn = document.querySelector('#galleryModal .close-modal');
-if (galleryCloseBtn) {
-    galleryCloseBtn.addEventListener('click', closeGallery);
-}
+
         // ========== INIT ==========
         loadProducts();
         const savedUser = localStorage.getItem('currentUser');
