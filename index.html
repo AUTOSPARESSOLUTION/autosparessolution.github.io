@@ -926,7 +926,7 @@
     <!-- Gallery Modal -->
     <div id="galleryModal" class="modal">
         <div class="modal-content">
-            <span class="close-modal" onclick="closeGallery()">&times;</span>
+            <span class="close-modal" id="galleryCloseBtn">&times;</span>
             <div id="gallery-media"></div>
             <div id="gallery-thumbnails"></div>
         </div>
@@ -1630,6 +1630,13 @@ function openProductImage(part, imgElement) {
     if (e.target === infoModal) closeInfoModal();
     if (e.target === appModal) closeAppModal();
 });
+        const galleryCloseBtn = document.getElementById('galleryCloseBtn');
+if (galleryCloseBtn) {
+    galleryCloseBtn.addEventListener('click', function() {
+        document.getElementById('galleryModal').style.display = 'none';
+        document.getElementById('gallery-media').innerHTML = '';
+    });
+}
 // Ensure gallery close button works
 const galleryCloseBtn = document.querySelector('#galleryModal .close-modal');
 if (galleryCloseBtn) {
