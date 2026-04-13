@@ -1097,6 +1097,11 @@ function extractYouTubeId(url) {
                             boxQty: parseInt(cols[8] || 1),
                             masterCarton: parseInt(cols[9] || 1),
                             brand: cols[10]?.trim() || "Unknown",
+                            make: cols[11]?.trim() || "",
+                            model: cols[12]?.trim() || "",
+                            year_start: cols[13]?.trim() || "",
+                            year_end: cols[14]?.trim() || "",
+                            segment: cols[15]?.trim() || "",
                             video: cols[16]?.trim() || "",
                             mostSelling: cols[18]?.trim() === '1',   // true if the cell contains "1"
                             //media: cols[17] ? cols[17].split(';').map(u => u.trim()).filter(u => u) : []
