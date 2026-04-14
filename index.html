@@ -1103,6 +1103,10 @@ function extractYouTubeId(url) {
                             year_end: cols[14]?.trim() || "",
                             segment: cols[15]?.trim() || "",
                             video: cols[16]?.trim() || "",
+                            sales_volume: cols[19]?.trim() || "",
+                             sales_value: cols[20]?.trim() || "",
+                             zone: cols[21]?.trim() || "",
+                             region: cols[22]?.trim() || "",
                             mostSelling: cols[18]?.trim() === '1',   // true if the cell contains "1"
                             //media: cols[17] ? cols[17].split(';').map(u => u.trim()).filter(u => u) : []
                             media: (() => {
