@@ -1459,6 +1459,47 @@ if (preloader) {
     const product = allProducts.find(p => p.part === part);
     if (!product) return;
 
+    // Define which fields we consider "application info" to decide whether to show search links
+    const hasLocalInfo = (product.make && product.make !== '') ||
+                         (product.model && product.model !== '') ||
+                         (product.year_start && product.year_start !== '') ||
+                         (product.segment && product.segment !== '');
+
+    let html = `<p><strong>Part Number:</strong> ${product.part}</p>`;
+    html += `<p><strong>Description:</strong> ${product.desc}</p>`;
+    html += `<p><strong>Brand:</strong> ${product.brand}</p>`;
+    html += `<p><strong>Stock:</strong> ${product.stock}</p>`;
+    html += `<p><strong>Price:</strong> ₹${product.price.toFixed(2)}</p>`;
+
+    // List of properties to skip (already shown or not needed)
+    const skipProps = ['part', 'desc', 'brand', 'stock', 'price', 'score', 'media', 'rawData', 'video', 'boxQty', 'masterCarton', 'mostSelling', 'sales_volume', 'sales_value', 'zone', 'region'];
+
+    // Loop through all product properties and display any that have a value and are not in skip list
+    for (let [key, value] of Object.entries(product)) {
+        if (skipProps.includes(key)) continue;
+        if (value && value.toString().trim() !== "" && typeof value !== 'object') {
+            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            html += `<p><strong>${displayKey}:</strong> ${value}</p>`;
+        }
+    }
+
+    // If no local application info, offer online search
+    if (!hasLocalInfo) {
+        html += `<p><strong>Application info not available in our database.</strong></p>`;
+        html += `<p>You can search online using the part number:</p>`;
+        html += `<div style="display: flex; gap: 1rem; margin-top: 1rem;">`;
+        html += `<a href="https://www.google.com/search?q=auto+part+${encodeURIComponent(product.part)}+${encodeURIComponent(product.brand)}" target="_blank" class="btn" style="background:#4285f4;">Search Google</a>`;
+        html += `<a href="https://boodmo.com/search/?q=${encodeURIComponent(product.part)}" target="_blank" class="btn" style="background:#ff6b6b;">Search Boodmo</a>`;
+        html += `</div>`;
+    }
+
+    document.getElementById('infoModalBody').innerHTML = html;
+    document.getElementById('infoModal').style.display = 'block';
+}
+       /* function showProductInfo(part) {
+    const product = allProducts.find(p => p.part === part);
+    if (!product) return;
+
     // Check if we have any local application info
     const hasLocalInfo = (product.make && product.make !== '') ||
                          (product.model && product.model !== '') ||
@@ -1498,7 +1539,7 @@ if (preloader) {
 
     document.getElementById('infoModalBody').innerHTML = html;
     document.getElementById('infoModal').style.display = 'block';
-}
+}*/
 
         // ========== VIDEO MODAL ==========
 function openVideoModal(url, part) {
