@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Spares – Professional Invoice</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .invoice-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .invoice-header {
+            background: #0a7c71;
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .invoice-header h1 { margin: 0; font-size: 28px; }
+        .invoice-header p { margin: 5px 0 0; opacity: 0.8; }
+        .invoice-body { padding: 30px; }
+        .row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
+        .col { flex: 1; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
+        th { background: #f8f9fa; }
+        .totals { text-align: right; margin-top: 20px; }
+        .totals table { width: 300px; margin-left: auto; }
+        .totals td { border: none; padding: 5px; }
+        .bank-details { margin-top: 30px; font-size: 14px; border-top: 1px solid #dee2e6; padding-top: 20px; }
+        .actions { margin-top: 30px; display: flex; gap: 15px; justify-content: flex-end; }
+        button { background: #0a7c71; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #09645a; }
+        .invoice-type { display: flex; gap: 20px; align-items: center; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; flex-wrap: wrap; }
+        .invoice-type label { margin-right: 10px; }
+        input, select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        @media print { .actions, .invoice-type { display: none; } body { background: white; padding: 0; } }
+    </style>
+</head>
+<body>
+<div class="invoice-container" id="invoiceContainer">
+    <div class="invoice-header">
+        <div>
+            <h1>Auto Spares Solution</h1>
+            <p>GSTIN: 19ANOPD3300R1ZO</p>
+            <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+            <p>Warehouse: 1 no British Indian Street, Kolkata, WB 700069</p>
+        </div>
+        <div style="text-align: right;">
+            <h2>TAX INVOICE</h2>
+            <p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p>
+            <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
+            <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
+        </div>
+    </div>
+    <div class="invoice-body">
+        <div class="invoice-type">
+            <div>
+                <label><input type="radio" name="invoiceType" value="cash" checked> Cash Bill</label>
+                <label><input type="radio" name="invoiceType" value="credit"> Credit Bill</label>
+            </div>
+            <div id="creditFields" style="display:none;">
+                <label>Credit Limit (₹):</label> <input type="number" id="creditLimit" placeholder="Limit" step="1000" value="50000">
+                <label>Payment Terms (days):</label> <input type="number" id="paymentTerms" value="30" style="width:70px;">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col customer-info">
+                <h3>Bill To:</h3>
+                <div id="customerDetails"></div>
+            </div>
+        </div>
+
+        <table id="itemsTable">
+            <thead><tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Unit Price (₹)</th><th>Taxable Value (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr></thead>
+            <tbody id="itemsBody"></tbody>
+        </table>
+
+        <div class="totals">
+            <table>
+                <tr><td style="text-align:right;">Subtotal:</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+                <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+                <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+                <tr><td style="text-align:right;">Round Off:</td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
+                <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            </table>
+        </div>
+
+        <div class="bank-details">
+            <p><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: State Bank of India<br>Account No: XXXXXXXXXXXXXX<br>IFSC: SBIN0001234<br>UPI: autospares@upi</p>
+            <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
+        </div>
+    </div>
+</div>
+<div class="actions">
+    <button onclick="saveInvoice()">💾 Save Invoice & Update Ledger</button>
+    <button onclick="downloadInvoicePDF()">📄 Download PDF</button>
+    <button onclick="window.print()">🖨️ Print</button>
+    <button onclick="window.close()">❌ Close</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+    // Data from localStorage
+    const cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    let invoiceNumber = localStorage.getItem('nextInvoiceNo') || 'INV-2026-0001';
+    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+    let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+
+    // Ensure currentUser exists in customers list (for ledger)
+    if (currentUser && !customers.find(c => c.email === currentUser.email)) {
+        customers.push({
+            name: currentUser.name,
+            email: currentUser.email,
+            phone: currentUser.phone,
+            address: currentUser.address,
+            pincode: currentUser.pincode,
+            creditLimit: 50000,
+            outstanding: 0,
+            totalPurchased: 0
+        });
+        localStorage.setItem('customers', JSON.stringify(customers));
+    }
+
+    function generateInvoiceNumber() {
+        let num = invoiceNumber;
+        let parts = num.split('-');
+        let newNum = parseInt(parts[2]) + 1;
+        let next = `${parts[0]}-${parts[1]}-${newNum.toString().padStart(4,'0')}`;
+        localStorage.setItem('nextInvoiceNo', next);
+        return num;
+    }
+
+    function formatDate(date) {
+        let d = new Date(date);
+        return d.toLocaleDateString('en-IN');
+    }
+
+    function calculateTotals() {
+        let subtotal = 0;
+        let cgstTotal = 0, sgstTotal = 0;
+        cart.forEach(item => {
+            let taxable = item.price * item.qty;
+            subtotal += taxable;
+            let cgst = taxable * 0.09;
+            let sgst = taxable * 0.09;
+            cgstTotal += cgst;
+            sgstTotal += sgst;
+        });
+        let totalTax = cgstTotal + sgstTotal;
+        let grand = subtotal + totalTax;
+        let roundOff = Math.round(grand) - grand;
+        grand = Math.round(grand);
+        return { subtotal, cgstTotal, sgstTotal, roundOff, grand };
+    }
+
+    function renderInvoice() {
+        document.getElementById('invoiceNo').innerText = generateInvoiceNumber();
+        document.getElementById('invoiceDate').innerText = formatDate(new Date());
+        let due = new Date();
+        let paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
+        due.setDate(due.getDate() + paymentTerms);
+        document.getElementById('dueDate').innerText = formatDate(due);
+
+        let customerHtml = '';
+        if (currentUser) {
+            customerHtml = `<p>${currentUser.name}<br>${currentUser.address || ''}<br>PIN: ${currentUser.pincode || ''}<br>Phone: ${currentUser.phone}<br>Email: ${currentUser.email}</p>`;
+        } else {
+            customerHtml = '<p>Customer details not available (Guest)</p>';
+        }
+        document.getElementById('customerDetails').innerHTML = customerHtml;
+
+        let itemsHtml = '';
+        cart.forEach((item, idx) => {
+            let taxable = item.price * item.qty;
+            let cgst = taxable * 0.09;
+            let sgst = taxable * 0.09;
+            itemsHtml += `<tr>
+                <td>${idx+1}</td>
+                <td>${item.part}</td>
+                <td>${item.desc}</td>
+                <td>${item.qty}</td>
+                <td>₹${item.price.toFixed(2)}</td>
+                <td>₹${taxable.toFixed(2)}</td>
+                <td>18%</td>
+                <td>₹${cgst.toFixed(2)}</td>
+                <td>₹${sgst.toFixed(2)}</td>
+                <td>₹${(taxable + cgst + sgst).toFixed(2)}</td>
+            </tr>`;
+        });
+        document.getElementById('itemsBody').innerHTML = itemsHtml;
+
+        let totals = calculateTotals();
+        document.getElementById('subtotal').innerText = totals.subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = totals.cgstTotal.toFixed(2);
+        document.getElementById('sgstTotal').innerText = totals.sgstTotal.toFixed(2);
+        document.getElementById('roundOff').innerText = totals.roundOff.toFixed(2);
+        document.getElementById('grandTotal').innerText = totals.grand.toFixed(2);
+    }
+
+    function saveInvoice() {
+        if (cart.length === 0) {
+            alert('Cart is empty');
+            return;
+        }
+        const invoiceType = document.querySelector('input[name="invoiceType"]:checked').value;
+        const creditLimit = parseFloat(document.getElementById('creditLimit').value) || 0;
+        const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
+
+        let totals = calculateTotals();
+        let invoice = {
+            invoiceNo: document.getElementById('invoiceNo').innerText,
+            date: document.getElementById('invoiceDate').innerText,
+            dueDate: document.getElementById('dueDate').innerText,
+            customer: currentUser ? { name: currentUser.name, email: currentUser.email, phone: currentUser.phone, address: currentUser.address, pincode: currentUser.pincode } : { name: 'Guest', email: '', phone: '' },
+            items: cart.map(item => ({ part: item.part, desc: item.desc, qty: item.qty, price: item.price, total: item.price * item.qty })),
+            subtotal: totals.subtotal,
+            cgst: totals.cgstTotal,
+            sgst: totals.sgstTotal,
+            roundOff: totals.roundOff,
+            grandTotal: totals.grand,
+            invoiceType: invoiceType,
+            paymentTerms: paymentTerms,
+            status: invoiceType === 'cash' ? 'Paid' : 'Pending'
+        };
+
+        // Update customer ledger
+        let customer = customers.find(c => c.email === currentUser?.email);
+        if (!customer && currentUser) {
+            customer = { name: currentUser.name, email: currentUser.email, phone: currentUser.phone, address: currentUser.address, pincode: currentUser.pincode, creditLimit: creditLimit, outstanding: 0, totalPurchased: 0 };
+            customers.push(customer);
+        }
+        if (customer) {
+            if (invoiceType === 'credit') {
+                if (customer.outstanding + totals.grand > customer.creditLimit) {
+                    alert(`Credit limit exceeded! Current outstanding: ₹${customer.outstanding}, Limit: ₹${customer.creditLimit}, This bill: ₹${totals.grand}`);
+                    return;
+                }
+                customer.outstanding += totals.grand;
+            }
+            customer.totalPurchased += totals.grand;
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+
+        // Add to allInvoices
+        allInvoices.push(invoice);
+        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+
+        // Clear cart in localStorage after saving
+        localStorage.setItem('invoiceCart', '[]');
+        alert('Invoice saved successfully!');
+        window.close(); // or redirect
+    }
+
+    async function downloadInvoicePDF() {
+        const element = document.getElementById('invoiceContainer');
+        const canvas = await html2canvas(element, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgWidth = 210;
+        const pageHeight = 295;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight;
+        let position = 0;
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        while (heightLeft >= 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+        }
+        pdf.save(`Invoice_${document.getElementById('invoiceNo').innerText}.pdf`);
+    }
+
+    // Toggle credit fields
+    document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
+        });
+    });
+
+    renderInvoice();
+</script>
+</body>
+</html>
