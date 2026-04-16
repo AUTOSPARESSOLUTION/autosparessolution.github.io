@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>View Invoice</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .invoice { max-width: 800px; margin: auto; border: 1px solid #ccc; padding: 20px; }
+        h2 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .totals { text-align: right; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<div class="invoice" id="invoiceView"></div>
+<script>
+    const invoice = JSON.parse(localStorage.getItem('viewInvoice') || '{}');
+    if (!invoice.invoiceNo) {
+        document.getElementById('invoiceView').innerHTML = '<p>No invoice selected</p>';
+    } else {
+        let html = `<h2>Auto Spares Solution</h2>
+        <p>Invoice No: ${invoice.invoiceNo}<br>Date: ${invoice.date}<br>Due Date: ${invoice.dueDate}</p>
+        <h3>Customer: ${invoice.customer.name}</h3>
+        表<thead><tr><th>Part</th><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></thead><tbody>`;
+        invoice.items.forEach(item => {
+            html += `<tr><td>${item.part}</td><td>${item.desc}</td><td>${item.qty}</td><td>₹${item.price.toFixed(2)}</td><td>₹${(item.price*item.qty).toFixed(2)}</td></tr>`;
+        });
+        html += `</tbody></table>
+        <div class="totals">Subtotal: ₹${invoice.subtotal.toFixed(2)}<br>CGST: ₹${invoice.cgst.toFixed(2)}<br>SGST: ₹${invoice.sgst.toFixed(2)}<br>Round Off: ₹${invoice.roundOff.toFixed(2)}<br><strong>Grand Total: ₹${invoice.grandTotal.toFixed(2)}</strong></div>
+        <p>Status: ${invoice.status} | Type: ${invoice.invoiceType}</p>`;
+        document.getElementById('invoiceView').innerHTML = html;
+    }
+</script>
+</body>
+</html>
