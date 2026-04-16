@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Customer Ledger - Auto Spares</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .summary { background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #09645a; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Customer Ledger</h1>
+    <div id="customerSelect"></div>
+    <div id="ledgerSummary" class="summary"></div>
+    <div id="ledgerTable"></div>
+    <button onclick="window.location.href='index.html'">Back to Store</button>
+</div>
+<script>
+    let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+
+    function renderLedger() {
+        const selectDiv = document.getElementById('customerSelect');
+        if (customers.length === 0) {
+            selectDiv.innerHTML = '<p>No customers found.</p>';
+            return;
+        }
+        let html = '<label>Select Customer: </label><select id="customerEmail">';
+        customers.forEach(c => {
+            html += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+        });
+        html += '</select><button onclick="loadLedger()">Show Ledger</button>';
+        selectDiv.innerHTML = html;
+    }
+
+    function loadLedger() {
+        const email = document.getElementById('customerEmail').value;
+        const customer = customers.find(c => c.email === email);
+        if (!customer) return;
+        const invoices = allInvoices.filter(inv => inv.customer?.email === email);
+        let outstanding = customer.outstanding || 0;
+        let totalPurchased = customer.totalPurchased || 0;
+        document.getElementById('ledgerSummary').innerHTML = `
+            <p><strong>${customer.name}</strong><br>
+            Credit Limit: ₹${customer.creditLimit || 50000}<br>
+            Total Purchased: ₹${totalPurchased.toFixed(2)}<br>
+            Outstanding: ₹${outstanding.toFixed(2)}<br>
+            Available Credit: ₹${(customer.creditLimit - outstanding).toFixed(2)}</p>
+        `;
+        let table = '</table><thead><tr><th>Invoice No</th><th>Date</th><th>Due Date</th><th>Amount (₹)</th><th>Status</th><th>Type</th></thead><tbody>';
+        invoices.forEach(inv => {
+            table += `<tr>
+                <td>${inv.invoiceNo}</td>
+                <td>${inv.date}</td>
+                <td>${inv.dueDate}</td>
+                <td>₹${inv.grandTotal.toFixed(2)}</td>
+                <td>${inv.status}</td>
+                <td>${inv.invoiceType}</td>
+            </tr>`;
+        });
+        table += '</tbody></table>';
+        document.getElementById('ledgerTable').innerHTML = table;
+    }
+
+    renderLedger();
+</script>
+</body>
+</html>
