@@ -1393,7 +1393,15 @@ if (preloader) {
             window.open(`https://wa.me/9830300193?text=${encodeURIComponent(msg)}`, '_blank');
             setTimeout(() => { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fab fa-whatsapp"></i> Confirm via WhatsApp'; } }, 5000);
         }
-
+function generateInvoice() {
+    if (cart.length === 0) {
+        showToast('Cart is empty', true);
+        return;
+    }
+    localStorage.setItem('invoiceCart', JSON.stringify(cart));
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    window.open('invoice.html', '_blank');
+}
         // ========== EMAIL ORDER ==========
         function sendOrderEmail() {
             if (!cart.length) { showToast('Cart empty', true); return; }
