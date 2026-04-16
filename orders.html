@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Order History - Auto Spares</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .search-box { margin-bottom: 20px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #09645a; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Order History (All Invoices)</h1>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by Invoice No, Customer Name, Part No..." style="width: 300px; padding: 8px;">
+        <button onclick="filterOrders()">Search</button>
+        <button onclick="exportToCSV()">Export to CSV</button>
+    </div>
+    <div id="ordersTable"></div>
+    <button onclick="window.location.href='index.html'">Back to Store</button>
+</div>
+<script>
+    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+
+    function displayOrders(filter = '') {
+        let filtered = allInvoices;
+        if (filter) {
+            filtered = allInvoices.filter(inv => 
+                inv.invoiceNo.toLowerCase().includes(filter) ||
+                (inv.customer.name && inv.customer.name.toLowerCase().includes(filter)) ||
+                inv.items.some(item => item.part.toLowerCase().includes(filter))
+            );
+        }
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></thead><tbody>';
+        filtered.forEach(inv => {
+            html += `<tr>
+                <td>${inv.invoiceNo}</td>
+                <td>${inv.date}</td>
+                <td>${inv.customer.name}</td>
+                <td>₹${inv.grandTotal.toFixed(2)}</td>
+                <td>${inv.status}</td>
+                <td>${inv.invoiceType}</td>
+                <td><button onclick="viewInvoice('${inv.invoiceNo}')">View</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('ordersTable').innerHTML = html;
+    }
+
+    function filterOrders() {
+        const term = document.getElementById('searchInput').value.toLowerCase();
+        displayOrders(term);
+    }
+
+    function viewInvoice(invoiceNo) {
+        const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
+        if (invoice) {
+            localStorage.setItem('viewInvoice', JSON.stringify(invoice));
+            window.open('view-invoice.html', '_blank');
+        }
+    }
+
+    function exportToCSV() {
+        let csv = "Invoice No,Date,Customer,Amount,Status,Type\n";
+        allInvoices.forEach(inv => {
+            csv += `"${inv.invoiceNo}",${inv.date},"${inv.customer.name}",${inv.grandTotal},${inv.status},${inv.invoiceType}\n`;
+        });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'orders_backup.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    displayOrders();
+</script>
+</body>
+</html>
