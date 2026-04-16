@@ -1548,7 +1548,18 @@ function openVideoModal(url, part) {
     openGallery(mediaArray, 0);
 }
         // ========== CLICK TO ENLARGE ==========
-function openProductImage(part, imgElement) {
+        function openProductImage(part, imgElement) {
+    const product = allProducts.find(p => p.part === part);
+    if (!product) return;
+    let mediaList = [imgElement.src]; // start with the main image
+    if (product.media && product.media.length) {
+        // Avoid duplicate if the main image path accidentally appears in media
+        const extra = product.media.filter(url => url !== imgElement.src);
+        mediaList = mediaList.concat(extra);
+    }
+    openGallery(mediaList, 0);
+}
+/*function openProductImage(part, imgElement) {
     // Build a media list starting with the clicked image
     let mediaList = [imgElement.src];
 
@@ -1560,7 +1571,7 @@ function openProductImage(part, imgElement) {
 
     // Open the gallery at the first item
     openGallery(mediaList, 0);
-}
+}*/
         let currentGallery = [], currentGalleryIndex = 0;
         function openGallery(media, idx) { currentGallery = media; currentGalleryIndex = idx; updateGallery(); document.getElementById('galleryModal').style.display='block'; }
         function closeGallery() {
