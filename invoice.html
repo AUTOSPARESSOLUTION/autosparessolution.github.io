@@ -13,7 +13,7 @@
             padding: 20px;
         }
         .invoice-container {
-            max-width: 1100px;
+            max-width: 1200px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
@@ -27,44 +27,120 @@
             display: flex;
             justify-content: space-between;
             flex-wrap: wrap;
+            align-items: center;
         }
-        .invoice-header h1 { margin: 0; font-size: 28px; }
-        .invoice-header p { margin: 5px 0 0; opacity: 0.8; }
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo-area img { height: 70px; }
+        .company-details h1 { margin: 0; font-size: 28px; }
+        .company-details p { margin: 5px 0 0; opacity: 0.8; }
+        .invoice-title h2 { margin: 0; font-size: 24px; }
         .invoice-body { padding: 30px; }
         .row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
-        .col { flex: 1; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
-        th { background: #f8f9fa; }
+        .col { flex: 1; min-width: 250px; }
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .info-box h3 {
+            margin: 0 0 10px 0;
+            color: #0a7c71;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 5px;
+        }
+        .info-row {
+            display: flex;
+            margin-bottom: 8px;
+        }
+        .info-label {
+            width: 130px;
+            font-weight: 600;
+            color: #555;
+        }
+        .info-value {
+            flex: 1;
+            color: #333;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+        .editable {
+            background: #fff9e0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #f8f9fa; font-weight: 600; }
         .totals { text-align: right; margin-top: 20px; }
         .totals table { width: 300px; margin-left: auto; }
         .totals td { border: none; padding: 5px; }
         .bank-details { margin-top: 30px; font-size: 14px; border-top: 1px solid #dee2e6; padding-top: 20px; }
         .actions { margin-top: 30px; display: flex; gap: 15px; justify-content: flex-end; }
-        button { background: #0a7c71; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
         button:hover { background: #09645a; }
-        .invoice-type { display: flex; gap: 20px; align-items: center; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; flex-wrap: wrap; }
-        .invoice-type label { margin-right: 10px; }
-        input, select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
-        @media print { .actions, .invoice-type { display: none; } body { background: white; padding: 0; } }
+        .invoice-type {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+        @media print {
+            .actions, .invoice-type, .editable, button, input, textarea, select { display: none; }
+            body { background: white; padding: 0; }
+            .info-value { color: black !important; }
+            .editable { background: none; }
+        }
     </style>
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
     <div class="invoice-header">
-        <div>
-            <h1>Auto Spares Solution</h1>
-            <p>GSTIN: 19ANOPD3300R1ZO</p>
-            <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-            <p>Warehouse: 1 no British Indian Street, Kolkata, WB 700069</p>
+        <div class="logo-area">
+            <img src="images/ASS.jpg" alt="Company Logo" onerror="this.src='https://via.placeholder.com/70'">
+            <div class="company-details">
+                <h1>Auto Spares Solution</h1>
+                <p>GSTIN: 19ANOPD3300R1ZO</p>
+                <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+                
+            </div>
         </div>
-        <div style="text-align: right;">
+        <div class="invoice-title">
             <h2>TAX INVOICE</h2>
             <p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p>
             <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
             <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
         </div>
     </div>
+
     <div class="invoice-body">
         <div class="invoice-type">
             <div>
@@ -76,15 +152,56 @@
                 <label>Payment Terms (days):</label> <input type="number" id="paymentTerms" value="30" style="width:70px;">
             </div>
         </div>
+
+        <!-- Two columns: Buyer and Consignee -->
         <div class="row">
-            <div class="col customer-info">
-                <h3>Bill To:</h3>
-                <div id="customerDetails"></div>
+            <div class="col">
+                <div class="info-box">
+                    <h3>Buyer (Bill to)</h3>
+                    <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
+                    <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                    <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN"></div></div>
+                    <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="buyerState" class="editable" placeholder="State"></div></div>
+                    <div class="info-row"><div class="info-label">Contact No:</div><div class="info-value"><input type="text" id="buyerPhone" class="editable" placeholder="Phone"></div></div>
+                    <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="buyerEmail" class="editable" placeholder="Email"></div></div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="info-box">
+                    <h3>Consignee (Ship to)</h3>
+                    <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="consigneeName" class="editable" placeholder="Consignee name"></div></div>
+                    <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="consigneeAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                    <div class="info-row"><div class="info-label">Contact No:</div><div class="info-value"><input type="text" id="consigneePhone" class="editable" placeholder="Phone"></div></div>
+                </div>
             </div>
         </div>
 
+        <!-- Order & Dispatch Details -->
+        <div class="row">
+            <div class="col">
+                <div class="info-box">
+                    <h3>Order Details</h3>
+                    <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode" class="editable" placeholder="Customer code"></div></div>
+                    <div class="info-row"><div class="info-label">Sales Order No:</div><div class="info-value"><input type="text" id="salesOrderNo" class="editable" placeholder="SO No."></div></div>
+                    <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo" class="editable" placeholder="Ref No."></div></div>
+                    <div class="info-row"><div class="info-label">Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="info-box">
+                    <h3>Dispatch Details</h3>
+                    <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo" class="editable" placeholder="Doc No."></div></div>
+                    <div class="info-row"><div class="info-label">Mode of Transport:</div><div class="info-value"><input type="text" id="transportMode" class="editable" placeholder="Road / Rail / Air"></div></div>
+                    <div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value"><input type="text" id="vehicleNo" class="editable" placeholder="Optional"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items Table -->
         <table id="itemsTable">
-            <thead><tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Unit Price (₹)</th><th>Taxable Value (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr></thead>
+            <thead>
+                <tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Unit Price (₹)</th><th>Taxable Value (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
+            </thead>
             <tbody id="itemsBody"></tbody>
         </table>
 
@@ -99,11 +216,12 @@
         </div>
 
         <div class="bank-details">
-            <p><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: State Bank of India<br>Account No: XXXXXXXXXXXXXX<br>IFSC: SBIN0001234<br>UPI: autospares@upi</p>
+            <p><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: State Bank of India<br>Account No: 021111100007383<br>IFSC:UBIN0802115<br>UPI: ass08@uboi</p>
             <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
         </div>
     </div>
 </div>
+
 <div class="actions">
     <button onclick="saveInvoice()">💾 Save Invoice & Update Ledger</button>
     <button onclick="downloadInvoicePDF()">📄 Download PDF</button>
@@ -114,26 +232,22 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
-    // Data from localStorage
+    // ========== DATA FROM localStorage ==========
     const cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let invoiceNumber = localStorage.getItem('nextInvoiceNo') || 'INV-2026-0001';
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
-    // Ensure currentUser exists in customers list (for ledger)
-    if (currentUser && !customers.find(c => c.email === currentUser.email)) {
-        customers.push({
-            name: currentUser.name,
-            email: currentUser.email,
-            phone: currentUser.phone,
-            address: currentUser.address,
-            pincode: currentUser.pincode,
-            creditLimit: 50000,
-            outstanding: 0,
-            totalPurchased: 0
-        });
-        localStorage.setItem('customers', JSON.stringify(customers));
+    // Auto-fill buyer details from logged-in user if available
+    if (currentUser) {
+        document.getElementById('buyerName').value = currentUser.name || '';
+        document.getElementById('buyerAddress').value = currentUser.address || '';
+        document.getElementById('buyerPhone').value = currentUser.phone || '';
+        document.getElementById('buyerEmail').value = currentUser.email || '';
+        document.getElementById('buyerGstin').value = currentUser.gstin || '';
+        document.getElementById('buyerState').value = currentUser.state || '';
+        // If consignee same as buyer, you can add a checkbox later
     }
 
     function generateInvoiceNumber() {
@@ -161,29 +275,13 @@
             cgstTotal += cgst;
             sgstTotal += sgst;
         });
-        let totalTax = cgstTotal + sgstTotal;
-        let grand = subtotal + totalTax;
+        let grand = subtotal + cgstTotal + sgstTotal;
         let roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
         return { subtotal, cgstTotal, sgstTotal, roundOff, grand };
     }
 
-    function renderInvoice() {
-        document.getElementById('invoiceNo').innerText = generateInvoiceNumber();
-        document.getElementById('invoiceDate').innerText = formatDate(new Date());
-        let due = new Date();
-        let paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
-        due.setDate(due.getDate() + paymentTerms);
-        document.getElementById('dueDate').innerText = formatDate(due);
-
-        let customerHtml = '';
-        if (currentUser) {
-            customerHtml = `<p>${currentUser.name}<br>${currentUser.address || ''}<br>PIN: ${currentUser.pincode || ''}<br>Phone: ${currentUser.phone}<br>Email: ${currentUser.email}</p>`;
-        } else {
-            customerHtml = '<p>Customer details not available (Guest)</p>';
-        }
-        document.getElementById('customerDetails').innerHTML = customerHtml;
-
+    function renderItems() {
         let itemsHtml = '';
         cart.forEach((item, idx) => {
             let taxable = item.price * item.qty;
@@ -203,13 +301,21 @@
             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
-
         let totals = calculateTotals();
         document.getElementById('subtotal').innerText = totals.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = totals.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = totals.sgstTotal.toFixed(2);
         document.getElementById('roundOff').innerText = totals.roundOff.toFixed(2);
         document.getElementById('grandTotal').innerText = totals.grand.toFixed(2);
+    }
+
+    function setDates() {
+        document.getElementById('invoiceNo').innerText = generateInvoiceNumber();
+        document.getElementById('invoiceDate').innerText = formatDate(new Date());
+        let due = new Date();
+        let terms = parseInt(document.getElementById('paymentTerms').value) || 30;
+        due.setDate(due.getDate() + terms);
+        document.getElementById('dueDate').innerText = formatDate(due);
     }
 
     function saveInvoice() {
@@ -226,7 +332,30 @@
             invoiceNo: document.getElementById('invoiceNo').innerText,
             date: document.getElementById('invoiceDate').innerText,
             dueDate: document.getElementById('dueDate').innerText,
-            customer: currentUser ? { name: currentUser.name, email: currentUser.email, phone: currentUser.phone, address: currentUser.address, pincode: currentUser.pincode } : { name: 'Guest', email: '', phone: '' },
+            buyer: {
+                name: document.getElementById('buyerName').value,
+                address: document.getElementById('buyerAddress').value,
+                gstin: document.getElementById('buyerGstin').value,
+                state: document.getElementById('buyerState').value,
+                phone: document.getElementById('buyerPhone').value,
+                email: document.getElementById('buyerEmail').value
+            },
+            consignee: {
+                name: document.getElementById('consigneeName').value,
+                address: document.getElementById('consigneeAddress').value,
+                phone: document.getElementById('consigneePhone').value
+            },
+            orderDetails: {
+                customerCode: document.getElementById('customerCode').value,
+                salesOrderNo: document.getElementById('salesOrderNo').value,
+                referenceNo: document.getElementById('referenceNo').value,
+                paymentTerms: document.getElementById('paymentTermsField').value
+            },
+            dispatchDetails: {
+                docNo: document.getElementById('dispatchDocNo').value,
+                transportMode: document.getElementById('transportMode').value,
+                vehicleNo: document.getElementById('vehicleNo').value
+            },
             items: cart.map(item => ({ part: item.part, desc: item.desc, qty: item.qty, price: item.price, total: item.price * item.qty })),
             subtotal: totals.subtotal,
             cgst: totals.cgstTotal,
@@ -234,17 +363,16 @@
             roundOff: totals.roundOff,
             grandTotal: totals.grand,
             invoiceType: invoiceType,
-            paymentTerms: paymentTerms,
             status: invoiceType === 'cash' ? 'Paid' : 'Pending'
         };
 
-        // Update customer ledger
-        let customer = customers.find(c => c.email === currentUser?.email);
-        if (!customer && currentUser) {
-            customer = { name: currentUser.name, email: currentUser.email, phone: currentUser.phone, address: currentUser.address, pincode: currentUser.pincode, creditLimit: creditLimit, outstanding: 0, totalPurchased: 0 };
-            customers.push(customer);
-        }
-        if (customer) {
+        // Update customer ledger (if buyer email exists)
+        if (invoice.buyer.email) {
+            let customer = customers.find(c => c.email === invoice.buyer.email);
+            if (!customer) {
+                customer = { name: invoice.buyer.name, email: invoice.buyer.email, phone: invoice.buyer.phone, address: invoice.buyer.address, gstin: invoice.buyer.gstin, creditLimit: creditLimit, outstanding: 0, totalPurchased: 0 };
+                customers.push(customer);
+            }
             if (invoiceType === 'credit') {
                 if (customer.outstanding + totals.grand > customer.creditLimit) {
                     alert(`Credit limit exceeded! Current outstanding: ₹${customer.outstanding}, Limit: ₹${customer.creditLimit}, This bill: ₹${totals.grand}`);
@@ -256,14 +384,11 @@
             localStorage.setItem('customers', JSON.stringify(customers));
         }
 
-        // Add to allInvoices
         allInvoices.push(invoice);
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-
-        // Clear cart in localStorage after saving
         localStorage.setItem('invoiceCart', '[]');
         alert('Invoice saved successfully!');
-        window.close(); // or redirect
+        window.close();
     }
 
     async function downloadInvoicePDF() {
@@ -295,7 +420,9 @@
         });
     });
 
-    renderInvoice();
+    // Initial render
+    setDates();
+    renderItems();
 </script>
 </body>
-</html>
+    </html>
