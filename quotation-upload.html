@@ -2,74 +2,63 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto Spares – Smart Quotation from Order Slip</title>
+    <title>Auto Spares – Quotation from Order</title>
     <style>
-        body { font-family: 'Roboto', sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1, h2 { color: #0a7c71; }
-        .upload-area {
-            border: 2px dashed #ccc;
-            border-radius: 10px;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 20px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        .upload-area:hover { background: #f9f9f9; border-color: #0a7c71; }
-        #imagePreview { max-width: 100%; max-height: 300px; margin-top: 10px; display: none; }
-        button { background: #0a7c71; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 10px 5px; }
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 10px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        textarea { width: 100%; height: 150px; padding: 10px; font-family: monospace; margin: 10px 0; }
+        button { background: #0a7c71; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
         button:hover { background: #09645a; }
-        textarea { width: 100%; height: 200px; font-family: monospace; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background: #0a7c71; color: white; }
-        .error { color: red; margin-top: 10px; }
-        .loader { display: none; text-align: center; margin: 20px; }
+        .error { color: red; }
+        .instruction { background: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>📄 Upload Order Slip → Generate Quotation</h1>
-    <p>Upload a clear image of the order slip (JPG, PNG). The system will extract text and create a quotation.</p>
-
-    <div class="upload-area" id="uploadArea">
-        <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: #0a7c71;"></i>
-        <p>Click or drag & drop an image here</p>
-        <input type="file" id="fileInput" accept="image/*,application/pdf" style="display: none;">
+    <h1>📄 Create Quotation from Order</h1>
+    
+    <div class="instruction">
+        <strong>📝 How to use:</strong><br>
+        1. Copy the order from customer's email/message<br>
+        2. Paste below (one item per line)<br>
+        3. Example format: <code>082BAA04661N-3L</code> or <code>Brake pad for Swift 4</code><br>
+        4. Click "Generate Quotation"
     </div>
-    <div id="imagePreview"></div>
-    <div class="loader" id="loader">⏳ Reading text from image... This may take a few seconds.</div>
 
-    <h3>Or paste text manually:</h3>
-    <textarea id="manualText" placeholder="Paste extracted text here..."></textarea>
-    <button onclick="processText()">Generate Quotation from Text</button>
-    <button onclick="clearAll()">Clear</button>
-
+    <textarea id="orderInput" placeholder="Paste order here...
+Example:
+082BAA04661N-3L
+082BAA07201N-3
+50ft 10X1.5X30 Lock nut 4
+Brake pad Swift 2"></textarea>
+    
+    <div>
+        <button onclick="generateQuotation()">Generate Quotation</button>
+        <button onclick="clearAll()">Clear</button>
+    </div>
+    
     <div id="resultArea"></div>
 </div>
 
 <script>
     let products = [];
-    const cyrillicMap = {
-        'А':'A','Б':'B','В':'V','Г':'G','Д':'D','Е':'E','Ё':'E','Ж':'ZH','З':'Z','И':'I','Й':'Y','К':'K','Л':'L','М':'M','Н':'N','О':'O','П':'P','Р':'R','С':'S','Т':'T','У':'U','Ф':'F','Х':'KH','Ц':'TS','Ч':'CH','Ш':'SH','Щ':'SCH','Ъ':'','Ы':'Y','Ь':'','Э':'E','Ю':'YU','Я':'YA',
-        'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'
-    };
-    function transliterate(t) { return t.split('').map(ch => cyrillicMap[ch] || ch).join(''); }
 
     // Load products from prices.csv
     async function loadProducts() {
         try {
-            const res = await fetch('prices.csv');
-            const csv = await res.text();
+            const response = await fetch('prices.csv');
+            if (!response.ok) throw new Error('prices.csv not found');
+            const csv = await response.text();
             const lines = csv.split('\n');
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
             const partIdx = headers.indexOf('part');
             const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
             const priceIdx = headers.indexOf('price') !== -1 ? headers.indexOf('price') : headers.indexOf('our price');
-            if (partIdx === -1 || descIdx === -1 || priceIdx === -1) throw new Error('CSV missing required columns');
+            
             for (let i = 1; i < lines.length; i++) {
                 const cols = lines[i].split(',');
                 if (cols.length < 3) continue;
@@ -82,170 +71,167 @@
                     price: parseFloat(cols[priceIdx]) || 0
                 });
             }
-            console.log(`Loaded ${products.length} products`);
+            console.log('Loaded', products.length, 'products');
+            document.getElementById('resultArea').innerHTML = '<div style="color:green;">✅ Products loaded: ' + products.length + ' items ready</div>';
         } catch (err) {
             console.error(err);
-            document.getElementById('resultArea').innerHTML = '<div class="error">❌ Failed to load prices.csv</div>';
+            document.getElementById('resultArea').innerHTML = '<div class="error">❌ Failed to load prices.csv. Make sure the file exists in the same folder.</div>';
         }
     }
 
-    // Parse order text into items
-    function parseOrderLines(text) {
-        const lines = text.split('\n');
-        const items = [];
-        for (let line of lines) {
-            line = line.trim();
-            if (line === '') continue;
-            let norm = transliterate(line);
-            let quantity = 1;
-            let qtyMatch = norm.match(/(\d+)\s*ч/);
-            if (qtyMatch) quantity = parseInt(qtyMatch[1]);
-            else {
-                let qEnd = norm.match(/(\d+)\s*(?:pcs?|qty|шт|x)?$/i);
-                if (qEnd) quantity = parseInt(qEnd[1]);
-            }
-            let partMatch = norm.match(/[-=]\s*([A-Z0-9]+)/i);
-            if (!partMatch) partMatch = norm.match(/\b([A-Z0-9]{8,15})\b/);
-            let identifier = partMatch ? partMatch[1] : norm;
-            items.push({ identifier, quantity, rawLine: line });
+    function parseOrderLine(line) {
+        line = line.trim();
+        if (line === '') return null;
+        
+        let quantity = 1;
+        let identifier = line;
+        
+        // Try to extract quantity from end (e.g., "4" at the end)
+        const words = line.split(/\s+/);
+        const lastWord = words[words.length-1];
+        if (!isNaN(parseFloat(lastWord)) && isFinite(lastWord)) {
+            quantity = parseInt(lastWord);
+            identifier = words.slice(0, -1).join(' ');
         }
-        return items;
+        
+        // Check if line contains a dash (part number pattern)
+        const dashMatch = identifier.match(/^([A-Z0-9]+)-(\d+)/i);
+        if (dashMatch) {
+            quantity = parseInt(dashMatch[2]);
+            identifier = dashMatch[1];
+        }
+        
+        // Remove special characters from identifier
+        identifier = identifier.replace(/[①-⑨]/g, '').trim();
+        
+        return { identifier, quantity, rawLine: line };
     }
 
     function matchProduct(identifier) {
+        // Exact match on part number
         let exact = products.find(p => p.part.toLowerCase() === identifier.toLowerCase());
         if (exact) return exact;
-        let words = identifier.toLowerCase().split(/\s+/);
-        let best = null, bestScore = 0;
-        for (let p of products) {
+        
+        // Partial match in description
+        const searchTerm = identifier.toLowerCase();
+        let bestMatch = null;
+        let bestScore = 0;
+        
+        for (const prod of products) {
             let score = 0;
-            if (p.part.toLowerCase().includes(identifier.toLowerCase())) score += 20;
-            for (let w of words) {
-                if (p.desc.toLowerCase().includes(w)) score++;
-                if (p.part.toLowerCase().includes(w)) score += 2;
-                if (p.brand && p.brand.toLowerCase().includes(w)) score += 3;
+            if (prod.part.toLowerCase().includes(searchTerm)) score += 10;
+            if (prod.desc.toLowerCase().includes(searchTerm)) score += 5;
+            if (prod.brand && prod.brand.toLowerCase().includes(searchTerm)) score += 3;
+            
+            // Word by word matching
+            const words = searchTerm.split(/\s+/);
+            for (const word of words) {
+                if (word.length > 2) {
+                    if (prod.desc.toLowerCase().includes(word)) score += 2;
+                    if (prod.part.toLowerCase().includes(word)) score += 3;
+                }
             }
-            if (score > bestScore) { bestScore = score; best = p; }
+            
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = prod;
+            }
         }
-        return bestScore >= 2 ? best : null;
+        
+        return bestScore >= 2 ? bestMatch : null;
     }
 
-    function generateQuotationFromItems(items) {
-        let quote = [];
-        let unmatched = [];
-        for (let item of items) {
-            let prod = matchProduct(item.identifier);
-            if (prod) {
-                quote.push({
-                    raw: item.rawLine,
-                    identifier: item.identifier,
-                    part: prod.part,
-                    desc: prod.desc,
-                    brand: prod.brand,
-                    qty: item.quantity,
-                    price: prod.price,
-                    total: prod.price * item.quantity
+    function generateQuotation() {
+        const orderText = document.getElementById('orderInput').value;
+        if (!orderText.trim()) {
+            alert('Please paste order first');
+            return;
+        }
+        
+        const lines = orderText.split('\n');
+        const quoteItems = [];
+        const unmatched = [];
+        
+        for (const line of lines) {
+            const parsed = parseOrderLine(line);
+            if (!parsed) continue;
+            
+            const product = matchProduct(parsed.identifier);
+            if (product) {
+                quoteItems.push({
+                    rawLine: parsed.rawLine,
+                    identifier: parsed.identifier,
+                    part: product.part,
+                    desc: product.desc,
+                    brand: product.brand,
+                    qty: parsed.quantity,
+                    price: product.price,
+                    total: product.price * parsed.quantity
                 });
             } else {
-                unmatched.push(item);
+                unmatched.push({ rawLine: parsed.rawLine, identifier: parsed.identifier });
             }
         }
-        let html = '<h2>📋 Price Quotation</h2>';
-        if (quote.length === 0 && unmatched.length === 0) { html += '<p>No items found.</p>'; }
-        else {
-            html += '<table><thead><tr><th>Customer Line</th><th>Matched Part</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit (₹)</th><th>Total (₹)</th></tr></thead><tbody>';
+        
+        let html = '<h2>📋 Quotation</h2>';
+        
+        if (quoteItems.length === 0 && unmatched.length === 0) {
+            html += '<p>No items found. Please check the format.</p>';
+        } else {
+            html += '<table><thead><tr><th>Customer Line</th><th>Matched Part</th><th>Description</th><th>Brand</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>';
             let subtotal = 0;
-            for (let i of quote) {
-                subtotal += i.total;
+            
+            for (const item of quoteItems) {
+                subtotal += item.total;
                 html += `<tr>
-                    <td>${escapeHtml(i.raw)}<br><small>🔍 ${escapeHtml(i.identifier)}</small></td>
-                    <td>${escapeHtml(i.part)}</td>
-                    <td>${escapeHtml(i.desc)}</td>
-                    <td>${escapeHtml(i.brand)}</td>
-                    <td>${i.qty}</td>
-                    <td>₹${i.price.toFixed(2)}</td>
-                    <td>₹${i.total.toFixed(2)}</td>
+                    <td>${escapeHtml(item.rawLine)}<br><small style="color:#666;">→ ${escapeHtml(item.identifier)}</small></td>
+                    <td>${escapeHtml(item.part)}</td>
+                    <td>${escapeHtml(item.desc)}</td>
+                    <td>${escapeHtml(item.brand)}</td>
+                    <td>${item.qty}</td>
+                    <td>₹${item.price.toFixed(2)}</td>
+                    <td>₹${item.total.toFixed(2)}</td>
                 </tr>`;
             }
-            let gst = subtotal * 0.18;
-            let grand = subtotal + gst;
-            html += `<tr class="total-row"><td colspan="6" style="text-align:right;">Subtotal</td><td>₹${subtotal.toFixed(2)}</td></tr>`;
-            html += `<tr class="total-row"><td colspan="6" style="text-align:right;">GST (18%)</td><td>₹${gst.toFixed(2)}</td></tr>`;
-            html += `<tr class="total-row"><td colspan="6" style="text-align:right;">Grand Total</td><td>₹${grand.toFixed(2)}</td></tr>`;
+            
+            const gst = subtotal * 0.18;
+            const grand = subtotal + gst;
+            
+            html += `<tr style="font-weight:bold;"><td colspan="6" style="text-align:right;">Subtotal</td><td>₹${subtotal.toFixed(2)}</td></tr>`;
+            html += `<tr style="font-weight:bold;"><td colspan="6" style="text-align:right;">GST (18%)</td><td>₹${gst.toFixed(2)}</td></tr>`;
+            html += `<tr style="font-weight:bold; background:#f0f0f0;"><td colspan="6" style="text-align:right;">Grand Total</td><td>₹${grand.toFixed(2)}</td></tr>`;
             html += '</tbody></table>';
-            if (unmatched.length) {
-                html += '<div class="error"><strong>⚠️ Unmatched items</strong><ul>';
-                unmatched.forEach(u => html += `<li>${escapeHtml(u.rawLine)} → searched for: ${escapeHtml(u.identifier)}</li>`);
+            
+            if (unmatched.length > 0) {
+                html += '<div class="error"><strong>⚠️ Unmatched items:</strong><ul>';
+                for (const u of unmatched) {
+                    html += `<li>${escapeHtml(u.rawLine)} → searched for: ${escapeHtml(u.identifier)}</li>`;
+                }
                 html += '</ul></div>';
             }
-            html += '<div style="margin-top:20px; text-align:right;">Auto Spares Solution<br>GSTIN: 19ANOPD3300R1ZO<br>Valid for 30 days</div>';
+            
+            html += '<div style="margin-top:20px; text-align:right; font-size:12px; color:#666;">Auto Spares Solution | GSTIN: 19ANOPD3300R1ZO</div>';
         }
+        
         document.getElementById('resultArea').innerHTML = html;
     }
-
-    async function processText() {
-        const manualText = document.getElementById('manualText').value;
-        if (!manualText.trim()) {
-            alert('Please provide text or upload an image first.');
-            return;
-        }
-        const items = parseOrderLines(manualText);
-        generateQuotationFromItems(items);
+    
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
     }
-
-    // OCR with Tesseract
-    async function extractTextFromImage(file) {
-        const loader = document.getElementById('loader');
-        loader.style.display = 'block';
-        try {
-            const { data: { text } } = await Tesseract.recognize(file, 'rus+eng');
-            loader.style.display = 'none';
-            document.getElementById('manualText').value = text;
-            processText();
-        } catch (err) {
-            loader.style.display = 'none';
-            alert('OCR failed. Please try a clearer image or paste text manually.');
-            console.error(err);
-        }
-    }
-
-    // Drag & drop / file upload handling
-    const uploadArea = document.getElementById('uploadArea');
-    const fileInput = document.getElementById('fileInput');
-    uploadArea.addEventListener('click', () => fileInput.click());
-    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.style.borderColor = '#0a7c71'; });
-    uploadArea.addEventListener('dragleave', () => uploadArea.style.borderColor = '#ccc');
-    uploadArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const file = e.dataTransfer.files[0];
-        if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
-            handleFile(file);
-        } else alert('Please drop an image or PDF file.');
-    });
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length) handleFile(e.target.files[0]);
-    });
-
-    function handleFile(file) {
-        if (file.type === 'application/pdf') {
-            alert('PDF OCR is not directly supported. Please convert to image (JPG/PNG) or paste text.');
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = function(ev) {
-            const preview = document.getElementById('imagePreview');
-            preview.innerHTML = `<img src="${ev.target.result}" style="max-width:100%; max-height:300px;">`;
-            extractTextFromImage(file);
-        };
-        reader.readAsDataURL(file);
-    }
-
+    
     function clearAll() {
-        document.getElementById('manualText').value = '';
+        document.getElementById('orderInput').value = '';
         document.getElementById('resultArea').innerHTML = '';
-        document.getElementById('imagePreview').innerHTML = '';
     }
-
+    
+    // Load products when page loads
     loadProducts();
 </script>
 </body>
