@@ -913,9 +913,11 @@
             <button class="btn btn-block" onclick="sendOrderEmail()" style="background:#6c757d; margin-top:10px;">
                 <i class="fas fa-envelope"></i> Email Order
             </button>
-           ${currentUser && currentUser.isAdmin ? `<button class="btn btn-block" onclick="generateInvoice()" style="background:#4CAF50; margin-top:10px;">
-    <i class="fas fa-file-invoice"></i> Generate Invoice
-</button>` : ''}
+${currentUser && currentUser.isAdmin ? `
+    <button class="btn btn-block" onclick="generateInvoice()" style="background:#4CAF50; margin-top:10px;">
+        <i class="fas fa-file-invoice"></i> Generate Invoice
+    </button>
+` : ''}
 
             <button class="btn buy btn-block" onclick="checkout()" style="background:var(--secondary); margin-top:10px;">
                 <i class="fas fa-credit-card"></i> Checkout
