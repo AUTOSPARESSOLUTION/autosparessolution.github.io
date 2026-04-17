@@ -1067,12 +1067,29 @@ function extractYouTubeId(url) {
     }
 }
         function login() {
+    const email = document.getElementById("login-email").value;
+    const password = document.getElementById("login-password").value;
+    const user = users.find(u => u.email === email && u.password === password);
+    if (user) {
+        currentUser = user;
+        // If your email is admin@autosparessolution.com, set isAdmin
+        if (email === "dipankar@autosparessolution.com") {
+            currentUser.isAdmin = true;
+        }
+        showUserProfile();
+        showToast("Login successful!");
+        updateDeliveryEstimator();
+    } else {
+        showToast("Invalid email or password", true);
+    }
+}
+     /*   function login() {
             const email = document.getElementById("login-email").value;
             const password = document.getElementById("login-password").value;
             const user = users.find(u => u.email === email && u.password === password);
             if (user) { currentUser = user; showUserProfile(); showToast("Login successful!"); updateDeliveryEstimator(); }
             else showToast("Invalid email or password", true);
-        }
+        }*/
         function logout() { currentUser = null; showLoginForm(); showToast("Logged out"); updateDeliveryEstimator(); }
 
         // ========== PRODUCT LOADING ==========
