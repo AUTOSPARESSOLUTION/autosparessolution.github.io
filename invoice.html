@@ -216,7 +216,7 @@
         </div>
 
         <div class="bank-details">
-            <p><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: State Bank of India<br>Account No: 021111100007383<br>IFSC:UBIN0802115<br>UPI: ass08@uboi</p>
+            <p><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: State Bank of India<br>Account No: 021111100007383<br>IFSC: UBIN0802115<br>UPI: ass08@uboi</p>
             <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
         </div>
     </div>
@@ -235,7 +235,6 @@
     // ========== DATA FROM localStorage ==========
     const cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-    let invoiceNumber = localStorage.getItem('nextInvoiceNo') || 'INV-2026-0001';
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
@@ -247,16 +246,64 @@
         document.getElementById('buyerEmail').value = currentUser.email || '';
         document.getElementById('buyerGstin').value = currentUser.gstin || '';
         document.getElementById('buyerState').value = currentUser.state || '';
-        // If consignee same as buyer, you can add a checkbox later
     }
 
-    function generateInvoiceNumber() {
-        let num = invoiceNumber;
-        let parts = num.split('-');
-        let newNum = parseInt(parts[2]) + 1;
-        let next = `${parts[0]}-${parts[1]}-${newNum.toString().padStart(4,'0')}`;
-        localStorage.setItem('nextInvoiceNo', next);
-        return num;
+    // ----- Financial Year Logic -----
+    function getFinancialYear() {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const month = now.getMonth() + 1; // 1-12
+        if (month >= 4) {
+            return `${currentYear}-${(currentYear+1).toString().slice(-2)}`;
+        } else {
+            return `${currentYear-1}-${currentYear.toString().slice(-2)}`;
+        }
+    }
+
+    // ----- Invoice Number Generation (separate counters for cash/credit) -----
+    function getNextInvoiceNumber(type) {
+        const finYear = getFinancialYear();
+        let counterKey = '';
+        let prefix = '';
+        if (type === 'credit') {
+            counterKey = `creditCounter_${finYear}`;
+            prefix = `ASS/${finYear}/`;
+        } else {
+            counterKey = `cashCounter_${finYear}`;
+            prefix = `ASS/${finYear}/CASH/`;
+        }
+        let currentCounter = parseInt(localStorage.getItem(counterKey)) || 1;
+        let nextNumber = currentCounter;
+        let invoiceNo = prefix + nextNumber.toString().padStart(4, '0');
+        // Increment counter for next time (but we will increment only when invoice is saved)
+        // For display, we show the next number without incrementing yet.
+        return { invoiceNo, counterKey, nextNumber };
+    }
+
+    // Update displayed invoice number based on selected type
+    function updateInvoiceNumberDisplay() {
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        const { invoiceNo } = getNextInvoiceNumber(type);
+        document.getElementById('invoiceNo').innerText = invoiceNo;
+    }
+
+    // Actually increment the counter and return the final invoice number (called when saving)
+    function getAndIncrementInvoiceNumber(type) {
+        const finYear = getFinancialYear();
+        let counterKey = '';
+        let prefix = '';
+        if (type === 'credit') {
+            counterKey = `creditCounter_${finYear}`;
+            prefix = `ASS/${finYear}/`;
+        } else {
+            counterKey = `cashCounter_${finYear}`;
+            prefix = `ASS/${finYear}/CASH/`;
+        }
+        let currentCounter = parseInt(localStorage.getItem(counterKey)) || 1;
+        let invoiceNo = prefix + currentCounter.toString().padStart(4, '0');
+        // Increment and store for next time
+        localStorage.setItem(counterKey, currentCounter + 1);
+        return invoiceNo;
     }
 
     function formatDate(date) {
@@ -310,7 +357,6 @@
     }
 
     function setDates() {
-        document.getElementById('invoiceNo').innerText = generateInvoiceNumber();
         document.getElementById('invoiceDate').innerText = formatDate(new Date());
         let due = new Date();
         let terms = parseInt(document.getElementById('paymentTerms').value) || 30;
@@ -328,8 +374,11 @@
         const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
 
         let totals = calculateTotals();
+        // Generate final invoice number (increment counter)
+        const finalInvoiceNo = getAndIncrementInvoiceNumber(invoiceType);
+        
         let invoice = {
-            invoiceNo: document.getElementById('invoiceNo').innerText,
+            invoiceNo: finalInvoiceNo,
             date: document.getElementById('invoiceDate').innerText,
             dueDate: document.getElementById('dueDate').innerText,
             buyer: {
@@ -387,7 +436,7 @@
         allInvoices.push(invoice);
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
         localStorage.setItem('invoiceCart', '[]');
-        alert('Invoice saved successfully!');
+        alert(`Invoice ${finalInvoiceNo} saved successfully!`);
         window.close();
     }
 
@@ -413,16 +462,18 @@
         pdf.save(`Invoice_${document.getElementById('invoiceNo').innerText}.pdf`);
     }
 
-    // Toggle credit fields
+    // Toggle credit fields and update invoice number display
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
             document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
+            updateInvoiceNumberDisplay();
         });
     });
 
     // Initial render
     setDates();
     renderItems();
+    updateInvoiceNumberDisplay();
 </script>
 </body>
     </html>
