@@ -20,16 +20,13 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             overflow: hidden;
         }
-        /* Main table that repeats thead on each page */
+        /* Master table for repeating headers */
         .master-table {
             width: 100%;
             border-collapse: collapse;
         }
         .master-table thead {
             display: table-header-group;
-        }
-        .master-table tbody {
-            display: table-row-group;
         }
         /* Header sections */
         .company-header {
@@ -123,6 +120,7 @@
             border-radius: 8px;
             flex-wrap: wrap;
         }
+        /* Print/PDF specific */
         @media print {
             .actions, .invoice-type, .editable, button, input, textarea, select { display: none; }
             body { background: white; padding: 0; margin: 0; }
@@ -135,10 +133,10 @@
 </head>
 <body>
 <div class="invoice-container">
-    <!-- The master table ensures thead repeats on every printed page -->
-    <table class="master-table">
+    <!-- Master table ensures thead repeats on every PDF page -->
+    <table class="master-table" id="invoiceMasterTable">
         <thead>
-            <!-- Header rows that repeat on each page -->
+            <!-- Company header -->
             <tr>
                 <td style="background: #0a7c71; padding: 20px 30px;">
                     <div class="company-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
@@ -160,6 +158,7 @@
                     </div>
                 </td>
             </tr>
+            <!-- Invoice type (cash/credit) -->
             <tr>
                 <td style="padding: 20px 30px 0 30px;">
                     <div class="invoice-type">
@@ -174,10 +173,11 @@
                     </div>
                 </td>
             </tr>
+            <!-- Buyer and Consignee -->
             <tr>
                 <td style="padding: 0 30px;">
-                    <div class="row" style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <div class="col" style="flex: 1; min-width: 250px;">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 250px;">
                             <div class="info-box">
                                 <h3>Buyer (Bill to)</h3>
                                 <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
@@ -188,7 +188,7 @@
                                 <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="buyerEmail" class="editable" placeholder="Email"></div></div>
                             </div>
                         </div>
-                        <div class="col" style="flex: 1; min-width: 250px;">
+                        <div style="flex: 1; min-width: 250px;">
                             <div class="info-box">
                                 <h3>Consignee (Ship to)</h3>
                                 <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="consigneeName" class="editable" placeholder="Consignee name"></div></div>
@@ -199,10 +199,11 @@
                     </div>
                 </td>
             </tr>
+            <!-- Order and Dispatch Details -->
             <tr>
                 <td style="padding: 0 30px;">
-                    <div class="row" style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <div class="col" style="flex: 1;">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <div style="flex: 1;">
                             <div class="info-box">
                                 <h3>Order Details</h3>
                                 <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode" class="editable" placeholder="Customer code"></div></div>
@@ -211,7 +212,7 @@
                                 <div class="info-row"><div class="info-label">Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
                             </div>
                         </div>
-                        <div class="col" style="flex: 1;">
+                        <div style="flex: 1;">
                             <div class="info-box">
                                 <h3>Dispatch Details</h3>
                                 <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo" class="editable" placeholder="Doc No."></div></div>
@@ -224,7 +225,7 @@
             </tr>
         </thead>
         <tbody>
-            <!-- Items table (will break across pages) -->
+            <!-- Items table (body content that can split across pages) -->
             <tr>
                 <td style="padding: 0 30px;">
                     <table class="items-table">
@@ -235,6 +236,7 @@
                     </table>
                 </td>
             </tr>
+            <!-- Totals and Bank Details (these will appear after items, not repeated) -->
             <tr>
                 <td style="padding: 0 30px;">
                     <div class="totals">
@@ -251,7 +253,7 @@
             <tr>
                 <td style="padding: 20px 30px;">
                     <div class="bank-details">
-                        <p><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: State Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</p>
+                        <p><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</p>
                         <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
                     </div>
                 </td>
@@ -262,11 +264,12 @@
 
 <div class="actions">
     <button onclick="saveInvoice()">💾 Save Invoice & Update Ledger</button>
-    <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+    <button onclick="generatePDF()">📄 Save as PDF</button>
+    <button onclick="window.print()">🖨️ Print</button>
     <button onclick="window.close()">❌ Close</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
     // ========== DATA FROM localStorage ==========
     const cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
@@ -463,6 +466,20 @@
         window.close();
     }
 
+    // PDF generation using html2pdf.js (handles multiple pages, repeats headers)
+    function generatePDF() {
+        const element = document.getElementById('invoiceMasterTable');
+        const opt = {
+            margin: [0.5, 0.5, 0.5, 0.5], // top, right, bottom, left (in inches)
+            filename: `Invoice_${document.getElementById('invoiceNo').innerText}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, letterRendering: true },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        // Use html2pdf to generate and download PDF
+        html2pdf().set(opt).from(element).save();
+    }
+
     // Toggle credit fields and update invoice number
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
@@ -476,4 +493,4 @@
     updateInvoiceNumberDisplay();
 </script>
 </body>
- </html>
+</html>
