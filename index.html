@@ -829,7 +829,7 @@
         <a href="orders.html"><i class="fas fa-history"></i> <span>Orders</span></a> 
         <a href="quotation-upload.html"><i class="fas fa-file-upload"></i> <span>Upload Order</span></a>
          <a href="customer-ledger.html"><i class="fas fa-book"></i> Ledger</a>
-        <a href="orders.html"><i class="fas fa-history"></i> Orders</a>
+        
         <a href="#about"><i class="fas fa-info-circle"></i> <span>About</span></a>
         <a href="#products"><i class="fas fa-box-open"></i> <span>Products</span></a>
         <a href="#investors"><i class="fas fa-chart-line"></i> <span>Investors</span></a>
@@ -917,7 +917,9 @@
             <button class="btn btn-block" onclick="generateInvoice()" style="background:#4CAF50; margin-top:10px;">
     <i class="fas fa-file-invoice"></i> Generate Invoice
 </button>
-
+<button class="btn btn-block" onclick="printLastInvoice()" style="background:#17a2b8; margin-top:10px;">
+    <i class="fas fa-print"></i> Print Last Invoice
+</button>
             <button class="btn buy btn-block" onclick="checkout()" style="background:var(--secondary); margin-top:10px;">
                 <i class="fas fa-credit-card"></i> Checkout
             </button>
@@ -1422,6 +1424,16 @@ function generateInvoice() {
     localStorage.setItem('invoiceCart', JSON.stringify(cart));
     localStorage.setItem('currentUser', JSON.stringify(currentUser));
     window.open('invoice.html', '_blank');
+}
+        function printLastInvoice() {
+    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+    if (allInvoices.length === 0) {
+        showToast('No invoices found', true);
+        return;
+    }
+    const lastInvoice = allInvoices[allInvoices.length - 1];
+    localStorage.setItem('viewInvoice', JSON.stringify(lastInvoice));
+    window.open('view-invoice.html', '_blank');
 }
         // ========== EMAIL ORDER ==========
         function sendOrderEmail() {
