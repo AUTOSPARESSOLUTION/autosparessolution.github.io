@@ -98,7 +98,8 @@
             padding: 6px 4px;
             text-align: left;
             vertical-align: top;
-            word-break: break-word;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
             white-space: normal;
         }
         /* Column widths */
@@ -278,7 +279,7 @@
                     </div>
                 </td>
             </tr>
-            <!-- Signature and Stamp Box (only on last page) -->
+            <!-- Signature and Stamp Box -->
             <tr>
                 <td style="padding: 0 15px 20px 15px;">
                     <div class="signature-box">
@@ -302,7 +303,7 @@
     <button onclick="window.close()">❌ Close</button>
 </div>
 
-<!-- Invoice type selection (outside repeating header) -->
+<!-- Invoice type selection -->
 <div class="invoice-type" style="margin: 0 15px 15px 15px;">
     <div>
         <label><input type="radio" name="invoiceType" value="cash" checked> Cash Bill</label>
@@ -382,8 +383,8 @@
             let sgst = taxable * 0.09;
             html += `<tr>
                 <td>${idx+1}</td>
-                <td style="word-break:break-word;">${item.part}</td>
-                <td style="word-break:break-word;">${item.desc}</td>
+                <td style="word-wrap:break-word; white-space:normal; overflow-wrap:break-word;">${escapeHtml(item.part)}</td>
+                <td style="word-wrap:break-word; white-space:normal; overflow-wrap:break-word;">${escapeHtml(item.desc)}</td>
                 <td>${item.qty}</td>
                 <td>₹${item.price.toFixed(2)}</td>
                 <td>₹${taxable.toFixed(2)}</td>
@@ -400,6 +401,16 @@
         document.getElementById('sgstTotal').innerText = t.sgstTotal.toFixed(2);
         document.getElementById('roundOff').innerText = t.roundOff.toFixed(2);
         document.getElementById('grandTotal').innerText = t.grand.toFixed(2);
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
     }
 
     function setDates() {
@@ -472,4 +483,4 @@
     updateInvoiceNumberDisplay();
 </script>
 </body>
-                                                                                                       </html>
+    </html>
