@@ -18,13 +18,39 @@
             background: white;
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            overflow: hidden;
             padding: 0 15px 15px 15px;
         }
-        /* First page static blocks – avoid breaking inside */
-        .first-page-block {
-            page-break-inside: avoid;
-            break-inside: avoid;
+        /* Hide invoice type selector in print */
+        .invoice-type, .actions {
+            display: flex;
+        }
+        @media print {
+            .invoice-type, .actions, .editable, button, input, textarea, select, .no-print {
+                display: none !important;
+            }
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .invoice-container {
+                box-shadow: none;
+                border-radius: 0;
+                padding: 0;
+                margin: 0;
+            }
+            .company-header {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .items-table th {
+                background: #f8f9fa !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .info-value {
+                color: black !important;
+            }
         }
         .company-header {
             background: #0a7c71;
@@ -34,7 +60,7 @@
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            margin: 0 -15px 15px -15px; /* compensate container padding */
+            margin: 0 -15px 15px -15px;
         }
         .logo-area {
             display: flex;
@@ -86,7 +112,6 @@
         .editable {
             background: #fff9e0;
         }
-        /* Items table – thead repeats on each page */
         .items-table {
             width: 100%;
             border-collapse: collapse;
@@ -103,7 +128,6 @@
             overflow-wrap: break-word;
             white-space: normal;
         }
-        /* Column widths */
         .items-table th:nth-child(1) { width: 5%; }
         .items-table th:nth-child(2) { width: 12%; }
         .items-table th:nth-child(3) { width: 20%; }
@@ -149,7 +173,6 @@
         }
         button:hover { background: #09645a; }
         .invoice-type {
-            display: flex;
             gap: 20px;
             align-items: center;
             margin-bottom: 15px;
@@ -159,96 +182,85 @@
             flex-wrap: wrap;
             font-size: 13px;
         }
-        @media print {
-            .actions, .invoice-type, .editable, button, input, textarea, select { display: none; }
-            body { background: white; padding: 0; margin: 0; }
-            .invoice-container { box-shadow: none; border-radius: 0; padding: 0; }
-            .company-header { background: #0a7c71 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; }
-            .first-page-block { page-break-inside: avoid; break-inside: avoid; }
-            .items-table thead { display: table-header-group; }
-            .info-value { color: black !important; }
-            .editable { background: none; }
-        }
     </style>
 </head>
 <body>
-<div class="invoice-container">
-    <!-- Static content (appears only on first page) -->
-    <div class="first-page-block">
-        <div class="company-header">
-            <div class="logo-area">
-                <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
-                <div class="company-details">
-                    <h1>Auto Spares Solution</h1>
-                    <p>GSTIN: 19ANOPD3300R1ZO</p>
-                    <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-                </div>
-            </div>
-            <div class="invoice-title">
-                <h2>TAX INVOICE</h2>
-                <p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p>
-                <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
-                <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
+<div class="invoice-container" id="invoiceContainer">
+    <!-- Company Header -->
+    <div class="company-header">
+        <div class="logo-area">
+            <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
+            <div class="company-details">
+                <h1>Auto Spares Solution</h1>
+                <p>GSTIN: 19ANOPD3300R1ZO</p>
+                <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
             </div>
         </div>
+        <div class="invoice-title">
+            <h2>TAX INVOICE</h2>
+            <p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p>
+            <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
+            <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
+        </div>
+    </div>
 
-        <div class="invoice-type">
-            <div>
-                <label><input type="radio" name="invoiceType" value="cash" checked> Cash Bill</label>
-                <label><input type="radio" name="invoiceType" value="credit"> Credit Bill</label>
-            </div>
-            <div id="creditFields" style="display:none;">
-                <label>Credit Limit (₹):</label> <input type="number" id="creditLimit" placeholder="Limit" step="1000" value="50000">
-                <label>Payment Terms (days):</label> <input type="number" id="paymentTerms" value="30" style="width:70px;">
+    <!-- Invoice Type Selector (hidden in print) -->
+    <div class="invoice-type no-print">
+        <div>
+            <label><input type="radio" name="invoiceType" value="cash" checked> Cash Bill</label>
+            <label><input type="radio" name="invoiceType" value="credit"> Credit Bill</label>
+        </div>
+        <div id="creditFields" style="display:none;">
+            <label>Credit Limit (₹):</label> <input type="number" id="creditLimit" placeholder="Limit" step="1000" value="50000">
+            <label>Payment Terms (days):</label> <input type="number" id="paymentTerms" value="30" style="width:70px;">
+        </div>
+    </div>
+
+    <!-- Buyer and Consignee -->
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 240px;">
+            <div class="info-box">
+                <h3>Buyer (Bill to)</h3>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN"></div></div>
+                <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="buyerState" class="editable" placeholder="State"></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="buyerPhone" class="editable" placeholder="Phone"></div></div>
+                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="buyerEmail" class="editable" placeholder="Email"></div></div>
             </div>
         </div>
-
-        <!-- Buyer and Consignee -->
-        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 240px;">
-                <div class="info-box">
-                    <h3>Buyer (Bill to)</h3>
-                    <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
-                    <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
-                    <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN"></div></div>
-                    <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="buyerState" class="editable" placeholder="State"></div></div>
-                    <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="buyerPhone" class="editable" placeholder="Phone"></div></div>
-                    <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="buyerEmail" class="editable" placeholder="Email"></div></div>
-                </div>
-            </div>
-            <div style="flex: 1; min-width: 240px;">
-                <div class="info-box">
-                    <h3>Consignee (Ship to)</h3>
-                    <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="consigneeName" class="editable" placeholder="Consignee name"></div></div>
-                    <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="consigneeAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
-                    <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="consigneePhone" class="editable" placeholder="Phone"></div></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Order and Dispatch Details -->
-        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-            <div style="flex: 1;">
-                <div class="info-box">
-                    <h3>Order Details</h3>
-                    <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode" class="editable" placeholder="Code"></div></div>
-                    <div class="info-row"><div class="info-label">Sales Order No:</div><div class="info-value"><input type="text" id="salesOrderNo" class="editable" placeholder="SO No."></div></div>
-                    <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo" class="editable" placeholder="Ref No."></div></div>
-                    <div class="info-row"><div class="info-label">Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
-                </div>
-            </div>
-            <div style="flex: 1;">
-                <div class="info-box">
-                    <h3>Dispatch Details</h3>
-                    <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo" class="editable" placeholder="Doc No."></div></div>
-                    <div class="info-row"><div class="info-label">Mode of Transport:</div><div class="info-value"><input type="text" id="transportMode" class="editable" placeholder="Road/Rail/Air"></div></div>
-                    <div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value"><input type="text" id="vehicleNo" class="editable" placeholder="Optional"></div></div>
-                </div>
+        <div style="flex: 1; min-width: 240px;">
+            <div class="info-box">
+                <h3>Consignee (Ship to)</h3>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="consigneeName" class="editable" placeholder="Consignee name"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="consigneeAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="consigneePhone" class="editable" placeholder="Phone"></div></div>
             </div>
         </div>
     </div>
 
-    <!-- Items table – thead repeats on each page -->
+    <!-- Order and Dispatch Details -->
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex: 1;">
+            <div class="info-box">
+                <h3>Order Details</h3>
+                <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode" class="editable" placeholder="Code"></div></div>
+                <div class="info-row"><div class="info-label">Sales Order No:</div><div class="info-value"><input type="text" id="salesOrderNo" class="editable" placeholder="SO No."></div></div>
+                <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo" class="editable" placeholder="Ref No."></div></div>
+                <div class="info-row"><div class="info-label">Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
+            </div>
+        </div>
+        <div style="flex: 1;">
+            <div class="info-box">
+                <h3>Dispatch Details</h3>
+                <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo" class="editable" placeholder="Doc No."></div></div>
+                <div class="info-row"><div class="info-label">Mode of Transport:</div><div class="info-value"><input type="text" id="transportMode" class="editable" placeholder="Road/Rail/Air"></div></div>
+                <div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value"><input type="text" id="vehicleNo" class="editable" placeholder="Optional"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items Table -->
     <table class="items-table" id="itemsTable">
         <thead>
             <tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Unit Price (₹)</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
@@ -256,7 +268,7 @@
         <tbody id="itemsBody"></tbody>
     </table>
 
-    <!-- Totals and footer (appear after items, on last page) -->
+    <!-- Totals -->
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal:</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
@@ -267,6 +279,7 @@
         </table>
     </div>
 
+    <!-- Bank Details & Signature -->
     <div class="bank-details">
         <p><strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</p>
         <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
@@ -281,7 +294,7 @@
     </div>
 </div>
 
-<div class="actions">
+<div class="actions no-print">
     <button onclick="saveInvoice()">💾 Save Invoice & Update Ledger</button>
     <button onclick="generatePDF()">📄 Save as PDF</button>
     <button onclick="window.print()">🖨️ Print</button>
@@ -356,8 +369,8 @@
             let sgst = taxable * 0.09;
             html += `<tr>
                 <td>${idx+1}</td>
-                <td style="word-wrap:break-word; white-space:normal; overflow-wrap:break-word;">${escapeHtml(item.part)}</td>
-                <td style="word-wrap:break-word; white-space:normal; overflow-wrap:break-word;">${escapeHtml(item.desc)}</td>
+                <td style="word-wrap:break-word; white-space:normal;">${escapeHtml(item.part)}</td>
+                <td style="word-wrap:break-word; white-space:normal;">${escapeHtml(item.desc)}</td>
                 <td>${item.qty}</td>
                 <td>₹${item.price.toFixed(2)}</td>
                 <td>₹${taxable.toFixed(2)}</td>
@@ -432,18 +445,15 @@
     }
 
     function generatePDF() {
-        const element = document.getElementById('invoiceContainer'); // we need to wrap the whole container
-        // Actually, the container is .invoice-container, but we need to include everything.
-        // For simplicity, we'll use the body's main div.
-        const container = document.querySelector('.invoice-container');
+        const element = document.getElementById('invoiceContainer');
         const opt = {
             margin: [0.2, 0.2, 0.2, 0.2],
             filename: `Invoice_${document.getElementById('invoiceNo').innerText}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, letterRendering: true },
+            html2canvas: { scale: 2, letterRendering: true, useCORS: true },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
-        html2pdf().set(opt).from(container).save();
+        html2pdf().set(opt).from(element).save();
     }
 
     // Event listeners
