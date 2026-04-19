@@ -20,12 +20,11 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             padding: 0 15px 15px 15px;
         }
-        /* Hide invoice type selector in print */
-        .invoice-type, .actions {
+        .no-print {
             display: flex;
         }
         @media print {
-            .invoice-type, .actions, .editable, button, input, textarea, select, .no-print {
+            .no-print, .actions, .invoice-type, button, input, textarea, select {
                 display: none !important;
             }
             body {
@@ -45,11 +44,10 @@
             }
             .items-table th {
                 background: #f8f9fa !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
             }
-            .info-value {
-                color: black !important;
+            .info-value-text {
+                display: inline-block;
+                width: 100%;
             }
         }
         .company-header {
@@ -186,7 +184,6 @@
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
-    <!-- Company Header -->
     <div class="company-header">
         <div class="logo-area">
             <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
@@ -204,7 +201,6 @@
         </div>
     </div>
 
-    <!-- Invoice Type Selector (hidden in print) -->
     <div class="invoice-type no-print">
         <div>
             <label><input type="radio" name="invoiceType" value="cash" checked> Cash Bill</label>
@@ -296,8 +292,8 @@
 
 <div class="actions no-print">
     <button onclick="saveInvoice()">💾 Save Invoice & Update Ledger</button>
+    <button onclick="printInvoice()">🖨️ Print</button>
     <button onclick="generatePDF()">📄 Save as PDF</button>
-    <button onclick="window.print()">🖨️ Print</button>
     <button onclick="window.close()">❌ Close</button>
 </div>
 
@@ -444,8 +440,55 @@
         window.close();
     }
 
+    // Helper: Replace inputs with static text in a clone
+    function replaceInputsWithText(container) {
+        container.querySelectorAll('input, textarea, select').forEach(el => {
+            const span = document.createElement('span');
+            span.className = 'info-value-text';
+            span.style.whiteSpace = 'pre-wrap';
+            if (el.tagName === 'TEXTAREA') {
+                span.innerText = el.value;
+            } else if (el.tagName === 'SELECT') {
+                span.innerText = el.options[el.selectedIndex]?.text || '';
+            } else {
+                span.innerText = el.value;
+            }
+            // Copy basic styles
+            span.style.fontSize = window.getComputedStyle(el).fontSize;
+            span.style.fontFamily = window.getComputedStyle(el).fontFamily;
+            span.style.color = '#333';
+            span.style.display = 'inline-block';
+            span.style.width = '100%';
+            el.parentNode.replaceChild(span, el);
+        });
+        // Remove any leftover editable class
+        container.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
+        return container;
+    }
+
+    // Print function
+    function printInvoice() {
+        const originalContainer = document.getElementById('invoiceContainer');
+        const clone = originalContainer.cloneNode(true);
+        replaceInputsWithText(clone);
+        // Hide original, show clone, print, then restore
+        originalContainer.style.display = 'none';
+        document.body.appendChild(clone);
+        window.print();
+        // After print dialog closes, remove clone and show original
+        setTimeout(() => {
+            document.body.removeChild(clone);
+            originalContainer.style.display = '';
+        }, 100);
+    }
+
+    // PDF generation
     function generatePDF() {
-        const element = document.getElementById('invoiceContainer');
+        const originalContainer = document.getElementById('invoiceContainer');
+        const clone = originalContainer.cloneNode(true);
+        replaceInputsWithText(clone);
+        originalContainer.style.display = 'none';
+        document.body.appendChild(clone);
         const opt = {
             margin: [0.2, 0.2, 0.2, 0.2],
             filename: `Invoice_${document.getElementById('invoiceNo').innerText}.pdf`,
@@ -453,7 +496,10 @@
             html2canvas: { scale: 2, letterRendering: true, useCORS: true },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
-        html2pdf().set(opt).from(element).save();
+        html2pdf().set(opt).from(clone).save().then(() => {
+            document.body.removeChild(clone);
+            originalContainer.style.display = '';
+        });
     }
 
     // Event listeners
@@ -469,4 +515,4 @@
     updateInvoiceNumberDisplay();
 </script>
 </body>
-</html>
+    </html>
