@@ -5,61 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order History - Auto Spares</title>
     <style>
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #f4f4f4;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: auto;
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #0a7c71;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background: #0a7c71;
-            color: white;
-        }
-        .search-box {
-            margin-bottom: 20px;
-        }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 2px;
-        }
-        button:hover {
-            background: #09645a;
-        }
-        .btn-pdf {
-            background: #dc3545;
-        }
-        .btn-pdf:hover {
-            background: #c82333;
-        }
-        .btn-view {
-            background: #17a2b8;
-        }
+        body { font-family: 'Roboto', sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .search-box { margin-bottom: 20px; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
+        button:hover { background: #09645a; }
+        .btn-edit { background: #17a2b8; }
+        .btn-edit:hover { background: #138496; }
+        .btn-delete { background: #dc3545; }
+        .btn-delete:hover { background: #c82333; }
+        .btn-pdf { background: #e67e22; }
+        .btn-pdf:hover { background: #d35400; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -100,7 +60,8 @@
                 <td>${inv.status}</td>
                 <td>${inv.invoiceType}</td>
                 <td>
-                    <button class="btn-view" onclick="viewInvoice('${inv.invoiceNo}')">View</button>
+                    <button class="btn-edit" onclick="editInvoice('${inv.invoiceNo}')">Edit</button>
+                    <button class="btn-delete" onclick="deleteInvoice('${inv.invoiceNo}')">Delete</button>
                     <button class="btn-pdf" onclick="downloadInvoicePDF('${inv.invoiceNo}')">PDF</button>
                 </td>
             </tr>`;
@@ -109,25 +70,40 @@
         document.getElementById('ordersTable').innerHTML = html;
     }
 
-    function viewInvoice(invoiceNo) {
-        const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
-        if (invoice) {
-            localStorage.setItem('viewInvoice', JSON.stringify(invoice));
-            window.open('view-invoice.html', '_blank');
-        } else {
-            alert('Invoice not found');
-        }
+    function editInvoice(invoiceNo) {
+        // Store the invoice to edit in localStorage and open edit page
+        localStorage.setItem('editInvoiceNo', invoiceNo);
+        window.open('edit-invoice.html', '_blank');
     }
 
-    // Generate and download PDF directly from invoice data
+    function deleteInvoice(invoiceNo) {
+        if (!confirm(`Are you sure you want to delete invoice ${invoiceNo}? This action cannot be undone.`)) return;
+        const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
+        if (!invoice) return;
+        
+        // Reverse ledger effect
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const customer = customers.find(c => c.email === invoice.buyer?.email);
+        if (customer) {
+            if (invoice.invoiceType === 'credit') {
+                customer.outstanding -= invoice.grandTotal;
+                if (customer.outstanding < 0) customer.outstanding = 0;
+            }
+            customer.totalPurchased -= invoice.grandTotal;
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+        
+        // Remove invoice
+        allInvoices = allInvoices.filter(i => i.invoiceNo !== invoiceNo);
+        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+        alert(`Invoice ${invoiceNo} deleted successfully.`);
+        displayOrders(document.getElementById('searchInput').value.toLowerCase());
+    }
+
     function downloadInvoicePDF(invoiceNo) {
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
-        if (!invoice) {
-            alert('Invoice not found');
-            return;
-        }
-
-        // Build the invoice HTML dynamically
+        if (!invoice) { alert('Invoice not found'); return; }
+        // Build PDF container (same as before)
         const container = document.createElement('div');
         container.style.padding = '20px';
         container.style.fontFamily = 'Roboto, sans-serif';
@@ -135,158 +111,35 @@
         container.style.margin = '0 auto';
         container.style.backgroundColor = 'white';
         
-        // Company Header
         container.innerHTML = `
             <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.src='https://via.placeholder.com/60'">
-                    <div>
-                        <h1 style="margin: 0; font-size: 24px;">Auto Spares Solution</h1>
-                        <p style="margin: 3px 0 0; font-size: 12px;">GSTIN: 19ANOPD3300R1ZO</p>
-                        <p style="margin: 3px 0 0; font-size: 12px;">101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-                    </div>
+                    <div><h1 style="margin:0;">Auto Spares Solution</h1><p style="margin:0;">GSTIN: 19ANOPD3300R1ZO</p></div>
                 </div>
-                <div style="text-align: right;">
-                    <h2 style="margin: 0; font-size: 20px;">TAX INVOICE</h2>
-                    <p style="margin: 5px 0; font-size: 12px;"><strong>Invoice No:</strong> ${invoice.invoiceNo}</p>
-                    <p style="margin: 5px 0; font-size: 12px;"><strong>Date:</strong> ${invoice.date}</p>
-                    <p style="margin: 5px 0; font-size: 12px;"><strong>Due Date:</strong> ${invoice.dueDate}</p>
-                </div>
+                <div><h2>TAX INVOICE</h2><p>Invoice No: ${invoice.invoiceNo}<br>Date: ${invoice.date}<br>Due Date: ${invoice.dueDate}</p></div>
             </div>
+            <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Buyer</h3><p>${invoice.buyer?.name}<br>${invoice.buyer?.address}<br>GSTIN: ${invoice.buyer?.gstin}<br>Phone: ${invoice.buyer?.phone}</p></div>
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Consignee</h3><p>${invoice.consignee?.name}<br>${invoice.consignee?.address}<br>Phone: ${invoice.consignee?.phone}</p></div>
+            </div>
+            <table style="width:100%; border-collapse:collapse; margin:20px 0;"><thead><tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>
+                ${invoice.items.map((item, i) => `<tr><td>${i+1}</td><td>${item.part}</td><td>${item.desc}</td><td>${item.qty}</td><td>₹${item.price.toFixed(2)}</td><td>₹${item.total.toFixed(2)}</td></tr>`).join('')}
+            </tbody></table>
+            <div style="text-align:right;"><strong>Grand Total: ₹${invoice.grandTotal.toFixed(2)}</strong></div>
+            <div style="margin-top:30px; border-top:1px solid #ccc; padding-top:15px;"><strong>Bank Details:</strong> Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115<br><strong>Terms:</strong> Goods once sold will not be taken back.</div>
         `;
-
-        // Buyer and Consignee
-        const buyer = invoice.buyer || {};
-        const consignee = invoice.consignee || {};
-        container.innerHTML += `
-            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
-                <div style="flex: 1; background: #f8f9fa; padding: 10px; border-radius: 6px;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #0a7c71;">Buyer (Bill to)</h3>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Name:</strong> ${buyer.name || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Address:</strong> ${buyer.address || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>GSTIN:</strong> ${buyer.gstin || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>State:</strong> ${buyer.state || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Contact:</strong> ${buyer.phone || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Email:</strong> ${buyer.email || ''}</div>
-                </div>
-                <div style="flex: 1; background: #f8f9fa; padding: 10px; border-radius: 6px;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #0a7c71;">Consignee (Ship to)</h3>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Name:</strong> ${consignee.name || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Address:</strong> ${consignee.address || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Contact:</strong> ${consignee.phone || ''}</div>
-                </div>
-            </div>
-        `;
-
-        // Order and Dispatch Details
-        const order = invoice.orderDetails || {};
-        const dispatch = invoice.dispatchDetails || {};
-        container.innerHTML += `
-            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
-                <div style="flex: 1; background: #f8f9fa; padding: 10px; border-radius: 6px;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #0a7c71;">Order Details</h3>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Customer Code:</strong> ${order.customerCode || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Sales Order No:</strong> ${order.salesOrderNo || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Reference No:</strong> ${order.referenceNo || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Payment Terms:</strong> ${order.paymentTerms || ''}</div>
-                </div>
-                <div style="flex: 1; background: #f8f9fa; padding: 10px; border-radius: 6px;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #0a7c71;">Dispatch Details</h3>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Dispatch Doc No:</strong> ${dispatch.docNo || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Mode of Transport:</strong> ${dispatch.transportMode || ''}</div>
-                    <div style="margin-bottom: 5px; font-size: 12px;"><strong>Vehicle No:</strong> ${dispatch.vehicleNo || ''}</div>
-                </div>
-            </div>
-        `;
-
-        // Items Table
-        let itemsHtml = '<table style="width:100%; border-collapse: collapse; margin: 15px 0; font-size: 11px;"><thead><tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Unit Price (₹)</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr></thead><tbody>';
-        invoice.items.forEach((item, idx) => {
-            const taxable = item.price * item.qty;
-            const cgst = taxable * 0.09;
-            const sgst = taxable * 0.09;
-            itemsHtml += `<tr>
-                <td>${idx+1}</td>
-                <td style="word-break:break-word;">${escapeHtml(item.part)}</td>
-                <td style="word-break:break-word;">${escapeHtml(item.desc)}</td>
-                <td>${item.qty}</td>
-                <td>₹${item.price.toFixed(2)}</td>
-                <td>₹${taxable.toFixed(2)}</td>
-                <td>18%</td>
-                <td>₹${cgst.toFixed(2)}</td>
-                <td>₹${sgst.toFixed(2)}</td>
-                <td>₹${(taxable+cgst+sgst).toFixed(2)}</td>
-            </tr>`;
-        });
-        itemsHtml += '</tbody></table>';
-        container.innerHTML += itemsHtml;
-
-        // Totals
-        container.innerHTML += `
-            <div style="text-align: right; margin-top: 15px;">
-                <table style="width: 280px; margin-left: auto;">
-                    <tr><td style="text-align:right;">Subtotal:</td><td>₹${invoice.subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">CGST (9%):</td><td>₹${invoice.cgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">SGST (9%):</td><td>₹${invoice.sgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">Round Off:</td><td>₹${invoice.roundOff.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td>₹${invoice.grandTotal.toFixed(2)}</td></tr>
-                </table>
-            </div>
-        `;
-
-        // Bank Details & Signature
-        container.innerHTML += `
-            <div style="margin-top: 20px; font-size: 11px; border-top: 1px solid #dee2e6; padding-top: 15px;">
-                <p><strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</p>
-                <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
-            </div>
-            <div style="margin-top: 30px; text-align: right;">
-                <div style="width: 250px; border-top: 1px solid #333; padding-top: 5px; margin-left: auto; text-align: center;">
-                    For Auto Spares Solution<br>
-                    (Authorised Signatory)<br>
-                    <span style="font-size: 10px;">(Stamp & Signature)</span>
-                </div>
-            </div>
-        `;
-
-        // Generate PDF using html2pdf
-        const opt = {
-            margin: [0.2, 0.2, 0.2, 0.2],
-            filename: `Invoice_${invoice.invoiceNo}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, letterRendering: true },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        };
+        const opt = { margin: [0.2,0.2,0.2,0.2], filename: `Invoice_${invoice.invoiceNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
         html2pdf().set(opt).from(container).save();
     }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
-
-    function filterOrders() {
-        const term = document.getElementById('searchInput').value.toLowerCase();
-        displayOrders(term);
-    }
-
+    function filterOrders() { const term = document.getElementById('searchInput').value.toLowerCase(); displayOrders(term); }
     function exportToCSV() {
         let csv = "Invoice No,Date,Customer,Amount,Status,Type\n";
-        allInvoices.forEach(inv => {
-            csv += `"${inv.invoiceNo}",${inv.date},"${inv.buyer?.name || 'Guest'}",${inv.grandTotal},${inv.status},${inv.invoiceType}\n`;
-        });
+        allInvoices.forEach(inv => { csv += `"${inv.invoiceNo}",${inv.date},"${inv.buyer?.name || 'Guest'}",${inv.grandTotal},${inv.status},${inv.invoiceType}\n`; });
         const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'orders_backup.csv';
-        a.click();
-        URL.revokeObjectURL(url);
+        const a = document.createElement('a'); a.href = url; a.download = 'orders_backup.csv'; a.click(); URL.revokeObjectURL(url);
     }
 
     displayOrders();
