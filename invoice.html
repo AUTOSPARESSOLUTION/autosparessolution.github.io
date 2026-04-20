@@ -140,9 +140,19 @@
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
         .totals table { width: 280px; margin-left: auto; }
         .totals td { border: none; padding: 3px; }
-        .bank-details { margin-top: 20px; font-size: 11px; border-top: 1px solid #dee2e6; padding-top: 15px; }
-        .signature-box {
+        .footer-box {
             margin-top: 30px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f9f9f9;
+        }
+        .bank-details, .terms {
+            font-size: 11px;
+            margin-bottom: 10px;
+        }
+        .signature-box {
+            margin-top: 20px;
             text-align: right;
             display: flex;
             justify-content: flex-end;
@@ -275,17 +285,20 @@
         </table>
     </div>
 
-    <!-- Bank Details & Signature -->
-    <div class="bank-details">
-        <p><strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</p>
-        <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
-    </div>
-
-    <div class="signature-box">
-        <div>
-            For Auto Spares Solution<br>
-            (Authorised Signatory)<br>
-            <span style="font-size: 10px;">(Stamp & Signature)</span>
+    <!-- Footer Box: Bank Details, Terms, Signature -->
+    <div class="footer-box">
+        <div class="bank-details">
+            <strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi
+        </div>
+        <div class="terms">
+            <strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.
+        </div>
+        <div class="signature-box">
+            <div>
+                For Auto Spares Solution<br>
+                (Authorised Signatory)<br>
+                <span style="font-size: 10px;">(Stamp & Signature)</span>
+            </div>
         </div>
     </div>
 </div>
@@ -348,6 +361,17 @@
 
     function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
 
+    // Compute due date based on invoice type and payment terms
+    function computeDueDate(invoiceDate, type, paymentTermsDays) {
+        const date = new Date(invoiceDate);
+        if (type === 'cash') {
+            return date; // same day
+        } else {
+            date.setDate(date.getDate() + paymentTermsDays);
+            return date;
+        }
+    }
+
     function calculateTotals() {
         let sub = 0, cgst = 0, sgst = 0;
         cart.forEach(i => { let t = i.price * i.qty; sub += t; cgst += t * 0.09; sgst += t * 0.09; });
@@ -396,11 +420,23 @@
     }
 
     function setDates() {
-        document.getElementById('invoiceDate').innerText = formatDate(new Date());
-        let due = new Date();
-        let terms = parseInt(document.getElementById('paymentTerms').value) || 30;
-        due.setDate(due.getDate() + terms);
-        document.getElementById('dueDate').innerText = formatDate(due);
+        const invoiceDate = new Date();
+        document.getElementById('invoiceDate').innerText = formatDate(invoiceDate);
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTerms);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
+    }
+
+    // Recalculate due date when type or payment terms change
+    function updateDueDate() {
+        const invoiceDateStr = document.getElementById('invoiceDate').innerText;
+        const parts = invoiceDateStr.split('/');
+        const invoiceDate = new Date(parts[2], parts[1]-1, parts[0]);
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTerms);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
     }
 
     function saveInvoice() {
@@ -410,7 +446,8 @@
         let totals = calculateTotals();
         const finalNo = getAndIncrementInvoiceNumber(type);
         let invoice = {
-            invoiceNo: finalNo, date: document.getElementById('invoiceDate').innerText,
+            invoiceNo: finalNo,
+            date: document.getElementById('invoiceDate').innerText,
             dueDate: document.getElementById('dueDate').innerText,
             buyer: { name: document.getElementById('buyerName').value, address: document.getElementById('buyerAddress').value, gstin: document.getElementById('buyerGstin').value, state: document.getElementById('buyerState').value, phone: document.getElementById('buyerPhone').value, email: document.getElementById('buyerEmail').value },
             consignee: { name: document.getElementById('consigneeName').value, address: document.getElementById('consigneeAddress').value, phone: document.getElementById('consigneePhone').value },
@@ -440,9 +477,11 @@
         window.close();
     }
 
-    // Helper: Replace inputs with static text in a clone
-    function replaceInputsWithText(container) {
-        container.querySelectorAll('input, textarea, select').forEach(el => {
+    // ========== PRINT FUNCTION ==========
+    function printInvoice() {
+        const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
+        const replacements = [];
+        inputs.forEach(el => {
             const span = document.createElement('span');
             span.className = 'info-value-text';
             span.style.whiteSpace = 'pre-wrap';
@@ -453,7 +492,41 @@
             } else {
                 span.innerText = el.value;
             }
-            // Copy basic styles
+            const styles = window.getComputedStyle(el);
+            span.style.fontSize = styles.fontSize;
+            span.style.fontFamily = styles.fontFamily;
+            span.style.color = '#333';
+            span.style.display = 'inline-block';
+            span.style.width = '100%';
+            span.style.padding = styles.padding;
+            span.style.backgroundColor = 'transparent';
+            const parent = el.parentNode;
+            parent.replaceChild(span, el);
+            replacements.push({ original: el, span: span, parent: parent });
+        });
+        window.print();
+        setTimeout(() => {
+            replacements.forEach(rep => {
+                rep.parent.replaceChild(rep.original, rep.span);
+            });
+        }, 100);
+    }
+
+    // ========== PDF GENERATION ==========
+    function generatePDF() {
+        const originalContainer = document.getElementById('invoiceContainer');
+        const clone = originalContainer.cloneNode(true);
+        clone.querySelectorAll('input, textarea, select').forEach(el => {
+            const span = document.createElement('span');
+            span.className = 'info-value-text';
+            span.style.whiteSpace = 'pre-wrap';
+            if (el.tagName === 'TEXTAREA') {
+                span.innerText = el.value;
+            } else if (el.tagName === 'SELECT') {
+                span.innerText = el.options[el.selectedIndex]?.text || '';
+            } else {
+                span.innerText = el.value;
+            }
             span.style.fontSize = window.getComputedStyle(el).fontSize;
             span.style.fontFamily = window.getComputedStyle(el).fontFamily;
             span.style.color = '#333';
@@ -461,32 +534,11 @@
             span.style.width = '100%';
             el.parentNode.replaceChild(span, el);
         });
-        // Remove any leftover editable class
-        container.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
-        return container;
-    }
-
-    // Print function
-    function printInvoice() {
-        const originalContainer = document.getElementById('invoiceContainer');
-        const clone = originalContainer.cloneNode(true);
-        replaceInputsWithText(clone);
-        // Hide original, show clone, print, then restore
-        originalContainer.style.display = 'none';
-        document.body.appendChild(clone);
-        window.print();
-        // After print dialog closes, remove clone and show original
-        setTimeout(() => {
-            document.body.removeChild(clone);
-            originalContainer.style.display = '';
-        }, 100);
-    }
-
-    // PDF generation
-    function generatePDF() {
-        const originalContainer = document.getElementById('invoiceContainer');
-        const clone = originalContainer.cloneNode(true);
-        replaceInputsWithText(clone);
+        clone.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
+        // Hide the invoice-type selector in the clone (already has no-print class, but ensure it's hidden)
+        const typeSelector = clone.querySelector('.invoice-type');
+        if (typeSelector) typeSelector.style.display = 'none';
+        
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
         const opt = {
@@ -505,14 +557,20 @@
     // Event listeners
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
+            const creditDiv = document.getElementById('creditFields');
+            creditDiv.style.display = this.value === 'credit' ? 'flex' : 'none';
             updateInvoiceNumberDisplay();
+            updateDueDate();
         });
     });
+    const paymentTermsInput = document.getElementById('paymentTerms');
+    if (paymentTermsInput) {
+        paymentTermsInput.addEventListener('change', updateDueDate);
+    }
 
     setDates();
     renderItems();
     updateInvoiceNumberDisplay();
 </script>
 </body>
-    </html>
+                    </html>
