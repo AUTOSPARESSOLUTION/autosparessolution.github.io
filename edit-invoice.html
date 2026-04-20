@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Invoice – Auto Spares</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .invoice-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 0 15px 15px 15px;
+        }
+        .company-header {
+            background: #0a7c71;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 0 -15px 15px -15px;
+        }
+        .logo-area { display: flex; align-items: center; gap: 15px; }
+        .logo-area img { height: 60px; }
+        .company-details h1 { margin: 0; font-size: 24px; }
+        .invoice-title h2 { margin: 0; font-size: 20px; }
+        .info-box { background: #f8f9fa; border-radius: 6px; padding: 10px; margin-bottom: 12px; }
+        .info-box h3 { margin: 0 0 8px; font-size: 14px; color: #0a7c71; }
+        .info-row { display: flex; margin-bottom: 5px; font-size: 12px; }
+        .info-label { width: 110px; font-weight: 600; color: #555; }
+        .info-value { flex: 1; }
+        input, textarea, select { width: 100%; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
+        .items-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; table-layout: fixed; }
+        .items-table th, .items-table td { border: 1px solid #dee2e6; padding: 6px 4px; text-align: left; vertical-align: top; word-wrap: break-word; }
+        .items-table th { background: #f8f9fa; }
+        .totals { text-align: right; margin-top: 15px; }
+        .actions { margin-top: 30px; display: flex; gap: 15px; justify-content: flex-end; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #09645a; }
+        .item-row { margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 6px; }
+        .item-row input { width: auto; }
+        .add-item { background: #28a745; margin-bottom: 15px; }
+        .remove-item { background: #dc3545; padding: 2px 8px; font-size: 12px; margin-left: 5px; }
+    </style>
+</head>
+<body>
+<div class="invoice-container" id="editInvoiceContainer">
+    <div class="company-header">
+        <div class="logo-area">
+            <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
+            <div class="company-details">
+                <h1>Auto Spares Solution</h1>
+                <p>GSTIN: 19ANOPD3300R1ZO</p>
+                <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+            </div>
+        </div>
+        <div class="invoice-title">
+            <h2>EDIT INVOICE</h2>
+            <p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p>
+            <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
+            <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex:1;">
+            <div class="info-box">
+                <h3>Buyer (Bill to)</h3>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2"></textarea></div></div>
+                <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin"></div></div>
+                <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="buyerState"></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="buyerPhone"></div></div>
+                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="buyerEmail"></div></div>
+            </div>
+        </div>
+        <div style="flex:1;">
+            <div class="info-box">
+                <h3>Consignee (Ship to)</h3>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="consigneeName"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="consigneeAddress" rows="2"></textarea></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="consigneePhone"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex:1;">
+            <div class="info-box">
+                <h3>Order Details</h3>
+                <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode"></div></div>
+                <div class="info-row"><div class="info-label">Sales Order No:</div><div class="info-value"><input type="text" id="salesOrderNo"></div></div>
+                <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo"></div></div>
+                <div class="info-row"><div class="info-label">Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField"></div></div>
+            </div>
+        </div>
+        <div style="flex:1;">
+            <div class="info-box">
+                <h3>Dispatch Details</h3>
+                <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo"></div></div>
+                <div class="info-row"><div class="info-label">Mode of Transport:</div><div class="info-value"><input type="text" id="transportMode"></div></div>
+                <div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value"><input type="text" id="vehicleNo"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Items</h3>
+    <div id="itemsContainer"></div>
+    <button class="add-item" onclick="addItem()">+ Add Item</button>
+
+    <div class="totals">
+        <table>
+            <tr><td style="text-align:right;">Subtotal: </td><td>₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%): </td><td>₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%): </td><td>₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td>₹<span id="grandTotal">0.00</span></td></tr>
+        </table>
+    </div>
+
+    <div class="actions">
+        <button onclick="saveEditedInvoice()">💾 Save Changes & Update Ledger</button>
+        <button onclick="window.close()">Cancel</button>
+    </div>
+</div>
+
+<script>
+    let originalInvoice = null;
+    let items = [];
+
+    function loadInvoice() {
+        const invoiceNo = localStorage.getItem('editInvoiceNo');
+        if (!invoiceNo) { alert('No invoice selected'); window.close(); return; }
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        originalInvoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
+        if (!originalInvoice) { alert('Invoice not found'); window.close(); return; }
+
+        document.getElementById('invoiceNo').innerText = originalInvoice.invoiceNo;
+        document.getElementById('invoiceDate').innerText = originalInvoice.date;
+        document.getElementById('dueDate').innerText = originalInvoice.dueDate;
+
+        // Buyer
+        document.getElementById('buyerName').value = originalInvoice.buyer?.name || '';
+        document.getElementById('buyerAddress').value = originalInvoice.buyer?.address || '';
+        document.getElementById('buyerGstin').value = originalInvoice.buyer?.gstin || '';
+        document.getElementById('buyerState').value = originalInvoice.buyer?.state || '';
+        document.getElementById('buyerPhone').value = originalInvoice.buyer?.phone || '';
+        document.getElementById('buyerEmail').value = originalInvoice.buyer?.email || '';
+        // Consignee
+        document.getElementById('consigneeName').value = originalInvoice.consignee?.name || '';
+        document.getElementById('consigneeAddress').value = originalInvoice.consignee?.address || '';
+        document.getElementById('consigneePhone').value = originalInvoice.consignee?.phone || '';
+        // Order details
+        document.getElementById('customerCode').value = originalInvoice.orderDetails?.customerCode || '';
+        document.getElementById('salesOrderNo').value = originalInvoice.orderDetails?.salesOrderNo || '';
+        document.getElementById('referenceNo').value = originalInvoice.orderDetails?.referenceNo || '';
+        document.getElementById('paymentTermsField').value = originalInvoice.orderDetails?.paymentTerms || '';
+        // Dispatch
+        document.getElementById('dispatchDocNo').value = originalInvoice.dispatchDetails?.docNo || '';
+        document.getElementById('transportMode').value = originalInvoice.dispatchDetails?.transportMode || '';
+        document.getElementById('vehicleNo').value = originalInvoice.dispatchDetails?.vehicleNo || '';
+
+        items = originalInvoice.items.map(item => ({ ...item }));
+        renderItems();
+        recalcTotals();
+    }
+
+    function renderItems() {
+        const container = document.getElementById('itemsContainer');
+        container.innerHTML = '';
+        items.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'item-row';
+            div.innerHTML = `
+                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" style="width:20%;" onchange="updateItem(${idx}, 'part', this.value)">
+                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" style="width:35%;" onchange="updateItem(${idx}, 'desc', this.value)">
+                <input type="number" placeholder="Qty" value="${item.qty}" style="width:10%;" onchange="updateItem(${idx}, 'qty', parseInt(this.value))">
+                <input type="number" placeholder="Unit Price" value="${item.price}" style="width:15%;" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))">
+                <button class="remove-item" onclick="removeItem(${idx})">X</button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function updateItem(idx, field, value) {
+        items[idx][field] = value;
+        recalcTotals();
+    }
+
+    function removeItem(idx) {
+        items.splice(idx, 1);
+        renderItems();
+        recalcTotals();
+    }
+
+    function addItem() {
+        items.push({ part: 'NEW', desc: 'New Item', qty: 1, price: 0 });
+        renderItems();
+        recalcTotals();
+    }
+
+    function recalcTotals() {
+        let subtotal = 0;
+        items.forEach(item => {
+            subtotal += item.qty * item.price;
+        });
+        const cgst = subtotal * 0.09;
+        const sgst = subtotal * 0.09;
+        const grand = subtotal + cgst + sgst;
+        document.getElementById('subtotal').innerText = subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = cgst.toFixed(2);
+        document.getElementById('sgstTotal').innerText = sgst.toFixed(2);
+        document.getElementById('grandTotal').innerText = grand.toFixed(2);
+    }
+
+    function saveEditedInvoice() {
+        // Build updated invoice object
+        const updatedInvoice = {
+            ...originalInvoice,
+            buyer: {
+                name: document.getElementById('buyerName').value,
+                address: document.getElementById('buyerAddress').value,
+                gstin: document.getElementById('buyerGstin').value,
+                state: document.getElementById('buyerState').value,
+                phone: document.getElementById('buyerPhone').value,
+                email: document.getElementById('buyerEmail').value
+            },
+            consignee: {
+                name: document.getElementById('consigneeName').value,
+                address: document.getElementById('consigneeAddress').value,
+                phone: document.getElementById('consigneePhone').value
+            },
+            orderDetails: {
+                customerCode: document.getElementById('customerCode').value,
+                salesOrderNo: document.getElementById('salesOrderNo').value,
+                referenceNo: document.getElementById('referenceNo').value,
+                paymentTerms: document.getElementById('paymentTermsField').value
+            },
+            dispatchDetails: {
+                docNo: document.getElementById('dispatchDocNo').value,
+                transportMode: document.getElementById('transportMode').value,
+                vehicleNo: document.getElementById('vehicleNo').value
+            },
+            items: items.map(item => ({
+                part: item.part,
+                desc: item.desc,
+                qty: item.qty,
+                price: item.price,
+                total: item.qty * item.price
+            })),
+            subtotal: parseFloat(document.getElementById('subtotal').innerText),
+            cgst: parseFloat(document.getElementById('cgstTotal').innerText),
+            sgst: parseFloat(document.getElementById('sgstTotal').innerText),
+            grandTotal: parseFloat(document.getElementById('grandTotal').innerText),
+            roundOff: 0
+        };
+
+        // Update the invoice in localStorage
+        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        const index = allInvoices.findIndex(i => i.invoiceNo === originalInvoice.invoiceNo);
+        if (index === -1) { alert('Invoice not found in storage'); return; }
+
+        // Update customer ledger: reverse old effect, apply new effect
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const customer = customers.find(c => c.email === updatedInvoice.buyer?.email);
+        if (customer) {
+            // Reverse old
+            if (originalInvoice.invoiceType === 'credit') {
+                customer.outstanding -= originalInvoice.grandTotal;
+                if (customer.outstanding < 0) customer.outstanding = 0;
+            }
+            customer.totalPurchased -= originalInvoice.grandTotal;
+            // Apply new
+            if (updatedInvoice.invoiceType === 'credit') {
+                customer.outstanding += updatedInvoice.grandTotal;
+            }
+            customer.totalPurchased += updatedInvoice.grandTotal;
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+
+        // Replace invoice
+        allInvoices[index] = updatedInvoice;
+        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+
+        alert(`Invoice ${updatedInvoice.invoiceNo} updated successfully.`);
+        window.close();
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m) { if (m==='&') return '&amp;'; if (m==='<') return '&lt;'; if (m==='>') return '&gt;'; return m; }); }
+
+    loadInvoice();
+</script>
+</body>
+                                                                                                                                             </html>
