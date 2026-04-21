@@ -273,7 +273,7 @@
     <!-- Totals -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal:  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
@@ -457,12 +457,36 @@
             dueDate: document.getElementById('dueDate').innerText,
             finYear: getFinancialYear(),
             invoiceType: type,
-            buyer: { name: document.getElementById('buyerName').value, address: document.getElementById('buyerAddress').value, gstin: document.getElementById('buyerGstin').value, state: document.getElementById('buyerState').value, phone: document.getElementById('buyerPhone').value, email: document.getElementById('buyerEmail').value },
-            consignee: { name: document.getElementById('consigneeName').value, address: document.getElementById('consigneeAddress').value, phone: document.getElementById('consigneePhone').value },
-            orderDetails: { customerCode: document.getElementById('customerCode').value, salesOrderNo: document.getElementById('salesOrderNo').value, referenceNo: document.getElementById('referenceNo').value, paymentTerms: document.getElementById('paymentTermsField').value },
-            dispatchDetails: { docNo: document.getElementById('dispatchDocNo').value, transportMode: document.getElementById('transportMode').value, vehicleNo: document.getElementById('vehicleNo').value },
+            buyer: {
+                name: document.getElementById('buyerName').value,
+                address: document.getElementById('buyerAddress').value,
+                gstin: document.getElementById('buyerGstin').value,
+                state: document.getElementById('buyerState').value,
+                phone: document.getElementById('buyerPhone').value,
+                email: document.getElementById('buyerEmail').value
+            },
+            consignee: {
+                name: document.getElementById('consigneeName').value,
+                address: document.getElementById('consigneeAddress').value,
+                phone: document.getElementById('consigneePhone').value
+            },
+            orderDetails: {
+                customerCode: document.getElementById('customerCode').value,
+                salesOrderNo: document.getElementById('salesOrderNo').value,
+                referenceNo: document.getElementById('referenceNo').value,
+                paymentTerms: document.getElementById('paymentTermsField').value
+            },
+            dispatchDetails: {
+                docNo: document.getElementById('dispatchDocNo').value,
+                transportMode: document.getElementById('transportMode').value,
+                vehicleNo: document.getElementById('vehicleNo').value
+            },
             items: cart.map(i => ({ part: i.part, desc: i.desc, qty: i.qty, price: i.price, total: i.price * i.qty })),
-            subtotal: totals.subtotal, cgst: totals.cgstTotal, sgst: totals.sgstTotal, roundOff: totals.roundOff, grandTotal: totals.grand,
+            subtotal: totals.subtotal,
+            cgst: totals.cgstTotal,
+            sgst: totals.sgstTotal,
+            roundOff: totals.roundOff,
+            grandTotal: totals.grand,
             status: type === 'cash' ? 'Paid' : 'Pending'
         };
         if (invoice.buyer.email) {
@@ -563,4 +587,4 @@
     updateInvoiceNumberDisplay();
 </script>
 </body>
-    </html>
+                </html>
