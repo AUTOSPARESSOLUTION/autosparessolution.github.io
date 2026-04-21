@@ -45,10 +45,6 @@
             .items-table th {
                 background: #f8f9fa !important;
             }
-            .info-value-text {
-                display: inline-block;
-                width: 100%;
-            }
         }
         .company-header {
             background: #0a7c71;
@@ -277,15 +273,14 @@
     <!-- Totals -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal:</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">Round Off:</td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
-    <!-- Footer Box: Bank Details, Terms, Signature -->
+    <!-- Footer Box -->
     <div class="footer-box">
         <div class="bank-details">
             <strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi
@@ -349,8 +344,24 @@
         document.getElementById('invoiceNo').innerText = invoiceNo;
     }
 
+    function getReusableInvoiceNumber(type) {
+        const finYear = getFinancialYear();
+        let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
+        let available = deletedNumbers.filter(n => n.type === type && n.finYear === finYear).sort((a,b) => a.number - b.number);
+        if (available.length > 0) {
+            const reused = available[0];
+            const remaining = deletedNumbers.filter(n => !(n.type === type && n.finYear === finYear && n.number === reused.number));
+            localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(remaining));
+            let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+            return prefix + reused.number.toString().padStart(4,'0');
+        }
+        return null;
+    }
+
     function getAndIncrementInvoiceNumber(type) {
         const finYear = getFinancialYear();
+        const reused = getReusableInvoiceNumber(type);
+        if (reused) return reused;
         let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
         let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
         let cnt = parseInt(localStorage.getItem(key)) || 1;
@@ -361,15 +372,11 @@
 
     function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
 
-    // Compute due date based on invoice type and payment terms
     function computeDueDate(invoiceDate, type, paymentTermsDays) {
         const date = new Date(invoiceDate);
-        if (type === 'cash') {
-            return date; // same day
-        } else {
-            date.setDate(date.getDate() + paymentTermsDays);
-            return date;
-        }
+        if (type === 'cash') return date;
+        date.setDate(date.getDate() + paymentTermsDays);
+        return date;
     }
 
     function calculateTotals() {
@@ -389,8 +396,8 @@
             let sgst = taxable * 0.09;
             html += `<tr>
                 <td>${idx+1}</td>
-                <td style="word-wrap:break-word; white-space:normal;">${escapeHtml(item.part)}</td>
-                <td style="word-wrap:break-word; white-space:normal;">${escapeHtml(item.desc)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
                 <td>${item.qty}</td>
                 <td>₹${item.price.toFixed(2)}</td>
                 <td>₹${taxable.toFixed(2)}</td>
@@ -428,7 +435,6 @@
         document.getElementById('dueDate').innerText = formatDate(dueDate);
     }
 
-    // Recalculate due date when type or payment terms change
     function updateDueDate() {
         const invoiceDateStr = document.getElementById('invoiceDate').innerText;
         const parts = invoiceDateStr.split('/');
@@ -449,13 +455,15 @@
             invoiceNo: finalNo,
             date: document.getElementById('invoiceDate').innerText,
             dueDate: document.getElementById('dueDate').innerText,
+            finYear: getFinancialYear(),
+            invoiceType: type,
             buyer: { name: document.getElementById('buyerName').value, address: document.getElementById('buyerAddress').value, gstin: document.getElementById('buyerGstin').value, state: document.getElementById('buyerState').value, phone: document.getElementById('buyerPhone').value, email: document.getElementById('buyerEmail').value },
             consignee: { name: document.getElementById('consigneeName').value, address: document.getElementById('consigneeAddress').value, phone: document.getElementById('consigneePhone').value },
             orderDetails: { customerCode: document.getElementById('customerCode').value, salesOrderNo: document.getElementById('salesOrderNo').value, referenceNo: document.getElementById('referenceNo').value, paymentTerms: document.getElementById('paymentTermsField').value },
             dispatchDetails: { docNo: document.getElementById('dispatchDocNo').value, transportMode: document.getElementById('transportMode').value, vehicleNo: document.getElementById('vehicleNo').value },
             items: cart.map(i => ({ part: i.part, desc: i.desc, qty: i.qty, price: i.price, total: i.price * i.qty })),
             subtotal: totals.subtotal, cgst: totals.cgstTotal, sgst: totals.sgstTotal, roundOff: totals.roundOff, grandTotal: totals.grand,
-            invoiceType: type, status: type === 'cash' ? 'Paid' : 'Pending'
+            status: type === 'cash' ? 'Paid' : 'Pending'
         };
         if (invoice.buyer.email) {
             let cust = customers.find(c => c.email === invoice.buyer.email);
@@ -477,7 +485,6 @@
         window.close();
     }
 
-    // ========== PRINT FUNCTION ==========
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -485,13 +492,9 @@
             const span = document.createElement('span');
             span.className = 'info-value-text';
             span.style.whiteSpace = 'pre-wrap';
-            if (el.tagName === 'TEXTAREA') {
-                span.innerText = el.value;
-            } else if (el.tagName === 'SELECT') {
-                span.innerText = el.options[el.selectedIndex]?.text || '';
-            } else {
-                span.innerText = el.value;
-            }
+            if (el.tagName === 'TEXTAREA') span.innerText = el.value;
+            else if (el.tagName === 'SELECT') span.innerText = el.options[el.selectedIndex]?.text || '';
+            else span.innerText = el.value;
             const styles = window.getComputedStyle(el);
             span.style.fontSize = styles.fontSize;
             span.style.fontFamily = styles.fontFamily;
@@ -506,13 +509,10 @@
         });
         window.print();
         setTimeout(() => {
-            replacements.forEach(rep => {
-                rep.parent.replaceChild(rep.original, rep.span);
-            });
+            replacements.forEach(rep => rep.parent.replaceChild(rep.original, rep.span));
         }, 100);
     }
 
-    // ========== PDF GENERATION ==========
     function generatePDF() {
         const originalContainer = document.getElementById('invoiceContainer');
         const clone = originalContainer.cloneNode(true);
@@ -520,13 +520,9 @@
             const span = document.createElement('span');
             span.className = 'info-value-text';
             span.style.whiteSpace = 'pre-wrap';
-            if (el.tagName === 'TEXTAREA') {
-                span.innerText = el.value;
-            } else if (el.tagName === 'SELECT') {
-                span.innerText = el.options[el.selectedIndex]?.text || '';
-            } else {
-                span.innerText = el.value;
-            }
+            if (el.tagName === 'TEXTAREA') span.innerText = el.value;
+            else if (el.tagName === 'SELECT') span.innerText = el.options[el.selectedIndex]?.text || '';
+            else span.innerText = el.value;
             span.style.fontSize = window.getComputedStyle(el).fontSize;
             span.style.fontFamily = window.getComputedStyle(el).fontFamily;
             span.style.color = '#333';
@@ -535,10 +531,8 @@
             el.parentNode.replaceChild(span, el);
         });
         clone.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
-        // Hide the invoice-type selector in the clone (already has no-print class, but ensure it's hidden)
         const typeSelector = clone.querySelector('.invoice-type');
         if (typeSelector) typeSelector.style.display = 'none';
-        
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
         const opt = {
@@ -554,23 +548,19 @@
         });
     }
 
-    // Event listeners
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            const creditDiv = document.getElementById('creditFields');
-            creditDiv.style.display = this.value === 'credit' ? 'flex' : 'none';
+            document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
             updateInvoiceNumberDisplay();
             updateDueDate();
         });
     });
     const paymentTermsInput = document.getElementById('paymentTerms');
-    if (paymentTermsInput) {
-        paymentTermsInput.addEventListener('change', updateDueDate);
-    }
+    if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
 
     setDates();
     renderItems();
     updateInvoiceNumberDisplay();
 </script>
 </body>
-                    </html>
+    </html>
