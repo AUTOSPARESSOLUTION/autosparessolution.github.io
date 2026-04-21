@@ -5,21 +5,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order History - Auto Spares</title>
     <style>
-        body { font-family: 'Roboto', sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1 { color: #0a7c71; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #0a7c71; color: white; }
-        .search-box { margin-bottom: 20px; }
-        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
-        button:hover { background: #09645a; }
-        .btn-edit { background: #17a2b8; }
-        .btn-edit:hover { background: #138496; }
-        .btn-delete { background: #dc3545; }
-        .btn-delete:hover { background: #c82333; }
-        .btn-pdf { background: #e67e22; }
-        .btn-pdf:hover { background: #d35400; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0a7c71;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            border: 1px solid #dee2e6;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: #0a7c71;
+            color: white;
+        }
+        .search-box {
+            margin-bottom: 20px;
+        }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+        }
+        button:hover {
+            background: #09645a;
+        }
+        .btn-edit {
+            background: #17a2b8;
+        }
+        .btn-edit:hover {
+            background: #138496;
+        }
+        .btn-delete {
+            background: #dc3545;
+        }
+        .btn-delete:hover {
+            background: #c82333;
+        }
+        .btn-pdf {
+            background: #e67e22;
+        }
+        .btn-pdf:hover {
+            background: #d35400;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -50,7 +101,7 @@
             document.getElementById('ordersTable').innerHTML = '<p>No invoices found.</p>';
             return;
         }
-        let html = '<tr><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(inv => {
             html += `<tr>
                 <td>${inv.invoiceNo}</td>
@@ -80,7 +131,6 @@
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!invoice) return;
 
-        // Reverse ledger effect
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const customer = customers.find(c => c.email === invoice.buyer?.email);
         if (customer) {
@@ -90,24 +140,23 @@
             localStorage.setItem('customers', JSON.stringify(customers));
         }
 
-        // Store deleted number for reuse
         let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
         let number = parseInt(invoice.invoiceNo.split('/').pop());
         deletedNumbers.push({ type: invoice.invoiceType, finYear: invoice.finYear, number: number });
         localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(deletedNumbers));
 
-        // Remove invoice
         allInvoices = allInvoices.filter(i => i.invoiceNo !== invoiceNo);
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
         alert(`Invoice ${invoiceNo} deleted. Number will be reused.`);
         displayOrders(document.getElementById('searchInput').value.toLowerCase());
     }
 
+    // Professional PDF generation (matches invoice.html layout)
     function downloadInvoicePDF(invoiceNo) {
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!invoice) { alert('Invoice not found'); return; }
 
-        // Recalculate totals from items to avoid rounding errors
+        // Recalculate totals from items to ensure accuracy
         let subtotal = 0;
         invoice.items.forEach(item => {
             subtotal += item.price * item.qty;
@@ -125,23 +174,57 @@
         container.style.margin = '0 auto';
         container.style.backgroundColor = 'white';
         container.innerHTML = `
-            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.src='https://via.placeholder.com/60'">
-                    <div><h1 style="margin:0;">Auto Spares Solution</h1><p>GSTIN: 19ANOPD3300R1ZO</p><p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p></div>
+                    <div>
+                        <h1 style="margin:0;">Auto Spares Solution</h1>
+                        <p style="margin:0;">GSTIN: 19ANOPD3300R1ZO</p>
+                        <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+                    </div>
                 </div>
-                <div><h2>TAX INVOICE</h2><p>Invoice No: ${invoice.invoiceNo}<br>Date: ${invoice.date}<br>Due Date: ${invoice.dueDate}</p></div>
+                <div style="text-align:right;">
+                    <h2 style="margin:0;">TAX INVOICE</h2>
+                    <p><strong>Invoice No:</strong> ${invoice.invoiceNo}<br>
+                    <strong>Date:</strong> ${invoice.date}<br>
+                    <strong>Due Date:</strong> ${invoice.dueDate}</p>
+                </div>
             </div>
             <div style="display:flex; gap:20px; flex-wrap:wrap; margin:20px 0;">
-                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Buyer</h3><p>${escapeHtml(invoice.buyer?.name)}<br>${escapeHtml(invoice.buyer?.address)}<br>GSTIN: ${escapeHtml(invoice.buyer?.gstin)}<br>State: ${escapeHtml(invoice.buyer?.state)}<br>Phone: ${escapeHtml(invoice.buyer?.phone)}<br>Email: ${escapeHtml(invoice.buyer?.email)}</p></div>
-                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Consignee</h3><p>${escapeHtml(invoice.consignee?.name)}<br>${escapeHtml(invoice.consignee?.address)}<br>Phone: ${escapeHtml(invoice.consignee?.phone)}</p></div>
+                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
+                    <h3 style="margin:0 0 8px 0; color:#0a7c71;">Buyer (Bill to)</h3>
+                    <p>${escapeHtml(invoice.buyer?.name)}<br>${escapeHtml(invoice.buyer?.address)}<br>GSTIN: ${escapeHtml(invoice.buyer?.gstin)}<br>State: ${escapeHtml(invoice.buyer?.state)}<br>Phone: ${escapeHtml(invoice.buyer?.phone)}<br>Email: ${escapeHtml(invoice.buyer?.email)}</p>
+                </div>
+                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
+                    <h3 style="margin:0 0 8px 0; color:#0a7c71;">Consignee (Ship to)</h3>
+                    <p>${escapeHtml(invoice.consignee?.name)}<br>${escapeHtml(invoice.consignee?.address)}<br>Phone: ${escapeHtml(invoice.consignee?.phone)}</p>
+                </div>
             </div>
             <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
-                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Order Details</h3><p>Customer Code: ${escapeHtml(invoice.orderDetails?.customerCode)}<br>SO No: ${escapeHtml(invoice.orderDetails?.salesOrderNo)}<br>Ref No: ${escapeHtml(invoice.orderDetails?.referenceNo)}<br>Payment Terms: ${escapeHtml(invoice.orderDetails?.paymentTerms)}</p></div>
-                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Dispatch Details</h3><p>Doc No: ${escapeHtml(invoice.dispatchDetails?.docNo)}<br>Mode: ${escapeHtml(invoice.dispatchDetails?.transportMode)}<br>Vehicle No: ${escapeHtml(invoice.dispatchDetails?.vehicleNo)}</p></div>
+                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
+                    <h3 style="margin:0 0 8px 0; color:#0a7c71;">Order Details</h3>
+                    <p>Customer Code: ${escapeHtml(invoice.orderDetails?.customerCode)}<br>SO No: ${escapeHtml(invoice.orderDetails?.salesOrderNo)}<br>Ref No: ${escapeHtml(invoice.orderDetails?.referenceNo)}<br>Payment Terms: ${escapeHtml(invoice.orderDetails?.paymentTerms)}</p>
+                </div>
+                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
+                    <h3 style="margin:0 0 8px 0; color:#0a7c71;">Dispatch Details</h3>
+                    <p>Doc No: ${escapeHtml(invoice.dispatchDetails?.docNo)}<br>Mode: ${escapeHtml(invoice.dispatchDetails?.transportMode)}<br>Vehicle No: ${escapeHtml(invoice.dispatchDetails?.vehicleNo)}</p>
+                </div>
             </div>
-            <table style="width:100%; border-collapse:collapse; margin:20px 0;">
-                <thead><tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Unit Price (₹)</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr></thead>
+            <table style="width:100%; border-collapse:collapse; margin:20px 0; font-size:11px;">
+                <thead>
+                    <tr style="background:#f8f9fa;">
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">#</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:12%;">Part No</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:20%;">Description</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">Qty</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Unit Price (₹)</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Taxable (₹)</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">GST%</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">CGST (₹)</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">SGST (₹)</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Total (₹)</th>
+                    </tr>
+                </thead>
                 <tbody>
                     ${invoice.items.map((item, idx) => {
                         const taxable = item.price * item.qty;
@@ -149,33 +232,39 @@
                         const sgstItem = taxable * 0.09;
                         const totalItem = taxable + cgstItem + sgstItem;
                         return `<tr>
-                            <td style="text-align:center;">${idx+1}</td>
-                            <td style="word-break:break-word;">${escapeHtml(item.part)}</td>
-                            <td style="word-break:break-word;">${escapeHtml(item.desc)}</td>
-                            <td style="text-align:center;">${item.qty}</td>
-                            <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
-                            <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                            <td style="text-align:center;">18%</td>
-                            <td style="text-align:right;">₹${cgstItem.toFixed(2)}</td>
-                            <td style="text-align:right;">₹${sgstItem.toFixed(2)}</td>
-                            <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${idx+1}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.part)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.desc)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgstItem.toFixed(2)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgstItem.toFixed(2)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
                         </tr>`;
                     }).join('')}
                 </tbody>
             </table>
-            <div class="totals" style="text-align:right;">
-                <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal:  </td><td style="text-align:right;">₹${subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${cgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${sgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">Round Off: </td><td style="text-align:right;">₹${roundOff.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>
+            <div class="totals" style="text-align:right; margin-top:15px;">
+                <table style="width:280px; margin-left:auto; border-collapse:collapse;">
+                    <tr><td style="text-align:right; border:none; padding:3px;">Subtotal:</td><td style="text-align:right; border:none; padding:3px;">₹${subtotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right; border:none; padding:3px;">CGST (9%):</td><td style="text-align:right; border:none; padding:3px;">₹${cgst.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right; border:none; padding:3px;">SGST (9%):</td><td style="text-align:right; border:none; padding:3px;">₹${sgst.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right; border:none; padding:3px;">Round Off:</td><td style="text-align:right; border:none; padding:3px;">₹${roundOff.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right; border:none; padding:3px;">Grand Total:</td><td style="text-align:right; border:none; padding:3px;">₹${grand.toFixed(2)}</td></tr>
                 </table>
             </div>
-            <div style="margin-top:30px; border:1px solid #dee2e6; border-radius:8px; padding:15px;">
-                <p><strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</p>
-                <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
-                <div style="text-align:right; margin-top:20px;"><div style="width:250px; border-top:1px solid #333; padding-top:5px; margin-left:auto; text-align:center;">For Auto Spares Solution<br>(Authorised Signatory)</div></div>
+            <div style="margin-top:30px; border:1px solid #dee2e6; border-radius:8px; padding:15px; background:#f9f9f9;">
+                <p style="margin:0 0 10px;"><strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</p>
+                <p style="margin:0 0 10px;"><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
+                <div style="text-align:right; margin-top:20px;">
+                    <div style="width:250px; border-top:1px solid #333; padding-top:5px; margin-left:auto; text-align:center;">
+                        For Auto Spares Solution<br>
+                        (Authorised Signatory)<br>
+                        <span style="font-size:10px;">(Stamp & Signature)</span>
+                    </div>
+                </div>
             </div>
         `;
         const opt = {
