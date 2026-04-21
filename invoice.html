@@ -395,16 +395,16 @@
             let cgst = taxable * 0.09;
             let sgst = taxable * 0.09;
             html += `<tr>
-                <td>${idx+1}</td>
+                <td style="text-align:center;">${idx+1}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
-                <td>${item.qty}</td>
-                <td>₹${item.price.toFixed(2)}</td>
-                <td>₹${taxable.toFixed(2)}</td>
-                <td>18%</td>
-                <td>₹${cgst.toFixed(2)}</td>
-                <td>₹${sgst.toFixed(2)}</td>
-                <td>₹${(taxable+cgst+sgst).toFixed(2)}</td>
+                <td style="text-align:center;">${item.qty}</td>
+                <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="text-align:center;">18%</td>
+                <td style="text-align:right;">₹${cgst.toFixed(2)}</td>
+                <td style="text-align:right;">₹${sgst.toFixed(2)}</td>
+                <td style="text-align:right;">₹${(taxable+cgst+sgst).toFixed(2)}</td>
             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = html;
@@ -412,7 +412,6 @@
         document.getElementById('subtotal').innerText = t.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = t.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = t.sgstTotal.toFixed(2);
-        document.getElementById('roundOff').innerText = t.roundOff.toFixed(2);
         document.getElementById('grandTotal').innerText = t.grand.toFixed(2);
     }
 
@@ -540,6 +539,7 @@
     function generatePDF() {
         const originalContainer = document.getElementById('invoiceContainer');
         const clone = originalContainer.cloneNode(true);
+        // Replace inputs with static text
         clone.querySelectorAll('input, textarea, select').forEach(el => {
             const span = document.createElement('span');
             span.className = 'info-value-text';
@@ -557,6 +557,40 @@
         clone.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
         const typeSelector = clone.querySelector('.invoice-type');
         if (typeSelector) typeSelector.style.display = 'none';
+        
+        // Recalculate totals from items in the clone
+        let subtotal = 0;
+        const rows = clone.querySelectorAll('#itemsBody tr');
+        rows.forEach(row => {
+            const cells = row.cells;
+            if (cells.length >= 6) {
+                const qty = parseFloat(cells[3].innerText);
+                const price = parseFloat(cells[4].innerText.replace('₹', ''));
+                subtotal += qty * price;
+            }
+        });
+        const cgst = subtotal * 0.09;
+        const sgst = subtotal * 0.09;
+        let grand = subtotal + cgst + sgst;
+        const roundOff = Math.round(grand) - grand;
+        grand = Math.round(grand);
+        // Update totals in clone
+        clone.querySelector('#subtotal').innerText = subtotal.toFixed(2);
+        clone.querySelector('#cgstTotal').innerText = cgst.toFixed(2);
+        clone.querySelector('#sgstTotal').innerText = sgst.toFixed(2);
+        clone.querySelector('#grandTotal').innerText = grand.toFixed(2);
+        // Add round-off row if not present (optional)
+        const totalsTable = clone.querySelector('.totals table');
+        if (!totalsTable.innerHTML.includes('Round Off')) {
+            const roundRow = document.createElement('tr');
+            roundRow.innerHTML = `<td style="text-align:right;">Round Off: </td><td style="text-align:right;">₹${roundOff.toFixed(2)}</td>`;
+            totalsTable.insertBefore(roundRow, totalsTable.lastElementChild);
+        } else {
+            // update existing round-off
+            const roundRow = clone.querySelector('.totals table tr:nth-last-child(2)');
+            if (roundRow) roundRow.cells[1].innerText = `₹${roundOff.toFixed(2)}`;
+        }
+        
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
         const opt = {
@@ -587,4 +621,4 @@
     updateInvoiceNumberDisplay();
 </script>
 </body>
-                </html>
+    </html>
