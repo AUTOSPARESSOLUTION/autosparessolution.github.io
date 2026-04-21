@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Orders – Auto Spares</title>
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; border: 1px solid #dee2e6; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
+        button:hover { background: #09645a; }
+        .btn-edit { background: #17a2b8; }
+        .btn-delete { background: #dc3545; }
+        .btn-pdf { background: #e67e22; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Purchase Invoices</h1>
+    <div id="purchaseTable"></div>
+    <button onclick="window.location.href='index.html'">Back</button>
+</div>
+<script>
+    let purchases = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+    let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+    let supplierCreditNotes = JSON.parse(localStorage.getItem('supplierCreditNotes') || '[]');
+
+    function displayPurchases() {
+        if (purchases.length === 0) { document.getElementById('purchaseTable').innerHTML = '<p>No purchase invoices.</p>'; return; }
+        let html = '<table><thead><tr><th>Invoice No</th><th>Supplier</th><th>Date</th><th>Due Date</th><th>Amount (₹)</th><th>Actions</th></tr></thead><tbody>';
+        purchases.forEach(p => {
+            html += `<tr>
+                <td>${p.invoiceNo}</td>
+                <td>${p.supplier.name}</td>
+                <td>${p.date}</td>
+                <td>${p.dueDate}</td>
+                <td>₹${p.grandTotal.toFixed(2)}</td>
+                <td><button class="btn-edit" onclick="editPurchase('${p.id}')">Edit</button>
+                        <button class="btn-delete" onclick="deletePurchase('${p.id}')">Delete</button>
+                        <button class="btn-pdf" onclick="downloadPurchasePDF('${p.id}')">PDF</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></tr>';
+        document.getElementById('purchaseTable').innerHTML = html;
+    }
+
+    function editPurchase(id) { alert('Edit not implemented in this demo'); }
+    function deletePurchase(id) {
+        if (!confirm('Delete this purchase invoice?')) return;
+        const invoice = purchases.find(p => p.id == id);
+        if (!invoice) return;
+        // Reverse ledger effect
+        const supplier = suppliers.find(s => s.name === invoice.supplier.name);
+        if (supplier) {
+            supplier.outstanding -= invoice.grandTotal;
+            supplier.totalPurchased -= invoice.grandTotal;
+            if (supplier.outstanding < 0) supplier.outstanding = 0;
+            localStorage.setItem('suppliers', JSON.stringify(suppliers));
+        }
+        purchases = purchases.filter(p => p.id != id);
+        localStorage.setItem('purchaseInvoices', JSON.stringify(purchases));
+        displayPurchases();
+    }
+
+    function downloadPurchasePDF(id) {
+        const inv = purchases.find(p => p.id == id);
+        if (!inv) return;
+        const container = document.createElement('div');
+        container.innerHTML = `<h2>Purchase Invoice</h2><p>Supplier: ${inv.supplier.name}<br>Invoice No: ${inv.invoiceNo}<br>Date: ${inv.date}</p><table border="1">${inv.items.map(i => `<tr><td>${i.part}</td><td>${i.desc}</td><td>${i.qty}</td><td>${i.price}</td><td>${i.total}</td></tr>`).join('')}</table><p>Total: ${inv.grandTotal}</p>`;
+        const opt = { margin: [0.2,0.2,0.2,0.2], filename: `Purchase_${inv.invoiceNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+        html2pdf().set(opt).from(container).save();
+    }
+
+    displayPurchases();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</body>
+</html>
