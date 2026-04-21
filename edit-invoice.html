@@ -47,14 +47,16 @@
         .actions { margin-top: 30px; display: flex; gap: 15px; justify-content: flex-end; }
         button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
         button:hover { background: #09645a; }
-        .item-row { margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 6px; }
-        .item-row input { width: auto; }
+        .item-row { margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .item-row input { flex: 1; min-width: 100px; }
+        .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
         .add-item { background: #28a745; margin-bottom: 15px; }
-        .remove-item { background: #dc3545; padding: 2px 8px; font-size: 12px; margin-left: 5px; }
+        .btn-pdf { background: #e67e22; }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
-<div class="invoice-container" id="editInvoiceContainer">
+<div class="invoice-container">
     <div class="company-header">
         <div class="logo-area">
             <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
@@ -120,15 +122,16 @@
 
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal: </td><td>₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%): </td><td>₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%): </td><td>₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td>₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
     <div class="actions">
         <button onclick="saveEditedInvoice()">💾 Save Changes & Update Ledger</button>
+        <button class="btn-pdf" onclick="downloadPDF()">📄 Download PDF</button>
         <button onclick="window.close()">Cancel</button>
     </div>
 </div>
@@ -148,23 +151,19 @@
         document.getElementById('invoiceDate').innerText = originalInvoice.date;
         document.getElementById('dueDate').innerText = originalInvoice.dueDate;
 
-        // Buyer
         document.getElementById('buyerName').value = originalInvoice.buyer?.name || '';
         document.getElementById('buyerAddress').value = originalInvoice.buyer?.address || '';
         document.getElementById('buyerGstin').value = originalInvoice.buyer?.gstin || '';
         document.getElementById('buyerState').value = originalInvoice.buyer?.state || '';
         document.getElementById('buyerPhone').value = originalInvoice.buyer?.phone || '';
         document.getElementById('buyerEmail').value = originalInvoice.buyer?.email || '';
-        // Consignee
         document.getElementById('consigneeName').value = originalInvoice.consignee?.name || '';
         document.getElementById('consigneeAddress').value = originalInvoice.consignee?.address || '';
         document.getElementById('consigneePhone').value = originalInvoice.consignee?.phone || '';
-        // Order details
         document.getElementById('customerCode').value = originalInvoice.orderDetails?.customerCode || '';
         document.getElementById('salesOrderNo').value = originalInvoice.orderDetails?.salesOrderNo || '';
         document.getElementById('referenceNo').value = originalInvoice.orderDetails?.referenceNo || '';
         document.getElementById('paymentTermsField').value = originalInvoice.orderDetails?.paymentTerms || '';
-        // Dispatch
         document.getElementById('dispatchDocNo').value = originalInvoice.dispatchDetails?.docNo || '';
         document.getElementById('transportMode').value = originalInvoice.dispatchDetails?.transportMode || '';
         document.getElementById('vehicleNo').value = originalInvoice.dispatchDetails?.vehicleNo || '';
@@ -181,10 +180,10 @@
             const div = document.createElement('div');
             div.className = 'item-row';
             div.innerHTML = `
-                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" style="width:20%;" onchange="updateItem(${idx}, 'part', this.value)">
-                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" style="width:35%;" onchange="updateItem(${idx}, 'desc', this.value)">
-                <input type="number" placeholder="Qty" value="${item.qty}" style="width:10%;" onchange="updateItem(${idx}, 'qty', parseInt(this.value))">
-                <input type="number" placeholder="Unit Price" value="${item.price}" style="width:15%;" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))">
+                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:2;">
+                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="flex:3;">
+                <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Unit Price" value="${item.price}" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))" style="flex:1;">
                 <button class="remove-item" onclick="removeItem(${idx})">X</button>
             `;
             container.appendChild(div);
@@ -203,16 +202,14 @@
     }
 
     function addItem() {
-        items.push({ part: 'NEW', desc: 'New Item', qty: 1, price: 0 });
+        items.push({ part: '', desc: '', qty: 1, price: 0 });
         renderItems();
         recalcTotals();
     }
 
     function recalcTotals() {
         let subtotal = 0;
-        items.forEach(item => {
-            subtotal += item.qty * item.price;
-        });
+        items.forEach(item => { subtotal += (item.qty || 0) * (item.price || 0); });
         const cgst = subtotal * 0.09;
         const sgst = subtotal * 0.09;
         const grand = subtotal + cgst + sgst;
@@ -223,7 +220,6 @@
     }
 
     function saveEditedInvoice() {
-        // Build updated invoice object
         const updatedInvoice = {
             ...originalInvoice,
             buyer: {
@@ -255,7 +251,7 @@
                 desc: item.desc,
                 qty: item.qty,
                 price: item.price,
-                total: item.qty * item.price
+                total: (item.qty || 0) * (item.price || 0)
             })),
             subtotal: parseFloat(document.getElementById('subtotal').innerText),
             cgst: parseFloat(document.getElementById('cgstTotal').innerText),
@@ -264,40 +260,107 @@
             roundOff: 0
         };
 
-        // Update the invoice in localStorage
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const index = allInvoices.findIndex(i => i.invoiceNo === originalInvoice.invoiceNo);
-        if (index === -1) { alert('Invoice not found in storage'); return; }
+        if (index === -1) { alert('Invoice not found'); return; }
 
-        // Update customer ledger: reverse old effect, apply new effect
+        // Update customer ledger
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const customer = customers.find(c => c.email === updatedInvoice.buyer?.email);
         if (customer) {
-            // Reverse old
-            if (originalInvoice.invoiceType === 'credit') {
-                customer.outstanding -= originalInvoice.grandTotal;
-                if (customer.outstanding < 0) customer.outstanding = 0;
-            }
+            if (originalInvoice.invoiceType === 'credit') customer.outstanding -= originalInvoice.grandTotal;
+            if (customer.outstanding < 0) customer.outstanding = 0;
             customer.totalPurchased -= originalInvoice.grandTotal;
-            // Apply new
-            if (updatedInvoice.invoiceType === 'credit') {
-                customer.outstanding += updatedInvoice.grandTotal;
-            }
+            if (updatedInvoice.invoiceType === 'credit') customer.outstanding += updatedInvoice.grandTotal;
             customer.totalPurchased += updatedInvoice.grandTotal;
             localStorage.setItem('customers', JSON.stringify(customers));
         }
 
-        // Replace invoice
         allInvoices[index] = updatedInvoice;
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-
         alert(`Invoice ${updatedInvoice.invoiceNo} updated successfully.`);
         window.close();
     }
 
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m) { if (m==='&') return '&amp;'; if (m==='<') return '&lt;'; if (m==='>') return '&gt;'; return m; }); }
+    function downloadPDF() {
+        const updatedInvoice = {
+            invoiceNo: document.getElementById('invoiceNo').innerText,
+            date: document.getElementById('invoiceDate').innerText,
+            dueDate: document.getElementById('dueDate').innerText,
+            buyer: {
+                name: document.getElementById('buyerName').value,
+                address: document.getElementById('buyerAddress').value,
+                gstin: document.getElementById('buyerGstin').value,
+                state: document.getElementById('buyerState').value,
+                phone: document.getElementById('buyerPhone').value,
+                email: document.getElementById('buyerEmail').value
+            },
+            consignee: {
+                name: document.getElementById('consigneeName').value,
+                address: document.getElementById('consigneeAddress').value,
+                phone: document.getElementById('consigneePhone').value
+            },
+            orderDetails: {
+                customerCode: document.getElementById('customerCode').value,
+                salesOrderNo: document.getElementById('salesOrderNo').value,
+                referenceNo: document.getElementById('referenceNo').value,
+                paymentTerms: document.getElementById('paymentTermsField').value
+            },
+            dispatchDetails: {
+                docNo: document.getElementById('dispatchDocNo').value,
+                transportMode: document.getElementById('transportMode').value,
+                vehicleNo: document.getElementById('vehicleNo').value
+            },
+            items: items.map(item => ({ part: item.part, desc: item.desc, qty: item.qty, price: item.price, total: (item.qty||0)*(item.price||0) })),
+            subtotal: parseFloat(document.getElementById('subtotal').innerText),
+            cgst: parseFloat(document.getElementById('cgstTotal').innerText),
+            sgst: parseFloat(document.getElementById('sgstTotal').innerText),
+            grandTotal: parseFloat(document.getElementById('grandTotal').innerText)
+        };
+        const container = document.createElement('div');
+        container.style.padding = '20px';
+        container.style.fontFamily = 'Roboto, sans-serif';
+        container.style.maxWidth = '1200px';
+        container.style.margin = '0 auto';
+        container.style.backgroundColor = 'white';
+        container.innerHTML = `
+            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.src='https://via.placeholder.com/60'">
+                    <div><h1 style="margin:0;">Auto Spares Solution</h1><p>GSTIN: 19ANOPD3300R1ZO</p><p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p></div>
+                </div>
+                <div><h2>TAX INVOICE</h2><p>Invoice No: ${updatedInvoice.invoiceNo}<br>Date: ${updatedInvoice.date}<br>Due Date: ${updatedInvoice.dueDate}</p></div>
+            </div>
+            <div style="display:flex; gap:20px; flex-wrap:wrap; margin:20px 0;">
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Buyer</h3><p>${updatedInvoice.buyer.name}<br>${updatedInvoice.buyer.address}<br>GSTIN: ${updatedInvoice.buyer.gstin}<br>State: ${updatedInvoice.buyer.state}<br>Phone: ${updatedInvoice.buyer.phone}<br>Email: ${updatedInvoice.buyer.email}</p></div>
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Consignee</h3><p>${updatedInvoice.consignee.name}<br>${updatedInvoice.consignee.address}<br>Phone: ${updatedInvoice.consignee.phone}</p></div>
+            </div>
+            <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Order Details</h3><p>Customer Code: ${updatedInvoice.orderDetails.customerCode}<br>SO No: ${updatedInvoice.orderDetails.salesOrderNo}<br>Ref No: ${updatedInvoice.orderDetails.referenceNo}<br>Payment Terms: ${updatedInvoice.orderDetails.paymentTerms}</p></div>
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Dispatch Details</h3><p>Doc No: ${updatedInvoice.dispatchDetails.docNo}<br>Mode: ${updatedInvoice.dispatchDetails.transportMode}<br>Vehicle No: ${updatedInvoice.dispatchDetails.vehicleNo}</p></div>
+            </div>
+            <table style="width:100%; border-collapse:collapse; margin:20px 0;"><thead><tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead><tbody>
+                ${updatedInvoice.items.map((item, idx) => {
+                    const taxable = item.price * item.qty;
+                    const cgst = taxable * 0.09;
+                    const sgst = taxable * 0.09;
+                    return `<tr><td>${idx+1}</td><td>${escapeHtml(item.part)}</td><td>${escapeHtml(item.desc)}</td><td>${item.qty}</td><td>₹${item.price.toFixed(2)}</td><td>₹${taxable.toFixed(2)}</td><td>18%</td><td>₹${cgst.toFixed(2)}</td><td>₹${sgst.toFixed(2)}</td><td>₹${(taxable+cgst+sgst).toFixed(2)}</td></tr>`;
+                }).join('')}
+            </tbody></table>
+            <div class="totals" style="text-align:right;"><table style="width:280px; margin-left:auto;"><tr><td>Subtotal:</td><td>₹${updatedInvoice.subtotal.toFixed(2)}</td></tr><tr><td>CGST (9%):</td><td>₹${updatedInvoice.cgst.toFixed(2)}</td></tr><tr><td>SGST (9%):</td><td>₹${updatedInvoice.sgst.toFixed(2)}</td></tr><tr style="font-weight:bold;"><td>Grand Total:</td><td>₹${updatedInvoice.grandTotal.toFixed(2)}</td></tr></table></div>
+            <div style="margin-top:30px; border:1px solid #dee2e6; border-radius:8px; padding:15px;">
+                <p><strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</p>
+                <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
+                <div style="text-align:right; margin-top:20px;"><div style="width:250px; border-top:1px solid #333; padding-top:5px; margin-left:auto; text-align:center;">For Auto Spares Solution<br>(Authorised Signatory)</div></div>
+            </div>
+        `;
+        const opt = { margin: [0.2,0.2,0.2,0.2], filename: `Invoice_${updatedInvoice.invoiceNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+        html2pdf().set(opt).from(container).save();
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
     loadInvoice();
 </script>
 </body>
-                                                                                                                                             </html>
+    </html>
