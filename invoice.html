@@ -274,9 +274,9 @@
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal:  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
@@ -344,31 +344,36 @@
         document.getElementById('invoiceNo').innerText = invoiceNo;
     }
 
+    // ========== REUSABLE INVOICE NUMBER LOGIC (FIXED) ==========
     function getReusableInvoiceNumber(type) {
         const finYear = getFinancialYear();
-        let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
-        let available = deletedNumbers.filter(n => n.type === type && n.finYear === finYear).sort((a,b) => a.number - b.number);
-        if (available.length > 0) {
-            const reused = available[0];
-            const remaining = deletedNumbers.filter(n => !(n.type === type && n.finYear === finYear && n.number === reused.number));
-            localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(remaining));
-            let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-            return prefix + reused.number.toString().padStart(4,'0');
-        }
-        return null;
+        let deleted = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
+        // Filter for same type and same financial year
+        let available = deleted.filter(n => n.type === type && n.finYear === finYear);
+        if (available.length === 0) return null;
+        // Get smallest number
+        let smallest = Math.min(...available.map(n => n.number));
+        // Remove it from deleted list
+        let remaining = deleted.filter(n => !(n.type === type && n.finYear === finYear && n.number === smallest));
+        localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(remaining));
+        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+        return prefix + smallest.toString().padStart(4, '0');
     }
 
     function getAndIncrementInvoiceNumber(type) {
-        const finYear = getFinancialYear();
-        const reused = getReusableInvoiceNumber(type);
+        // First try to reuse a deleted number
+        let reused = getReusableInvoiceNumber(type);
         if (reused) return reused;
+        // Otherwise get from counter
+        const finYear = getFinancialYear();
         let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
         let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
         let cnt = parseInt(localStorage.getItem(key)) || 1;
-        let invNo = prefix + cnt.toString().padStart(4,'0');
+        let invNo = prefix + cnt.toString().padStart(4, '0');
         localStorage.setItem(key, cnt + 1);
         return invNo;
     }
+    // ==================================================
 
     function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
 
@@ -539,7 +544,6 @@
     function generatePDF() {
         const originalContainer = document.getElementById('invoiceContainer');
         const clone = originalContainer.cloneNode(true);
-        // Replace inputs with static text
         clone.querySelectorAll('input, textarea, select').forEach(el => {
             const span = document.createElement('span');
             span.className = 'info-value-text';
@@ -574,22 +578,10 @@
         let grand = subtotal + cgst + sgst;
         const roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
-        // Update totals in clone
         clone.querySelector('#subtotal').innerText = subtotal.toFixed(2);
         clone.querySelector('#cgstTotal').innerText = cgst.toFixed(2);
         clone.querySelector('#sgstTotal').innerText = sgst.toFixed(2);
         clone.querySelector('#grandTotal').innerText = grand.toFixed(2);
-        // Add round-off row if not present (optional)
-        const totalsTable = clone.querySelector('.totals table');
-        if (!totalsTable.innerHTML.includes('Round Off')) {
-            const roundRow = document.createElement('tr');
-            roundRow.innerHTML = `<td style="text-align:right;">Round Off: </td><td style="text-align:right;">₹${roundOff.toFixed(2)}</td>`;
-            totalsTable.insertBefore(roundRow, totalsTable.lastElementChild);
-        } else {
-            // update existing round-off
-            const roundRow = clone.querySelector('.totals table tr:nth-last-child(2)');
-            if (roundRow) roundRow.cells[1].innerText = `₹${roundOff.toFixed(2)}`;
-        }
         
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
