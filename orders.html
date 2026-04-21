@@ -71,7 +71,6 @@
     }
 
     function editInvoice(invoiceNo) {
-        // Store the invoice to edit in localStorage and open edit page
         localStorage.setItem('editInvoiceNo', invoiceNo);
         window.open('edit-invoice.html', '_blank');
     }
@@ -80,58 +79,75 @@
         if (!confirm(`Are you sure you want to delete invoice ${invoiceNo}? This action cannot be undone.`)) return;
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!invoice) return;
-        
+
         // Reverse ledger effect
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const customer = customers.find(c => c.email === invoice.buyer?.email);
         if (customer) {
-            if (invoice.invoiceType === 'credit') {
-                customer.outstanding -= invoice.grandTotal;
-                if (customer.outstanding < 0) customer.outstanding = 0;
-            }
+            if (invoice.invoiceType === 'credit') customer.outstanding -= invoice.grandTotal;
+            if (customer.outstanding < 0) customer.outstanding = 0;
             customer.totalPurchased -= invoice.grandTotal;
             localStorage.setItem('customers', JSON.stringify(customers));
         }
-        
+
+        // Store deleted number for reuse
+        let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
+        let number = parseInt(invoice.invoiceNo.split('/').pop());
+        deletedNumbers.push({ type: invoice.invoiceType, finYear: invoice.finYear, number: number });
+        localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(deletedNumbers));
+
         // Remove invoice
         allInvoices = allInvoices.filter(i => i.invoiceNo !== invoiceNo);
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-        alert(`Invoice ${invoiceNo} deleted successfully.`);
+        alert(`Invoice ${invoiceNo} deleted. Number will be reused.`);
         displayOrders(document.getElementById('searchInput').value.toLowerCase());
     }
 
     function downloadInvoicePDF(invoiceNo) {
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!invoice) { alert('Invoice not found'); return; }
-        // Build PDF container (same as before)
         const container = document.createElement('div');
         container.style.padding = '20px';
         container.style.fontFamily = 'Roboto, sans-serif';
         container.style.maxWidth = '1200px';
         container.style.margin = '0 auto';
         container.style.backgroundColor = 'white';
-        
         container.innerHTML = `
-            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.src='https://via.placeholder.com/60'">
-                    <div><h1 style="margin:0;">Auto Spares Solution</h1><p style="margin:0;">GSTIN: 19ANOPD3300R1ZO</p></div>
+                    <div><h1 style="margin:0;">Auto Spares Solution</h1><p>GSTIN: 19ANOPD3300R1ZO</p><p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p></div>
                 </div>
                 <div><h2>TAX INVOICE</h2><p>Invoice No: ${invoice.invoiceNo}<br>Date: ${invoice.date}<br>Due Date: ${invoice.dueDate}</p></div>
             </div>
-            <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
-                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Buyer</h3><p>${invoice.buyer?.name}<br>${invoice.buyer?.address}<br>GSTIN: ${invoice.buyer?.gstin}<br>Phone: ${invoice.buyer?.phone}</p></div>
+            <div style="display:flex; gap:20px; flex-wrap:wrap; margin:20px 0;">
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Buyer</h3><p>${invoice.buyer?.name}<br>${invoice.buyer?.address}<br>GSTIN: ${invoice.buyer?.gstin}<br>State: ${invoice.buyer?.state}<br>Phone: ${invoice.buyer?.phone}<br>Email: ${invoice.buyer?.email}</p></div>
                 <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Consignee</h3><p>${invoice.consignee?.name}<br>${invoice.consignee?.address}<br>Phone: ${invoice.consignee?.phone}</p></div>
             </div>
-            <table style="width:100%; border-collapse:collapse; margin:20px 0;"><thead><tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>
-                ${invoice.items.map((item, i) => `<tr><td>${i+1}</td><td>${item.part}</td><td>${item.desc}</td><td>${item.qty}</td><td>₹${item.price.toFixed(2)}</td><td>₹${item.total.toFixed(2)}</td></tr>`).join('')}
+            <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Order Details</h3><p>Customer Code: ${invoice.orderDetails?.customerCode}<br>SO No: ${invoice.orderDetails?.salesOrderNo}<br>Ref No: ${invoice.orderDetails?.referenceNo}<br>Payment Terms: ${invoice.orderDetails?.paymentTerms}</p></div>
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Dispatch Details</h3><p>Doc No: ${invoice.dispatchDetails?.docNo}<br>Mode: ${invoice.dispatchDetails?.transportMode}<br>Vehicle No: ${invoice.dispatchDetails?.vehicleNo}</p></div>
+            </div>
+            <table style="width:100%; border-collapse:collapse; margin:20px 0;"><thead><tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead><tbody>
+                ${invoice.items.map((item, idx) => {
+                    const taxable = item.price * item.qty;
+                    const cgst = taxable * 0.09;
+                    const sgst = taxable * 0.09;
+                    return `<tr><td>${idx+1}</td><td>${escapeHtml(item.part)}</td><td>${escapeHtml(item.desc)}</td><td>${item.qty}</td><td>₹${item.price.toFixed(2)}</td><td>₹${taxable.toFixed(2)}</td><td>18%</td><td>₹${cgst.toFixed(2)}</td><td>₹${sgst.toFixed(2)}</td><td>₹${(taxable+cgst+sgst).toFixed(2)}</td></tr>`;
+                }).join('')}
             </tbody></table>
-            <div style="text-align:right;"><strong>Grand Total: ₹${invoice.grandTotal.toFixed(2)}</strong></div>
-            <div style="margin-top:30px; border-top:1px solid #ccc; padding-top:15px;"><strong>Bank Details:</strong> Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115<br><strong>Terms:</strong> Goods once sold will not be taken back.</div>
+            <div class="totals" style="text-align:right;"><table style="width:280px; margin-left:auto;"><tr><td>Subtotal:</td><td>₹${invoice.subtotal.toFixed(2)}</td></tr><tr><td>CGST (9%):</td><td>₹${invoice.cgst.toFixed(2)}</td></tr><tr><td>SGST (9%):</td><td>₹${invoice.sgst.toFixed(2)}</td></tr><tr style="font-weight:bold;"><td>Grand Total:</td><td>₹${invoice.grandTotal.toFixed(2)}</td></tr></table></div>
+            <div style="margin-top:30px; border:1px solid #dee2e6; border-radius:8px; padding:15px;">
+                <p><strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</p>
+                <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
+                <div style="text-align:right; margin-top:20px;"><div style="width:250px; border-top:1px solid #333; padding-top:5px; margin-left:auto; text-align:center;">For Auto Spares Solution<br>(Authorised Signatory)</div></div>
+            </div>
         `;
         const opt = { margin: [0.2,0.2,0.2,0.2], filename: `Invoice_${invoice.invoiceNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
         html2pdf().set(opt).from(container).save();
     }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
     function filterOrders() { const term = document.getElementById('searchInput').value.toLowerCase(); displayOrders(term); }
     function exportToCSV() {
