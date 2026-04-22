@@ -19,6 +19,7 @@
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             padding: 0 15px 15px 15px;
+            border: 1px solid #dee2e6; /* Professional border */
         }
         .no-print {
             display: flex;
@@ -37,6 +38,7 @@
                 border-radius: 0;
                 padding: 0;
                 margin: 0;
+                border: 1px solid #aaa;
             }
             .company-header {
                 -webkit-print-color-adjust: exact;
@@ -125,14 +127,15 @@
         .items-table th:nth-child(1) { width: 5%; }
         .items-table th:nth-child(2) { width: 10%; }
         .items-table th:nth-child(3) { width: 15%; }
-        .items-table th:nth-child(4) { width: 5%; }
-        .items-table th:nth-child(5) { width: 8%; }
+        .items-table th:nth-child(4) { width: 8%; }
+        .items-table th:nth-child(5) { width: 5%; }
         .items-table th:nth-child(6) { width: 8%; }
         .items-table th:nth-child(7) { width: 6%; }
         .items-table th:nth-child(8) { width: 8%; }
-        .items-table th:nth-child(9) { width: 8%; }
+        .items-table th:nth-child(9) { width: 6%; }
         .items-table th:nth-child(10) { width: 8%; }
         .items-table th:nth-child(11) { width: 8%; }
+        .items-table th:nth-child(12) { width: 8%; }
         .items-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .tax-summary-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
@@ -264,7 +267,7 @@
         </div>
     </div>
 
-    <!-- Items Table (with HSN column) -->
+    <!-- Items Table with HSN and Discount -->
     <table class="items-table" id="itemsTable">
         <thead>
             <tr>
@@ -274,6 +277,7 @@
                 <th>HSN/SAC</th>
                 <th>Qty</th>
                 <th>Unit Price (₹)</th>
+                <th>Disc %</th>
                 <th>Taxable (₹)</th>
                 <th>GST%</th>
                 <th>CGST (₹)</th>
@@ -302,10 +306,9 @@
     <!-- Totals -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal:  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">Round Off:  </td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
@@ -409,61 +412,61 @@
         return date;
     }
 
-    function calculateTotals() {
+    function calculateTotalsAndTaxGroups() {
         let sub = 0, cgst = 0, sgst = 0;
-        cart.forEach(i => {
-            let t = i.price * i.qty;
-            sub += t;
-            cgst += t * 0.09;
-            sgst += t * 0.09;
+        let taxGroups = {}; // key = hsn
+        cart.forEach(item => {
+            const hsn = item.hsn || '';
+            const taxable = (item.price * item.qty) * (1 - (item.discount || 0) / 100);
+            sub += taxable;
+            const cgstVal = taxable * 0.09;
+            const sgstVal = taxable * 0.09;
+            cgst += cgstVal;
+            sgst += sgstVal;
+            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0 };
+            taxGroups[hsn].taxable += taxable;
+            taxGroups[hsn].cgst += cgstVal;
+            taxGroups[hsn].sgst += sgstVal;
         });
         let grand = sub + cgst + sgst;
         let roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
-        return { subtotal: sub, cgstTotal: cgst, sgstTotal: sgst, roundOff, grand };
+        return { subtotal: sub, cgstTotal: cgst, sgstTotal: sgst, roundOff, grand, taxGroups };
     }
 
     function renderItemsAndTaxSummary() {
         let itemsHtml = '';
-        let taxGroups = {}; // key = hsn
+        const totals = calculateTotalsAndTaxGroups();
         cart.forEach((item, idx) => {
-            const taxable = item.price * item.qty;
-            const cgst = taxable * 0.09;
-            const sgst = taxable * 0.09;
-            const hsn = item.hsn || '';
+            const discount = item.discount || 0;
+            const taxable = (item.price * item.qty) * (1 - discount / 100);
+            const cgstVal = taxable * 0.09;
+            const sgstVal = taxable * 0.09;
+            const totalItem = taxable + cgstVal + sgstVal;
             itemsHtml += `<tr>
                 <td style="text-align:center;">${idx+1}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
-                <td>${escapeHtml(hsn)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.hsn)}</td>
                 <td style="text-align:center;">${item.qty}</td>
                 <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
                 <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
                 <td style="text-align:center;">18%</td>
-                <td style="text-align:right;">₹${cgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${sgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${(taxable+cgst+sgst).toFixed(2)}</td>
+                <td style="text-align:right;">₹${cgstVal.toFixed(2)}</td>
+                <td style="text-align:right;">₹${sgstVal.toFixed(2)}</td>
+                <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
             </tr>`;
-            if (hsn) {
-                if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0 };
-                taxGroups[hsn].taxable += taxable;
-                taxGroups[hsn].cgst += cgst;
-                taxGroups[hsn].sgst += sgst;
-            } else {
-                if (!taxGroups[''] ) taxGroups[''] = { taxable: 0, cgst: 0, sgst: 0 };
-                taxGroups[''].taxable += taxable;
-                taxGroups[''].cgst += cgst;
-                taxGroups[''].sgst += sgst;
-            }
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
 
+        // Tax summary
         let taxHtml = '';
-        for (let hsn in taxGroups) {
-            const g = taxGroups[hsn];
+        for (let hsn in totals.taxGroups) {
+            const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst;
             taxHtml += `<tr>
-                <td>${hsn || 'N/A'}</td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
                 <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
                 <td style="text-align:right;">₹${g.cgst.toFixed(2)}</td>
                 <td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>
@@ -473,12 +476,18 @@
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
 
-        let t = calculateTotals();
-        document.getElementById('subtotal').innerText = t.subtotal.toFixed(2);
-        document.getElementById('cgstTotal').innerText = t.cgstTotal.toFixed(2);
-        document.getElementById('sgstTotal').innerText = t.sgstTotal.toFixed(2);
-        document.getElementById('roundOff').innerText = t.roundOff.toFixed(2);
-        document.getElementById('grandTotal').innerText = t.grand.toFixed(2);
+        document.getElementById('subtotal').innerText = totals.subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = totals.cgstTotal.toFixed(2);
+        document.getElementById('sgstTotal').innerText = totals.sgstTotal.toFixed(2);
+        document.getElementById('grandTotal').innerText = totals.grand.toFixed(2);
+    }
+
+    function updateDiscount(part, discPercent) {
+        const item = cart.find(i => i.part === part);
+        if (item) {
+            item.discount = parseFloat(discPercent) || 0;
+            renderItemsAndTaxSummary();
+        }
     }
 
     function escapeHtml(str) {
@@ -514,7 +523,7 @@
         if (cart.length === 0) { alert('Cart empty'); return; }
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const creditLimit = parseFloat(document.getElementById('creditLimit').value) || 0;
-        let totals = calculateTotals();
+        let totals = calculateTotalsAndTaxGroups();
         const finalNo = getAndIncrementInvoiceNumber(type);
         let invoice = {
             invoiceNo: finalNo,
@@ -546,12 +555,13 @@
                 transportMode: document.getElementById('transportMode').value,
                 vehicleNo: document.getElementById('vehicleNo').value
             },
-            items: cart.map(i => ({ part: i.part, desc: i.desc, hsn: i.hsn || '', qty: i.qty, price: i.price, total: i.price * i.qty })),
+            items: cart.map(i => ({ part: i.part, desc: i.desc, hsn: i.hsn || '', qty: i.qty, price: i.price, discount: i.discount || 0, total: (i.price * i.qty) * (1 - (i.discount||0)/100) })),
             subtotal: totals.subtotal,
             cgst: totals.cgstTotal,
             sgst: totals.sgstTotal,
             roundOff: totals.roundOff,
             grandTotal: totals.grand,
+            taxGroups: totals.taxGroups,
             status: type === 'cash' ? 'Paid' : 'Pending'
         };
         if (invoice.buyer.email) {
@@ -653,4 +663,4 @@
     updateInvoiceNumberDisplay();
 </script>
 </body>
-</html>
+    </html>
