@@ -19,6 +19,16 @@
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             padding: 0 15px 15px 15px;
+            border: 1px solid #dee2e6;
+        }
+        @media print {
+            .no-print, .actions, button, input, textarea, select {
+                display: none !important;
+            }
+            body { background: white; padding: 0; margin: 0; }
+            .invoice-container { box-shadow: none; border-radius: 0; padding: 0; margin: 0; border: 1px solid #aaa; }
+            .company-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .items-table th, .tax-summary-table th { background: #f8f9fa !important; }
         }
         .company-header {
             background: #0a7c71;
@@ -57,17 +67,18 @@
             overflow-wrap: break-word;
             white-space: normal;
         }
-        .items-table th:nth-child(1) { width: 5%; }
+        .items-table th:nth-child(1) { width: 4%; }
         .items-table th:nth-child(2) { width: 10%; }
-        .items-table th:nth-child(3) { width: 15%; }
+        .items-table th:nth-child(3) { width: 12%; }
         .items-table th:nth-child(4) { width: 8%; }
-        .items-table th:nth-child(5) { width: 5%; }
-        .items-table th:nth-child(6) { width: 8%; }
-        .items-table th:nth-child(7) { width: 8%; }
-        .items-table th:nth-child(8) { width: 6%; }
-        .items-table th:nth-child(9) { width: 8%; }
+        .items-table th:nth-child(5) { width: 4%; }
+        .items-table th:nth-child(6) { width: 7%; }
+        .items-table th:nth-child(7) { width: 6%; }
+        .items-table th:nth-child(8) { width: 8%; }
+        .items-table th:nth-child(9) { width: 6%; }
         .items-table th:nth-child(10) { width: 8%; }
         .items-table th:nth-child(11) { width: 8%; }
+        .items-table th:nth-child(12) { width: 8%; }
         .items-table th { background: #f8f9fa; }
         .tax-summary-table th { background: #f8f9fa; }
         .totals { text-align: right; margin-top: 15px; }
@@ -95,7 +106,7 @@
         </div>
         <div class="invoice-title">
             <h2>EDIT INVOICE</h2>
-            <p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p>
+            <p><strong>Invoice No:</strong> <input type="text" id="invoiceNo" style="width:180px; background:#fff9e0;"></p>
             <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
             <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
         </div>
@@ -149,18 +160,16 @@
 
     <!-- Tax Summary Table -->
     <table class="tax-summary-table">
-        <thead>
-            <tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr>
-        </thead>
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal:  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
@@ -182,7 +191,7 @@
         originalInvoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!originalInvoice) { alert('Invoice not found'); window.close(); return; }
 
-        document.getElementById('invoiceNo').innerText = originalInvoice.invoiceNo;
+        document.getElementById('invoiceNo').value = originalInvoice.invoiceNo;
         document.getElementById('invoiceDate').innerText = originalInvoice.date;
         document.getElementById('dueDate').innerText = originalInvoice.dueDate;
 
@@ -220,6 +229,7 @@
                 <input type="text" placeholder="HSN" value="${escapeHtml(item.hsn || '')}" onchange="updateItem(${idx}, 'hsn', this.value)" style="flex:1;">
                 <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
                 <input type="number" placeholder="Unit Price" value="${item.price}" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Disc %" value="${item.discount || 0}" step="0.01" onchange="updateItem(${idx}, 'discount', parseFloat(this.value))" style="flex:1;">
                 <button class="remove-item" onclick="removeItem(${idx})">X</button>
             `;
             container.appendChild(div);
@@ -238,7 +248,7 @@
     }
 
     function addItem() {
-        items.push({ part: '', desc: '', hsn: '', qty: 1, price: 0 });
+        items.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0 });
         renderItems();
         recalcTotals();
     }
@@ -247,7 +257,7 @@
         let subtotal = 0;
         let taxGroups = {};
         items.forEach(item => {
-            const taxable = (item.qty || 0) * (item.price || 0);
+            const taxable = (item.qty || 0) * (item.price || 0) * (1 - (item.discount || 0) / 100);
             subtotal += taxable;
             const cgst = taxable * 0.09;
             const sgst = taxable * 0.09;
@@ -266,7 +276,6 @@
         document.getElementById('sgstTotal').innerText = sgstTotal.toFixed(2);
         document.getElementById('grandTotal').innerText = grand.toFixed(2);
 
-        // Render tax summary
         let taxHtml = '';
         for (let hsn in taxGroups) {
             const g = taxGroups[hsn];
@@ -284,8 +293,18 @@
     }
 
     function saveEditedInvoice() {
+        const newInvoiceNo = document.getElementById('invoiceNo').value.trim();
+        if (!newInvoiceNo) { alert('Invoice number cannot be empty'); return; }
+        // Check duplicate invoice number
+        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        if (newInvoiceNo !== originalInvoice.invoiceNo && allInvoices.some(i => i.invoiceNo === newInvoiceNo)) {
+            alert('Invoice number already exists! Please use a different number.');
+            return;
+        }
+
         const updatedInvoice = {
             ...originalInvoice,
+            invoiceNo: newInvoiceNo,
             buyer: {
                 name: document.getElementById('buyerName').value,
                 address: document.getElementById('buyerAddress').value,
@@ -316,7 +335,8 @@
                 hsn: item.hsn || '',
                 qty: item.qty,
                 price: item.price,
-                total: (item.qty || 0) * (item.price || 0)
+                discount: item.discount || 0,
+                total: (item.qty * item.price) * (1 - (item.discount||0)/100)
             })),
             subtotal: parseFloat(document.getElementById('subtotal').innerText),
             cgst: parseFloat(document.getElementById('cgstTotal').innerText),
@@ -325,10 +345,10 @@
             roundOff: 0
         };
 
-        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const index = allInvoices.findIndex(i => i.invoiceNo === originalInvoice.invoiceNo);
-        if (index === -1) { alert('Invoice not found'); return; }
+        if (index === -1) { alert('Invoice not found in storage'); return; }
 
+        // Update customer ledger: reverse old, apply new
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const customer = customers.find(c => c.email === updatedInvoice.buyer?.email);
         if (customer) {
@@ -351,7 +371,7 @@
         let subtotal = 0;
         let taxGroups = {};
         items.forEach(item => {
-            const taxable = (item.qty || 0) * (item.price || 0);
+            const taxable = (item.qty || 0) * (item.price || 0) * (1 - (item.discount || 0) / 100);
             subtotal += taxable;
             const cgst = taxable * 0.09;
             const sgst = taxable * 0.09;
@@ -368,7 +388,7 @@
         grand = Math.round(grand);
 
         const updatedInvoice = {
-            invoiceNo: document.getElementById('invoiceNo').innerText,
+            invoiceNo: document.getElementById('invoiceNo').value,
             date: document.getElementById('invoiceDate').innerText,
             dueDate: document.getElementById('dueDate').innerText,
             buyer: {
@@ -401,7 +421,8 @@
                 hsn: item.hsn || '',
                 qty: item.qty,
                 price: item.price,
-                total: (item.qty || 0) * (item.price || 0)
+                discount: item.discount || 0,
+                total: (item.qty * item.price) * (1 - (item.discount||0)/100)
             })),
             subtotal: subtotal,
             cgst: cgstTotal,
@@ -417,7 +438,8 @@
         container.style.maxWidth = '1200px';
         container.style.margin = '0 auto';
         container.style.backgroundColor = 'white';
-        
+        container.style.border = '1px solid #dee2e6';
+
         let taxHtml = '';
         for (let hsn in taxGroups) {
             const g = taxGroups[hsn];
@@ -431,6 +453,28 @@
                 <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
             </tr>`;
         }
+
+        let itemsHtml = '';
+        updatedInvoice.items.forEach((item, idx) => {
+            const taxable = item.price * item.qty * (1 - item.discount/100);
+            const cgstItem = taxable * 0.09;
+            const sgstItem = taxable * 0.09;
+            const totalItem = taxable + cgstItem + sgstItem;
+            itemsHtml += `<tr>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${idx+1}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.part)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.desc)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px;">${escapeHtml(item.hsn)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.discount}%</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgstItem.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgstItem.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
+            </tr>`;
+        });
 
         container.innerHTML = `
             <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
@@ -470,54 +514,33 @@
                 </div>
             </div>
             <table style="width:100%; border-collapse:collapse; margin:20px 0; font-size:11px; table-layout:fixed;">
-                <thead>
-                    <tr style="background:#f8f9fa;">
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">#</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Part No</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:15%;">Description</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">HSN</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">Qty</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Unit Price</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Taxable</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">GST%</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">CGST</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">SGST</th>
-                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${updatedInvoice.items.map((item, idx) => {
-                        const taxable = item.price * item.qty;
-                        const cgstItem = taxable * 0.09;
-                        const sgstItem = taxable * 0.09;
-                        const totalItem = taxable + cgstItem + sgstItem;
-                        return `<tr>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${idx+1}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.part)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.desc)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px;">${escapeHtml(item.hsn)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgstItem.toFixed(2)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgstItem.toFixed(2)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
-                        </tr>`;
-                    }).join('')}
-                </tbody>
+                <thead><tr style="background:#f8f9fa;">
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:4%;">#</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Part No</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:12%;">Description</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">HSN</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:4%;">Qty</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:7%;">Unit Price</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">Disc%</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Taxable</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">GST%</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">CGST</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">SGST</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Total</th>
+                </tr></thead>
+                <tbody>${itemsHtml}</tbody>
             </table>
             <table style="width:100%; border-collapse:collapse; margin:15px 0; font-size:11px;">
                 <thead><tr style="background:#f8f9fa;"><th>HSN/SAC</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total Tax</th></tr></thead>
                 <tbody>${taxHtml}</tbody>
             </table>
-            <div class="totals" style="text-align:right;">
+            <div style="text-align:right;">
                 <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${updatedInvoice.subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${updatedInvoice.cgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${updatedInvoice.sgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">Round Off: </td><td style="text-align:right;">₹${updatedInvoice.roundOff.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${updatedInvoice.grandTotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹${updatedInvoice.subtotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹${updatedInvoice.cgst.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹${updatedInvoice.sgst.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">Round Off:</td><td style="text-align:right;">₹${updatedInvoice.roundOff.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹${updatedInvoice.grandTotal.toFixed(2)}</td></tr>
                 </table>
             </div>
             <div style="margin-top:30px; border:1px solid #dee2e6; border-radius:8px; padding:15px; background:#f9f9f9;">
@@ -534,17 +557,9 @@
         html2pdf().set(opt).from(container).save();
     }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
     loadInvoice();
 </script>
 </body>
-</html>
+    </html>
