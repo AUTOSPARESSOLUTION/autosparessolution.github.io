@@ -42,7 +42,7 @@
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .items-table th {
+            .items-table th, .tax-summary-table th {
                 background: #f8f9fa !important;
             }
         }
@@ -106,14 +106,14 @@
         .editable {
             background: #fff9e0;
         }
-        .items-table {
+        .items-table, .tax-summary-table {
             width: 100%;
             border-collapse: collapse;
             margin: 15px 0;
             font-size: 11px;
             table-layout: fixed;
         }
-        .items-table th, .items-table td {
+        .items-table th, .items-table td, .tax-summary-table th, .tax-summary-table td {
             border: 1px solid #dee2e6;
             padding: 6px 4px;
             text-align: left;
@@ -123,16 +123,18 @@
             white-space: normal;
         }
         .items-table th:nth-child(1) { width: 5%; }
-        .items-table th:nth-child(2) { width: 12%; }
-        .items-table th:nth-child(3) { width: 20%; }
+        .items-table th:nth-child(2) { width: 10%; }
+        .items-table th:nth-child(3) { width: 15%; }
         .items-table th:nth-child(4) { width: 5%; }
         .items-table th:nth-child(5) { width: 8%; }
-        .items-table th:nth-child(6) { width: 10%; }
+        .items-table th:nth-child(6) { width: 8%; }
         .items-table th:nth-child(7) { width: 6%; }
         .items-table th:nth-child(8) { width: 8%; }
         .items-table th:nth-child(9) { width: 8%; }
-        .items-table th:nth-child(10) { width: 10%; }
+        .items-table th:nth-child(10) { width: 8%; }
+        .items-table th:nth-child(11) { width: 8%; }
         .items-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
+        .tax-summary-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
         .totals table { width: 280px; margin-left: auto; }
         .totals td { border: none; padding: 3px; }
@@ -262,12 +264,39 @@
         </div>
     </div>
 
-    <!-- Items Table -->
+    <!-- Items Table (with HSN column) -->
     <table class="items-table" id="itemsTable">
         <thead>
-            <tr><th>#</th><th>Part No</th><th>Description</th><th>Qty</th><th>Unit Price (₹)</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
+            <tr>
+                <th>#</th>
+                <th>Part No</th>
+                <th>Description</th>
+                <th>HSN/SAC</th>
+                <th>Qty</th>
+                <th>Unit Price (₹)</th>
+                <th>Taxable (₹)</th>
+                <th>GST%</th>
+                <th>CGST (₹)</th>
+                <th>SGST (₹)</th>
+                <th>Total (₹)</th>
+            </tr>
         </thead>
         <tbody id="itemsBody"></tbody>
+    </table>
+
+    <!-- Tax Summary Table (grouped by HSN) -->
+    <table class="tax-summary-table">
+        <thead>
+            <tr>
+                <th>HSN/SAC</th>
+                <th>Taxable Value (₹)</th>
+                <th>CGST (₹)</th>
+                <th>SGST (₹)</th>
+                <th>IGST (₹)</th>
+                <th>Total Tax (₹)</th>
+            </tr>
+        </thead>
+        <tbody id="taxSummaryBody"></tbody>
     </table>
 
     <!-- Totals -->
@@ -276,6 +305,7 @@
             <tr><td style="text-align:right;">Subtotal:  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Round Off:  </td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
@@ -344,36 +374,31 @@
         document.getElementById('invoiceNo').innerText = invoiceNo;
     }
 
-    // ========== REUSABLE INVOICE NUMBER LOGIC (FIXED) ==========
     function getReusableInvoiceNumber(type) {
         const finYear = getFinancialYear();
-        let deleted = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
-        // Filter for same type and same financial year
-        let available = deleted.filter(n => n.type === type && n.finYear === finYear);
-        if (available.length === 0) return null;
-        // Get smallest number
-        let smallest = Math.min(...available.map(n => n.number));
-        // Remove it from deleted list
-        let remaining = deleted.filter(n => !(n.type === type && n.finYear === finYear && n.number === smallest));
-        localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(remaining));
-        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-        return prefix + smallest.toString().padStart(4, '0');
+        let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
+        let available = deletedNumbers.filter(n => n.type === type && n.finYear === finYear).sort((a,b) => a.number - b.number);
+        if (available.length > 0) {
+            const reused = available[0];
+            const remaining = deletedNumbers.filter(n => !(n.type === type && n.finYear === finYear && n.number === reused.number));
+            localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(remaining));
+            let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+            return prefix + reused.number.toString().padStart(4,'0');
+        }
+        return null;
     }
 
     function getAndIncrementInvoiceNumber(type) {
-        // First try to reuse a deleted number
-        let reused = getReusableInvoiceNumber(type);
-        if (reused) return reused;
-        // Otherwise get from counter
         const finYear = getFinancialYear();
+        const reused = getReusableInvoiceNumber(type);
+        if (reused) return reused;
         let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
         let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
         let cnt = parseInt(localStorage.getItem(key)) || 1;
-        let invNo = prefix + cnt.toString().padStart(4, '0');
+        let invNo = prefix + cnt.toString().padStart(4,'0');
         localStorage.setItem(key, cnt + 1);
         return invNo;
     }
-    // ==================================================
 
     function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
 
@@ -386,23 +411,31 @@
 
     function calculateTotals() {
         let sub = 0, cgst = 0, sgst = 0;
-        cart.forEach(i => { let t = i.price * i.qty; sub += t; cgst += t * 0.09; sgst += t * 0.09; });
+        cart.forEach(i => {
+            let t = i.price * i.qty;
+            sub += t;
+            cgst += t * 0.09;
+            sgst += t * 0.09;
+        });
         let grand = sub + cgst + sgst;
         let roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
         return { subtotal: sub, cgstTotal: cgst, sgstTotal: sgst, roundOff, grand };
     }
 
-    function renderItems() {
-        let html = '';
+    function renderItemsAndTaxSummary() {
+        let itemsHtml = '';
+        let taxGroups = {}; // key = hsn
         cart.forEach((item, idx) => {
-            let taxable = item.price * item.qty;
-            let cgst = taxable * 0.09;
-            let sgst = taxable * 0.09;
-            html += `<tr>
+            const taxable = item.price * item.qty;
+            const cgst = taxable * 0.09;
+            const sgst = taxable * 0.09;
+            const hsn = item.hsn || '';
+            itemsHtml += `<tr>
                 <td style="text-align:center;">${idx+1}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
+                <td>${escapeHtml(hsn)}</td>
                 <td style="text-align:center;">${item.qty}</td>
                 <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
                 <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
@@ -411,12 +444,40 @@
                 <td style="text-align:right;">₹${sgst.toFixed(2)}</td>
                 <td style="text-align:right;">₹${(taxable+cgst+sgst).toFixed(2)}</td>
             </tr>`;
+            if (hsn) {
+                if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0 };
+                taxGroups[hsn].taxable += taxable;
+                taxGroups[hsn].cgst += cgst;
+                taxGroups[hsn].sgst += sgst;
+            } else {
+                if (!taxGroups[''] ) taxGroups[''] = { taxable: 0, cgst: 0, sgst: 0 };
+                taxGroups[''].taxable += taxable;
+                taxGroups[''].cgst += cgst;
+                taxGroups[''].sgst += sgst;
+            }
         });
-        document.getElementById('itemsBody').innerHTML = html;
+        document.getElementById('itemsBody').innerHTML = itemsHtml;
+
+        let taxHtml = '';
+        for (let hsn in taxGroups) {
+            const g = taxGroups[hsn];
+            const totalTax = g.cgst + g.sgst;
+            taxHtml += `<tr>
+                <td>${hsn || 'N/A'}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="text-align:right;">₹${g.cgst.toFixed(2)}</td>
+                <td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>
+                <td style="text-align:right;">₹0.00</td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+            </tr>`;
+        }
+        document.getElementById('taxSummaryBody').innerHTML = taxHtml;
+
         let t = calculateTotals();
         document.getElementById('subtotal').innerText = t.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = t.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = t.sgstTotal.toFixed(2);
+        document.getElementById('roundOff').innerText = t.roundOff.toFixed(2);
         document.getElementById('grandTotal').innerText = t.grand.toFixed(2);
     }
 
@@ -485,7 +546,7 @@
                 transportMode: document.getElementById('transportMode').value,
                 vehicleNo: document.getElementById('vehicleNo').value
             },
-            items: cart.map(i => ({ part: i.part, desc: i.desc, qty: i.qty, price: i.price, total: i.price * i.qty })),
+            items: cart.map(i => ({ part: i.part, desc: i.desc, hsn: i.hsn || '', qty: i.qty, price: i.price, total: i.price * i.qty })),
             subtotal: totals.subtotal,
             cgst: totals.cgstTotal,
             sgst: totals.sgstTotal,
@@ -562,27 +623,6 @@
         const typeSelector = clone.querySelector('.invoice-type');
         if (typeSelector) typeSelector.style.display = 'none';
         
-        // Recalculate totals from items in the clone
-        let subtotal = 0;
-        const rows = clone.querySelectorAll('#itemsBody tr');
-        rows.forEach(row => {
-            const cells = row.cells;
-            if (cells.length >= 6) {
-                const qty = parseFloat(cells[3].innerText);
-                const price = parseFloat(cells[4].innerText.replace('₹', ''));
-                subtotal += qty * price;
-            }
-        });
-        const cgst = subtotal * 0.09;
-        const sgst = subtotal * 0.09;
-        let grand = subtotal + cgst + sgst;
-        const roundOff = Math.round(grand) - grand;
-        grand = Math.round(grand);
-        clone.querySelector('#subtotal').innerText = subtotal.toFixed(2);
-        clone.querySelector('#cgstTotal').innerText = cgst.toFixed(2);
-        clone.querySelector('#sgstTotal').innerText = sgst.toFixed(2);
-        clone.querySelector('#grandTotal').innerText = grand.toFixed(2);
-        
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
         const opt = {
@@ -609,8 +649,8 @@
     if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
 
     setDates();
-    renderItems();
+    renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
 </script>
 </body>
-    </html>
+</html>
