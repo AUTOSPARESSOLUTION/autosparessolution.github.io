@@ -1138,6 +1138,7 @@ function extractYouTubeId(url) {
                              sales_value: cols[20]?.trim() || "",
                              zone: cols[21]?.trim() || "",
                              region: cols[22]?.trim() || "",
+                            hsn: cols[23]?.trim() || "",
                             mostSelling: cols[18]?.trim() === '1',   // true if the cell contains "1"
                             //media: cols[17] ? cols[17].split(';').map(u => u.trim()).filter(u => u) : []
                             media: (() => {
@@ -1334,7 +1335,7 @@ if (preloader) {
             const existing = cart.find(i => i.part === part);
             const product = allProducts.find(p => p.part === part);
             if (existing) existing.qty += qty;
-            else cart.push({ part, price, qty, desc: product?.desc || part, boxQty: product?.boxQty || 1, masterCarton: product?.masterCarton || 1 });
+            else cart.push({ part, price, qty, desc: product?.desc || part, boxQty: product?.boxQty || 1, masterCarton: product?.masterCarton || 1, hsn: product?.hsn || '' });
             updateCartUI();
             showToast(`${part} added to cart`);
         }
