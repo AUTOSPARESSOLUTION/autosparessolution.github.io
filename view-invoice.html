@@ -6,7 +6,7 @@
     <title>View Invoice – Auto Spares</title>
     <style>
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .invoice-container { max-width: 1100px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .invoice-container { max-width: 1100px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #dee2e6; }
         .company-header { background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px; border-radius: 8px; }
         .logo-area { display: flex; align-items: center; gap: 15px; }
         .logo-area img { height: 60px; }
@@ -37,10 +37,10 @@
     if (!invoice.invoiceNo) {
         document.getElementById('invoiceView').innerHTML = '<p style="color:red;">No invoice data found.</p>';
     } else {
-        // Calculate tax groups from items
+        // Recalculate tax groups from items (to ensure consistency)
         let taxGroups = {};
         invoice.items.forEach(item => {
-            const taxable = item.price * item.qty;
+            const taxable = item.price * item.qty * (1 - (item.discount || 0)/100);
             const cgst = taxable * 0.09;
             const sgst = taxable * 0.09;
             const hsn = item.hsn || '';
@@ -65,7 +65,7 @@
 
         let itemsHtml = '';
         invoice.items.forEach((item, idx) => {
-            const taxable = item.price * item.qty;
+            const taxable = item.price * item.qty * (1 - (item.discount || 0)/100);
             const cgst = taxable * 0.09;
             const sgst = taxable * 0.09;
             const totalItem = taxable + cgst + sgst;
@@ -76,6 +76,7 @@
                 <td style="border:1px solid #dee2e6; padding:6px 4px;">${escapeHtml(item.hsn)}</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.discount || 0}%</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgst.toFixed(2)}</td>
@@ -110,7 +111,11 @@
                 <div style="flex:1;"><div class="info-box"><h3>Dispatch Details</h3><div class="info-row"><div class="info-label">Doc No:</div><div class="info-value">${escapeHtml(invoice.dispatchDetails?.docNo)}</div></div><div class="info-row"><div class="info-label">Mode:</div><div class="info-value">${escapeHtml(invoice.dispatchDetails?.transportMode)}</div></div><div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value">${escapeHtml(invoice.dispatchDetails?.vehicleNo)}</div></div></div></div>
             </div>
             <table style="width:100%; border-collapse:collapse; margin:20px 0; font-size:11px; table-layout:fixed;">
-                <thead><tr style="background:#f8f9fa;"><th style="width:5%;">#</th><th style="width:10%;">Part No</th><th style="width:15%;">Description</th><th style="width:8%;">HSN</th><th style="width:5%;">Qty</th><th style="width:8%;">Unit Price</th><th style="width:8%;">Taxable</th><th style="width:6%;">GST%</th><th style="width:8%;">CGST</th><th style="width:8%;">SGST</th><th style="width:8%;">Total</th></tr></thead>
+                <thead><tr style="background:#f8f9fa;">
+                    <th style="width:4%;">#</th><th style="width:10%;">Part No</th><th style="width:12%;">Description</th><th style="width:8%;">HSN</th>
+                    <th style="width:4%;">Qty</th><th style="width:7%;">Unit Price</th><th style="width:6%;">Disc%</th>
+                    <th style="width:8%;">Taxable</th><th style="width:6%;">GST%</th><th style="width:8%;">CGST</th><th style="width:8%;">SGST</th><th style="width:8%;">Total</th>
+                </tr></thead>
                 <tbody>${itemsHtml}</tbody>
             </table>
             <table style="width:100%; border-collapse:collapse; margin:15px 0; font-size:11px;">
@@ -119,11 +124,11 @@
             </table>
             <div class="totals">
                 <table>
-                    <tr><td style="text-align:right;">Subtotal:  </td><td style="text-align:right;">₹${invoice.subtotal?.toFixed(2) || '0.00'}</td></tr>
-                    <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹${invoice.cgst?.toFixed(2) || '0.00'}</td></tr>
-                    <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹${invoice.sgst?.toFixed(2) || '0.00'}</td></tr>
-                    <tr><td style="text-align:right;">Round Off:  </td><td style="text-align:right;">₹${invoice.roundOff?.toFixed(2) || '0.00'}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹${invoice.grandTotal?.toFixed(2) || '0.00'}</td></tr>
+                    <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹${invoice.subtotal?.toFixed(2) || '0.00'}</td></tr>
+                    <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹${invoice.cgst?.toFixed(2) || '0.00'}</td></tr>
+                    <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹${invoice.sgst?.toFixed(2) || '0.00'}</td></tr>
+                    <tr><td style="text-align:right;">Round Off:</td><td style="text-align:right;">₹${invoice.roundOff?.toFixed(2) || '0.00'}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹${invoice.grandTotal?.toFixed(2) || '0.00'}</td></tr>
                 </table>
             </div>
             <div class="signature-box">
@@ -133,10 +138,7 @@
         document.getElementById('invoiceView').innerHTML = html;
     }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
-    }
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 </script>
 </body>
 </html>
