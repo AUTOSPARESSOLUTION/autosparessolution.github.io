@@ -50,7 +50,7 @@
             document.getElementById('ordersTable').innerHTML = '<p>No invoices found.</p>';
             return;
         }
-        let html = '<tr><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(inv => {
             html += `<tr>
                 <td>${inv.invoiceNo}</td>
@@ -104,11 +104,11 @@
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!invoice) { alert('Invoice not found'); return; }
 
-        // Recalculate totals from items
+        // Recalculate from items to ensure accuracy
         let subtotal = 0;
         let taxGroups = {};
         invoice.items.forEach(item => {
-            const taxable = item.price * item.qty;
+            const taxable = item.price * item.qty * (1 - (item.discount || 0) / 100);
             subtotal += taxable;
             const cgst = taxable * 0.09;
             const sgst = taxable * 0.09;
@@ -138,14 +138,37 @@
             </tr>`;
         }
 
+        let itemsHtml = '';
+        invoice.items.forEach((item, idx) => {
+            const taxable = item.price * item.qty * (1 - (item.discount || 0)/100);
+            const cgstItem = taxable * 0.09;
+            const sgstItem = taxable * 0.09;
+            const totalItem = taxable + cgstItem + sgstItem;
+            itemsHtml += `<tr>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${idx+1}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.part)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.desc)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px;">${escapeHtml(item.hsn)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.discount || 0}%</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgstItem.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgstItem.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
+            </tr>`;
+        });
+
         const container = document.createElement('div');
         container.style.padding = '20px';
         container.style.fontFamily = 'Roboto, sans-serif';
         container.style.maxWidth = '1200px';
         container.style.margin = '0 auto';
         container.style.backgroundColor = 'white';
+        container.style.border = '1px solid #dee2e6';
         container.innerHTML = `
-            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.src='https://via.placeholder.com/60?text=ASS'">
                     <div><h1 style="margin:0;">Auto Spares Solution</h1><p>GSTIN: 19ANOPD3300R1ZO</p><p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p></div>
@@ -161,28 +184,21 @@
                 <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Dispatch Details</h3><p>Doc No: ${escapeHtml(invoice.dispatchDetails?.docNo)}<br>Mode: ${escapeHtml(invoice.dispatchDetails?.transportMode)}<br>Vehicle No: ${escapeHtml(invoice.dispatchDetails?.vehicleNo)}</p></div>
             </div>
             <table style="width:100%; border-collapse:collapse; margin:20px 0; font-size:11px; table-layout:fixed;">
-                <thead><tr style="background:#f8f9fa;"><th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">#</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Part No</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:15%;">Description</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">HSN</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">Qty</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Unit Price</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Taxable</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">GST%</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">CGST</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">SGST</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Total</th></tr></thead>
-                <tbody>
-                    ${invoice.items.map((item, idx) => {
-                        const taxable = item.price * item.qty;
-                        const cgstItem = taxable * 0.09;
-                        const sgstItem = taxable * 0.09;
-                        const totalItem = taxable + cgstItem + sgstItem;
-                        return `<tr>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${idx+1}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.part)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.desc)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px;">${escapeHtml(item.hsn)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgstItem.toFixed(2)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgstItem.toFixed(2)}</td>
-                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
-                        </tr>`;
-                    }).join('')}
-                </tbody>
+                <thead><tr style="background:#f8f9fa;">
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:4%;">#</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Part No</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:12%;">Description</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">HSN</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:4%;">Qty</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:7%;">Unit Price</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">Disc%</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Taxable</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">GST%</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">CGST</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">SGST</th>
+                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Total</th>
+                </tr></thead>
+                <tbody>${itemsHtml}</tbody>
             </table>
             <table style="width:100%; border-collapse:collapse; margin:15px 0; font-size:11px;">
                 <thead><tr style="background:#f8f9fa;"><th>HSN/SAC</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total Tax</th></tr></thead>
@@ -190,11 +206,11 @@
             </table>
             <div style="text-align:right;">
                 <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal:  </td><td style="text-align:right;">₹${subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹${cgstTotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹${sgstTotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">Round Off:  </td><td style="text-align:right;">₹${roundOff.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹${subtotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹${cgstTotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹${sgstTotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">Round Off:</td><td style="text-align:right;">₹${roundOff.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>
                 </table>
             </div>
             <div style="margin-top:30px; border:1px solid #dee2e6; border-radius:8px; padding:15px; background:#f9f9f9;">
