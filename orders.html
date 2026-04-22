@@ -3,371 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order History - Auto Spares Solution</title>
+    <title>Order History - Auto Spares</title>
     <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .company-header {
-            background: #0a7c71;
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-            border-radius: 8px;
-        }
-        .logo-area {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .logo-area img {
-            height: 60px;
-        }
-        .company-details h1 {
-            margin: 0;
-            font-size: 24px;
-        }
-        .company-details p {
-            margin: 3px 0 0;
-            font-size: 12px;
-            opacity: 0.8;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #0a7c71;
-            margin-top: 0;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            border: 1px solid #dee2e6;
-        }
-        th, td {
-            border: 1px solid #dee2e6;
-            padding: 8px;
-            text-align: left;
-            vertical-align: top;
-        }
-        th {
-            background: #0a7c71;
-            color: white;
-        }
-        .search-box {
-            margin-bottom: 20px;
-        }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 2px;
-        }
-        button:hover {
-            background: #09645a;
-        }
-        .btn-edit {
-            background: #17a2b8;
-        }
-        .btn-edit:hover {
-            background: #138496;
-        }
-        .btn-delete {
-            background: #dc3545;
-        }
-        .btn-delete:hover {
-            background: #c82333;
-        }
-        .btn-pdf {
-            background: #e67e22;
-        }
-        .btn-pdf:hover {
-            background: #d35400;
-        }
-        @media print {
-            .no-print, .search-box, .actions, button {
-                display: none !important;
-            }
-            body {
-                background: white;
-                padding: 0;
-            }
-            .container {
-                box-shadow: none;
-                padding: 0;
-            }
-        }
+        body { font-family: 'Roboto', sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; border: 1px solid #dee2e6; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .search-box { margin-bottom: 20px; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
+        button:hover { background: #09645a; }
+        .btn-edit { background: #17a2b8; }
+        .btn-edit:hover { background: #138496; }
+        .btn-delete { background: #dc3545; }
+        .btn-delete:hover { background: #c82333; }
+        .btn-pdf { background: #e67e22; }
+        .btn-pdf:hover { background: #d35400; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
-    <!-- Company Header (visible on screen) -->
-    <div class="company-header">
-        <div class="logo-area">
-            <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60?text=ASS'">
-            <div class="company-details">
-                <h1>Auto Spares Solution</h1>
-                <p>GSTIN: 19ANOPD3300R1ZO | 101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+<div class="container">
+    <h1>Order History (All Invoices)</h1>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by Invoice No, Customer Name..." style="width: 300px; padding: 8px;">
+        <button onclick="filterOrders()">Search</button>
+        <button onclick="exportToCSV()">Export to CSV</button>
+    </div>
+    <div id="ordersTable"></div>
+    <button onclick="window.location.href='index.html'">Back to Store</button>
+</div>
+
+<script>
+    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+
+    function displayOrders(filter = '') {
+        let filtered = allInvoices;
+        if (filter) {
+            filtered = allInvoices.filter(inv => 
+                inv.invoiceNo.toLowerCase().includes(filter) ||
+                (inv.buyer?.name && inv.buyer.name.toLowerCase().includes(filter))
+            );
+        }
+        if (filtered.length === 0) {
+            document.getElementById('ordersTable').innerHTML = '<p>No invoices found.</p>';
+            return;
+        }
+        let html = '<tr><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></tr></thead><tbody>';
+        filtered.forEach(inv => {
+            html += `<tr>
+                <td>${inv.invoiceNo}</td>
+                <td>${inv.date}</td>
+                <td>${inv.buyer?.name || 'Guest'}</td>
+                <td>₹${inv.grandTotal.toFixed(2)}</td>
+                <td>${inv.status}</td>
+                <td>${inv.invoiceType}</td>
+                <td>
+                    <button class="btn-edit" onclick="editInvoice('${inv.invoiceNo}')">Edit</button>
+                    <button class="btn-delete" onclick="deleteInvoice('${inv.invoiceNo}')">Delete</button>
+                    <button class="btn-pdf" onclick="downloadInvoicePDF('${inv.invoiceNo}')">PDF</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('ordersTable').innerHTML = html;
+    }
+
+    function editInvoice(invoiceNo) {
+        localStorage.setItem('editInvoiceNo', invoiceNo);
+        window.open('edit-invoice.html', '_blank');
+    }
+
+    function deleteInvoice(invoiceNo) {
+        if (!confirm(`Delete invoice ${invoiceNo}?`)) return;
+        const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
+        if (!invoice) return;
+
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const customer = customers.find(c => c.email === invoice.buyer?.email);
+        if (customer) {
+            if (invoice.invoiceType === 'credit') customer.outstanding -= invoice.grandTotal;
+            if (customer.outstanding < 0) customer.outstanding = 0;
+            customer.totalPurchased -= invoice.grandTotal;
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+
+        let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
+        let number = parseInt(invoice.invoiceNo.split('/').pop());
+        deletedNumbers.push({ type: invoice.invoiceType, finYear: invoice.finYear, number: number });
+        localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(deletedNumbers));
+
+        allInvoices = allInvoices.filter(i => i.invoiceNo !== invoiceNo);
+        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+        alert(`Invoice ${invoiceNo} deleted.`);
+        displayOrders(document.getElementById('searchInput').value.toLowerCase());
+    }
+
+    function downloadInvoicePDF(invoiceNo) {
+        const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
+        if (!invoice) { alert('Invoice not found'); return; }
+
+        // Recalculate totals from items
+        let subtotal = 0;
+        let taxGroups = {};
+        invoice.items.forEach(item => {
+            const taxable = item.price * item.qty;
+            subtotal += taxable;
+            const cgst = taxable * 0.09;
+            const sgst = taxable * 0.09;
+            const hsn = item.hsn || '';
+            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0 };
+            taxGroups[hsn].taxable += taxable;
+            taxGroups[hsn].cgst += cgst;
+            taxGroups[hsn].sgst += sgst;
+        });
+        const cgstTotal = subtotal * 0.09;
+        const sgstTotal = subtotal * 0.09;
+        let grand = subtotal + cgstTotal + sgstTotal;
+        const roundOff = Math.round(grand) - grand;
+        grand = Math.round(grand);
+
+        let taxHtml = '';
+        for (let hsn in taxGroups) {
+            const g = taxGroups[hsn];
+            const totalTax = g.cgst + g.sgst;
+            taxHtml += `<tr>
+                <td style="border:1px solid #dee2e6; padding:6px 4px;">${hsn || 'N/A'}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${g.cgst.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${g.sgst.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹0.00</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalTax.toFixed(2)}</td>
+            </tr>`;
+        }
+
+        const container = document.createElement('div');
+        container.style.padding = '20px';
+        container.style.fontFamily = 'Roboto, sans-serif';
+        container.style.maxWidth = '1200px';
+        container.style.margin = '0 auto';
+        container.style.backgroundColor = 'white';
+        container.innerHTML = `
+            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.src='https://via.placeholder.com/60?text=ASS'">
+                    <div><h1 style="margin:0;">Auto Spares Solution</h1><p>GSTIN: 19ANOPD3300R1ZO</p><p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p></div>
+                </div>
+                <div><h2>TAX INVOICE</h2><p>Invoice No: ${invoice.invoiceNo}<br>Date: ${invoice.date}<br>Due Date: ${invoice.dueDate}</p></div>
             </div>
-        </div>
-        <div style="text-align: right;">
-            <h2 style="margin:0;">Order History</h2>
-        </div>
-    </div>
-
-    <div class="container">
-        <h1>All Invoices</h1>
-        <div class="search-box no-print">
-            <input type="text" id="searchInput" placeholder="Search by Invoice No, Customer Name..." style="width: 300px; padding: 8px;">
-            <button onclick="filterOrders()">Search</button>
-            <button onclick="exportToCSV()">Export to CSV</button>
-        </div>
-        <div id="ordersTable"></div>
-        <div class="no-print" style="margin-top: 20px;">
-            <button onclick="window.location.href='index.html'">Back to Store</button>
-        </div>
-    </div>
-
-    <script>
-        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-
-        function displayOrders(filter = '') {
-            let filtered = allInvoices;
-            if (filter) {
-                filtered = allInvoices.filter(inv => 
-                    inv.invoiceNo.toLowerCase().includes(filter) ||
-                    (inv.buyer?.name && inv.buyer.name.toLowerCase().includes(filter))
-                );
-            }
-            if (filtered.length === 0) {
-                document.getElementById('ordersTable').innerHTML = '<p>No invoices found.</p>';
-                return;
-            }
-            let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></tr></thead><tbody>';
-            filtered.forEach(inv => {
-                html += `<tr>
-                    <td>${inv.invoiceNo}</td>
-                    <td>${inv.date}</td>
-                    <td>${inv.buyer?.name || 'Guest'}</td>
-                    <td>₹${inv.grandTotal.toFixed(2)}</td>
-                    <td>${inv.status}</td>
-                    <td>${inv.invoiceType}</td>
-                    <td>
-                        <button class="btn-edit" onclick="editInvoice('${inv.invoiceNo}')">Edit</button>
-                        <button class="btn-delete" onclick="deleteInvoice('${inv.invoiceNo}')">Delete</button>
-                        <button class="btn-pdf" onclick="downloadInvoicePDF('${inv.invoiceNo}')">PDF</button>
-                    </td>
-                </tr>`;
-            });
-            html += '</tbody></table>';
-            document.getElementById('ordersTable').innerHTML = html;
-        }
-
-        function editInvoice(invoiceNo) {
-            localStorage.setItem('editInvoiceNo', invoiceNo);
-            window.open('edit-invoice.html', '_blank');
-        }
-
-        function deleteInvoice(invoiceNo) {
-            if (!confirm(`Are you sure you want to delete invoice ${invoiceNo}? This action cannot be undone.`)) return;
-            const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
-            if (!invoice) return;
-
-            const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-            const customer = customers.find(c => c.email === invoice.buyer?.email);
-            if (customer) {
-                if (invoice.invoiceType === 'credit') customer.outstanding -= invoice.grandTotal;
-                if (customer.outstanding < 0) customer.outstanding = 0;
-                customer.totalPurchased -= invoice.grandTotal;
-                localStorage.setItem('customers', JSON.stringify(customers));
-            }
-
-            let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
-            let number = parseInt(invoice.invoiceNo.split('/').pop());
-            deletedNumbers.push({ type: invoice.invoiceType, finYear: invoice.finYear, number: number });
-            localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(deletedNumbers));
-
-            allInvoices = allInvoices.filter(i => i.invoiceNo !== invoiceNo);
-            localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-            alert(`Invoice ${invoiceNo} deleted. Number will be reused.`);
-            displayOrders(document.getElementById('searchInput').value.toLowerCase());
-        }
-
-        // Professional PDF generation – matches invoice.html exactly
-        function downloadInvoicePDF(invoiceNo) {
-            const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
-            if (!invoice) { alert('Invoice not found'); return; }
-
-            // Recalculate totals from items
-            let subtotal = 0;
-            invoice.items.forEach(item => {
-                subtotal += item.price * item.qty;
-            });
-            const cgst = subtotal * 0.09;
-            const sgst = subtotal * 0.09;
-            let grand = subtotal + cgst + sgst;
-            const roundOff = Math.round(grand) - grand;
-            grand = Math.round(grand);
-
-            const container = document.createElement('div');
-            container.style.padding = '20px';
-            container.style.fontFamily = 'Roboto, sans-serif';
-            container.style.maxWidth = '1200px';
-            container.style.margin = '0 auto';
-            container.style.backgroundColor = 'white';
-            container.innerHTML = `
-                <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.src='https://via.placeholder.com/60?text=ASS'">
-                        <div>
-                            <h1 style="margin:0;">Auto Spares Solution</h1>
-                            <p style="margin:0;">GSTIN: 19ANOPD3300R1ZO</p>
-                            <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-                        </div>
-                    </div>
-                    <div style="text-align:right;">
-                        <h2 style="margin:0;">TAX INVOICE</h2>
-                        <p><strong>Invoice No:</strong> ${invoice.invoiceNo}<br>
-                        <strong>Date:</strong> ${invoice.date}<br>
-                        <strong>Due Date:</strong> ${invoice.dueDate}</p>
-                    </div>
-                </div>
-                <div style="display:flex; gap:20px; flex-wrap:wrap; margin:20px 0;">
-                    <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
-                        <h3 style="margin:0 0 8px 0; color:#0a7c71;">Buyer (Bill to)</h3>
-                        <p>${escapeHtml(invoice.buyer?.name)}<br>${escapeHtml(invoice.buyer?.address)}<br>GSTIN: ${escapeHtml(invoice.buyer?.gstin)}<br>State: ${escapeHtml(invoice.buyer?.state)}<br>Phone: ${escapeHtml(invoice.buyer?.phone)}<br>Email: ${escapeHtml(invoice.buyer?.email)}</p>
-                    </div>
-                    <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
-                        <h3 style="margin:0 0 8px 0; color:#0a7c71;">Consignee (Ship to)</h3>
-                        <p>${escapeHtml(invoice.consignee?.name)}<br>${escapeHtml(invoice.consignee?.address)}<br>Phone: ${escapeHtml(invoice.consignee?.phone)}</p>
-                    </div>
-                </div>
-                <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
-                    <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
-                        <h3 style="margin:0 0 8px 0; color:#0a7c71;">Order Details</h3>
-                        <p>Customer Code: ${escapeHtml(invoice.orderDetails?.customerCode)}<br>SO No: ${escapeHtml(invoice.orderDetails?.salesOrderNo)}<br>Ref No: ${escapeHtml(invoice.orderDetails?.referenceNo)}<br>Payment Terms: ${escapeHtml(invoice.orderDetails?.paymentTerms)}</p>
-                    </div>
-                    <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
-                        <h3 style="margin:0 0 8px 0; color:#0a7c71;">Dispatch Details</h3>
-                        <p>Doc No: ${escapeHtml(invoice.dispatchDetails?.docNo)}<br>Mode: ${escapeHtml(invoice.dispatchDetails?.transportMode)}<br>Vehicle No: ${escapeHtml(invoice.dispatchDetails?.vehicleNo)}</p>
-                    </div>
-                </div>
-                <table style="width:100%; border-collapse:collapse; margin:20px 0; font-size:11px; table-layout:fixed;">
-                    <thead>
-                        <tr style="background:#f8f9fa;">
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">#</th>
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:12%;">Part No</th>
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:20%;">Description</th>
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">Qty</th>
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Unit Price (₹)</th>
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Taxable (₹)</th>
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">GST%</th>
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">CGST (₹)</th>
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">SGST (₹)</th>
-                            <th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Total (₹)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${invoice.items.map((item, idx) => {
-                            const taxable = item.price * item.qty;
-                            const cgstItem = taxable * 0.09;
-                            const sgstItem = taxable * 0.09;
-                            const totalItem = taxable + cgstItem + sgstItem;
-                            return `<tr>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${idx+1}</td>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.part)}</td>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.desc)}</td>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</td>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</td>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgstItem.toFixed(2)}</td>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgstItem.toFixed(2)}</td>
-                                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
-                            </tr>`;
-                        }).join('')}
-                    </tbody>
+            <div style="display:flex; gap:20px; flex-wrap:wrap; margin:20px 0;">
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Buyer</h3><p>${escapeHtml(invoice.buyer?.name)}<br>${escapeHtml(invoice.buyer?.address)}<br>GSTIN: ${escapeHtml(invoice.buyer?.gstin)}<br>State: ${escapeHtml(invoice.buyer?.state)}<br>Phone: ${escapeHtml(invoice.buyer?.phone)}<br>Email: ${escapeHtml(invoice.buyer?.email)}</p></div>
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Consignee</h3><p>${escapeHtml(invoice.consignee?.name)}<br>${escapeHtml(invoice.consignee?.address)}<br>Phone: ${escapeHtml(invoice.consignee?.phone)}</p></div>
+            </div>
+            <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Order Details</h3><p>Customer Code: ${escapeHtml(invoice.orderDetails?.customerCode)}<br>SO No: ${escapeHtml(invoice.orderDetails?.salesOrderNo)}<br>Ref No: ${escapeHtml(invoice.orderDetails?.referenceNo)}<br>Payment Terms: ${escapeHtml(invoice.orderDetails?.paymentTerms)}</p></div>
+                <div style="flex:1; background:#f8f9fa; padding:10px;"><h3>Dispatch Details</h3><p>Doc No: ${escapeHtml(invoice.dispatchDetails?.docNo)}<br>Mode: ${escapeHtml(invoice.dispatchDetails?.transportMode)}<br>Vehicle No: ${escapeHtml(invoice.dispatchDetails?.vehicleNo)}</p></div>
+            </div>
+            <table style="width:100%; border-collapse:collapse; margin:20px 0; font-size:11px; table-layout:fixed;">
+                <thead><tr style="background:#f8f9fa;"><th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">#</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Part No</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:15%;">Description</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">HSN</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:5%;">Qty</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Unit Price</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Taxable</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">GST%</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">CGST</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">SGST</th><th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Total</th></tr></thead>
+                <tbody>
+                    ${invoice.items.map((item, idx) => {
+                        const taxable = item.price * item.qty;
+                        const cgstItem = taxable * 0.09;
+                        const sgstItem = taxable * 0.09;
+                        const totalItem = taxable + cgstItem + sgstItem;
+                        return `<tr>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${idx+1}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.part)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.desc)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px;">${escapeHtml(item.hsn)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgstItem.toFixed(2)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgstItem.toFixed(2)}</td>
+                            <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+            <table style="width:100%; border-collapse:collapse; margin:15px 0; font-size:11px;">
+                <thead><tr style="background:#f8f9fa;"><th>HSN/SAC</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total Tax</th></tr></thead>
+                <tbody>${taxHtml}</tbody>
+            </table>
+            <div style="text-align:right;">
+                <table style="width:280px; margin-left:auto;">
+                    <tr><td style="text-align:right;">Subtotal:  </td><td style="text-align:right;">₹${subtotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹${cgstTotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹${sgstTotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">Round Off:  </td><td style="text-align:right;">₹${roundOff.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>
                 </table>
-                <div class="totals" style="text-align:right; margin-top:15px;">
-                    <table style="width:280px; margin-left:auto; border-collapse:collapse;">
-                        <tr><td style="text-align:right; border:none; padding:3px;">Subtotal:  </td><td style="text-align:right; border:none; padding:3px;">₹${subtotal.toFixed(2)}</td></tr>
-                        <tr><td style="text-align:right; border:none; padding:3px;">CGST (9%): </td><td style="text-align:right; border:none; padding:3px;">₹${cgst.toFixed(2)}</td></tr>
-                        <tr><td style="text-align:right; border:none; padding:3px;">SGST (9%): </td><td style="text-align:right; border:none; padding:3px;">₹${sgst.toFixed(2)}</td></tr>
-                        <tr><td style="text-align:right; border:none; padding:3px;">Round Off: </td><td style="text-align:right; border:none; padding:3px;">₹${roundOff.toFixed(2)}</td></tr>
-                        <tr style="font-weight:bold;"><td style="text-align:right; border:none; padding:3px;">Grand Total: </td><td style="text-align:right; border:none; padding:3px;">₹${grand.toFixed(2)}</td></tr>
-                    </table>
-                </div>
-                <div style="margin-top:30px;">
-                    <div style="border:1px solid #dee2e6; border-radius:8px; padding:15px; background:#f9f9f9;">
-                        <p style="margin:0 0 8px;"><strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</p>
-                        <p style="margin:0;"><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
-                    </div>
-                    <div style="text-align:right; margin-top:20px;">
-                        <div style="width:250px; border-top:1px solid #333; padding-top:5px; margin-left:auto; text-align:center;">
-                            For Auto Spares Solution<br>
-                            (Authorised Signatory)<br>
-                            <span style="font-size:10px;">(Stamp & Signature)</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-            const opt = {
-                margin: [0.2, 0.2, 0.2, 0.2],
-                filename: `Invoice_${invoice.invoiceNo}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-            };
-            html2pdf().set(opt).from(container).save();
-        }
+            </div>
+            <div style="margin-top:30px; border:1px solid #dee2e6; border-radius:8px; padding:15px; background:#f9f9f9;">
+                <p><strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</p>
+                <p><strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.</p>
+                <div style="text-align:right; margin-top:20px;"><div style="width:250px; border-top:1px solid #333; padding-top:5px; margin-left:auto; text-align:center;">For Auto Spares Solution<br>(Authorised Signatory)</div></div>
+            </div>
+        `;
+        const opt = { margin: [0.2,0.2,0.2,0.2], filename: `Invoice_${invoice.invoiceNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+        html2pdf().set(opt).from(container).save();
+    }
 
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            });
-        }
-
-        function filterOrders() {
-            const term = document.getElementById('searchInput').value.toLowerCase();
-            displayOrders(term);
-        }
-
-        function exportToCSV() {
-            let csv = "Invoice No,Date,Customer,Amount,Status,Type\n";
-            allInvoices.forEach(inv => {
-                csv += `"${inv.invoiceNo}",${inv.date},"${inv.buyer?.name || 'Guest'}",${inv.grandTotal},${inv.status},${inv.invoiceType}\n`;
-            });
-            const blob = new Blob([csv], {type: 'text/csv'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'orders_backup.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        displayOrders();
-    </script>
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function filterOrders() { const term = document.getElementById('searchInput').value.toLowerCase(); displayOrders(term); }
+    function exportToCSV() {
+        let csv = "Invoice No,Date,Customer,Amount,Status,Type\n";
+        allInvoices.forEach(inv => { csv += `"${inv.invoiceNo}",${inv.date},"${inv.buyer?.name || 'Guest'}",${inv.grandTotal},${inv.status},${inv.invoiceType}\n`; });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'orders_backup.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+    displayOrders();
+</script>
 </body>
 </html>
