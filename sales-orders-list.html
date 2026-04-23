@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Orders – Auto Spares</title>
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; border: 1px solid #dee2e6; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .search-box { margin-bottom: 20px; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
+        button:hover { background: #09645a; }
+        .btn-edit { background: #17a2b8; }
+        .btn-edit:hover { background: #138496; }
+        .btn-delete { background: #dc3545; }
+        .btn-delete:hover { background: #c82333; }
+        .btn-convert { background: #28a745; }
+        .btn-convert:hover { background: #218838; }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; }
+        .status-draft { background: #6c757d; color: white; }
+        .status-confirmed { background: #17a2b8; color: white; }
+        .status-converted { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Sales Orders</h1>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by Order No, Customer..." style="width: 300px; padding: 8px;">
+        <button onclick="filterOrders()">Search</button>
+        <button onclick="window.location.href='sales-order.html'">+ New Sales Order</button>
+    </div>
+    <div id="ordersTable"></div>
+    <button onclick="window.location.href='index.html'">Back to Store</button>
+</div>
+
+<script>
+    let allOrders = JSON.parse(localStorage.getItem('salesOrders') || '[]');
+
+    function displayOrders(filter = '') {
+        let filtered = allOrders;
+        if (filter) {
+            filtered = allOrders.filter(o => 
+                o.orderNo.toLowerCase().includes(filter) ||
+                (o.customer.name && o.customer.name.toLowerCase().includes(filter))
+            );
+        }
+        if (filtered.length === 0) {
+            document.getElementById('ordersTable').innerHTML = '<p>No sales orders found.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>Order No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        filtered.forEach(order => {
+            let statusClass = `status-${order.status.toLowerCase()}`;
+            html += `<tr>
+                <td>${order.orderNo}</td>
+                <td>${order.date}</td>
+                <td>${order.customer.name || 'Guest'}</td>
+                <td>₹${order.grandTotal.toFixed(2)}</td>
+                <td><span class="status-badge ${statusClass}">${order.status}</span></td>
+                <td>
+                    <button class="btn-edit" onclick="editOrder('${order.id}')">Edit</button>
+                    <button class="btn-delete" onclick="deleteOrder('${order.id}')">Delete</button>
+                    ${order.status !== 'Converted' ? `<button class="btn-convert" onclick="convertOrder('${order.id}')">Convert to Invoice</button>` : ''}
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('ordersTable').innerHTML = html;
+    }
+
+    function editOrder(id) {
+        window.location.href = `sales-order.html?id=${id}`;
+    }
+
+    function deleteOrder(id) {
+        if (!confirm('Delete this sales order?')) return;
+        allOrders = allOrders.filter(o => o.id != id);
+        localStorage.setItem('salesOrders', JSON.stringify(allOrders));
+        displayOrders(document.getElementById('searchInput').value.toLowerCase());
+    }
+
+    function convertOrder(id) {
+        const order = allOrders.find(o => o.id == id);
+        if (!order) return;
+        // Build cart from order items
+        let cart = order.items.map(item => ({
+            part: item.part,
+            desc: item.desc,
+            hsn: item.hsn,
+            qty: item.qty,
+            price: item.price,
+            discount: item.discount,
+            boxQty: 1,
+            masterCarton: 1
+        }));
+        localStorage.setItem('invoiceCart', JSON.stringify(cart));
+        localStorage.setItem('invoiceCustomer', JSON.stringify(order.customer));
+        // Update order status to Converted
+        order.status = 'Converted';
+        localStorage.setItem('salesOrders', JSON.stringify(allOrders));
+        window.open('invoice.html', '_blank');
+        displayOrders(document.getElementById('searchInput').value.toLowerCase());
+    }
+
+    function filterOrders() {
+        const term = document.getElementById('searchInput').value.toLowerCase();
+        displayOrders(term);
+    }
+
+    displayOrders();
+</script>
+</body>
+</html>
