@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Inventory – Auto Spares</title>
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        .stats { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; flex: 1; text-align: center; }
+        .stat-card h3 { margin: 0; font-size: 14px; color: #555; }
+        .stat-card .number { font-size: 28px; font-weight: bold; color: #0a7c71; }
+        .low-stock { background: #fff3cd; border-left: 4px solid #ffc107; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .search-box { margin-bottom: 20px; }
+        input, select { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #09645a; }
+        .low-stock-row { background: #fff3cd; }
+        .btn-adjust { background: #17a2b8; }
+        .btn-adjust:hover { background: #138496; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Stock Inventory Management</h1>
+    <div class="stats" id="stats"></div>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by Part No or Description..." style="width: 300px;">
+        <button onclick="loadInventory()">Search</button>
+        <button onclick="window.location.href='stock-adjustment.html'">+ Manual Adjustment</button>
+        <button onclick="window.location.href='stock-report.html'">Stock Movement Report</button>
+    </div>
+    <div id="inventoryTable"></div>
+</div>
+
+<script>
+    let allProducts = [];
+    let stockMovements = JSON.parse(localStorage.getItem('stockMovements') || '[]');
+
+    // Load products from prices.csv and compute current stock
+    async function loadProducts() {
+        try {
+            const res = await fetch('prices.csv');
+            const csv = await res.text();
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const partIdx = headers.indexOf('part');
+            const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
+            const stockIdx = headers.indexOf('stock');
+            const rows = lines.slice(1);
+            allProducts = rows.map(r => {
+                const cols = r.split(',');
+                const part = cols[partIdx]?.trim();
+                if (!part) return null;
+                const initialStock = stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0;
+                return {
+                    part: part,
+                    desc: descIdx !== -1 ? cols[descIdx]?.trim() || '' : '',
+                    initialStock: initialStock,
+                    currentStock: initialStock
+                };
+            }).filter(p => p);
+            // Apply movements to compute current stock
+            stockMovements.forEach(m => {
+                const product = allProducts.find(p => p.part === m.part);
+                if (product) {
+                    if (m.type === 'IN') product.currentStock += m.quantity;
+                    else if (m.type === 'OUT') product.currentStock -= m.quantity;
+                }
+            });
+            displayInventory();
+        } catch (err) {
+            console.error(err);
+            document.getElementById('inventoryTable').innerHTML = '<p>Error loading products</p>';
+        }
+    }
+
+    function displayInventory() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        let filtered = allProducts.filter(p => 
+            p.part.toLowerCase().includes(searchTerm) || p.desc.toLowerCase().includes(searchTerm)
+        );
+        let totalItems = filtered.length;
+        let totalValue = 0; // we don't have price here, skip
+        let lowStockCount = filtered.filter(p => p.currentStock < 5).length;
+        document.getElementById('stats').innerHTML = `
+            <div class="stat-card"><h3>Total Products</h3><div class="number">${totalItems}</div></div>
+            <div class="stat-card"><h3>Low Stock (<5)</h3><div class="number">${lowStockCount}</div></div>
+            <div class="stat-card"><h3>Total Stock Units</h3><div class="number">${filtered.reduce((s,p)=>s+p.currentStock,0)}</div></div>
+        `;
+        let html = '<table><thead><tr><th>Part No</th><th>Description</th><th>Current Stock</th><th>Initial Stock</th><th>Actions</th></tr></thead><tbody>';
+        filtered.forEach(p => {
+            const isLow = p.currentStock < 5;
+            html += `<tr class="${isLow ? 'low-stock-row' : ''}">
+                <td>${escapeHtml(p.part)}</td>
+                <td>${escapeHtml(p.desc)}</td>
+                <td>${p.currentStock}</td>
+                <td>${p.initialStock}</td>
+                <td><button class="btn-adjust" onclick="adjustStock('${p.part}')">Adjust</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('inventoryTable').innerHTML = html;
+    }
+
+    function adjustStock(part) {
+        window.location.href = `stock-adjustment.html?part=${encodeURIComponent(part)}`;
+    }
+
+    function loadInventory() {
+        displayInventory();
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    loadProducts();
+</script>
+</body>
+</html>
