@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Adjustment – Auto Spares</title>
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #09645a; }
+        .info { background: #e9ecef; padding: 10px; border-radius: 6px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Manual Stock Adjustment</h1>
+    <div class="info" id="productInfo"></div>
+    <form id="adjustForm">
+        <div class="form-group">
+            <label>Part Number</label>
+            <input type="text" id="part" readonly>
+        </div>
+        <div class="form-group">
+            <label>Current Stock</label>
+            <input type="number" id="currentStock" readonly>
+        </div>
+        <div class="form-group">
+            <label>Adjustment Type</label>
+            <select id="adjustType">
+                <option value="IN">Add Stock (IN)</option>
+                <option value="OUT">Remove Stock (OUT)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" id="quantity" step="1" min="1" required>
+        </div>
+        <div class="form-group">
+            <label>Reason / Remarks</label>
+            <textarea id="remarks" rows="2" placeholder="e.g., Physical stock correction, damage, etc."></textarea>
+        </div>
+        <button type="button" onclick="saveAdjustment()">Save Adjustment</button>
+        <button type="button" onclick="window.location.href='inventory.html'">Cancel</button>
+    </form>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const partNo = urlParams.get('part');
+    let product = null;
+    let allProducts = [];
+    let stockMovements = JSON.parse(localStorage.getItem('stockMovements') || '[]');
+
+    async function loadProduct() {
+        const res = await fetch('prices.csv');
+        const csv = await res.text();
+        const lines = csv.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const partIdx = headers.indexOf('part');
+        const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
+        const stockIdx = headers.indexOf('stock');
+        const rows = lines.slice(1);
+        let found = null;
+        for (let r of rows) {
+            const cols = r.split(',');
+            const part = cols[partIdx]?.trim();
+            if (part === partNo) {
+                found = {
+                    part: part,
+                    desc: descIdx !== -1 ? cols[descIdx]?.trim() : '',
+                    initialStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0
+                };
+                break;
+            }
+        }
+        if (!found) {
+            document.getElementById('productInfo').innerHTML = '<p>Product not found</p>';
+            return;
+        }
+        // Compute current stock from movements
+        let current = found.initialStock;
+        stockMovements.forEach(m => {
+            if (m.part === partNo) {
+                if (m.type === 'IN') current += m.quantity;
+                else if (m.type === 'OUT') current -= m.quantity;
+            }
+        });
+        product = found;
+        document.getElementById('part').value = partNo;
+        document.getElementById('currentStock').value = current;
+        document.getElementById('productInfo').innerHTML = `<strong>${partNo}</strong> - ${found.desc}`;
+    }
+
+    function saveAdjustment() {
+        const adjustType = document.getElementById('adjustType').value;
+        const quantity = parseInt(document.getElementById('quantity').value);
+        const remarks = document.getElementById('remarks').value;
+        if (isNaN(quantity) || quantity <= 0) { alert('Enter valid quantity'); return; }
+        const movement = {
+            id: Date.now(),
+            part: partNo,
+            type: adjustType,
+            quantity: quantity,
+            date: new Date().toISOString(),
+            remarks: remarks,
+            source: 'Manual Adjustment'
+        };
+        stockMovements.push(movement);
+        localStorage.setItem('stockMovements', JSON.stringify(stockMovements));
+        alert('Stock adjusted successfully');
+        window.location.href = 'inventory.html';
+    }
+
+    loadProduct();
+</script>
+</body>
+</html>
