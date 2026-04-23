@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .invoice-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 0 15px 15px 15px;
+            border: 1px solid #dee2e6;
+        }
+        .no-print {
+            display: flex;
+        }
+        @media print {
+            .no-print, .actions, .invoice-type, button, input, textarea, select {
+                display: none !important;
+            }
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .invoice-container {
+                box-shadow: none;
+                border-radius: 0;
+                padding: 0;
+                margin: 0;
+                border: 1px solid #aaa;
+            }
+            .company-header {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .items-table th, .tax-summary-table th {
+                background: #f8f9fa !important;
+            }
+        }
+        .company-header {
+            background: #0a7c71;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 0 -15px 15px -15px;
+        }
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo-area img { height: 60px; }
+        .company-details h1 { margin: 0; font-size: 24px; }
+        .company-details p { margin: 3px 0 0; font-size: 12px; opacity: 0.8; }
+        .invoice-title h2 { margin: 0; font-size: 20px; }
+        .invoice-title p { margin: 5px 0; font-size: 12px; }
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 12px;
+            width: 100%;
+        }
+        .info-box h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #0a7c71;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 4px;
+        }
+        .info-row {
+            display: flex;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .info-label {
+            width: 110px;
+            font-weight: 600;
+            color: #555;
+        }
+        .info-value {
+            flex: 1;
+            color: #333;
+            word-break: break-word;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: inherit;
+        }
+        .editable {
+            background: #fff9e0;
+        }
+        .items-table, .tax-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 11px;
+            table-layout: fixed;
+        }
+        .items-table th, .items-table td, .tax-summary-table th, .tax-summary-table td {
+            border: 1px solid #dee2e6;
+            padding: 6px 4px;
+            text-align: left;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+        }
+        .items-table th:nth-child(1) { width: 4%; }
+        .items-table th:nth-child(2) { width: 10%; }
+        .items-table th:nth-child(3) { width: 12%; }
+        .items-table th:nth-child(4) { width: 8%; }
+        .items-table th:nth-child(5) { width: 4%; }
+        .items-table th:nth-child(6) { width: 7%; }
+        .items-table th:nth-child(7) { width: 6%; }
+        .items-table th:nth-child(8) { width: 8%; }
+        .items-table th:nth-child(9) { width: 6%; }
+        .items-table th:nth-child(10) { width: 8%; }
+        .items-table th:nth-child(11) { width: 8%; }
+        .items-table th:nth-child(12) { width: 8%; }
+        .items-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
+        .tax-summary-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
+        .totals { text-align: right; margin-top: 15px; font-size: 12px; }
+        .totals table { width: 280px; margin-left: auto; }
+        .totals td { border: none; padding: 3px; }
+        .footer-box {
+            margin-top: 30px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f9f9f9;
+        }
+        .bank-details, .terms {
+            font-size: 11px;
+            margin-bottom: 10px;
+        }
+        .signature-box {
+            margin-top: 20px;
+            text-align: right;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .signature-box div {
+            width: 250px;
+            border-top: 1px solid #333;
+            padding-top: 5px;
+            font-size: 11px;
+            text-align: center;
+        }
+        .actions {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+        }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #09645a; }
+        .invoice-type {
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+<div class="invoice-container" id="invoiceContainer">
+    <div class="company-header">
+        <div class="logo-area">
+            <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
+            <div class="company-details">
+                <h1>Auto Spares Solution</h1>
+                <p>GSTIN: 19ANOPD3300R1ZO</p>
+                <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+            </div>
+        </div>
+        <div class="invoice-title">
+            <h2>TAX INVOICE</h2>
+            <p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p>
+            <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
+            <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
+        </div>
+    </div>
+
+    <div class="invoice-type no-print">
+        <div>
+            <label><input type="radio" name="invoiceType" value="cash" checked> Cash Bill</label>
+            <label><input type="radio" name="invoiceType" value="credit"> Credit Bill</label>
+        </div>
+        <div id="creditFields" style="display:none;">
+            <label>Credit Limit (₹):</label> <input type="number" id="creditLimit" placeholder="Limit" step="1000" value="50000">
+            <label>Payment Terms (days):</label> <input type="number" id="paymentTerms" value="30" style="width:70px;">
+        </div>
+    </div>
+
+    <!-- Buyer and Consignee -->
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 240px;">
+            <div class="info-box">
+                <h3>Buyer (Bill to)</h3>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN"></div></div>
+                <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="buyerState" class="editable" placeholder="State"></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="buyerPhone" class="editable" placeholder="Phone"></div></div>
+                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="buyerEmail" class="editable" placeholder="Email"></div></div>
+            </div>
+        </div>
+        <div style="flex: 1; min-width: 240px;">
+            <div class="info-box">
+                <h3>Consignee (Ship to)</h3>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="consigneeName" class="editable" placeholder="Consignee name"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="consigneeAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="consigneePhone" class="editable" placeholder="Phone"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order and Dispatch Details -->
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex: 1;">
+            <div class="info-box">
+                <h3>Order Details</h3>
+                <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode" class="editable" placeholder="Code"></div></div>
+                <div class="info-row"><div class="info-label">Sales Order No:</div><div class="info-value"><input type="text" id="salesOrderNo" class="editable" placeholder="SO No."></div></div>
+                <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo" class="editable" placeholder="Ref No."></div></div>
+                <div class="info-row"><div class="info-label">Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
+            </div>
+        </div>
+        <div style="flex: 1;">
+            <div class="info-box">
+                <h3>Dispatch Details</h3>
+                <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo" class="editable" placeholder="Doc No."></div></div>
+                <div class="info-row"><div class="info-label">Mode of Transport:</div><div class="info-value"><input type="text" id="transportMode" class="editable" placeholder="Road/Rail/Air"></div></div>
+                <div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value"><input type="text" id="vehicleNo" class="editable" placeholder="Optional"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items Table (with HSN and Discount) -->
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Part No</th>
+                <th>Description</th>
+                <th>HSN/SAC</th>
+                <th>Qty</th>
+                <th>Unit Price (₹)</th>
+                <th>Disc %</th>
+                <th>Taxable (₹)</th>
+                <th>GST%</th>
+                <th>CGST (₹)</th>
+                <th>SGST (₹)</th>
+                <th>Total (₹)</th>
+            </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+    </table>
+
+    <!-- Tax Summary Table (grouped by HSN) -->
+    <table class="tax-summary-table">
+        <thead>
+            <tr>
+                <th>HSN/SAC</th>
+                <th>Taxable Value (₹)</th>
+                <th>CGST (₹)</th>
+                <th>SGST (₹)</th>
+                <th>IGST (₹)</th>
+                <th>Total Tax (₹)</th>
+            </tr>
+        </thead>
+        <tbody id="taxSummaryBody"></tbody>
+    </table>
+
+    <!-- Totals -->
+    <div class="totals">
+        <tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+        </table>
+    </div>
+
+    <!-- Footer Box -->
+    <div class="footer-box">
+        <div class="bank-details">
+            <strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi
+        </div>
+        <div class="terms">
+            <strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.
+        </div>
+        <div class="signature-box">
+            <div>
+                For Auto Spares Solution<br>
+                (Authorised Signatory)<br>
+                <span style="font-size: 10px;">(Stamp & Signature)</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="actions no-print">
+    <button onclick="saveInvoice()">💾 Save Invoice & Update Ledger</button>
+    <button onclick="printInvoice()">🖨️ Print</button>
+    <button onclick="generatePDF()">📄 Save as PDF</button>
+    <button onclick="window.close()">❌ Close</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    // ========== DATA FROM localStorage ==========
+    const cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+    let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+
+    if (currentUser) {
+        document.getElementById('buyerName').value = currentUser.name || '';
+        document.getElementById('buyerAddress').value = currentUser.address || '';
+        document.getElementById('buyerPhone').value = currentUser.phone || '';
+        document.getElementById('buyerEmail').value = currentUser.email || '';
+        document.getElementById('buyerGstin').value = currentUser.gstin || '';
+        document.getElementById('buyerState').value = currentUser.state || '';
+    }
+
+    function getFinancialYear() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
+        else return `${year-1}-${year.toString().slice(-2)}`;
+    }
+
+    function getNextInvoiceNumber(type) {
+        const finYear = getFinancialYear();
+        let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
+        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+        let cnt = parseInt(localStorage.getItem(key)) || 1;
+        return { invoiceNo: prefix + cnt.toString().padStart(4,'0'), key, cnt };
+    }
+
+    function updateInvoiceNumberDisplay() {
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        const { invoiceNo } = getNextInvoiceNumber(type);
+        document.getElementById('invoiceNo').innerText = invoiceNo;
+    }
+
+    function getReusableInvoiceNumber(type) {
+        const finYear = getFinancialYear();
+        let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
+        let available = deletedNumbers.filter(n => n.type === type && n.finYear === finYear).sort((a,b) => a.number - b.number);
+        if (available.length > 0) {
+            const reused = available[0];
+            const remaining = deletedNumbers.filter(n => !(n.type === type && n.finYear === finYear && n.number === reused.number));
+            localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(remaining));
+            let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+            return prefix + reused.number.toString().padStart(4,'0');
+        }
+        return null;
+    }
+
+    function getAndIncrementInvoiceNumber(type) {
+        const finYear = getFinancialYear();
+        const reused = getReusableInvoiceNumber(type);
+        if (reused) return reused;
+        let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
+        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+        let cnt = parseInt(localStorage.getItem(key)) || 1;
+        let invNo = prefix + cnt.toString().padStart(4,'0');
+        localStorage.setItem(key, cnt + 1);
+        return invNo;
+    }
+
+    function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
+
+    function computeDueDate(invoiceDate, type, paymentTermsDays) {
+        const date = new Date(invoiceDate);
+        if (type === 'cash') return date;
+        date.setDate(date.getDate() + paymentTermsDays);
+        return date;
+    }
+
+    function calculateTotalsAndTaxGroups() {
+        let sub = 0;
+        let taxGroups = {};
+        cart.forEach(i => {
+            const hsn = i.hsn || '';
+            const taxable = (i.price * i.qty) * (1 - (i.discount || 0) / 100);
+            sub += taxable;
+            const cgst = taxable * 0.09;
+            const sgst = taxable * 0.09;
+            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0 };
+            taxGroups[hsn].taxable += taxable;
+            taxGroups[hsn].cgst += cgst;
+            taxGroups[hsn].sgst += sgst;
+        });
+        let grand = sub + (sub * 0.18);
+        let roundOff = Math.round(grand) - grand;
+        grand = Math.round(grand);
+        return { subtotal: sub, cgstTotal: sub * 0.09, sgstTotal: sub * 0.09, roundOff, grand, taxGroups };
+    }
+
+    function renderItemsAndTaxSummary() {
+        let itemsHtml = '';
+        cart.forEach((item, idx) => {
+            const discount = item.discount || 0;
+            const taxable = (item.price * item.qty) * (1 - discount / 100);
+            const cgst = taxable * 0.09;
+            const sgst = taxable * 0.09;
+            const totalItem = taxable + cgst + sgst;
+            itemsHtml += `<tr>
+                <td style="text-align:center;">${idx+1}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.hsn || '')}</td>
+                <td style="text-align:center;">${item.qty}</td>
+                <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="text-align:center;">18%</td>
+                <td style="text-align:right;">₹${cgst.toFixed(2)}</td>
+                <td style="text-align:right;">₹${sgst.toFixed(2)}</td>
+                <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
+            </tr>`;
+        });
+        document.getElementById('itemsBody').innerHTML = itemsHtml;
+
+        const totals = calculateTotalsAndTaxGroups();
+        document.getElementById('subtotal').innerText = totals.subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = totals.cgstTotal.toFixed(2);
+        document.getElementById('sgstTotal').innerText = totals.sgstTotal.toFixed(2);
+        document.getElementById('grandTotal').innerText = totals.grand.toFixed(2);
+
+        let taxHtml = '';
+        for (let hsn in totals.taxGroups) {
+            const g = totals.taxGroups[hsn];
+            const totalTax = g.cgst + g.sgst;
+            taxHtml += `<tr>
+                <td>${hsn || 'N/A'}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="text-align:right;">₹${g.cgst.toFixed(2)}</td>
+                <td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>
+                <td style="text-align:right;">₹0.00</td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+            </tr>`;
+        }
+        document.getElementById('taxSummaryBody').innerHTML = taxHtml;
+    }
+
+    function updateDiscount(part, discPercent) {
+        const item = cart.find(i => i.part === part);
+        if (item) {
+            item.discount = parseFloat(discPercent) || 0;
+            renderItemsAndTaxSummary();
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    function setDates() {
+        const invoiceDate = new Date();
+        document.getElementById('invoiceDate').innerText = formatDate(invoiceDate);
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTerms);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
+    }
+
+    function updateDueDate() {
+        const invoiceDateStr = document.getElementById('invoiceDate').innerText;
+        const parts = invoiceDateStr.split('/');
+        const invoiceDate = new Date(parts[2], parts[1]-1, parts[0]);
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTerms);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
+    }
+
+    function saveInvoice() {
+        if (cart.length === 0) { alert('Cart empty'); return; }
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        const creditLimit = parseFloat(document.getElementById('creditLimit').value) || 0;
+        const totals = calculateTotalsAndTaxGroups();
+        const finalNo = getAndIncrementInvoiceNumber(type);
+        let invoice = {
+            invoiceNo: finalNo,
+            date: document.getElementById('invoiceDate').innerText,
+            dueDate: document.getElementById('dueDate').innerText,
+            finYear: getFinancialYear(),
+            invoiceType: type,
+            buyer: {
+                name: document.getElementById('buyerName').value,
+                address: document.getElementById('buyerAddress').value,
+                gstin: document.getElementById('buyerGstin').value,
+                state: document.getElementById('buyerState').value,
+                phone: document.getElementById('buyerPhone').value,
+                email: document.getElementById('buyerEmail').value
+            },
+            consignee: {
+                name: document.getElementById('consigneeName').value,
+                address: document.getElementById('consigneeAddress').value,
+                phone: document.getElementById('consigneePhone').value
+            },
+            orderDetails: {
+                customerCode: document.getElementById('customerCode').value,
+                salesOrderNo: document.getElementById('salesOrderNo').value,
+                referenceNo: document.getElementById('referenceNo').value,
+                paymentTerms: document.getElementById('paymentTermsField').value
+            },
+            dispatchDetails: {
+                docNo: document.getElementById('dispatchDocNo').value,
+                transportMode: document.getElementById('transportMode').value,
+                vehicleNo: document.getElementById('vehicleNo').value
+            },
+            items: cart.map(i => ({
+                part: i.part,
+                desc: i.desc,
+                hsn: i.hsn || '',
+                qty: i.qty,
+                price: i.price,
+                discount: i.discount || 0,
+                total: (i.price * i.qty) * (1 - (i.discount||0)/100)
+            })),
+            subtotal: totals.subtotal,
+            cgst: totals.cgstTotal,
+            sgst: totals.sgstTotal,
+            roundOff: totals.roundOff,
+            grandTotal: totals.grand,
+            status: type === 'cash' ? 'Paid' : 'Pending'
+        };
+        if (invoice.buyer.email) {
+            let cust = customers.find(c => c.email === invoice.buyer.email);
+            if (!cust) {
+                cust = { name: invoice.buyer.name, email: invoice.buyer.email, phone: invoice.buyer.phone, address: invoice.buyer.address, gstin: invoice.buyer.gstin, creditLimit, outstanding: 0, totalPurchased: 0 };
+                customers.push(cust);
+            }
+            if (type === 'credit') {
+                if (cust.outstanding + totals.grand > cust.creditLimit) { alert(`Credit limit exceeded!`); return; }
+                cust.outstanding += totals.grand;
+            }
+            cust.totalPurchased += totals.grand;
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+        allInvoices.push(invoice);
+        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+
+        // ========== STOCK DEDUCTION (NEW) ==========
+        let stockMovements = JSON.parse(localStorage.getItem('stockMovements') || '[]');
+        cart.forEach(item => {
+            stockMovements.push({
+                id: Date.now() + Math.random(),
+                part: item.part,
+                type: 'OUT',
+                quantity: item.qty,
+                date: new Date().toISOString(),
+                source: `Invoice ${finalNo}`,
+                remarks: `Sold to ${invoice.buyer.name || 'Customer'}`
+            });
+        });
+        localStorage.setItem('stockMovements', JSON.stringify(stockMovements));
+        // ============================================
+
+        localStorage.setItem('invoiceCart', '[]');
+        alert(`Invoice ${finalNo} saved!`);
+        window.close();
+    }
+
+    function printInvoice() {
+        const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
+        const replacements = [];
+        inputs.forEach(el => {
+            const span = document.createElement('span');
+            span.className = 'info-value-text';
+            span.style.whiteSpace = 'pre-wrap';
+            if (el.tagName === 'TEXTAREA') span.innerText = el.value;
+            else if (el.tagName === 'SELECT') span.innerText = el.options[el.selectedIndex]?.text || '';
+            else span.innerText = el.value;
+            const styles = window.getComputedStyle(el);
+            span.style.fontSize = styles.fontSize;
+            span.style.fontFamily = styles.fontFamily;
+            span.style.color = '#333';
+            span.style.display = 'inline-block';
+            span.style.width = '100%';
+            span.style.padding = styles.padding;
+            span.style.backgroundColor = 'transparent';
+            const parent = el.parentNode;
+            parent.replaceChild(span, el);
+            replacements.push({ original: el, span: span, parent: parent });
+        });
+        window.print();
+        setTimeout(() => {
+            replacements.forEach(rep => rep.parent.replaceChild(rep.original, rep.span));
+        }, 100);
+    }
+
+    function generatePDF() {
+        const originalContainer = document.getElementById('invoiceContainer');
+        const clone = originalContainer.cloneNode(true);
+        clone.querySelectorAll('input, textarea, select').forEach(el => {
+            const span = document.createElement('span');
+            span.className = 'info-value-text';
+            span.style.whiteSpace = 'pre-wrap';
+            if (el.tagName === 'TEXTAREA') span.innerText = el.value;
+            else if (el.tagName === 'SELECT') span.innerText = el.options[el.selectedIndex]?.text || '';
+            else span.innerText = el.value;
+            span.style.fontSize = window.getComputedStyle(el).fontSize;
+            span.style.fontFamily = window.getComputedStyle(el).fontFamily;
+            span.style.color = '#333';
+            span.style.display = 'inline-block';
+            span.style.width = '100%';
+            el.parentNode.replaceChild(span, el);
+        });
+        clone.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
+        const typeSelector = clone.querySelector('.invoice-type');
+        if (typeSelector) typeSelector.style.display = 'none';
+        
+        originalContainer.style.display = 'none';
+        document.body.appendChild(clone);
+        const opt = {
+            margin: [0.2, 0.2, 0.2, 0.2],
+            filename: `Invoice_${document.getElementById('invoiceNo').innerText}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, letterRendering: true, useCORS: true },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(clone).save().then(() => {
+            document.body.removeChild(clone);
+            originalContainer.style.display = '';
+        });
+    }
+
+    document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
+            updateInvoiceNumberDisplay();
+            updateDueDate();
+        });
+    });
+    const paymentTermsInput = document.getElementById('paymentTerms');
+    if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
+
+    setDates();
+    renderItemsAndTaxSummary();
+    updateInvoiceNumberDisplay();
+</script>
+</body>
+</html>
