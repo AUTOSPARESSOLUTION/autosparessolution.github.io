@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Entry – Supplier Bill (Stock Integrated)</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+        }
+        h1, h2, h3 { color: #0a7c71; }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-family: inherit;
+        }
+        .item-row {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .item-row input { flex: 1; min-width: 100px; }
+        .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .add-item { background: #28a745; margin-bottom: 15px; }
+        .totals { text-align: right; margin-top: 20px; }
+        .totals table { width: 300px; margin-left: auto; }
+        .totals td { padding: 5px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
+        button:hover { background: #09645a; }
+        .btn-danger { background: #6c757d; }
+        .credit-note-section { margin-top: 20px; border-top: 1px solid #dee2e6; padding-top: 20px; }
+        hr { margin: 20px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Purchase Entry (Stock Integrated)</h1>
+    <hr>
+
+    <!-- Supplier Details -->
+    <div class="form-row">
+        <div class="form-group"><label>Supplier Name *</label><input type="text" id="supplierName"></div>
+        <div class="form-group"><label>Supplier GSTIN</label><input type="text" id="supplierGstin"></div>
+        <div class="form-group"><label>Supplier Phone</label><input type="text" id="supplierPhone"></div>
+    </div>
+    <div class="form-row">
+        <div class="form-group"><label>Supplier Address</label><textarea id="supplierAddress" rows="2"></textarea></div>
+    </div>
+
+    <!-- Bill Details -->
+    <div class="form-row">
+        <div class="form-group"><label>Purchase Invoice No *</label><input type="text" id="purchaseInvoiceNo"></div>
+        <div class="form-group"><label>Invoice Date</label><input type="date" id="purchaseDate"></div>
+        <div class="form-group"><label>Due Date</label><input type="date" id="purchaseDueDate"></div>
+        <div class="form-group"><label>Payment Terms (days)</label><input type="number" id="paymentTerms" value="30"></div>
+    </div>
+
+    <!-- Items Table -->
+    <h3>Items Purchased</h3>
+    <div id="itemsContainer"></div>
+    <button class="add-item" onclick="addItem()">+ Add Item</button>
+
+    <!-- Totals -->
+    <div class="totals">
+        <table>
+            <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+        </table>
+    </div>
+
+    <div>
+        <button onclick="savePurchaseInvoice()">💾 Save Purchase Invoice</button>
+        <button class="btn-danger" onclick="window.close()">Cancel</button>
+    </div>
+
+    <!-- Credit Note Entry Section -->
+    <div class="credit-note-section">
+        <h3>Record Credit Note (Supplier Return)</h3>
+        <div class="form-row">
+            <div class="form-group"><label>Credit Note Date</label><input type="date" id="creditDate"></div>
+            <div class="form-group"><label>Amount (₹)</label><input type="number" id="creditAmount" step="0.01" placeholder="Enter amount"></div>
+            <div class="form-group"><label>Against Invoice (optional)</label><select id="creditInvoiceSelect"><option value="">All outstanding</option></select></div>
+            <div class="form-group"><label>Reason / Remarks</label><input type="text" id="creditRemarks" placeholder="Return reason"></div>
+            <div class="form-group"><button onclick="recordCreditNote()">Record Credit Note</button></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let items = [];
+    let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+    let purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+    let supplierCreditNotes = JSON.parse(localStorage.getItem('supplierCreditNotes') || '[]');
+
+    function addItem() {
+        items.push({ part: '', desc: '', qty: 1, price: 0 });
+        renderItems();
+    }
+
+    function removeItem(idx) {
+        items.splice(idx, 1);
+        renderItems();
+        recalcTotals();
+    }
+
+    function updateItem(idx, field, value) {
+        items[idx][field] = value;
+        recalcTotals();
+    }
+
+    function renderItems() {
+        const container = document.getElementById('itemsContainer');
+        container.innerHTML = '';
+        items.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'item-row';
+            div.innerHTML = `
+                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:2;">
+                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="flex:3;">
+                <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Unit Price (₹)" value="${item.price}" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))" style="flex:1;">
+                <button class="remove-item" onclick="removeItem(${idx})">X</button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function recalcTotals() {
+        let subtotal = 0;
+        items.forEach(item => subtotal += (item.qty || 0) * (item.price || 0));
+        const cgst = subtotal * 0.09;
+        const sgst = subtotal * 0.09;
+        let grand = subtotal + cgst + sgst;
+        grand = Math.round(grand);
+        document.getElementById('subtotal').innerText = subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = cgst.toFixed(2);
+        document.getElementById('sgstTotal').innerText = sgst.toFixed(2);
+        document.getElementById('grandTotal').innerText = grand.toFixed(2);
+    }
+
+    function savePurchaseInvoice() {
+        const supplierName = document.getElementById('supplierName').value.trim();
+        const purchaseInvoiceNo = document.getElementById('purchaseInvoiceNo').value.trim();
+        if (!supplierName || !purchaseInvoiceNo) { alert('Please enter supplier name and invoice number'); return; }
+        if (items.length === 0) { alert('Add at least one item'); return; }
+
+        const purchaseDate = document.getElementById('purchaseDate').value || new Date().toISOString().split('T')[0];
+        let dueDate = document.getElementById('purchaseDueDate').value;
+        if (!dueDate) {
+            const d = new Date(purchaseDate);
+            d.setDate(d.getDate() + (parseInt(document.getElementById('paymentTerms').value) || 30));
+            dueDate = d.toISOString().split('T')[0];
+        }
+
+        const purchaseInvoice = {
+            id: Date.now(),
+            supplier: { name: supplierName, gstin: document.getElementById('supplierGstin').value, phone: document.getElementById('supplierPhone').value, address: document.getElementById('supplierAddress').value },
+            invoiceNo: purchaseInvoiceNo,
+            date: purchaseDate,
+            dueDate: dueDate,
+            items: items.map(i => ({ part: i.part, desc: i.desc, qty: i.qty, price: i.price, total: i.qty * i.price })),
+            subtotal: parseFloat(document.getElementById('subtotal').innerText),
+            cgst: parseFloat(document.getElementById('cgstTotal').innerText),
+            sgst: parseFloat(document.getElementById('sgstTotal').innerText),
+            grandTotal: parseFloat(document.getElementById('grandTotal').innerText),
+            createdAt: new Date().toISOString()
+        };
+        purchaseInvoices.push(purchaseInvoice);
+        localStorage.setItem('purchaseInvoices', JSON.stringify(purchaseInvoices));
+
+        // Update supplier ledger
+        let supplier = suppliers.find(s => s.name === supplierName);
+        if (!supplier) {
+            supplier = { name: supplierName, gstin: purchaseInvoice.supplier.gstin, phone: purchaseInvoice.supplier.phone, address: purchaseInvoice.supplier.address, outstanding: 0, totalPurchased: 0 };
+            suppliers.push(supplier);
+        }
+        supplier.outstanding += purchaseInvoice.grandTotal;
+        supplier.totalPurchased += purchaseInvoice.grandTotal;
+        localStorage.setItem('suppliers', JSON.stringify(suppliers));
+
+        // ========== STOCK ADDITION (NEW) ==========
+        let stockMovements = JSON.parse(localStorage.getItem('stockMovements') || '[]');
+        items.forEach(item => {
+            stockMovements.push({
+                id: Date.now() + Math.random(),
+                part: item.part,
+                type: 'IN',
+                quantity: item.qty,
+                date: new Date().toISOString(),
+                source: `Purchase Invoice ${purchaseInvoiceNo}`,
+                remarks: `From supplier ${supplierName}`
+            });
+        });
+        localStorage.setItem('stockMovements', JSON.stringify(stockMovements));
+        // ==========================================
+
+        alert(`Purchase invoice ${purchaseInvoiceNo} saved! Stock added.`);
+        // Reset form
+        document.getElementById('supplierName').value = '';
+        document.getElementById('purchaseInvoiceNo').value = '';
+        items = [];
+        renderItems();
+        recalcTotals();
+        populateInvoiceDropdown();
+    }
+
+    function recordCreditNote() {
+        const supplierName = document.getElementById('supplierName').value.trim();
+        if (!supplierName) { alert('Select a supplier first'); return; }
+        const creditDate = document.getElementById('creditDate').value;
+        const amount = parseFloat(document.getElementById('creditAmount').value);
+        const invoiceNo = document.getElementById('creditInvoiceSelect').value;
+        const remarks = document.getElementById('creditRemarks').value;
+        if (!creditDate || isNaN(amount) || amount <= 0) { alert('Enter valid date and amount'); return; }
+
+        const creditNote = {
+            id: Date.now(),
+            supplierName: supplierName,
+            date: creditDate,
+            amount: amount,
+            invoiceNo: invoiceNo || null,
+            remarks: remarks || 'Credit Note',
+            type: 'credit_note'
+        };
+        supplierCreditNotes.push(creditNote);
+        localStorage.setItem('supplierCreditNotes', JSON.stringify(supplierCreditNotes));
+
+        // Update supplier outstanding (reduce)
+        const supplier = suppliers.find(s => s.name === supplierName);
+        if (supplier) {
+            supplier.outstanding -= amount;
+            if (supplier.outstanding < 0) supplier.outstanding = 0;
+            localStorage.setItem('suppliers', JSON.stringify(suppliers));
+        }
+
+        // Also reduce stock (returned goods)
+        // For simplicity, we don't adjust stock here – you could add a separate return entry.
+        alert('Credit note recorded');
+        document.getElementById('creditAmount').value = '';
+        document.getElementById('creditRemarks').value = '';
+    }
+
+    function populateInvoiceDropdown() {
+        const supplierName = document.getElementById('supplierName').value.trim();
+        const select = document.getElementById('creditInvoiceSelect');
+        if (!supplierName) { select.innerHTML = '<option value="">All outstanding</option>'; return; }
+        const invoices = purchaseInvoices.filter(inv => inv.supplier.name === supplierName);
+        select.innerHTML = '<option value="">All outstanding</option>';
+        invoices.forEach(inv => {
+            select.innerHTML += `<option value="${inv.invoiceNo}">${inv.invoiceNo} - ₹${inv.grandTotal.toFixed(2)} (Due: ${inv.dueDate})</option>`;
+        });
+    }
+
+    document.getElementById('supplierName').addEventListener('change', populateInvoiceDropdown);
+    document.getElementById('purchaseDate').valueAsDate = new Date();
+    const due = new Date(); due.setDate(due.getDate() + 30);
+    document.getElementById('purchaseDueDate').valueAsDate = due;
+    addItem();
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+</script>
+</body>
+</html>
