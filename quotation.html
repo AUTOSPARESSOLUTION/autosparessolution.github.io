@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price Quotation – Auto Spares</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .quotation-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 0 15px 15px 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+        }
+        .company-header {
+            background: #0a7c71;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 0 -15px 15px -15px;
+        }
+        .logo-area { display: flex; align-items: center; gap: 15px; }
+        .logo-area img { height: 60px; }
+        .company-details h1 { margin: 0; font-size: 24px; }
+        .company-details p { margin: 3px 0 0; font-size: 12px; }
+        .quote-title h2 { margin: 0; font-size: 20px; color: #e67e22; }
+        .info-box { background: #f8f9fa; border-radius: 6px; padding: 10px; margin-bottom: 12px; }
+        .info-box h3 { margin: 0 0 8px; font-size: 14px; color: #0a7c71; }
+        .info-row { display: flex; margin-bottom: 5px; font-size: 12px; }
+        .info-label { width: 110px; font-weight: 600; color: #555; }
+        .info-value { flex: 1; }
+        input, textarea, select { width: 100%; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
+        .items-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; table-layout: fixed; }
+        .items-table th, .items-table td { border: 1px solid #dee2e6; padding: 6px 4px; text-align: left; vertical-align: top; word-wrap: break-word; }
+        .items-table th { background: #f8f9fa; }
+        .totals { text-align: right; margin-top: 15px; }
+        .actions { margin-top: 30px; display: flex; gap: 15px; justify-content: flex-end; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #09645a; }
+        .item-row { margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .item-row input { flex: 1; min-width: 80px; }
+        .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .add-item { background: #28a745; margin-bottom: 15px; }
+        @media print { .actions, button, input, textarea, select { display: none; } body { background: white; padding: 0; } }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+<div class="quotation-container" id="quotationContainer">
+    <div class="company-header">
+        <div class="logo-area">
+            <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
+            <div class="company-details">
+                <h1>Auto Spares Solution</h1>
+                <p>GSTIN: 19ANOPD3300R1ZO</p>
+                <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+            </div>
+        </div>
+        <div class="quote-title">
+            <h2>PRICE QUOTATION</h2>
+            <p><strong>Quote No:</strong> <span id="quoteNo"></span></p>
+            <p><strong>Date:</strong> <span id="quoteDate"></span></p>
+            <p><strong>Valid Until:</strong> <span id="validUntil"></span></p>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex:1;">
+            <div class="info-box">
+                <h3>Customer Details</h3>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="customerName" placeholder="Customer name"></div></div>
+                <div class="info-row"><div class="info-label">Company:</div><div class="info-value"><input type="text" id="customerCompany" placeholder="Company name"></div></div>
+                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="customerEmail"></div></div>
+                <div class="info-row"><div class="info-label">Phone:</div><div class="info-value"><input type="text" id="customerPhone"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="customerAddress" rows="2"></textarea></div></div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Items</h3>
+    <div id="itemsContainer"></div>
+    <button class="add-item" onclick="addItem()">+ Add Item</button>
+
+    <div class="totals">
+        <table>
+            <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+        </table>
+    </div>
+
+    <div style="margin-top:30px; border-top:1px solid #dee2e6; padding-top:15px;">
+        <p><strong>Terms:</strong> This quotation is valid for 15 days. Prices are subject to change without notice.</p>
+        <div style="text-align:right; margin-top:20px;">
+            <div style="width:250px; border-top:1px solid #333; padding-top:5px; margin-left:auto; text-align:center;">
+                For Auto Spares Solution<br>(Authorised Signatory)
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="actions">
+    <button onclick="saveQuotation()">💾 Save Quotation</button>
+    <button onclick="downloadPDF()">📄 Download PDF</button>
+    <button onclick="window.print()">🖨️ Print</button>
+    <button onclick="window.close()">Close</button>
+</div>
+
+<script>
+    let items = [];
+    let quoteCounter = localStorage.getItem('quoteCounter') || 1;
+    document.getElementById('quoteNo').innerText = 'Q-' + new Date().getFullYear() + '-' + quoteCounter.toString().padStart(4,'0');
+    document.getElementById('quoteDate').innerText = new Date().toLocaleDateString('en-IN');
+    let valid = new Date(); valid.setDate(valid.getDate() + 15);
+    document.getElementById('validUntil').innerText = valid.toLocaleDateString('en-IN');
+
+    let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    if (currentUser) {
+        document.getElementById('customerName').value = currentUser.name || '';
+        document.getElementById('customerEmail').value = currentUser.email || '';
+        document.getElementById('customerPhone').value = currentUser.phone || '';
+        document.getElementById('customerAddress').value = currentUser.address || '';
+    }
+
+    function addItem() {
+        items.push({ part: '', desc: '', qty: 1, price: 0, discount: 0 });
+        renderItems();
+    }
+
+    function removeItem(idx) {
+        items.splice(idx, 1);
+        renderItems();
+        recalcTotals();
+    }
+
+    function updateItem(idx, field, value) {
+        items[idx][field] = value;
+        recalcTotals();
+    }
+
+    function renderItems() {
+        const container = document.getElementById('itemsContainer');
+        container.innerHTML = '';
+        items.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'item-row';
+            div.innerHTML = `
+                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:2;">
+                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="flex:3;">
+                <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Unit Price" value="${item.price}" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Disc %" value="${item.discount}" step="0.01" onchange="updateItem(${idx}, 'discount', parseFloat(this.value))" style="flex:1;">
+                <button class="remove-item" onclick="removeItem(${idx})">X</button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function recalcTotals() {
+        let subtotal = 0;
+        items.forEach(item => {
+            const taxable = (item.qty || 0) * (item.price || 0) * (1 - (item.discount || 0)/100);
+            subtotal += taxable;
+        });
+        const cgst = subtotal * 0.09;
+        const sgst = subtotal * 0.09;
+        const grand = subtotal + cgst + sgst;
+        document.getElementById('subtotal').innerText = subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = cgst.toFixed(2);
+        document.getElementById('sgstTotal').innerText = sgst.toFixed(2);
+        document.getElementById('grandTotal').innerText = grand.toFixed(2);
+    }
+
+    function saveQuotation() {
+        if (items.length === 0) { alert('Add items'); return; }
+        const quotation = {
+            quoteNo: document.getElementById('quoteNo').innerText,
+            date: document.getElementById('quoteDate').innerText,
+            validUntil: document.getElementById('validUntil').innerText,
+            customer: {
+                name: document.getElementById('customerName').value,
+                company: document.getElementById('customerCompany').value,
+                email: document.getElementById('customerEmail').value,
+                phone: document.getElementById('customerPhone').value,
+                address: document.getElementById('customerAddress').value
+            },
+            items: items.map(i => ({ ...i })),
+            subtotal: parseFloat(document.getElementById('subtotal').innerText),
+            cgst: parseFloat(document.getElementById('cgstTotal').innerText),
+            sgst: parseFloat(document.getElementById('sgstTotal').innerText),
+            grandTotal: parseFloat(document.getElementById('grandTotal').innerText)
+        };
+        let quotes = JSON.parse(localStorage.getItem('quotes') || '[]');
+        quotes.push(quotation);
+        localStorage.setItem('quotes', JSON.stringify(quotes));
+        localStorage.setItem('quoteCounter', parseInt(quoteCounter) + 1);
+        alert('Quotation saved');
+        window.close();
+    }
+
+    function downloadPDF() {
+        const element = document.getElementById('quotationContainer');
+        const opt = { margin: [0.2,0.2,0.2,0.2], filename: `Quotation_${document.getElementById('quoteNo').innerText}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+        html2pdf().set(opt).from(element).save();
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    addItem();
+</script>
+</body>
+</html>
