@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Movement Report – Auto Spares</title>
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        .filters { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
+        .filter-group { display: flex; flex-direction: column; }
+        label { font-size: 12px; font-weight: 600; }
+        input, select { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Stock Movement Report</h1>
+    <div class="filters">
+        <div class="filter-group">
+            <label>Part No</label>
+            <input type="text" id="filterPart" placeholder="Part number">
+        </div>
+        <div class="filter-group">
+            <label>From Date</label>
+            <input type="date" id="fromDate">
+        </div>
+        <div class="filter-group">
+            <label>To Date</label>
+            <input type="date" id="toDate">
+        </div>
+        <div class="filter-group">
+            <label>Movement Type</label>
+            <select id="filterType">
+                <option value="">All</option>
+                <option value="IN">Stock In</option>
+                <option value="OUT">Stock Out</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <button onclick="loadReport()">Show Report</button>
+            <button onclick="exportToCSV()">Export CSV</button>
+        </div>
+    </div>
+    <div id="reportTable"></div>
+</div>
+
+<script>
+    let stockMovements = JSON.parse(localStorage.getItem('stockMovements') || '[]');
+
+    function loadReport() {
+        const part = document.getElementById('filterPart').value.trim().toLowerCase();
+        const from = document.getElementById('fromDate').value;
+        const to = document.getElementById('toDate').value;
+        const type = document.getElementById('filterType').value;
+        let filtered = stockMovements;
+        if (part) filtered = filtered.filter(m => m.part.toLowerCase().includes(part));
+        if (from) filtered = filtered.filter(m => new Date(m.date) >= new Date(from));
+        if (to) filtered = filtered.filter(m => new Date(m.date) <= new Date(to));
+        if (type) filtered = filtered.filter(m => m.type === type);
+        filtered.sort((a,b) => new Date(b.date) - new Date(a.date));
+        if (filtered.length === 0) {
+            document.getElementById('reportTable').innerHTML = '<p>No movements found.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>Date</th><th>Part No</th><th>Type</th><th>Quantity</th><th>Source</th><th>Remarks</th></tr></thead><tbody>';
+        filtered.forEach(m => {
+            html += `<tr>
+                <td>${new Date(m.date).toLocaleString()}</td>
+                <td>${escapeHtml(m.part)}</td>
+                <td>${m.type === 'IN' ? 'Stock In' : 'Stock Out'}</td>
+                <td>${m.quantity}</td>
+                <td>${escapeHtml(m.source || '')}</td>
+                <td>${escapeHtml(m.remarks || '')}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('reportTable').innerHTML = html;
+    }
+
+    function exportToCSV() {
+        let csv = "Date,Part No,Type,Quantity,Source,Remarks\n";
+        stockMovements.forEach(m => {
+            csv += `"${new Date(m.date).toLocaleString()}",${m.part},${m.type},${m.quantity},${m.source || ''},${m.remarks || ''}\n`;
+        });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'stock_movements.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    loadReport();
+</script>
+</body>
+</html>
