@@ -776,6 +776,7 @@
     font-size: 35px;
 }
     </style>
+    <script src="access-control.js"></script>
 </head>
 <body>
     <div id="preloader">
@@ -1088,6 +1089,42 @@ function extractYouTubeId(url) {
     const user = users.find(u => u.email === email && u.password === password);
     if (user) {
         currentUser = user;
+        
+        // Assign role based on email (customize as needed)
+        if (email === "dipankar@autosparessolution.com") {
+            currentUser.role = "admin";
+        } else if (email.includes("manager")) {
+            currentUser.role = "manager";
+        } else if (email.includes("staff")) {
+            currentUser.role = "staff";
+        } else {
+            currentUser.role = "customer";
+        }
+        
+        // Also keep isAdmin for backward compatibility
+        if (email === "dipankar@autosparessolution.com") {
+            currentUser.isAdmin = true;
+        }
+        
+        showUserProfile();
+        showToast("Login successful!");
+        updateDeliveryEstimator();
+        updateCartUI();
+        
+        // Update navigation menu based on role (if access-control.js is loaded)
+        if (typeof updateNavigationByRole === 'function') {
+            updateNavigationByRole();
+        }
+    } else {
+        showToast("Invalid email or password", true);
+    }
+}
+       /* function login() {
+    const email = document.getElementById("login-email").value;
+    const password = document.getElementById("login-password").value;
+    const user = users.find(u => u.email === email && u.password === password);
+    if (user) {
+        currentUser = user;
         // If your email is admin@autosparessolution.com, set isAdmin
         if (email === "dipankar@autosparessolution.com") {
             currentUser.isAdmin = true;
@@ -1098,7 +1135,7 @@ function extractYouTubeId(url) {
     } else {
         showToast("Invalid email or password", true);
     }
-}
+}*/
      /*   function login() {
             const email = document.getElementById("login-email").value;
             const password = document.getElementById("login-password").value;
@@ -1770,6 +1807,14 @@ if (galleryCloseBtn) {
         loadProducts();
         const savedUser = localStorage.getItem('currentUser');
         if (savedUser) { currentUser = JSON.parse(savedUser); showUserProfile(); updateDeliveryEstimator(); }
+        // After loading products and other init code
+if (typeof updateNavigationByRole === 'function') {
+    updateNavigationByRole();
+        }
+        // Update navigation based on user role (if logged in)
+if (currentUser && typeof updateNavigationByRole === 'function') {
+    updateNavigationByRole();
+        }
     </script>
    
     </div>
