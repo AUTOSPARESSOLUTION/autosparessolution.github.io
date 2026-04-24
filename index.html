@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="access-control.js"></script>
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
@@ -12,6 +12,7 @@
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="access-control.js"></script>
     <!-- Google AdSense (manual) -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389" crossorigin="anonymous"></script>
     <!-- Iubenda (cookie consent) – keep your existing scripts if any -->
@@ -1088,10 +1089,11 @@ function extractYouTubeId(url) {
     const email = document.getElementById("login-email").value;
     const password = document.getElementById("login-password").value;
     const user = users.find(u => u.email === email && u.password === password);
+    
     if (user) {
         currentUser = user;
         
-        // Assign role based on email (customize as needed)
+        // Assign role based on email
         if (email === "dipankar@autosparessolution.com") {
             currentUser.role = "admin";
         } else if (email.includes("manager")) {
@@ -1102,7 +1104,7 @@ function extractYouTubeId(url) {
             currentUser.role = "customer";
         }
         
-        // Also keep isAdmin for backward compatibility
+        // Also set isAdmin for backward compatibility
         if (email === "dipankar@autosparessolution.com") {
             currentUser.isAdmin = true;
         }
@@ -1112,7 +1114,7 @@ function extractYouTubeId(url) {
         updateDeliveryEstimator();
         updateCartUI();
         
-        // Update navigation menu based on role (if access-control.js is loaded)
+        // Update navigation based on role
         if (typeof updateNavigationByRole === 'function') {
             updateNavigationByRole();
         }
@@ -1809,13 +1811,19 @@ if (galleryCloseBtn) {
         const savedUser = localStorage.getItem('currentUser');
         if (savedUser) { currentUser = JSON.parse(savedUser); showUserProfile(); updateDeliveryEstimator(); }
         // After loading products and other init code
+// Initialize navigation based on user role after page loads
 if (typeof updateNavigationByRole === 'function') {
     updateNavigationByRole();
-        }
-        // Update navigation based on user role (if logged in)
-if (currentUser && typeof updateNavigationByRole === 'function') {
-    updateNavigationByRole();
-        }
+}
+
+// Also update navigation when user logs out
+const originalLogout = logout;
+logout = function() {
+    originalLogout();
+    if (typeof updateNavigationByRole === 'function') {
+        updateNavigationByRole();
+    }
+};
     </script>
    
     </div>
