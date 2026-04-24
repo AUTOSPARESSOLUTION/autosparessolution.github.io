@@ -94,7 +94,7 @@
     <button class="add-item" onclick="addItem()">+ Add Item</button>
 
     <div class="totals">
-        <table>
+        </table>
             <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
@@ -133,6 +133,22 @@
         document.getElementById('customerEmail').value = currentUser.email || '';
         document.getElementById('customerPhone').value = currentUser.phone || '';
         document.getElementById('customerAddress').value = currentUser.address || '';
+    }
+
+    // Pre‑fill items from cart
+    const cartData = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    if (cartData.length > 0) {
+        items = cartData.map(item => ({
+            part: item.part,
+            desc: item.desc,
+            qty: item.qty,
+            price: item.price,
+            discount: item.discount || 0
+        }));
+        renderItems();
+        recalcTotals();
+    } else {
+        addItem();
     }
 
     function addItem() {
@@ -218,7 +234,6 @@
     }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-    addItem();
 </script>
 </body>
-</html>
+    </html>
