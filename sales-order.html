@@ -80,7 +80,6 @@
         </div>
     </div>
 
-    <!-- Customer Details -->
     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <div style="flex:1;">
             <div class="info-box">
@@ -103,22 +102,20 @@
         </div>
     </div>
 
-    <!-- Items -->
     <h3>Items</h3>
     <div id="itemsContainer"></div>
     <button class="add-item" onclick="addItem()">+ Add Item</button>
 
-    <!-- Totals -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount): </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount): <table><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
-    <div class="footer-box" style="margin-top:30px; border-top:1px solid #dee2e6; padding-top:15px;">
+    <div style="margin-top:30px; border-top:1px solid #dee2e6; padding-top:15px;">
         <p><strong>Terms:</strong> Subject to our standard terms and conditions.</p>
         <div style="text-align:right; margin-top:20px;">
             <div style="width:250px; border-top:1px solid #333; padding-top:5px; margin-left:auto; text-align:center;">
@@ -142,7 +139,6 @@
     let editOrderId = null;
     let currentStatus = 'Draft';
 
-    // Load existing order if editing
     const urlParams = new URLSearchParams(window.location.search);
     const orderId = urlParams.get('id');
     if (orderId) {
@@ -170,7 +166,6 @@
             recalcTotals();
         }
     } else {
-        // Generate new order number
         let orderCounter = localStorage.getItem('salesOrderCounter') || 1;
         let orderNo = 'SO/' + new Date().getFullYear() + '/' + orderCounter.toString().padStart(4,'0');
         document.getElementById('orderNo').innerText = orderNo;
@@ -178,7 +173,6 @@
         document.getElementById('orderStatus').innerText = 'Draft';
     }
 
-    // Prefill customer from logged-in user if available
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     if (currentUser && !isEdit) {
         document.getElementById('customerName').value = currentUser.name || '';
@@ -187,6 +181,28 @@
         document.getElementById('customerEmail').value = currentUser.email || '';
         document.getElementById('customerGstin').value = currentUser.gstin || '';
         document.getElementById('customerState').value = currentUser.state || '';
+    }
+
+    // Pre‑fill items from cart (only for new orders)
+    if (!isEdit) {
+        const cartData = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+        if (cartData.length > 0) {
+            items = cartData.map(item => ({
+                part: item.part,
+                desc: item.desc,
+                hsn: item.hsn || '',
+                qty: item.qty,
+                price: item.price,
+                discount: item.discount || 0
+            }));
+            renderItems();
+            recalcTotals();
+        } else {
+            addItem();
+        }
+    } else {
+        // For existing order, items already loaded
+        if (items.length === 0) addItem();
     }
 
     function addItem() {
@@ -241,9 +257,10 @@
 
     function saveOrder() {
         if (items.length === 0) { alert('Add at least one item'); return; }
+        const orderNo = document.getElementById('orderNo').innerText;
         const order = {
             id: isEdit ? editOrderId : Date.now(),
-            orderNo: document.getElementById('orderNo').innerText,
+            orderNo: orderNo,
             date: document.getElementById('orderDate').innerText,
             status: currentStatus,
             customer: {
@@ -269,7 +286,6 @@
             if (index !== -1) orders[index] = order;
         } else {
             orders.push(order);
-            // increment counter for next order number
             let counter = parseInt(localStorage.getItem('salesOrderCounter') || 1);
             localStorage.setItem('salesOrderCounter', counter + 1);
         }
@@ -281,7 +297,6 @@
     function convertToInvoice() {
         if (items.length === 0) { alert('No items to convert'); return; }
         if (currentStatus === 'Converted') { alert('Already converted to invoice'); return; }
-        // Build cart array from items
         let cart = items.map(item => ({
             part: item.part,
             desc: item.desc,
@@ -292,9 +307,7 @@
             boxQty: 1,
             masterCarton: 1
         }));
-        // Save to localStorage for invoice.html
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
-        // Also store customer details to prefill in invoice
         let customerForInvoice = {
             name: document.getElementById('customerName').value,
             address: document.getElementById('customerAddress').value,
@@ -304,12 +317,8 @@
             email: document.getElementById('customerEmail').value
         };
         localStorage.setItem('invoiceCustomer', JSON.stringify(customerForInvoice));
-        // Open invoice.html
-        window.open('invoice.html', '_blank');
-        // Update status to Converted (but we can't wait for invoice save, so we'll mark as converted now or after? 
-        // Better to mark after invoice is saved, but that's complex. We'll just mark now and allow manual.
-        // For simplicity, we'll update the status here.
-        if (!isEdit) saveOrder(); // ensure order exists first
+        window.open('invoice-stock.html', '_blank');
+        if (!isEdit) saveOrder(); // ensure order exists
         let orders = JSON.parse(localStorage.getItem('salesOrders') || '[]');
         let order = orders.find(o => o.orderNo === document.getElementById('orderNo').innerText);
         if (order) {
@@ -329,7 +338,6 @@
     }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-    addItem(); // start with one empty item
 </script>
 </body>
-</html>
+    </html>
