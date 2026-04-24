@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
+        /* ... same styles as before ... (keep unchanged) */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -43,9 +44,6 @@
             }
             .items-table th, .tax-summary-table th {
                 background: #f8f9fa !important;
-            }
-            .page-break {
-                page-break-after: avoid;
             }
         }
         .company-header {
@@ -278,7 +276,7 @@
         </div>
     </div>
 
-    <!-- Items Table (with HSN and Discount) -->
+    <!-- Items Table (with editable HSN and Discount) -->
     <table class="items-table">
         <thead>
             <tr>
@@ -299,14 +297,14 @@
         <tbody id="itemsBody"></tbody>
     </table>
 
-    <!-- Tax Summary Table (grouped by HSN) - will show CGST/SGST or IGST based on customer GSTIN -->
+    <!-- Tax Summary Table (grouped by HSN) -->
     <table class="tax-summary-table">
         <thead>
             <tr>
                 <th>HSN/SAC</th>
                 <th>Taxable Value (₹)</th>
-                <th id="gstTypeHeader">CGST (₹)</th>
-                <th id="gstTypeHeader2">SGST (₹)</th>
+                <th>CGST (₹)</th>
+                <th>SGST (₹)</th>
                 <th>IGST (₹)</th>
                 <th>Total Tax (₹)</th>
             </tr>
@@ -318,7 +316,7 @@
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):   </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></td>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):   </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):   </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:   </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
@@ -359,7 +357,6 @@
         This is a computer generated invoice. All disputes are subject to Howrah jurisdiction only.
     </div>
 
-    <!-- Page Number (will be populated via JavaScript) -->
     <div id="pageNumber" class="page-number"></div>
 </div>
 
@@ -373,38 +370,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
     // ========== DATA FROM localStorage ==========
-    const cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    // Ensure each item has an hsn property (if not, add empty)
+    cart = cart.map(i => ({ ...i, hsn: i.hsn || '' }));
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-
-    // Helper: check if customer GSTIN is local ( starts with "19" )
-    let customerGstin = '';
-    function isLocalGst() {
-        const gst = document.getElementById('buyerGstin').value.trim();
-        return gst.startsWith('19');
-    }
-
-    // Update GST display based on customer GSTIN
-    function updateGstDisplay() {
-        const isLocal = isLocalGst();
-        const cgstLabel = document.getElementById('gstLabel1');
-        const sgstLabel = document.getElementById('gstLabel2');
-        const header1 = document.getElementById('gstTypeHeader');
-        const header2 = document.getElementById('gstTypeHeader2');
-        if (!isLocal) {
-            cgstLabel.innerHTML = 'IGST (18%):';
-            sgstLabel.innerHTML = '';
-            if (header1) header1.innerHTML = 'IGST (₹)';
-            if (header2) header2.innerHTML = '';
-        } else {
-            cgstLabel.innerHTML = 'CGST (9%):';
-            sgstLabel.innerHTML = 'SGST (9%):';
-            if (header1) header1.innerHTML = 'CGST (₹)';
-            if (header2) header2.innerHTML = 'SGST (₹)';
-        }
-        renderItemsAndTaxSummary(); // recalc with correct tax
-    }
 
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
@@ -413,8 +384,28 @@
         document.getElementById('buyerEmail').value = currentUser.email || '';
         document.getElementById('buyerGstin').value = currentUser.gstin || '';
         document.getElementById('buyerState').value = currentUser.state || '';
-        customerGstin = currentUser.gstin || '';
     }
+
+    // Helper: check if customer GSTIN is local (starts with "19")
+    function isLocalGst() {
+        const gst = document.getElementById('buyerGstin').value.trim();
+        return gst.startsWith('19');
+    }
+
+    function updateGstDisplay() {
+        const isLocal = isLocalGst();
+        const cgstLabel = document.getElementById('gstLabel1');
+        const sgstLabel = document.getElementById('gstLabel2');
+        if (!isLocal) {
+            cgstLabel.innerHTML = 'IGST (18%):';
+            sgstLabel.innerHTML = '';
+        } else {
+            cgstLabel.innerHTML = 'CGST (9%):';
+            sgstLabel.innerHTML = 'SGST (9%):';
+        }
+        renderItemsAndTaxSummary(); // recalc with correct tax
+    }
+
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
     function getFinancialYear() {
@@ -474,6 +465,7 @@
         return date;
     }
 
+    // Recalculate totals and tax groups
     function calculateTotalsAndTaxGroups() {
         let sub = 0;
         let taxGroups = {};
@@ -525,16 +517,18 @@
                 <td style="text-align:center;">${idx+1}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.hsn || '')}</td>
+                <td style="word-wrap:break-word;">
+                    <input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)">
+                </td>
                 <td style="text-align:center;">${item.qty}</td>
                 <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
                 <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
                 <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="text-align:center;">${isLocal ? '18%' : '18%'}</td>
+                <td style="text-align:center;">18%</td>
                 <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
-            </tr>`;
+            </table>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
 
@@ -549,13 +543,13 @@
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td>${hsn || 'N/A'}</td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
                 <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
                 <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
-            </tr>`;
+            </table>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
     }
@@ -565,6 +559,14 @@
         if (item) {
             item.discount = parseFloat(discPercent) || 0;
             renderItemsAndTaxSummary();
+        }
+    }
+
+    function updateHsn(part, hsnValue) {
+        const item = cart.find(i => i.part === part);
+        if (item) {
+            item.hsn = hsnValue;
+            renderItemsAndTaxSummary(); // refresh tax groups
         }
     }
 
@@ -687,20 +689,6 @@
         window.close();
     }
 
-    // Page numbering (simple approximation for print – we'll rely on browser's print headers)
-    // For PDF generation via html2pdf, we don't have direct page number control, but we can add a simple JS
-    // that tries to detect page breaks – not reliable. We'll add a static page number placeholder that can be
-    // updated manually or left as is. For now, we'll set a simple text that will appear in print.
-    function setPageNumber() {
-        // This is a placeholder; actual page numbers are better handled by CSS `@page` or browser.
-        // We'll add a note in the footer that says "Page 1 of ?" but it's not dynamic here.
-        // To keep it simple, we'll put a static "Page 1" that can be changed in print preview.
-        // Alternatively, we can omit dynamic page numbering because it's complex with html2pdf.
-        // I'll add a simple script that tries to compute pages based on content height, but not robust.
-        // Instead, we'll rely on the browser's print dialog which shows page numbers.
-        document.getElementById('pageNumber').innerHTML = '';
-    }
-
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -770,6 +758,7 @@
             document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
             updateInvoiceNumberDisplay();
             updateDueDate();
+            updateGstDisplay();
         });
     });
     const paymentTermsInput = document.getElementById('paymentTerms');
@@ -779,7 +768,6 @@
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
     updateGstDisplay();
-    setPageNumber();
 </script>
 </body>
-        </html>
+</html>
