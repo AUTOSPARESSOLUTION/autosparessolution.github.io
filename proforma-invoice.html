@@ -128,7 +128,6 @@
     let valid = new Date(); valid.setDate(valid.getDate() + 15);
     document.getElementById('validUntil').innerText = valid.toLocaleDateString('en-IN');
 
-    // Auto-fill customer if logged in
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     if (currentUser) {
         document.getElementById('customerName').value = currentUser.name || '';
@@ -137,6 +136,23 @@
         document.getElementById('customerEmail').value = currentUser.email || '';
         document.getElementById('customerGstin').value = currentUser.gstin || '';
         document.getElementById('customerState').value = currentUser.state || '';
+    }
+
+    // Pre‑fill items from cart
+    const cartData = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    if (cartData.length > 0) {
+        items = cartData.map(item => ({
+            part: item.part,
+            desc: item.desc,
+            hsn: item.hsn || '',
+            qty: item.qty,
+            price: item.price,
+            discount: item.discount || 0
+        }));
+        renderItems();
+        recalcTotals();
+    } else {
+        addItem();
     }
 
     function addItem() {
@@ -224,7 +240,6 @@
     }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-    addItem();
 </script>
 </body>
 </html>
