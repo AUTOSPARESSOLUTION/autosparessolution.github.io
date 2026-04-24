@@ -21,9 +21,6 @@
             padding: 0 15px 15px 15px;
             border: 1px solid #dee2e6;
         }
-        .no-print {
-            display: flex;
-        }
         @media print {
             .no-print, .actions, .invoice-type, button, input, textarea, select {
                 display: none !important;
@@ -46,6 +43,9 @@
             }
             .items-table th, .tax-summary-table th {
                 background: #f8f9fa !important;
+            }
+            .page-break {
+                page-break-after: avoid;
             }
         }
         .company-header {
@@ -141,29 +141,33 @@
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
         .totals table { width: 280px; margin-left: auto; }
         .totals td { border: none; padding: 3px; }
-        .footer-box {
-            margin-top: 30px;
+        .qr-box, .carton-box {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 12px 0;
             border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            background: #f9f9f9;
         }
-        .bank-details, .terms {
-            font-size: 11px;
-            margin-bottom: 10px;
+        .qr-box img { max-width: 120px; height: auto; }
+        .signature-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            gap: 20px;
         }
         .signature-box {
-            margin-top: 20px;
-            text-align: right;
-            display: flex;
-            justify-content: flex-end;
-        }
-        .signature-box div {
-            width: 250px;
+            text-align: center;
+            width: 45%;
             border-top: 1px solid #333;
             padding-top: 5px;
-            font-size: 11px;
+        }
+        .footer-legal {
+            font-size: 9px;
             text-align: center;
+            margin-top: 20px;
+            color: #555;
+            border-top: 1px solid #dee2e6;
+            padding-top: 10px;
         }
         .actions {
             margin-top: 30px;
@@ -190,6 +194,12 @@
             border-radius: 8px;
             flex-wrap: wrap;
             font-size: 13px;
+        }
+        .page-number {
+            text-align: center;
+            font-size: 10px;
+            color: #777;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -263,6 +273,7 @@
                 <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo" class="editable" placeholder="Doc No."></div></div>
                 <div class="info-row"><div class="info-label">Mode of Transport:</div><div class="info-value"><input type="text" id="transportMode" class="editable" placeholder="Road/Rail/Air"></div></div>
                 <div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value"><input type="text" id="vehicleNo" class="editable" placeholder="Optional"></div></div>
+                <div class="info-row"><div class="info-label">No. of Cartons:</div><div class="info-value"><input type="text" id="cartons" class="editable" placeholder="Number of cartons"></div></div>
             </div>
         </div>
     </div>
@@ -288,14 +299,14 @@
         <tbody id="itemsBody"></tbody>
     </table>
 
-    <!-- Tax Summary Table (grouped by HSN) -->
+    <!-- Tax Summary Table (grouped by HSN) - will show CGST/SGST or IGST based on customer GSTIN -->
     <table class="tax-summary-table">
         <thead>
             <tr>
                 <th>HSN/SAC</th>
                 <th>Taxable Value (₹)</th>
-                <th>CGST (₹)</th>
-                <th>SGST (₹)</th>
+                <th id="gstTypeHeader">CGST (₹)</th>
+                <th id="gstTypeHeader2">SGST (₹)</th>
                 <th>IGST (₹)</th>
                 <th>Total Tax (₹)</th>
             </tr>
@@ -305,30 +316,51 @@
 
     <!-- Totals -->
     <div class="totals">
-        <tr>
+        <table>
             <tr><td style="text-align:right;">Subtotal (after discount):  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):   </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></td>
+            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):   </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:   </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
-    <!-- Footer Box -->
-    <div class="footer-box">
-        <div class="bank-details">
-            <strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi
-        </div>
-        <div class="terms">
-            <strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.
-        </div>
-        <div class="signature-box">
+    <!-- Payment QR Code and Bank Details Box -->
+    <div class="qr-box">
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
             <div>
-                For Auto Spares Solution<br>
-                (Authorised Signatory)<br>
-                <span style="font-size: 10px;">(Stamp & Signature)</span>
+                <img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;">
+            </div>
+            <div>
+                <strong>Bank Details:</strong><br>
+                Account Name: Auto Spares Solution<br>
+                Bank: Union Bank of India<br>
+                Account No: 021111100007383<br>
+                IFSC: UBINO802115<br>
+                UPI: ass08@uboi
             </div>
         </div>
     </div>
+
+    <!-- Customer Stamp & Signature Box + Company Signature Box -->
+    <div class="signature-row">
+        <div class="signature-box">
+            Customer's Stamp & Signature<br>
+            <span style="font-size: 10px;">(Receiver's acknowledgment)</span>
+        </div>
+        <div class="signature-box">
+            For Auto Spares Solution<br>
+            (Authorised Signatory)<br>
+            <span style="font-size: 10px;">(Stamp & Signature)</span>
+        </div>
+    </div>
+
+    <!-- Footer Legal Line -->
+    <div class="footer-legal">
+        This is a computer generated invoice. All disputes are subject to Howrah jurisdiction only.
+    </div>
+
+    <!-- Page Number (will be populated via JavaScript) -->
+    <div id="pageNumber" class="page-number"></div>
 </div>
 
 <div class="actions no-print">
@@ -346,6 +378,34 @@
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
+    // Helper: check if customer GSTIN is local ( starts with "19" )
+    let customerGstin = '';
+    function isLocalGst() {
+        const gst = document.getElementById('buyerGstin').value.trim();
+        return gst.startsWith('19');
+    }
+
+    // Update GST display based on customer GSTIN
+    function updateGstDisplay() {
+        const isLocal = isLocalGst();
+        const cgstLabel = document.getElementById('gstLabel1');
+        const sgstLabel = document.getElementById('gstLabel2');
+        const header1 = document.getElementById('gstTypeHeader');
+        const header2 = document.getElementById('gstTypeHeader2');
+        if (!isLocal) {
+            cgstLabel.innerHTML = 'IGST (18%):';
+            sgstLabel.innerHTML = '';
+            if (header1) header1.innerHTML = 'IGST (₹)';
+            if (header2) header2.innerHTML = '';
+        } else {
+            cgstLabel.innerHTML = 'CGST (9%):';
+            sgstLabel.innerHTML = 'SGST (9%):';
+            if (header1) header1.innerHTML = 'CGST (₹)';
+            if (header2) header2.innerHTML = 'SGST (₹)';
+        }
+        renderItemsAndTaxSummary(); // recalc with correct tax
+    }
+
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
         document.getElementById('buyerAddress').value = currentUser.address || '';
@@ -353,7 +413,9 @@
         document.getElementById('buyerEmail').value = currentUser.email || '';
         document.getElementById('buyerGstin').value = currentUser.gstin || '';
         document.getElementById('buyerState').value = currentUser.state || '';
+        customerGstin = currentUser.gstin || '';
     }
+    document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
     function getFinancialYear() {
         const now = new Date();
@@ -415,31 +477,50 @@
     function calculateTotalsAndTaxGroups() {
         let sub = 0;
         let taxGroups = {};
+        const isLocal = isLocalGst();
         cart.forEach(i => {
             const hsn = i.hsn || '';
             const taxable = (i.price * i.qty) * (1 - (i.discount || 0) / 100);
             sub += taxable;
-            const cgst = taxable * 0.09;
-            const sgst = taxable * 0.09;
-            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0 };
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
             taxGroups[hsn].taxable += taxable;
             taxGroups[hsn].cgst += cgst;
             taxGroups[hsn].sgst += sgst;
+            taxGroups[hsn].igst += igst;
         });
-        let grand = sub + (sub * 0.18);
+        let cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
+        for (let hsn in taxGroups) {
+            cgstTotal += taxGroups[hsn].cgst;
+            sgstTotal += taxGroups[hsn].sgst;
+            igstTotal += taxGroups[hsn].igst;
+        }
+        let grand = sub + (isLocal ? cgstTotal + sgstTotal : igstTotal);
         let roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
-        return { subtotal: sub, cgstTotal: sub * 0.09, sgstTotal: sub * 0.09, roundOff, grand, taxGroups };
+        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, roundOff, grand, taxGroups, isLocal };
     }
 
     function renderItemsAndTaxSummary() {
         let itemsHtml = '';
+        const isLocal = isLocalGst();
         cart.forEach((item, idx) => {
             const discount = item.discount || 0;
             const taxable = (item.price * item.qty) * (1 - discount / 100);
-            const cgst = taxable * 0.09;
-            const sgst = taxable * 0.09;
-            const totalItem = taxable + cgst + sgst;
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             itemsHtml += `<tr>
                 <td style="text-align:center;">${idx+1}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
@@ -449,9 +530,9 @@
                 <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
                 <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
                 <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="text-align:center;">18%</td>
-                <td style="text-align:right;">₹${cgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${sgst.toFixed(2)}</td>
+                <td style="text-align:center;">${isLocal ? '18%' : '18%'}</td>
+                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
             </tr>`;
         });
@@ -466,13 +547,13 @@
         let taxHtml = '';
         for (let hsn in totals.taxGroups) {
             const g = totals.taxGroups[hsn];
-            const totalTax = g.cgst + g.sgst;
+            const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
                 <td>${hsn || 'N/A'}</td>
                 <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">₹${g.cgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹0.00</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
             </tr>`;
         }
@@ -550,7 +631,8 @@
             dispatchDetails: {
                 docNo: document.getElementById('dispatchDocNo').value,
                 transportMode: document.getElementById('transportMode').value,
-                vehicleNo: document.getElementById('vehicleNo').value
+                vehicleNo: document.getElementById('vehicleNo').value,
+                cartons: document.getElementById('cartons').value
             },
             items: cart.map(i => ({
                 part: i.part,
@@ -564,9 +646,10 @@
             subtotal: totals.subtotal,
             cgst: totals.cgstTotal,
             sgst: totals.sgstTotal,
-            roundOff: totals.roundOff,
+            igst: totals.igstTotal,
             grandTotal: totals.grand,
-            status: type === 'cash' ? 'Paid' : 'Pending'
+            status: type === 'cash' ? 'Paid' : 'Pending',
+            isLocalGst: totals.isLocal
         };
         if (invoice.buyer.email) {
             let cust = customers.find(c => c.email === invoice.buyer.email);
@@ -584,7 +667,7 @@
         allInvoices.push(invoice);
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
 
-        // ========== STOCK DEDUCTION (NEW) ==========
+        // Stock deduction
         let stockMovements = JSON.parse(localStorage.getItem('stockMovements') || '[]');
         cart.forEach(item => {
             stockMovements.push({
@@ -598,11 +681,24 @@
             });
         });
         localStorage.setItem('stockMovements', JSON.stringify(stockMovements));
-        // ============================================
 
         localStorage.setItem('invoiceCart', '[]');
         alert(`Invoice ${finalNo} saved!`);
         window.close();
+    }
+
+    // Page numbering (simple approximation for print – we'll rely on browser's print headers)
+    // For PDF generation via html2pdf, we don't have direct page number control, but we can add a simple JS
+    // that tries to detect page breaks – not reliable. We'll add a static page number placeholder that can be
+    // updated manually or left as is. For now, we'll set a simple text that will appear in print.
+    function setPageNumber() {
+        // This is a placeholder; actual page numbers are better handled by CSS `@page` or browser.
+        // We'll add a note in the footer that says "Page 1 of ?" but it's not dynamic here.
+        // To keep it simple, we'll put a static "Page 1" that can be changed in print preview.
+        // Alternatively, we can omit dynamic page numbering because it's complex with html2pdf.
+        // I'll add a simple script that tries to compute pages based on content height, but not robust.
+        // Instead, we'll rely on the browser's print dialog which shows page numbers.
+        document.getElementById('pageNumber').innerHTML = '';
     }
 
     function printInvoice() {
@@ -682,6 +778,8 @@
     setDates();
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
+    updateGstDisplay();
+    setPageNumber();
 </script>
 </body>
-</html>
+        </html>
