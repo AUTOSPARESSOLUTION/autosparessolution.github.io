@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Master – Auto Spares</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+        }
+        h1, h2 {
+            color: #0a7c71;
+        }
+        .form-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 180px;
+        }
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-family: inherit;
+        }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #09645a;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        .search-box {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .search-box input {
+            flex: 1;
+            min-width: 200px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: #0a7c71;
+            color: white;
+        }
+        .customer-row:hover {
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .status-active {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-inactive {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .credit-warning {
+            background: #fff3cd;
+        }
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+            }
+            table {
+                font-size: 12px;
+            }
+            th, td {
+                padding: 6px;
+            }
+        }
+    </style>
+    <script src="access-control.js"></script>
+    <script>
+        if (typeof checkAccess === 'function') {
+            checkAccess('customer-master.html');
+        }
+    </script>
+</head>
+<body>
+<div class="container">
+    <h1>Customer Master</h1>
+    
+    <!-- Add/Edit Customer Form -->
+    <div class="form-section">
+        <h2 id="formTitle">Add New Customer</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Customer Name *</label>
+                <input type="text" id="custName" placeholder="Enter customer name">
+            </div>
+            <div class="form-group">
+                <label>Email *</label>
+                <input type="email" id="custEmail" placeholder="customer@example.com">
+            </div>
+            <div class="form-group">
+                <label>Phone *</label>
+                <input type="text" id="custPhone" placeholder="Phone number">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Address</label>
+                <textarea id="custAddress" rows="2" placeholder="Full address"></textarea>
+            </div>
+            <div class="form-group">
+                <label>PIN Code</label>
+                <input type="text" id="custPincode" placeholder="PIN code">
+            </div>
+            <div class="form-group">
+                <label>GSTIN</label>
+                <input type="text" id="custGstin" placeholder="GSTIN (optional)">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>State</label>
+                <input type="text" id="custState" placeholder="State">
+            </div>
+            <div class="form-group">
+                <label>Credit Limit (₹)</label>
+                <input type="number" id="custCreditLimit" step="1000" value="50000" placeholder="Credit limit">
+            </div>
+            <div class="form-group">
+                <label>Business Name</label>
+                <input type="text" id="custBusiness" placeholder="Business name (optional)">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Status</label>
+                <select id="custStatus">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Customer Code (Auto-generated)</label>
+                <input type="text" id="custCode" readonly style="background:#e9ecef;">
+            </div>
+        </div>
+        <div class="form-row">
+            <button onclick="saveCustomer()">💾 Save Customer</button>
+            <button class="btn-warning" onclick="clearForm()">Clear Form</button>
+            <button id="cancelEditBtn" class="btn-danger" style="display:none;" onclick="cancelEdit()">Cancel Edit</button>
+        </div>
+    </div>
+    
+    <!-- Search and Customer List -->
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by Name, Email, Phone, GSTIN...">
+        <button onclick="searchCustomers()">🔍 Search</button>
+        <button onclick="loadCustomers()">🔄 Refresh</button>
+        <button onclick="exportToCSV()">📄 Export CSV</button>
+    </div>
+    
+    <div id="customersTable"></div>
+</div>
+
+<script>
+    let customers = [];
+    let editId = null;
+    
+    // Load customers from localStorage
+    function loadCustomers() {
+        customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        // Also sync with users array for backwards compatibility
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        users.forEach(user => {
+            if (!customers.find(c => c.email === user.email)) {
+                customers.push({
+                    id: Date.now() + Math.random(),
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    address: user.address || '',
+                    pincode: user.pincode || '',
+                    gstin: user.gstin || '',
+                    state: user.state || '',
+                    creditLimit: 50000,
+                    business: user.business || '',
+                    status: 'active',
+                    outstanding: 0,
+                    totalPurchased: 0,
+                    customerCode: 'CUST' + (Math.floor(Math.random() * 10000)).toString().padStart(4,'0'),
+                    createdAt: new Date().toISOString()
+                });
+            }
+        });
+        localStorage.setItem('customers', JSON.stringify(customers));
+        displayCustomers();
+    }
+    
+    // Display customers in table
+    function displayCustomers() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        let filtered = customers;
+        if (searchTerm) {
+            filtered = customers.filter(c => 
+                c.name?.toLowerCase().includes(searchTerm) ||
+                c.email?.toLowerCase().includes(searchTerm) ||
+                c.phone?.includes(searchTerm) ||
+                c.gstin?.toLowerCase().includes(searchTerm) ||
+                c.customerCode?.toLowerCase().includes(searchTerm)
+            );
+        }
+        
+        if (filtered.length === 0) {
+            document.getElementById('customersTable').innerHTML = '<p>No customers found.</p>';
+            return;
+        }
+        
+        let html = '<table><thead><tr>
+            <th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>GSTIN</th>
+            <th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody>';
+        
+        filtered.forEach(c => {
+            const outstanding = c.outstanding || 0;
+            const creditLimit = c.creditLimit || 50000;
+            const isOverLimit = outstanding > creditLimit;
+            html += `<tr class="${isOverLimit ? 'credit-warning' : ''}">
+                <td>${escapeHtml(c.customerCode || '')}</td>
+                <td><strong>${escapeHtml(c.name)}</strong></td>
+                <td>${escapeHtml(c.email)}</td>
+                <td>${escapeHtml(c.phone)}</td>
+                <td>${escapeHtml(c.gstin || '-')}</td>
+                <td>₹${creditLimit.toLocaleString()}</td>
+                <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</td>
+                <td class="${c.status === 'active' ? 'status-active' : 'status-inactive'}">${c.status || 'active'}</td>
+                <td class="action-buttons">
+                    <button onclick="editCustomer('${c.id}')" style="background:#17a2b8;">✏️ Edit</button>
+                    <button onclick="viewLedger('${c.email}')" style="background:#e67e22;">📊 Ledger</button>
+                    <button onclick="deleteCustomer('${c.id}')" class="btn-danger">🗑️ Delete</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('customersTable').innerHTML = html;
+    }
+    
+    // Generate customer code
+    function generateCustomerCode() {
+        const count = customers.length + 1;
+        return 'CUST' + count.toString().padStart(4, '0');
+    }
+    
+    // Save customer (add or update)
+    function saveCustomer() {
+        const name = document.getElementById('custName').value.trim();
+        const email = document.getElementById('custEmail').value.trim();
+        const phone = document.getElementById('custPhone').value.trim();
+        
+        if (!name || !email || !phone) {
+            alert('Please fill Name, Email, and Phone');
+            return;
+        }
+        
+        // Check duplicate email (except when editing same customer)
+        if (editId === null && customers.some(c => c.email === email)) {
+            alert('Customer with this email already exists!');
+            return;
+        }
+        
+        const customerData = {
+            id: editId || Date.now(),
+            name: name,
+            email: email,
+            phone: phone,
+            address: document.getElementById('custAddress').value,
+            pincode: document.getElementById('custPincode').value,
+            gstin: document.getElementById('custGstin').value,
+            state: document.getElementById('custState').value,
+            creditLimit: parseFloat(document.getElementById('custCreditLimit').value) || 50000,
+            business: document.getElementById('custBusiness').value,
+            status: document.getElementById('custStatus').value,
+            customerCode: document.getElementById('custCode').value || generateCustomerCode(),
+            outstanding: 0,
+            totalPurchased: 0,
+            updatedAt: new Date().toISOString()
+        };
+        
+        if (editId === null) {
+            customerData.createdAt = new Date().toISOString();
+            customers.push(customerData);
+        } else {
+            // Preserve existing outstanding and totalPurchased
+            const oldCustomer = customers.find(c => c.id == editId);
+            if (oldCustomer) {
+                customerData.outstanding = oldCustomer.outstanding || 0;
+                customerData.totalPurchased = oldCustomer.totalPurchased || 0;
+                customerData.createdAt = oldCustomer.createdAt;
+            }
+            const index = customers.findIndex(c => c.id == editId);
+            customers[index] = customerData;
+        }
+        
+        localStorage.setItem('customers', JSON.stringify(customers));
+        
+        // Also sync to users for login compatibility
+        syncToUsers(customerData);
+        
+        alert('Customer saved successfully!');
+        clearForm();
+        loadCustomers();
+    }
+    
+    // Sync customer to users array (for login)
+    function syncToUsers(customer) {
+        let users = JSON.parse(localStorage.getItem('users') || '[]');
+        const existingIndex = users.findIndex(u => u.email === customer.email);
+        const userData = {
+            name: customer.name,
+            email: customer.email,
+            password: customer.email.split('@')[0] + '123', // default password
+            phone: customer.phone,
+            business: customer.business,
+            gstin: customer.gstin,
+            address: customer.address,
+            pincode: customer.pincode,
+            state: customer.state,
+            role: 'customer'
+        };
+        if (existingIndex !== -1) {
+            users[existingIndex] = { ...users[existingIndex], ...userData };
+        } else {
+            users.push(userData);
+        }
+        localStorage.setItem('users', JSON.stringify(users));
+    }
+    
+    // Edit customer
+    function editCustomer(id) {
+        const customer = customers.find(c => c.id == id);
+        if (!customer) return;
+        
+        editId = id;
+        document.getElementById('formTitle').innerHTML = 'Edit Customer';
+        document.getElementById('custName').value = customer.name;
+        document.getElementById('custEmail').value = customer.email;
+        document.getElementById('custPhone').value = customer.phone;
+        document.getElementById('custAddress').value = customer.address || '';
+        document.getElementById('custPincode').value = customer.pincode || '';
+        document.getElementById('custGstin').value = customer.gstin || '';
+        document.getElementById('custState').value = customer.state || '';
+        document.getElementById('custCreditLimit').value = customer.creditLimit || 50000;
+        document.getElementById('custBusiness').value = customer.business || '';
+        document.getElementById('custStatus').value = customer.status || 'active';
+        document.getElementById('custCode').value = customer.customerCode || '';
+        document.getElementById('cancelEditBtn').style.display = 'inline-block';
+        
+        // Scroll to form
+        document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function cancelEdit() {
+        clearForm();
+    }
+    
+    function clearForm() {
+        editId = null;
+        document.getElementById('formTitle').innerHTML = 'Add New Customer';
+        document.getElementById('custName').value = '';
+        document.getElementById('custEmail').value = '';
+        document.getElementById('custPhone').value = '';
+        document.getElementById('custAddress').value = '';
+        document.getElementById('custPincode').value = '';
+        document.getElementById('custGstin').value = '';
+        document.getElementById('custState').value = '';
+        document.getElementById('custCreditLimit').value = '50000';
+        document.getElementById('custBusiness').value = '';
+        document.getElementById('custStatus').value = 'active';
+        document.getElementById('custCode').value = '';
+        document.getElementById('cancelEditBtn').style.display = 'none';
+    }
+    
+    // Delete customer
+    function deleteCustomer(id) {
+        if (!confirm('Delete this customer? This will NOT delete their invoices or ledger data.')) return;
+        customers = customers.filter(c => c.id != id);
+        localStorage.setItem('customers', JSON.stringify(customers));
+        loadCustomers();
+    }
+    
+    // View customer ledger
+    function viewLedger(email) {
+        localStorage.setItem('viewCustomerEmail', email);
+        window.open('customer-ledger.html', '_blank');
+    }
+    
+    function searchCustomers() {
+        displayCustomers();
+    }
+    
+    function exportToCSV() {
+        let csv = "Customer Code,Name,Email,Phone,Address,PIN,GSTIN,State,Business,Credit Limit,Outstanding,Status\n";
+        customers.forEach(c => {
+            csv += `"${c.customerCode || ''}","${c.name}","${c.email}","${c.phone}","${c.address || ''}","${c.pincode || ''}","${c.gstin || ''}","${c.state || ''}","${c.business || ''}",${c.creditLimit || 0},${c.outstanding || 0},${c.status || 'active'}\n`;
+        });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'customers_master.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+    
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
+    }
+    
+    // Initialize
+    loadCustomers();
+</script>
+</body>
+  </html>
