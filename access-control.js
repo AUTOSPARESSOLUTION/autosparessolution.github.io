@@ -40,7 +40,7 @@ function updateNavigationByRole() {
     const role = getUserRole();
     
     // Define which links to show/hide
-    const adminOnly = ['inventory.html', 'stock-report.html', 'purchase-invoice-stock.html', 'supplier-ledger.html', 'edit-invoice.html'];
+    const adminOnly = ['inventory.html','customer-master.html', 'stock-report.html', 'purchase-invoice-stock.html', 'supplier-ledger.html', 'edit-invoice.html'];
     const managerOnly = ['sales-order.html'];
     const staffOnly = ['orders.html', 'customer-ledger.html'];
     
