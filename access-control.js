@@ -1,5 +1,6 @@
 // access-control.js
 const PERMISSIONS = {
+    'customer-master.html': ['admin', 'manager'],
     'invoice-stock.html': ['admin', 'manager', 'staff'],
     'proforma-invoice.html': ['admin', 'manager', 'staff'],
     'quotation.html': ['admin', 'manager', 'staff'],
