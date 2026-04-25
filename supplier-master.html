@@ -106,10 +106,6 @@
             background: #0a7c71;
             color: white;
         }
-        .supplier-row:hover {
-            background: #f8f9fa;
-            cursor: pointer;
-        }
         .action-buttons {
             display: flex;
             gap: 5px;
@@ -135,20 +131,14 @@
             }
         }
     </style>
-    <!-- Optional: include access-control.js if needed -->
-    <!--
-    <script src="access-control.js"></script>
-    <script>
-        if (typeof checkAccess === 'function') {
-            checkAccess('supplier-master.html');
-        }
-    </script>
-    -->
 </head>
 <body>
 <div class="container">
-    <h1>Supplier Master</h1>
-    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>Supplier Master</h1>
+        <a href="index.html" style="background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">🏠 Home</a>
+    </div>
+
     <!-- Add/Edit Supplier Form -->
     <div class="form-section">
         <h2 id="formTitle">Add New Supplier</h2>
@@ -232,7 +222,7 @@
             <button id="cancelEditBtn" class="btn-danger" style="display:none;" onclick="cancelEdit()">Cancel Edit</button>
         </div>
     </div>
-    
+
     <!-- Search and Supplier List -->
     <div class="search-box">
         <input type="text" id="searchInput" placeholder="Search by Name, Email, Phone, GSTIN, Code...">
@@ -240,36 +230,33 @@
         <button onclick="loadSuppliers()">🔄 Refresh</button>
         <button onclick="exportToCSV()">📄 Export CSV</button>
     </div>
-    
+
     <div id="suppliersTable"></div>
 </div>
 
 <script>
     let suppliers = [];
     let editId = null;
-    
-    // Load suppliers from localStorage
+
     function loadSuppliers() {
         suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        // Auto-generate missing supplier codes for old entries
         let changed = false;
         suppliers.forEach(s => {
             if (!s.supplierCode) {
                 s.supplierCode = generateSupplierCode();
                 changed = true;
             }
+            if (s.outstanding === undefined) s.outstanding = s.openingBalance || 0;
         });
         if (changed) localStorage.setItem('suppliers', JSON.stringify(suppliers));
         displaySuppliers();
     }
-    
-    // Generate unique supplier code
+
     function generateSupplierCode() {
         const count = suppliers.length + 1;
         return 'SUP' + count.toString().padStart(4, '0');
     }
-    
-    // Display suppliers in table
+
     function displaySuppliers() {
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         let filtered = suppliers;
@@ -283,57 +270,57 @@
                 s.contactPerson?.toLowerCase().includes(searchTerm)
             );
         }
-        
+
         if (filtered.length === 0) {
             document.getElementById('suppliersTable').innerHTML = '<p>No suppliers found.</p>';
             return;
         }
-        
-        let html = '<table><thead><tr>' +
-            '<th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>Contact Person</th>' +
-            '<th>GSTIN</th><th>Credit Limit</th><th>Balance</th><th>Status</th><th>Actions</th>' +
-            '</tr></thead><tbody>';
-        
+
+        let html = '<tr><thead><tr><th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>Contact Person</th><th>GSTIN</th><th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(s => {
-            const balance = s.openingBalance || 0;
+            const outstanding = s.outstanding || 0;
             const creditLimit = s.creditLimit || 50000;
             html += `<tr>
                 <td>${escapeHtml(s.supplierCode || '')}</td>
-                <td><strong>${escapeHtml(s.name)}</strong></strong></td>
-                <td>${escapeHtml(s.email)}</td></td>
-                <td>${escapeHtml(s.phone)}</td></td>
-                <td>${escapeHtml(s.contactPerson || '-')}</td></td>
-                <td>${escapeHtml(s.gstin || '-')}</td></td>
-                <td>₹${creditLimit.toLocaleString()}</td></td>
-                <td style="color:${balance>0?'#dc3545':'#28a745'}">₹${balance.toLocaleString()}</td></td>
+                <td><strong>${escapeHtml(s.name)}</strong></td>
+                <td>${escapeHtml(s.email)}</td>
+                <td>${escapeHtml(s.phone)}</td>
+                <td>${escapeHtml(s.contactPerson || '-')}</td>
+                <td>${escapeHtml(s.gstin || '-')}</td>
+                <td>₹${creditLimit.toLocaleString()}</td>
+                <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</td>
                 <td class="${s.status === 'active' ? 'status-active' : 'status-inactive'}">${s.status || 'active'}</td>
                 <td class="action-buttons">
                     <button onclick="editSupplier('${s.id}')" style="background:#17a2b8;">✏️ Edit</button>
+                    <button onclick="viewSupplierLedger('${s.email}')" style="background:#e67e22;">📊 Ledger</button>
                     <button onclick="deleteSupplier('${s.id}')" class="btn-danger">🗑️ Delete</button>
                 </td>
-            </table>`;
+            </tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('suppliersTable').innerHTML = html;
     }
-    
-    // Save supplier (add or update)
+
+    function viewSupplierLedger(email) {
+        localStorage.setItem('viewSupplierEmail', email);
+        window.open('supplier-ledger.html', '_blank');
+    }
+
     function saveSupplier() {
         const name = document.getElementById('suppName').value.trim();
         const email = document.getElementById('suppEmail').value.trim();
         const phone = document.getElementById('suppPhone').value.trim();
-        
+
         if (!name || !email || !phone) {
             alert('Please fill Supplier Name, Email, and Phone');
             return;
         }
-        
-        // Check duplicate email (except when editing same supplier)
+
         if (editId === null && suppliers.some(s => s.email === email)) {
             alert('Supplier with this email already exists!');
             return;
         }
-        
+
         const supplierData = {
             id: editId || Date.now(),
             name: name,
@@ -347,36 +334,37 @@
             business: document.getElementById('suppBusiness').value,
             creditLimit: parseFloat(document.getElementById('suppCreditLimit').value) || 50000,
             openingBalance: parseFloat(document.getElementById('suppOpeningBalance').value) || 0,
+            outstanding: parseFloat(document.getElementById('suppOpeningBalance').value) || 0,
             status: document.getElementById('suppStatus').value,
             paymentTerms: document.getElementById('suppPaymentTerms').value,
             supplierCode: document.getElementById('suppCode').value || generateSupplierCode(),
             updatedAt: new Date().toISOString()
         };
-        
+
         if (editId === null) {
             supplierData.createdAt = new Date().toISOString();
             suppliers.push(supplierData);
         } else {
-            // Preserve existing data (like createdAt)
             const oldSupplier = suppliers.find(s => s.id == editId);
             if (oldSupplier) {
                 supplierData.createdAt = oldSupplier.createdAt;
+                // preserve existing outstanding from ledger if any
+                supplierData.outstanding = oldSupplier.outstanding;
             }
             const index = suppliers.findIndex(s => s.id == editId);
             suppliers[index] = supplierData;
         }
-        
+
         localStorage.setItem('suppliers', JSON.stringify(suppliers));
         alert('Supplier saved successfully!');
         clearForm();
         loadSuppliers();
     }
-    
-    // Edit supplier
+
     function editSupplier(id) {
         const supplier = suppliers.find(s => s.id == id);
         if (!supplier) return;
-        
+
         editId = id;
         document.getElementById('formTitle').innerHTML = 'Edit Supplier';
         document.getElementById('suppName').value = supplier.name;
@@ -394,14 +382,14 @@
         document.getElementById('suppPaymentTerms').value = supplier.paymentTerms || 'net30';
         document.getElementById('suppCode').value = supplier.supplierCode || '';
         document.getElementById('cancelEditBtn').style.display = 'inline-block';
-        
+
         document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
     }
-    
+
     function cancelEdit() {
         clearForm();
     }
-    
+
     function clearForm() {
         editId = null;
         document.getElementById('formTitle').innerHTML = 'Add New Supplier';
@@ -421,23 +409,22 @@
         document.getElementById('suppCode').value = '';
         document.getElementById('cancelEditBtn').style.display = 'none';
     }
-    
-    // Delete supplier
+
     function deleteSupplier(id) {
         if (!confirm('Delete this supplier? This will NOT affect purchase records.')) return;
         suppliers = suppliers.filter(s => s.id != id);
         localStorage.setItem('suppliers', JSON.stringify(suppliers));
         loadSuppliers();
     }
-    
+
     function searchSuppliers() {
         displaySuppliers();
     }
-    
+
     function exportToCSV() {
-        let csv = "Supplier Code,Name,Email,Phone,Contact Person,Address,PIN,GSTIN,State,Business Name,Credit Limit,Opening Balance,Status,Payment Terms\n";
+        let csv = "Supplier Code,Name,Email,Phone,Contact Person,Address,PIN,GSTIN,State,Business Name,Credit Limit,Opening Balance,Outstanding,Status,Payment Terms\n";
         suppliers.forEach(s => {
-            csv += `"${s.supplierCode || ''}","${s.name}","${s.email}","${s.phone}","${s.contactPerson || ''}","${s.address || ''}","${s.pincode || ''}","${s.gstin || ''}","${s.state || ''}","${s.business || ''}",${s.creditLimit || 0},${s.openingBalance || 0},${s.status || 'active'},"${s.paymentTerms || ''}"\n`;
+            csv += `"${s.supplierCode || ''}","${s.name}","${s.email}","${s.phone}","${s.contactPerson || ''}","${s.address || ''}","${s.pincode || ''}","${s.gstin || ''}","${s.state || ''}","${s.business || ''}",${s.creditLimit || 0},${s.openingBalance || 0},${s.outstanding || 0},${s.status || 'active'},"${s.paymentTerms || ''}"\n`;
         });
         const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
@@ -447,14 +434,13 @@
         a.click();
         URL.revokeObjectURL(url);
     }
-    
+
     function escapeHtml(str) {
         if (!str) return '';
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
-    
-    // Initialize
+
     loadSuppliers();
 </script>
 </body>
-</html>
+            </html>
