@@ -3,42 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Report</title>
+    <title>Stock Report – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; }
+        .stats { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; flex: 1; text-align: center; }
+        .stat-card .number { font-size: 28px; font-weight: bold; color: #0a7c71; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
         th { background: #0a7c71; color: white; }
-        .low-stock { background-color: #fff3cd; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-bottom:15px; }
+        .low-stock-row { background: #fff3cd; }
+        .search-box { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        input, select { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .tab { overflow: hidden; border-bottom: 1px solid #ccc; margin: 20px 0; }
+        .tab button { background: #f1f1f1; float: left; border: none; outline: none; cursor: pointer; padding: 8px 16px; margin-right: 5px; }
+        .tab button.active { background: #0a7c71; color: white; }
+        .tabcontent { display: none; padding: 15px 0; }
+        .export-btn { background: #28a745; }
     </style>
     <script src="data-manager.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>Stock Report</h1>
-    <button onclick="location.reload()">Refresh</button>
-    <div id="stockTable"></div>
+    <h1><i class="fas fa-chart-line"></i> Stock Report (Integrated)</h1>
+    <div class="stats" id="stats"></div>
+    
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by Name, SKU..." style="width: 250px;">
+        <button onclick="displayStock()"><i class="fas fa-search"></i> Search</button>
+        <button class="export-btn" onclick="exportToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <button onclick="window.location.href='inventory.html'"><i class="fas fa-boxes"></i> Inventory Ops</button>
+    </div>
+
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'Current')">Current Stock</button>
+        <button class="tablinks" onclick="openTab(event, 'Movement')">Stock Movement Summary</button>
+    </div>
+
+    <!-- Current Stock Tab -->
+    <div id="Current" class="tabcontent" style="display:block;">
+        <div id="stockTable"></div>
+    </div>
+
+    <!-- Movement Summary Tab -->
+    <div id="Movement" class="tabcontent">
+        <div id="movementTable"></div>
+    </div>
 </div>
+
 <script>
+    let allProducts = [];
+    let allTransactions = [];
+
+    function loadData() {
+        allProducts = getProducts();
+        allTransactions = getInventoryTransactions();
+        displayStock();
+        displayMovementSummary();
+        updateStats();
+    }
+
+    function updateStats() {
+        let totalProducts = allProducts.length;
+        let totalStockUnits = allProducts.reduce((sum, p) => sum + (p.currentStock || 0), 0);
+        let totalStockValue = allProducts.reduce((sum, p) => sum + ((p.currentStock || 0) * (p.price || 0)), 0);
+        let lowStockCount = allProducts.filter(p => (p.currentStock || 0) <= (p.reorderLevel || 0)).length;
+        document.getElementById('stats').innerHTML = `
+            <div class="stat-card"><h3>Total Products</h3><div class="number">${totalProducts}</div></div>
+            <div class="stat-card"><h3>Total Stock Units</h3><div class="number">${totalStockUnits}</div></div>
+            <div class="stat-card"><h3>Total Stock Value</h3><div class="number">₹${totalStockValue.toLocaleString()}</div></div>
+            <div class="stat-card"><h3>Low Stock Items</h3><div class="number">${lowStockCount}</div></div>
+        `;
+    }
+
     function displayStock() {
-        const products = getProducts();
-        if (products.length === 0) { document.getElementById('stockTable').innerHTML = '<p>No products.</p>'; return; }
-        let html = '<table><thead><tr><th>SKU</th><th>Product Name</th><th>Current Stock</th><th>Unit</th><th>Reorder Level</th><th>Status</th></tr></thead><tbody>';
-        products.forEach(p => {
-            const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
-            html += `<tr class="${low ? 'low-stock' : ''}">
-                <td>${p.sku}</td><td>${p.name}</td><td>${p.currentStock}</td><td>${p.unit}</td><td>${p.reorderLevel}</td>
-                <td>${low ? '⚠️ Low stock' : 'OK'}</td>
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        let filtered = allProducts.filter(p => 
+            p.name?.toLowerCase().includes(searchTerm) || 
+            p.sku?.toLowerCase().includes(searchTerm)
+        );
+        let html = '<table><thead><tr>
+            <th>SKU</th><th>Product Name</th><th>Current Stock</th><th>Unit</th><th>Reorder Level</th><th>Price (₹)</th><th>Status</th>
+        </tr></thead><tbody>';
+        filtered.forEach(p => {
+            const isLow = (p.currentStock || 0) <= (p.reorderLevel || 0);
+            html += `<tr class="${isLow ? 'low-stock-row' : ''}">
+                <td>${escapeHtml(p.sku)}</td>
+                <td><strong>${escapeHtml(p.name)}</strong></td>
+                <td>${p.currentStock || 0}</td>
+                <td>${escapeHtml(p.unit || 'pc')}</td>
+                <td>${p.reorderLevel || 0}</td>
+                <td>₹${(p.price || 0).toFixed(2)}</td>
+                <td>${isLow ? '<i class="fas fa-exclamation-triangle"></i> Reorder needed' : 'OK'}</td>
             </tr>`;
         });
         html += '</tbody></table>';
-        document.getElementById('stockTable').innerHTML = html;
+        document.getElementById('stockTable').innerHTML = html || '<p>No products found.</p>';
     }
-    displayStock();
+
+    function displayMovementSummary() {
+        // Group transactions by productId and type
+        let summary = {};
+        allTransactions.forEach(t => {
+            if (!summary[t.productId]) summary[t.productId] = { in: 0, out: 0, adjustments: 0, transfers: 0 };
+            if (t.type === 'purchase' || t.type === 'sales_return' || (t.type === 'adjustment' && t.quantity > 0)) {
+                summary[t.productId].in += t.quantity > 0 ? t.quantity : 0;
+                if (t.type === 'adjustment' && t.quantity > 0) summary[t.productId].adjustments += t.quantity;
+                else if (t.type === 'purchase') summary[t.productId].in += t.quantity; // already counted
+            } else if (t.type === 'sales' || t.type === 'adjustment' && t.quantity < 0) {
+                let outQty = t.quantity < 0 ? -t.quantity : t.quantity;
+                summary[t.productId].out += outQty;
+                if (t.type === 'adjustment') summary[t.productId].adjustments += outQty;
+            } else if (t.type === 'transfer') {
+                summary[t.productId].transfers += Math.abs(t.quantity);
+            }
+        });
+        let html = '<table><thead><tr>
+            <th>Product</th><th>SKU</th><th>Purchases In (Qty)</th><th>Sales Out (Qty)</th><th>Adjustments (Net)</th><th>Transfers Out</th><th>Current Stock</th>
+        </table></thead><tbody>';
+        for (let pid in summary) {
+            let product = allProducts.find(p => p.id == pid);
+            if (!product) continue;
+            let netAdjust = (summary[pid].adjustments || 0);
+            // netAdjust sign: positive means addition, negative means removal. Already factored in current stock.
+            html += `<tr>
+                <td>${escapeHtml(product.name)}</td>
+                <td>${escapeHtml(product.sku)}</td>
+                <td>${summary[pid].in || 0}</td>
+                <td>${summary[pid].out || 0}</td>
+                <td>${netAdjust}</td>
+                <td>${summary[pid].transfers || 0}</td>
+                <td>${product.currentStock || 0}</td>
+            </tr>`;
+        }
+        if (Object.keys(summary).length === 0) html = '<p>No movements recorded yet.</p>';
+        html += '</tbody></table>';
+        document.getElementById('movementTable').innerHTML = html;
+    }
+
+    function exportToCSV() {
+        let csv = "SKU,Product Name,Current Stock,Unit,Reorder Level,Price,Status\n";
+        allProducts.forEach(p => {
+            const isLow = (p.currentStock || 0) <= (p.reorderLevel || 0);
+            csv += `"${p.sku}","${p.name}",${p.currentStock || 0},"${p.unit || 'pc'}",${p.reorderLevel || 0},${p.price || 0},"${isLow ? 'Low Stock' : 'OK'}"\n`;
+        });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `stock_report_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function openTab(evt, tabName) {
+        document.querySelectorAll('.tabcontent').forEach(div => div.style.display = 'none');
+        document.querySelectorAll('.tablinks').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        evt.currentTarget.classList.add('active');
+        if (tabName === 'Movement') displayMovementSummary();
+        else displayStock();
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+    loadData();
 </script>
 </body>
 </html>
