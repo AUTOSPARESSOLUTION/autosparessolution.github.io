@@ -4,242 +4,209 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Proforma Invoice – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .proforma-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            padding: 0 15px 15px 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border: 1px solid #dee2e6;
-        }
-        .company-header {
-            background: #0a7c71;
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            margin: 0 -15px 15px -15px;
-        }
-        .logo-area { display: flex; align-items: center; gap: 15px; }
-        .logo-area img { height: 60px; }
-        .company-details h1 { margin: 0; font-size: 24px; }
-        .company-details p { margin: 3px 0 0; font-size: 12px; opacity: 0.8; }
-        .invoice-title h2 { margin: 0; font-size: 20px; color: #e67e22; }
-        .info-box { background: #f8f9fa; border-radius: 6px; padding: 10px; margin-bottom: 12px; }
-        .info-box h3 { margin: 0 0 8px; font-size: 14px; color: #0a7c71; }
-        .info-row { display: flex; margin-bottom: 5px; font-size: 12px; }
-        .info-label { width: 110px; font-weight: 600; color: #555; }
-        .info-value { flex: 1; }
-        input, textarea, select { width: 100%; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
-        .items-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; table-layout: fixed; }
-        .items-table th, .items-table td { border: 1px solid #dee2e6; padding: 6px 4px; text-align: left; vertical-align: top; word-wrap: break-word; }
-        .items-table th { background: #f8f9fa; }
-        .totals { text-align: right; margin-top: 15px; }
-        .actions { margin-top: 30px; display: flex; gap: 15px; justify-content: flex-end; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
-        button:hover { background: #09645a; }
-        .item-row { margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-        .item-row input { flex: 1; min-width: 80px; }
-        .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
-        .add-item { background: #28a745; margin-bottom: 15px; }
-        @media print { .actions, button, input, textarea, select { display: none; } body { background: white; padding: 0; } }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1, h2 { color: #0a7c71; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
+        .form-group { flex: 1; min-width: 180px; }
+        label { display: block; font-size: 12px; font-weight: 600; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
+        th { background: #f1f3f5; }
+        .remove-btn { background: #dc3545; color: white; border: none; padding: 4px 8px; cursor: pointer; }
+        .total { font-size: 18px; font-weight: bold; text-align: right; margin-top: 15px; }
+        .action-buttons { margin-top: 20px; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="data-manager.js"></script>
 </head>
 <body>
-<div class="proforma-container" id="proformaContainer">
-    <div class="company-header">
-        <div class="logo-area">
-            <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
-            <div class="company-details">
-                <h1>Auto Spares Solution</h1>
-                <p>GSTIN: 19ANOPD3300R1ZO</p>
-                <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-            </div>
-        </div>
-        <div class="invoice-title">
-            <h2>PROFORMA INVOICE</h2>
-            <p><strong>Proforma No:</strong> <span id="proformaNo"></span></p>
-            <p><strong>Date:</strong> <span id="proformaDate"></span></p>
-            <p><strong>Valid Until:</strong> <span id="validUntil"></span></p>
-        </div>
+<div class="container">
+    <h1><i class="fas fa-file-invoice"></i> Proforma Invoice</h1>
+    <div class="form-row">
+        <div class="form-group"><label>Customer *</label><select id="customerEmail"><option value="">-- Select Customer --</option></select></div>
+        <div class="form-group"><label>Date</label><input type="date" id="proformaDate"></div>
+        <div class="form-group"><label>Proforma No.</label><input type="text" id="proformaNo" placeholder="Auto"></div>
     </div>
-
-    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-        <div style="flex:1;">
-            <div class="info-box">
-                <h3>Bill To</h3>
-                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="customerName" placeholder="Customer name"></div></div>
-                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="customerAddress" rows="2"></textarea></div></div>
-                <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="customerGstin"></div></div>
-                <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="customerState"></div></div>
-                <div class="info-row"><div class="info-label">Phone:</div><div class="info-value"><input type="text" id="customerPhone"></div></div>
-                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="customerEmail"></div></div>
-            </div>
-        </div>
+    <h2>Items</h2>
+    <table id="itemsTable"><thead><tr><th>Product</th><th>Qty</th><th>Price (₹)</th><th>Total</th><th></th></tr></thead><tbody id="itemsBody"><tr class="item-row"><td><select class="productSelect" style="width:200px;"><option value="">-- Select --</option></select></td><td><input type="number" class="qty" value="1" min="1"></td><td><input type="number" class="price" step="0.01" value="0"></td><td class="itemTotal">₹0</td><td><button type="button" class="remove-btn" onclick="this.closest('tr').remove(); calcTotal()">Remove</button></td></tr></tbody></table>
+    <button onclick="addItemRow()">+ Add Item</button>
+    <div class="total">Total: ₹<span id="grandTotal">0</span></div>
+    <div class="action-buttons">
+        <button onclick="saveProforma()"><i class="fas fa-save"></i> Save Proforma</button>
+        <button onclick="convertToInvoice()" style="background:#28a745;"><i class="fas fa-exchange-alt"></i> Convert to Sales Invoice</button>
+        <button onclick="window.location.href='index.html'">Cancel</button>
     </div>
-
-    <h3>Items</h3>
-    <div id="itemsContainer"></div>
-    <button class="add-item" onclick="addItem()">+ Add Item</button>
-
-    <div class="totals">
-        <table>
-            <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
-        </table>
-    </div>
-
-    <div class="footer-box" style="margin-top:30px; border-top:1px solid #dee2e6; padding-top:15px;">
-        <p><strong>Terms:</strong> This is a proforma invoice – not a tax invoice. Payment required before order processing.</p>
-        <div style="text-align:right; margin-top:20px;">
-            <div style="width:250px; border-top:1px solid #333; padding-top:5px; margin-left:auto; text-align:center;">
-                For Auto Spares Solution<br>(Authorised Signatory)
-            </div>
-        </div>
-    </div>
+    <div id="savedProformas" style="margin-top:30px;"><h3>Saved Proforma Invoices</h3><div id="proformaList"></div></div>
 </div>
-
-<div class="actions">
-    <button onclick="saveProforma()">💾 Save Proforma</button>
-    <button onclick="downloadPDF()">📄 Download PDF</button>
-    <button onclick="window.print()">🖨️ Print</button>
-    <button onclick="window.close()">Close</button>
-</div>
-
 <script>
-    let items = [];
-    let proformaCounter = localStorage.getItem('proformaCounter') || 1;
-    document.getElementById('proformaNo').innerText = 'PROF-' + new Date().getFullYear() + '-' + proformaCounter.toString().padStart(4,'0');
-    document.getElementById('proformaDate').innerText = new Date().toLocaleDateString('en-IN');
-    let valid = new Date(); valid.setDate(valid.getDate() + 15);
-    document.getElementById('validUntil').innerText = valid.toLocaleDateString('en-IN');
+    let products = [], customers = [], proformas = [];
+    let currentItems = [];
 
-    let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-    if (currentUser) {
-        document.getElementById('customerName').value = currentUser.name || '';
-        document.getElementById('customerAddress').value = currentUser.address || '';
-        document.getElementById('customerPhone').value = currentUser.phone || '';
-        document.getElementById('customerEmail').value = currentUser.email || '';
-        document.getElementById('customerGstin').value = currentUser.gstin || '';
-        document.getElementById('customerState').value = currentUser.state || '';
+    function loadData() {
+        products = getProducts();
+        customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const customerSelect = document.getElementById('customerEmail');
+        customerSelect.innerHTML = '<option value="">-- Select Customer --</option>';
+        customers.forEach(c => customerSelect.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`);
+        proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
+        displayProformas();
+        document.getElementById('proformaDate').value = new Date().toISOString().slice(0,10);
     }
 
-    // Pre‑fill items from cart
-    const cartData = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
-    if (cartData.length > 0) {
-        items = cartData.map(item => ({
-            part: item.part,
-            desc: item.desc,
-            hsn: item.hsn || '',
-            qty: item.qty,
-            price: item.price,
-            discount: item.discount || 0
-        }));
-        renderItems();
-        recalcTotals();
-    } else {
-        addItem();
+    function addItemRow() {
+        const tbody = document.getElementById('itemsBody');
+        const newRow = document.createElement('tr'); newRow.className = 'item-row';
+        newRow.innerHTML = `<td><select class="productSelect"><option value="">-- Select --</option></select></td><td><input type="number" class="qty" value="1" min="1"></td><td><input type="number" class="price" step="0.01" value="0"></td><td class="itemTotal">₹0</td><td><button type="button" class="remove-btn" onclick="this.closest('tr').remove(); calcTotal()">Remove</button></td>`;
+        tbody.appendChild(newRow);
+        fillProductDropdowns();
+        attachEvents();
+        calcTotal();
     }
 
-    function addItem() {
-        items.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0 });
-        renderItems();
-    }
-
-    function removeItem(idx) {
-        items.splice(idx, 1);
-        renderItems();
-        recalcTotals();
-    }
-
-    function updateItem(idx, field, value) {
-        items[idx][field] = value;
-        recalcTotals();
-    }
-
-    function renderItems() {
-        const container = document.getElementById('itemsContainer');
-        container.innerHTML = '';
-        items.forEach((item, idx) => {
-            const div = document.createElement('div');
-            div.className = 'item-row';
-            div.innerHTML = `
-                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:2;">
-                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="flex:3;">
-                <input type="text" placeholder="HSN" value="${escapeHtml(item.hsn)}" onchange="updateItem(${idx}, 'hsn', this.value)" style="flex:1;">
-                <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
-                <input type="number" placeholder="Unit Price" value="${item.price}" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))" style="flex:1;">
-                <input type="number" placeholder="Disc %" value="${item.discount}" step="0.01" onchange="updateItem(${idx}, 'discount', parseFloat(this.value))" style="flex:1;">
-                <button class="remove-item" onclick="removeItem(${idx})">X</button>
-            `;
-            container.appendChild(div);
+    function fillProductDropdowns() {
+        document.querySelectorAll('.productSelect').forEach(select => {
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">-- Select --</option>';
+            products.forEach(p => select.innerHTML += `<option value="${p.id}" data-price="${p.price || 0}">${p.name} (${p.sku}) - Stock: ${p.currentStock}</option>`);
+            if (currentVal) select.value = currentVal;
         });
     }
 
-    function recalcTotals() {
-        let subtotal = 0;
-        items.forEach(item => {
-            const taxable = (item.qty || 0) * (item.price || 0) * (1 - (item.discount || 0)/100);
-            subtotal += taxable;
+    function attachEvents() {
+        document.querySelectorAll('.productSelect').forEach(select => select.addEventListener('change', onProductChange));
+        document.querySelectorAll('.qty, .price').forEach(input => input.addEventListener('input', calcTotal));
+    }
+
+    function onProductChange(e) {
+        const select = e.target;
+        const price = parseFloat(select.options[select.selectedIndex]?.dataset.price) || 0;
+        const row = select.closest('tr');
+        row.querySelector('.price').value = price;
+        calcTotal();
+    }
+
+    function calcTotal() {
+        let grand = 0;
+        document.querySelectorAll('#itemsBody .item-row').forEach(row => {
+            const qty = parseFloat(row.querySelector('.qty')?.value) || 0;
+            const price = parseFloat(row.querySelector('.price')?.value) || 0;
+            const total = qty * price;
+            row.querySelector('.itemTotal').innerText = '₹' + total.toFixed(2);
+            grand += total;
         });
-        const cgst = subtotal * 0.09;
-        const sgst = subtotal * 0.09;
-        const grand = subtotal + cgst + sgst;
-        document.getElementById('subtotal').innerText = subtotal.toFixed(2);
-        document.getElementById('cgstTotal').innerText = cgst.toFixed(2);
-        document.getElementById('sgstTotal').innerText = sgst.toFixed(2);
         document.getElementById('grandTotal').innerText = grand.toFixed(2);
     }
 
+    function getItemsFromForm() {
+        const items = [];
+        document.querySelectorAll('#itemsBody .item-row').forEach(row => {
+            const productId = row.querySelector('.productSelect').value;
+            if (!productId) return;
+            items.push({
+                productId: parseInt(productId),
+                quantity: parseFloat(row.querySelector('.qty').value),
+                price: parseFloat(row.querySelector('.price').value)
+            });
+        });
+        return items;
+    }
+
     function saveProforma() {
+        const customerEmail = document.getElementById('customerEmail').value;
+        if (!customerEmail) { alert('Select customer'); return; }
+        const items = getItemsFromForm();
         if (items.length === 0) { alert('Add items'); return; }
+        const total = items.reduce((s,i) => s + i.quantity * i.price, 0);
+        const proformaNo = document.getElementById('proformaNo').value.trim() || 'PROF-' + Date.now();
         const proforma = {
-            proformaNo: document.getElementById('proformaNo').innerText,
-            date: document.getElementById('proformaDate').innerText,
-            validUntil: document.getElementById('validUntil').innerText,
-            customer: {
-                name: document.getElementById('customerName').value,
-                address: document.getElementById('customerAddress').value,
-                gstin: document.getElementById('customerGstin').value,
-                state: document.getElementById('customerState').value,
-                phone: document.getElementById('customerPhone').value,
-                email: document.getElementById('customerEmail').value
-            },
-            items: items.map(i => ({ ...i })),
-            subtotal: parseFloat(document.getElementById('subtotal').innerText),
-            cgst: parseFloat(document.getElementById('cgstTotal').innerText),
-            sgst: parseFloat(document.getElementById('sgstTotal').innerText),
-            grandTotal: parseFloat(document.getElementById('grandTotal').innerText)
+            id: Date.now(),
+            date: document.getElementById('proformaDate').value,
+            customerEmail: customerEmail,
+            items: items,
+            total: total,
+            proformaNo: proformaNo,
+            status: 'draft'
         };
-        let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
         proformas.push(proforma);
         localStorage.setItem('proformas', JSON.stringify(proformas));
-        localStorage.setItem('proformaCounter', parseInt(proformaCounter) + 1);
         alert('Proforma saved');
-        window.close();
+        displayProformas();
+        clearForm();
     }
 
-    function downloadPDF() {
-        const element = document.getElementById('proformaContainer');
-        const opt = { margin: [0.2,0.2,0.2,0.2], filename: `Proforma_${document.getElementById('proformaNo').innerText}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
-        html2pdf().set(opt).from(element).save();
+    function convertToInvoice() {
+        const customerEmail = document.getElementById('customerEmail').value;
+        if (!customerEmail) { alert('Select customer'); return; }
+        const items = getItemsFromForm();
+        if (items.length === 0) { alert('Add items'); return; }
+        const total = items.reduce((s,i) => s + i.quantity * i.price, 0);
+        const invoice = {
+            id: Date.now(),
+            date: document.getElementById('proformaDate').value,
+            customerEmail: customerEmail,
+            items: items,
+            total: total,
+            invoiceNo: 'INV-' + Date.now(),
+            status: 'pending'
+        };
+        try {
+            createSalesInvoice(invoice);
+            alert('Converted to Sales Invoice! Stock and outstanding updated.');
+            clearForm();
+            displayProformas();
+        } catch(err) { alert('Error: ' + err.message); }
     }
 
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function displayProformas() {
+        let html = '<table><thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Total</th><th>Actions</th></tr></thead><tbody>';
+        proformas.forEach(p => {
+            html += `<tr><td>${p.proformaNo}</td><td>${p.date}</td><td>${p.customerEmail}</td><td>₹${p.total}</td><td><button onclick="loadProforma('${p.id}')">Load</button> <button onclick="deleteProforma('${p.id}')">Delete</button></td></tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('proformaList').innerHTML = html || '<p>No proformas.</p>';
+    }
+
+    function loadProforma(id) {
+        const proforma = proformas.find(p => p.id == id);
+        if (!proforma) return;
+        document.getElementById('customerEmail').value = proforma.customerEmail;
+        document.getElementById('proformaDate').value = proforma.date;
+        document.getElementById('proformaNo').value = proforma.proformaNo;
+        // Clear and rebuild items
+        document.getElementById('itemsBody').innerHTML = '';
+        proforma.items.forEach(item => {
+            const row = document.createElement('tr'); row.className = 'item-row';
+            row.innerHTML = `<td><select class="productSelect"><option value="${item.productId}">Loading...</option></select></td><td><input type="number" class="qty" value="${item.quantity}"></td><td><input type="number" class="price" value="${item.price}"></td><td class="itemTotal">₹${item.quantity*item.price}</td><td><button type="button" class="remove-btn" onclick="this.closest('tr').remove(); calcTotal()">Remove</button></td>`;
+            document.getElementById('itemsBody').appendChild(row);
+        });
+        fillProductDropdowns();
+        calcTotal();
+    }
+
+    function deleteProforma(id) {
+        if(confirm('Delete proforma?')) {
+            proformas = proformas.filter(p => p.id != id);
+            localStorage.setItem('proformas', JSON.stringify(proformas));
+            displayProformas();
+        }
+    }
+
+    function clearForm() {
+        document.getElementById('customerEmail').value = '';
+        document.getElementById('proformaDate').value = new Date().toISOString().slice(0,10);
+        document.getElementById('proformaNo').value = '';
+        document.getElementById('itemsBody').innerHTML = '<tr class="item-row"><td><select class="productSelect"><option value="">-- Select --</option></select></td><td><input type="number" class="qty" value="1" min="1"></td><td><input type="number" class="price" step="0.01" value="0"></td><td class="itemTotal">₹0</td><td><button type="button" class="remove-btn" onclick="this.closest('tr').remove(); calcTotal()">Remove</button></td></tr>';
+        fillProductDropdowns();
+        calcTotal();
+    }
+
+    loadData();
+    addItemRow(); // initial row
 </script>
 </body>
 </html>
