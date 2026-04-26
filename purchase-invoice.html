@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Purchase Entry – Supplier Bill / Credit Note</title>
+    <title>Purchase Entry – Supplier Bill / Credit Note (Stock Integrated)</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -55,7 +55,7 @@
             gap: 10px;
             align-items: center;
         }
-        .item-row input { flex: 1; min-width: 100px; }
+        .item-row input, .item-row select { flex: 1; min-width: 100px; }
         .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
         .add-item { background: #28a745; margin-bottom: 15px; }
         .totals { text-align: right; margin-top: 20px; }
@@ -67,15 +67,22 @@
         .credit-note-section { margin-top: 20px; border-top: 1px solid #dee2e6; padding-top: 20px; }
         hr { margin: 20px 0; }
     </style>
+    <script src="data-manager.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>Purchase Entry</h1>
+    <h1>Purchase Entry (Stock Integrated)</h1>
     <hr>
 
     <!-- Supplier Details -->
     <div class="form-row">
-        <div class="form-group"><label>Supplier Name *</label><input type="text" id="supplierName"></div>
+        <div class="form-group">
+            <label>Supplier *</label>
+            <select id="supplierSelect">
+                <option value="">-- Select existing or type new --</option>
+            </select>
+            <input type="text" id="supplierName" placeholder="Or enter new supplier name" style="margin-top:5px;">
+        </div>
         <div class="form-group"><label>Supplier GSTIN</label><input type="text" id="supplierGstin"></div>
         <div class="form-group"><label>Supplier Phone</label><input type="text" id="supplierPhone"></div>
     </div>
@@ -91,7 +98,7 @@
         <div class="form-group"><label>Payment Terms (days)</label><input type="number" id="paymentTerms" value="30"></div>
     </div>
 
-    <!-- Items Table -->
+    <!-- Items Table (with product selection) -->
     <h3>Items Purchased</h3>
     <div id="itemsContainer"></div>
     <button class="add-item" onclick="addItem()">+ Add Item</button>
@@ -126,12 +133,41 @@
 
 <script>
     let items = [];
-    let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-    let purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-    let supplierCreditNotes = JSON.parse(localStorage.getItem('supplierCreditNotes') || '[]');
+    let products = [];
+    let suppliers = [];
+    let purchaseInvoices = [];
+
+    // Load data from localStorage
+    function loadData() {
+        products = getProducts();  // from data-manager.js
+        suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+        purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+
+        // Populate supplier dropdown
+        const supplierSelect = document.getElementById('supplierSelect');
+        supplierSelect.innerHTML = '<option value="">-- Select existing supplier --</option>';
+        suppliers.forEach(sup => {
+            supplierSelect.innerHTML += `<option value="${sup.email}" data-name="${sup.name}" data-gstin="${sup.gstin || ''}" data-phone="${sup.phone || ''}" data-address="${sup.address || ''}">${sup.name} (${sup.email})</option>`;
+        });
+        supplierSelect.addEventListener('change', function() {
+            const selected = supplierSelect.options[supplierSelect.selectedIndex];
+            if (selected.value) {
+                document.getElementById('supplierName').value = selected.dataset.name || '';
+                document.getElementById('supplierGstin').value = selected.dataset.gstin || '';
+                document.getElementById('supplierPhone').value = selected.dataset.phone || '';
+                document.getElementById('supplierAddress').value = selected.dataset.address || '';
+            } else {
+                document.getElementById('supplierName').value = '';
+                document.getElementById('supplierGstin').value = '';
+                document.getElementById('supplierPhone').value = '';
+                document.getElementById('supplierAddress').value = '';
+            }
+            populateInvoiceDropdown();
+        });
+    }
 
     function addItem() {
-        items.push({ part: '', desc: '', qty: 1, price: 0 });
+        items.push({ productId: '', productName: '', qty: 1, cost: 0 });
         renderItems();
     }
 
@@ -143,6 +179,16 @@
 
     function updateItem(idx, field, value) {
         items[idx][field] = value;
+        if (field === 'productId') {
+            const product = products.find(p => p.id == value);
+            if (product) {
+                items[idx].productName = product.name;
+                items[idx].cost = product.price || 0; // default to selling price? user can change.
+            } else {
+                items[idx].productName = '';
+            }
+        }
+        renderItems(); // re-render to refresh product name display
         recalcTotals();
     }
 
@@ -152,11 +198,16 @@
         items.forEach((item, idx) => {
             const div = document.createElement('div');
             div.className = 'item-row';
+            // Product dropdown
+            let productOptions = '<option value="">-- Select Product --</option>';
+            products.forEach(p => {
+                productOptions += `<option value="${p.id}" ${item.productId == p.id ? 'selected' : ''}>${p.name} (${p.sku}) - Stock: ${p.currentStock}</option>`;
+            });
             div.innerHTML = `
-                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:2;">
-                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="flex:3;">
+                <select onchange="updateItem(${idx}, 'productId', this.value)" style="flex:2;">${productOptions}</select>
+                <input type="text" placeholder="Product Name" value="${escapeHtml(item.productName)}" readonly style="flex:2; background:#e9ecef;">
                 <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
-                <input type="number" placeholder="Unit Price (₹)" value="${item.price}" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Cost (₹)" value="${item.cost}" step="0.01" onchange="updateItem(${idx}, 'cost', parseFloat(this.value))" style="flex:1;">
                 <button class="remove-item" onclick="removeItem(${idx})">X</button>
             `;
             container.appendChild(div);
@@ -165,7 +216,7 @@
 
     function recalcTotals() {
         let subtotal = 0;
-        items.forEach(item => subtotal += (item.qty || 0) * (item.price || 0));
+        items.forEach(item => subtotal += (item.qty || 0) * (item.cost || 0));
         const cgst = subtotal * 0.09;
         const sgst = subtotal * 0.09;
         let grand = subtotal + cgst + sgst;
@@ -177,54 +228,82 @@
     }
 
     function savePurchaseInvoice() {
-        const supplierName = document.getElementById('supplierName').value.trim();
+        // Get supplier email or create new supplier
+        let supplierEmail = document.getElementById('supplierSelect').value;
+        let supplierName = document.getElementById('supplierName').value.trim();
+        if (!supplierName) { alert('Please select or enter supplier name'); return; }
         const purchaseInvoiceNo = document.getElementById('purchaseInvoiceNo').value.trim();
-        if (!supplierName || !purchaseInvoiceNo) { alert('Please enter supplier name and invoice number'); return; }
+        if (!purchaseInvoiceNo) { alert('Enter purchase invoice number'); return; }
         if (items.length === 0) { alert('Add at least one item'); return; }
 
-        const purchaseDate = document.getElementById('purchaseDate').value || new Date().toISOString().split('T')[0];
-        let dueDate = document.getElementById('purchaseDueDate').value;
-        if (!dueDate) {
-            const d = new Date(purchaseDate);
-            d.setDate(d.getDate() + (parseInt(document.getElementById('paymentTerms').value) || 30));
-            dueDate = d.toISOString().split('T')[0];
-        }
-
-        const purchaseInvoice = {
-            id: Date.now(),
-            supplier: { name: supplierName, gstin: document.getElementById('supplierGstin').value, phone: document.getElementById('supplierPhone').value, address: document.getElementById('supplierAddress').value },
-            invoiceNo: purchaseInvoiceNo,
-            date: purchaseDate,
-            dueDate: dueDate,
-            items: items.map(i => ({ part: i.part, desc: i.desc, qty: i.qty, price: i.price, total: i.qty * i.price })),
-            subtotal: parseFloat(document.getElementById('subtotal').innerText),
-            cgst: parseFloat(document.getElementById('cgstTotal').innerText),
-            sgst: parseFloat(document.getElementById('sgstTotal').innerText),
-            grandTotal: parseFloat(document.getElementById('grandTotal').innerText),
-            createdAt: new Date().toISOString()
-        };
-        purchaseInvoices.push(purchaseInvoice);
-        localStorage.setItem('purchaseInvoices', JSON.stringify(purchaseInvoices));
-
-        // Update supplier ledger
-        let supplier = suppliers.find(s => s.name === supplierName);
+        // Find or create supplier in suppliers array
+        let supplier = suppliers.find(s => s.email === supplierEmail || s.name === supplierName);
         if (!supplier) {
-            supplier = { name: supplierName, gstin: purchaseInvoice.supplier.gstin, phone: purchaseInvoice.supplier.phone, address: purchaseInvoice.supplier.address, outstanding: 0, totalPurchased: 0 };
+            // Create new supplier
+            supplier = {
+                id: Date.now(),
+                name: supplierName,
+                email: supplierEmail || `supplier_${Date.now()}@temp.com`,
+                phone: document.getElementById('supplierPhone').value,
+                gstin: document.getElementById('supplierGstin').value,
+                address: document.getElementById('supplierAddress').value,
+                creditLimit: 50000,
+                openingBalance: 0,
+                outstanding: 0,
+                status: 'active',
+                supplierCode: 'SUP' + (suppliers.length + 1).toString().padStart(4,'0'),
+                createdAt: new Date().toISOString()
+            };
             suppliers.push(supplier);
+            localStorage.setItem('suppliers', JSON.stringify(suppliers));
         }
-        supplier.outstanding += purchaseInvoice.grandTotal;
-        supplier.totalPurchased += purchaseInvoice.grandTotal;
-        localStorage.setItem('suppliers', JSON.stringify(suppliers));
 
-        alert(`Purchase invoice ${purchaseInvoiceNo} saved!`);
-        // Reset form
-        document.getElementById('supplierName').value = '';
-        document.getElementById('purchaseInvoiceNo').value = '';
-        items = [];
-        renderItems();
-        recalcTotals();
-        // Refresh invoice dropdown for credit notes
-        populateInvoiceDropdown();
+        // Prepare items for createPurchaseInvoice (from data-manager.js)
+        const purchaseItems = [];
+        for (let item of items) {
+            if (!item.productId) {
+                alert('Please select a product for each item');
+                return;
+            }
+            purchaseItems.push({
+                productId: parseInt(item.productId),
+                quantity: item.qty,
+                cost: item.cost
+            });
+        }
+
+        const purchaseDate = document.getElementById('purchaseDate').value || new Date().toISOString().split('T')[0];
+        const dueDate = document.getElementById('purchaseDueDate').value;
+
+        const purchase = {
+            id: Date.now(),
+            date: purchaseDate,
+            supplierEmail: supplier.email,
+            items: purchaseItems,
+            total: parseFloat(document.getElementById('grandTotal').innerText),
+            poNo: purchaseInvoiceNo,
+            dueDate: dueDate
+        };
+
+        try {
+            // Central function from data-manager.js
+            createPurchaseInvoice(purchase);
+            alert(`Purchase invoice ${purchaseInvoiceNo} saved! Stock increased and supplier outstanding updated.`);
+
+            // Reset form
+            document.getElementById('supplierSelect').value = '';
+            document.getElementById('supplierName').value = '';
+            document.getElementById('supplierGstin').value = '';
+            document.getElementById('supplierPhone').value = '';
+            document.getElementById('supplierAddress').value = '';
+            document.getElementById('purchaseInvoiceNo').value = '';
+            items = [];
+            renderItems();
+            recalcTotals();
+            populateInvoiceDropdown();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
     }
 
     function recordCreditNote() {
@@ -236,7 +315,18 @@
         const remarks = document.getElementById('creditRemarks').value;
         if (!creditDate || isNaN(amount) || amount <= 0) { alert('Enter valid date and amount'); return; }
 
-        const creditNote = {
+        // Find supplier to reduce outstanding
+        let supplier = suppliers.find(s => s.name === supplierName);
+        if (!supplier) { alert('Supplier not found in master'); return; }
+
+        // Update supplier outstanding using paySupplier from data-manager.js (if you have it)
+        // Or directly update outstanding and ledger
+        supplier.outstanding = Math.max(0, (supplier.outstanding || 0) - amount);
+        localStorage.setItem('suppliers', JSON.stringify(suppliers));
+
+        // Record credit note in separate array (optional)
+        let supplierCreditNotes = JSON.parse(localStorage.getItem('supplierCreditNotes') || '[]');
+        supplierCreditNotes.push({
             id: Date.now(),
             supplierName: supplierName,
             date: creditDate,
@@ -244,20 +334,15 @@
             invoiceNo: invoiceNo || null,
             remarks: remarks || 'Credit Note',
             type: 'credit_note'
-        };
-        supplierCreditNotes.push(creditNote);
+        });
         localStorage.setItem('supplierCreditNotes', JSON.stringify(supplierCreditNotes));
 
-        // Update supplier outstanding (reduce)
-        const supplier = suppliers.find(s => s.name === supplierName);
-        if (supplier) {
-            supplier.outstanding -= amount;
-            if (supplier.outstanding < 0) supplier.outstanding = 0;
-            localStorage.setItem('suppliers', JSON.stringify(suppliers));
-        }
-        alert('Credit note recorded');
+        // Also add to supplier ledger if you have one
+        // For now, just update outstanding
+        alert('Credit note recorded. Supplier outstanding reduced.');
         document.getElementById('creditAmount').value = '';
         document.getElementById('creditRemarks').value = '';
+        // Refresh supplier list display if needed
     }
 
     function populateInvoiceDropdown() {
@@ -271,13 +356,17 @@
         });
     }
 
-    document.getElementById('supplierName').addEventListener('change', populateInvoiceDropdown);
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+    // Set default dates
     document.getElementById('purchaseDate').valueAsDate = new Date();
     const due = new Date(); due.setDate(due.getDate() + 30);
     document.getElementById('purchaseDueDate').valueAsDate = due;
-    addItem();
+    document.getElementById('creditDate').valueAsDate = new Date();
 
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    // Initialization
+    loadData();
+    addItem(); // start with one empty row
 </script>
 </body>
 </html>
