@@ -50,7 +50,7 @@
             document.getElementById('ordersTable').innerHTML = '<p>No invoices found.</p>';
             return;
         }
-        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></tr></thead><tbody>';
+        let html = '</table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(inv => {
             html += `<tr>
                 <td>${inv.invoiceNo}</td>
@@ -66,7 +66,7 @@
                 </td>
             </tr>`;
         });
-        html += '</tbody></table>';
+        html += '</tbody><table>';
         document.getElementById('ordersTable').innerHTML = html;
     }
 
@@ -104,7 +104,7 @@
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!invoice) { alert('Invoice not found'); return; }
 
-        // Helper to check if GST is local (starts with "19")
+        // Helper: check if GST is local (starts with "19")
         const isLocalGst = invoice.buyer?.gstin && invoice.buyer.gstin.startsWith('19');
 
         // Recalculate totals from items (to ensure accuracy)
@@ -160,7 +160,7 @@
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">${isLocalGst ? '₹'+cgst.toFixed(2) : '-'}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">${isLocalGst ? '₹'+sgst.toFixed(2) : '-'}</td>
+                ${isLocalGst ? `<td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgst.toFixed(2)}</td>` : ''}
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
             </tr>`;
         });
@@ -174,13 +174,13 @@
                 <td style="border:1px solid #dee2e6; padding:6px 4px;">${hsn || 'N/A'}</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${g.taxable.toFixed(2)}</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">${isLocalGst ? '₹'+g.cgst.toFixed(2) : '-'}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">${isLocalGst ? '₹'+g.sgst.toFixed(2) : '-'}</td>
+                ${isLocalGst ? `<td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${g.sgst.toFixed(2)}</td>` : ''}
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">${!isLocalGst ? '₹'+g.igst.toFixed(2) : '-'}</td>
                 <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalTax.toFixed(2)}</td>
             </tr>`;
         }
 
-        // Build the complete PDF container
+        // Build the complete PDF container (exact same format as invoice-stock.html)
         const container = document.createElement('div');
         container.style.padding = '20px';
         container.style.fontFamily = 'Roboto, sans-serif';
@@ -189,75 +189,85 @@
         container.style.backgroundColor = 'white';
         container.style.border = '1px solid #dee2e6';
         container.innerHTML = `
-            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div style="background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; border-radius: 8px 8px 0 0;">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.src='https://via.placeholder.com/60?text=ASS'">
                     <div>
-                        <h1 style="margin:0;">Auto Spares Solution</h1>
-                        <p style="margin:0;">GSTIN: 19ANOPD3300R1ZO</p>
-                        <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+                        <h1 style="margin:0; font-size:24px;">Auto Spares Solution</h1>
+                        <p style="margin:3px 0 0; font-size:12px;">GSTIN: 19ANOPD3300R1ZO</p>
+                        <p style="margin:0; font-size:12px;">101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
                     </div>
                 </div>
                 <div style="text-align:right;">
-                    <h2 style="margin:0;">TAX INVOICE</h2>
-                    <p><strong>Invoice No:</strong> ${invoice.invoiceNo}<br>
+                    <h2 style="margin:0; font-size:20px;">TAX INVOICE</h2>
+                    <p style="margin:5px 0;"><strong>Invoice No:</strong> ${invoice.invoiceNo}<br>
                     <strong>Date:</strong> ${invoice.date}<br>
                     <strong>Due Date:</strong> ${invoice.dueDate}</p>
                 </div>
             </div>
             <div style="display:flex; gap:20px; flex-wrap:wrap; margin:20px 0;">
-                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
-                    <h3 style="margin:0 0 8px 0; color:#0a7c71;">Buyer (Bill to)</h3>
-                    <p>${escapeHtml(invoice.buyer?.name)}<br>${escapeHtml(invoice.buyer?.address)}<br>GSTIN: ${escapeHtml(invoice.buyer?.gstin)}<br>State: ${escapeHtml(invoice.buyer?.state)}<br>Phone: ${escapeHtml(invoice.buyer?.phone)}<br>Email: ${escapeHtml(invoice.buyer?.email)}</p>
+                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px; border:1px solid #dee2e6;">
+                    <h3 style="margin:0 0 8px 0; color:#0a7c71; font-size:14px;">Buyer (Bill to)</h3>
+                    <p style="margin:2px 0;">${escapeHtml(invoice.buyer?.name || '')}<br>${escapeHtml(invoice.buyer?.address || '')}<br>GSTIN: ${escapeHtml(invoice.buyer?.gstin || '')}<br>State: ${escapeHtml(invoice.buyer?.state || '')}<br>Phone: ${escapeHtml(invoice.buyer?.phone || '')}<br>Email: ${escapeHtml(invoice.buyer?.email || '')}</p>
                 </div>
-                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
-                    <h3 style="margin:0 0 8px 0; color:#0a7c71;">Consignee (Ship to)</h3>
-                    <p>${escapeHtml(invoice.consignee?.name)}<br>${escapeHtml(invoice.consignee?.address)}<br>Phone: ${escapeHtml(invoice.consignee?.phone)}</p>
+                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px; border:1px solid #dee2e6;">
+                    <h3 style="margin:0 0 8px 0; color:#0a7c71; font-size:14px;">Consignee (Ship to)</h3>
+                    <p>${escapeHtml(invoice.consignee?.name || '')}<br>${escapeHtml(invoice.consignee?.address || '')}<br>Phone: ${escapeHtml(invoice.consignee?.phone || '')}</p>
                 </div>
             </div>
             <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
-                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
-                    <h3 style="margin:0 0 8px 0; color:#0a7c71;">Order Details</h3>
-                    <p>Customer Code: ${escapeHtml(invoice.orderDetails?.customerCode)}<br>SO No: ${escapeHtml(invoice.orderDetails?.salesOrderNo)}<br>Ref No: ${escapeHtml(invoice.orderDetails?.referenceNo)}<br>Payment Terms: ${escapeHtml(invoice.orderDetails?.paymentTerms)}</p>
+                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px; border:1px solid #dee2e6;">
+                    <h3 style="margin:0 0 8px 0; color:#0a7c71; font-size:14px;">Order Details</h3>
+                    <p>Customer Code: ${escapeHtml(invoice.orderDetails?.customerCode || '')}<br>SO No: ${escapeHtml(invoice.orderDetails?.salesOrderNo || '')}<br>Ref No: ${escapeHtml(invoice.orderDetails?.referenceNo || '')}<br>Payment Terms: ${escapeHtml(invoice.orderDetails?.paymentTerms || '')}</p>
                 </div>
-                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px;">
-                    <h3 style="margin:0 0 8px 0; color:#0a7c71;">Dispatch Details</h3>
-                    <p>Doc No: ${escapeHtml(invoice.dispatchDetails?.docNo)}<br>Mode: ${escapeHtml(invoice.dispatchDetails?.transportMode)}<br>Vehicle No: ${escapeHtml(invoice.dispatchDetails?.vehicleNo)}<br>Cartons: ${escapeHtml(invoice.dispatchDetails?.cartons || '')}</p>
+                <div style="flex:1; background:#f8f9fa; padding:10px; border-radius:6px; border:1px solid #dee2e6;">
+                    <h3 style="margin:0 0 8px 0; color:#0a7c71; font-size:14px;">Dispatch Details</h3>
+                    <p>Doc No: ${escapeHtml(invoice.dispatchDetails?.docNo || '')}<br>Mode: ${escapeHtml(invoice.dispatchDetails?.transportMode || '')}<br>Vehicle No: ${escapeHtml(invoice.dispatchDetails?.vehicleNo || '')}<br>Cartons: ${escapeHtml(invoice.dispatchDetails?.cartons || '')}</p>
                 </div>
             </div>
             <table style="width:100%; border-collapse:collapse; margin:20px 0; font-size:11px; table-layout:fixed;">
-                <thead><tr style="background:#f8f9fa;">
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:4%;">#</th>
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Part No</th>
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:12%;">Description</th>
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">HSN</th>
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:4%;">Qty</th>
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:7%;">Unit Price</th>
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">Disc%</th>
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Taxable</th>
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">GST%</th>
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">${isLocalGst ? 'CGST' : 'IGST'}</th>
-                    ${isLocalGst ? '<th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">SGST</th>' : ''}
-                    <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Total</th>
-                </tr></thead>
+                <thead>
+                    <tr style="background:#f8f9fa;">
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:4%;">#</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:10%;">Part No</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:12%;">Description</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">HSN</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:4%;">Qty</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:7%;">Unit Price</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">Disc%</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Taxable</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:6%;">GST%</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">${isLocalGst ? 'CGST' : 'IGST'}</th>
+                        ${isLocalGst ? '<th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">SGST</th>' : ''}
+                        <th style="border:1px solid #dee2e6; padding:6px 4px; width:8%;">Total</th>
+                    </tr>
+                </thead>
                 <tbody>${itemsHtml}</tbody>
             </table>
             <table style="width:100%; border-collapse:collapse; margin:15px 0; font-size:11px;">
-                <thead><tr style="background:#f8f9fa;"><th>HSN/SAC</th><th>Taxable Value</th><th>${isLocalGst ? 'CGST' : 'IGST'}</th>${isLocalGst ? '<th>SGST</th>' : ''}<th>Total Tax</th></tr></thead>
+                <thead>
+                    <tr style="background:#f8f9fa;">
+                        <th style="border:1px solid #dee2e6; padding:6px 4px;">HSN/SAC</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px;">Taxable Value</th>
+                        <th style="border:1px solid #dee2e6; padding:6px 4px;">${isLocalGst ? 'CGST' : 'IGST'}</th>
+                        ${isLocalGst ? '<th style="border:1px solid #dee2e6; padding:6px 4px;">SGST</th>' : ''}
+                        <th style="border:1px solid #dee2e6; padding:6px 4px;">Total Tax</th>
+                    </tr>
+                </thead>
                 <tbody>${taxHtml}</tbody>
             </table>
             <div style="text-align:right;">
-                <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹${subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">${isLocalGst ? 'CGST (9%):' : 'IGST (18%):'}</td><td style="text-align:right;">${isLocalGst ? '₹'+cgstTotal.toFixed(2) : '₹'+igstTotal.toFixed(2)}</td></tr>
-                    ${isLocalGst ? `<tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹${sgstTotal.toFixed(2)}</td></tr>` : ''}
-                    <tr><td style="text-align:right;">Round Off:</td><td style="text-align:right;">₹${roundOff.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>
+                <table style="width:300px; margin-left:auto; border-collapse:collapse;">
+                    <tr><td style="text-align:right; padding:3px;">Subtotal (after discount):</td><td style="text-align:right; padding:3px;">₹${subtotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right; padding:3px;">${isLocalGst ? 'CGST (9%):' : 'IGST (18%):'}</td><td style="text-align:right; padding:3px;">${isLocalGst ? '₹'+cgstTotal.toFixed(2) : '₹'+igstTotal.toFixed(2)}</td></tr>
+                    ${isLocalGst ? `<tr><td style="text-align:right; padding:3px;">SGST (9%):</td><td style="text-align:right; padding:3px;">₹${sgstTotal.toFixed(2)}</td></tr>` : ''}
+                    <tr><td style="text-align:right; padding:3px;">Round Off:</td><td style="text-align:right; padding:3px;">₹${roundOff.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right; padding:3px;">Grand Total:</td><td style="text-align:right; padding:3px;">₹${grand.toFixed(2)}</td></tr>
                 </table>
             </div>
             <div style="margin-top:20px; background:#f8f9fa; border-radius:6px; padding:10px; border:1px solid #dee2e6;">
                 <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
-                    <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
+                    <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;" onerror="this.src='https://via.placeholder.com/120?text=QR'"></div>
                     <div><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</div>
                 </div>
             </div>
@@ -277,7 +287,7 @@
             margin: [0.2, 0.2, 0.2, 0.2],
             filename: `Invoice_${invoice.invoiceNo}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
+            html2canvas: { scale: 2, letterRendering: true, useCORS: true },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
         html2pdf().set(opt).from(container).save();
