@@ -3,380 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Supplier Ledger – Auto Spares</title>
+    <title>Supplier Ledger</title>
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border: 1px solid #dee2e6;
-        }
-        h1, h2 {
-            color: #0a7c71;
-        }
-        .supplier-info {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #0a7c71;
-        }
-        .form-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            border: 1px solid #dee2e6;
-        }
-        .form-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-        .form-group {
-            flex: 1;
-            min-width: 180px;
-        }
-        label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 4px;
-            color: #555;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-family: inherit;
-        }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-right: 10px;
-        }
-        button:hover {
-            background: #09645a;
-        }
-        .btn-danger {
-            background: #dc3545;
-        }
-        .btn-danger:hover {
-            background: #c82333;
-        }
-        .btn-warning {
-            background: #ffc107;
-            color: #333;
-        }
-        .search-box {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: space-between;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #dee2e6;
-            padding: 10px;
-            text-align: left;
-            vertical-align: top;
-        }
-        th {
-            background: #0a7c71;
-            color: white;
-        }
-        .balance-positive {
-            color: #28a745;
-            font-weight: bold;
-        }
-        .balance-negative {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        .total-row {
-            background: #f1f3f5;
-            font-weight: bold;
-        }
-        @media (max-width: 768px) {
-            .form-row {
-                flex-direction: column;
-            }
-            table {
-                font-size: 12px;
-            }
-            th, td {
-                padding: 6px;
-            }
-        }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        .supplier-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .balance-positive { color: #28a745; font-weight: bold; }
+        .balance-negative { color: #dc3545; font-weight: bold; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
     </style>
+    <script src="data-manager.js"></script>
 </head>
 <body>
 <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1>Supplier Ledger</h1>
-        <a href="supplier-master.html" style="background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">← Back to Suppliers</a>
+    <h1>Supplier Ledger</h1>
+    <div id="supplierInfo" class="supplier-info">Loading...</div>
+    <div>
+        <input type="text" id="searchInput" placeholder="Search by ref, type..." style="padding:8px;width:200px;">
+        <button onclick="filterLedger()">Search</button>
+        <button onclick="loadLedger()">Refresh</button>
+        <button onclick="exportToCSV()">Export CSV</button>
     </div>
-
-    <div id="supplierInfo" class="supplier-info">
-        Loading supplier information...
-    </div>
-
-    <!-- Add Transaction Form -->
-    <div class="form-section">
-        <h2>Add Transaction</h2>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Transaction Type *</label>
-                <select id="transType">
-                    <option value="purchase">Purchase Invoice</option>
-                    <option value="payment">Payment to Supplier</option>
-                    <option value="debit_note">Debit Note (Return)</option>
-                    <option value="credit_note">Credit Note (Adjustment)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Date *</label>
-                <input type="date" id="transDate">
-            </div>
-            <div class="form-group">
-                <label>Reference / Invoice No.</label>
-                <input type="text" id="transRef" placeholder="Inv No / Payment Ref">
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Amount (₹) *</label>
-                <input type="number" id="transAmount" step="0.01" placeholder="Amount">
-            </div>
-            <div class="form-group">
-                <label>Narration / Remarks</label>
-                <input type="text" id="transNarration" placeholder="Optional notes">
-            </div>
-        </div>
-        <div class="form-row">
-            <button onclick="addTransaction()">➕ Add Transaction</button>
-            <button class="btn-warning" onclick="clearTransactionForm()">Clear</button>
-        </div>
-    </div>
-
-    <!-- Ledger Table -->
-    <div class="search-box">
-        <input type="text" id="searchTransInput" placeholder="Search by ref, narration...">
-        <button onclick="searchTransactions()">🔍 Search</button>
-        <button onclick="loadLedger()">🔄 Refresh</button>
-        <button onclick="exportLedgerToCSV()">📄 Export CSV</button>
-    </div>
-
     <div id="ledgerTable"></div>
+    <button onclick="window.location.href='supplier-master.html'">← Back to Suppliers</button>
 </div>
-
 <script>
-    let currentSupplier = null;
-    let transactions = [];
-    let filteredTransactions = [];
+    let supplierEmail = localStorage.getItem('viewSupplierEmail');
+    let ledger = [];
+    let filtered = [];
+    let supplier = null;
 
-    const supplierEmail = localStorage.getItem('viewSupplierEmail');
-
-    function loadSupplierInfo() {
-        if (!supplierEmail) {
-            document.getElementById('supplierInfo').innerHTML = '<p style="color:red;">No supplier selected. Please go back to Supplier Master and click the Ledger button.</p>';
-            return null;
+    function loadLedger() {
+        if (!supplierEmail) { document.getElementById('supplierInfo').innerHTML = '<p style="color:red;">No supplier selected.</p>'; return; }
+        let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+        supplier = suppliers.find(s => s.email === supplierEmail);
+        if (supplier) {
+            document.getElementById('supplierInfo').innerHTML = `<strong>${supplier.name}</strong> (${supplier.email})<br>Outstanding: ₹${(supplier.outstanding || 0).toLocaleString()}`;
+        } else {
+            document.getElementById('supplierInfo').innerHTML = '<p>Supplier not found</p>';
+            return;
         }
-        const suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        const supplier = suppliers.find(s => s.email === supplierEmail);
-        if (!supplier) {
-            document.getElementById('supplierInfo').innerHTML = '<p style="color:red;">Supplier not found. Please check the supplier master.</p>';
-            return null;
-        }
-        currentSupplier = supplier;
-        const openingBalance = supplier.openingBalance || 0;
-        const creditLimit = supplier.creditLimit || 50000;
-        document.getElementById('supplierInfo').innerHTML = `
-            <strong>${escapeHtml(supplier.name)}</strong><br>
-            Code: ${escapeHtml(supplier.supplierCode || '')} | Email: ${escapeHtml(supplier.email)} | Phone: ${escapeHtml(supplier.phone)}<br>
-            Opening Balance: <strong class="${openingBalance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${openingBalance.toLocaleString()}</strong> | 
-            Credit Limit: ₹${creditLimit.toLocaleString()}
-        `;
-        return supplier;
-    }
-
-    function loadTransactions() {
-        const allTransactions = JSON.parse(localStorage.getItem('supplierTransactions') || '[]');
-        transactions = allTransactions.filter(t => t.supplierEmail === supplierEmail);
-        transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-        filteredTransactions = [...transactions];
+        ledger = JSON.parse(localStorage.getItem('supplierLedger') || '[]');
+        ledger = ledger.filter(e => e.supplierEmail === supplierEmail).sort((a,b) => new Date(a.date) - new Date(b.date));
+        filtered = [...ledger];
         displayLedger();
     }
 
     function displayLedger() {
-        if (!currentSupplier) return;
-        let runningBalance = currentSupplier.openingBalance || 0;
-        let html = '<table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (Supplier owes us)</th><th>Credit (We owe supplier)</th><th>Running Balance</th><th>Narration</th><th>Actions</th></tr></thead><tbody>';
-        if (filteredTransactions.length === 0) {
-            html += `<tr><td colspan="8">No transactions found. Add a purchase or payment. Starting balance: ₹${runningBalance.toLocaleString()}</td></tr>`;
-        } else {
-            filteredTransactions.forEach(t => {
-                let debit = 0, credit = 0;
-                switch(t.type) {
-                    case 'purchase': debit = t.amount; break;
-                    case 'payment': credit = t.amount; break;
-                    case 'debit_note': debit = t.amount; break;
-                    case 'credit_note': credit = t.amount; break;
-                }
-                runningBalance = runningBalance + debit - credit;
-                html += `<tr>
-                    <td>${formatDate(t.date)}</td>
-                    <td>${getTypeLabel(t.type)}</td>
-                    <td>${escapeHtml(t.ref || '-')}</td>
-                    <td class="balance-negative">${debit > 0 ? '₹' + debit.toLocaleString() : '-'}</td>
-                    <td class="balance-positive">${credit > 0 ? '₹' + credit.toLocaleString() : '-'}</td>
-                    <td class="${runningBalance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${runningBalance.toLocaleString()}</td>
-                    <td>${escapeHtml(t.narration || '-')}</td>
-                    <td><button onclick="deleteTransaction('${t.id}')" class="btn-danger" style="padding:4px 8px; font-size:12px;">🗑️</button></td>
-                </tr>`;
-            });
-        }
-        html += `<tr class="total-row"><td colspan="5"><strong>Closing Balance</strong></td><td colspan="3"><strong class="${runningBalance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${runningBalance.toLocaleString()}</strong></td></tr>`;
+        let html = '<table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Running Balance</th><th>Narration</th></tr></thead><tbody>';
+        let balance = supplier.openingBalance || 0;
+        filtered.forEach(entry => {
+            balance += (entry.debit || 0) - (entry.credit || 0);
+            html += `<tr>
+                <td>${entry.date}</td>
+                <td>${entry.type}</td>
+                <td>${entry.ref || '-'}</td>
+                <td>${entry.debit ? '₹' + entry.debit.toLocaleString() : '-'}</td>
+                <td>${entry.credit ? '₹' + entry.credit.toLocaleString() : '-'}</td>
+                <td class="${balance>=0?'balance-positive':'balance-negative'}">₹${balance.toLocaleString()}</td>
+                <td>${entry.narration || '-'}</td>
+            </tr>`;
+        });
         html += '</tbody></table>';
-        document.getElementById('ledgerTable').innerHTML = html;
+        document.getElementById('ledgerTable').innerHTML = html || '<p>No transactions.</p>';
     }
 
-    function addTransaction() {
-        if (!currentSupplier) { alert('Supplier not loaded.'); return; }
-        const type = document.getElementById('transType').value;
-        const date = document.getElementById('transDate').value;
-        const ref = document.getElementById('transRef').value.trim();
-        const amount = parseFloat(document.getElementById('transAmount').value);
-        const narration = document.getElementById('transNarration').value.trim();
-        if (!date) { alert('Please select date.'); return; }
-        if (isNaN(amount) || amount <= 0) { alert('Enter a valid positive amount.'); return; }
-        const newTransaction = {
-            id: Date.now() + Math.random(),
-            supplierEmail: supplierEmail,
-            type: type,
-            date: date,
-            ref: ref,
-            amount: amount,
-            narration: narration,
-            createdAt: new Date().toISOString()
-        };
-        let allTransactions = JSON.parse(localStorage.getItem('supplierTransactions') || '[]');
-        allTransactions.push(newTransaction);
-        localStorage.setItem('supplierTransactions', JSON.stringify(allTransactions));
-        updateSupplierOutstanding();
-        clearTransactionForm();
-        loadTransactions();
-        alert('Transaction added.');
-    }
-
-    function updateSupplierOutstanding() {
-        let allTransactions = JSON.parse(localStorage.getItem('supplierTransactions') || '[]');
-        const suppTransactions = allTransactions.filter(t => t.supplierEmail === supplierEmail);
-        suppTransactions.sort((a,b) => new Date(a.date) - new Date(b.date));
-        let balance = currentSupplier.openingBalance || 0;
-        for (let t of suppTransactions) {
-            switch(t.type) {
-                case 'purchase': balance += t.amount; break;
-                case 'payment': balance -= t.amount; break;
-                case 'debit_note': balance += t.amount; break;
-                case 'credit_note': balance -= t.amount; break;
-            }
-        }
-        let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        const index = suppliers.findIndex(s => s.email === supplierEmail);
-        if (index !== -1) {
-            suppliers[index].outstanding = balance;
-            localStorage.setItem('suppliers', JSON.stringify(suppliers));
-            currentSupplier.outstanding = balance;
-            loadSupplierInfo();
-        }
-    }
-
-    function deleteTransaction(id) {
-        if (!confirm('Delete this transaction?')) return;
-        let allTransactions = JSON.parse(localStorage.getItem('supplierTransactions') || '[]');
-        allTransactions = allTransactions.filter(t => t.id != id);
-        localStorage.setItem('supplierTransactions', JSON.stringify(allTransactions));
-        updateSupplierOutstanding();
-        loadTransactions();
-    }
-
-    function searchTransactions() {
-        const term = document.getElementById('searchTransInput').value.toLowerCase();
-        if (!term) filteredTransactions = [...transactions];
-        else filteredTransactions = transactions.filter(t => (t.ref && t.ref.toLowerCase().includes(term)) || (t.narration && t.narration.toLowerCase().includes(term)) || getTypeLabel(t.type).toLowerCase().includes(term));
+    function filterLedger() {
+        const term = document.getElementById('searchInput').value.toLowerCase();
+        if (!term) filtered = [...ledger];
+        else filtered = ledger.filter(e => (e.ref && e.ref.toLowerCase().includes(term)) || e.type.toLowerCase().includes(term));
         displayLedger();
     }
 
-    function clearTransactionForm() {
-        document.getElementById('transType').value = 'purchase';
-        document.getElementById('transDate').value = new Date().toISOString().slice(0,10);
-        document.getElementById('transRef').value = '';
-        document.getElementById('transAmount').value = '';
-        document.getElementById('transNarration').value = '';
+    function exportToCSV() {
+        let csv = "Date,Type,Reference,Debit,Credit,Running Balance,Narration\n";
+        let balance = supplier.openingBalance || 0;
+        filtered.forEach(e => {
+            balance += (e.debit||0) - (e.credit||0);
+            csv += `"${e.date}","${e.type}","${e.ref || ''}",${e.debit||0},${e.credit||0},${balance},"${e.narration||''}"\n`;
+        });
+        const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `supplier_ledger_${supplierEmail}.csv`; a.click(); URL.revokeObjectURL(url);
     }
-
-    function exportLedgerToCSV() {
-        if (!currentSupplier) return;
-        let csv = "Date,Transaction Type,Reference,Debit (Dr),Credit (Cr),Running Balance,Narration\n";
-        let runningBalance = currentSupplier.openingBalance || 0;
-        for (let t of filteredTransactions) {
-            let debit = 0, credit = 0;
-            switch(t.type) {
-                case 'purchase': debit = t.amount; break;
-                case 'payment': credit = t.amount; break;
-                case 'debit_note': debit = t.amount; break;
-                case 'credit_note': credit = t.amount; break;
-            }
-            runningBalance = runningBalance + debit - credit;
-            csv += `"${t.date}","${getTypeLabel(t.type)}","${t.ref || ''}",${debit},${credit},${runningBalance},"${t.narration || ''}"\n`;
-        }
-        const blob = new Blob([csv], {type: 'text/csv'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `supplier_ledger_${currentSupplier.supplierCode}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
-    function getTypeLabel(type) {
-        const map = { 'purchase': 'Purchase Invoice', 'payment': 'Payment', 'debit_note': 'Debit Note (Return)', 'credit_note': 'Credit Note (Adjustment)' };
-        return map[type] || type;
-    }
-
-    function formatDate(dateStr) { if (!dateStr) return ''; return new Date(dateStr).toLocaleDateString('en-IN'); }
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-
-    function loadLedger() { loadTransactions(); }
-    function init() {
-        if (!supplierEmail) { document.getElementById('supplierInfo').innerHTML = '<p style="color:red;">No supplier selected. Please go back to Supplier Master and click Ledger.</p>'; return; }
-        const supplier = loadSupplierInfo();
-        if (supplier) { document.getElementById('transDate').value = new Date().toISOString().slice(0,10); loadTransactions(); }
-    }
-    init();
+    loadLedger();
 </script>
 </body>
-    </html>
+</html>
