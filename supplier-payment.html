@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supplier Payment</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        .info { background: #e9ecef; padding: 10px; border-radius: 6px; margin: 15px 0; }
+    </style>
+    <script src="data-manager.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>Supplier Payment</h1>
+    <div class="form-group">
+        <label>Supplier *</label>
+        <select id="supplierEmail"><option value="">-- Select Supplier --</option></select>
+    </div>
+    <div class="form-group">
+        <label>Payment Date</label>
+        <input type="date" id="paymentDate">
+    </div>
+    <div class="form-group">
+        <label>Amount (₹) *</label>
+        <input type="number" id="amount" step="0.01">
+    </div>
+    <div class="form-group">
+        <label>Reference / Cheque No.</label>
+        <input type="text" id="reference">
+    </div>
+    <div id="supplierInfo" class="info">Select a supplier to see outstanding.</div>
+    <button onclick="recordPayment()">💾 Record Payment</button>
+    <button onclick="window.location.href='supplier-master.html'">Cancel</button>
+</div>
+<script>
+    let suppliers = [];
+    function loadSuppliers() {
+        suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+        const select = document.getElementById('supplierEmail');
+        select.innerHTML = '<option value="">-- Select Supplier --</option>';
+        suppliers.forEach(s => {
+            select.innerHTML += `<option value="${s.email}" data-outstanding="${s.outstanding || 0}">${s.name} (${s.email}) - Outstanding: ₹${(s.outstanding || 0).toLocaleString()}</option>`;
+        });
+        document.getElementById('paymentDate').value = new Date().toISOString().slice(0,10);
+        select.addEventListener('change', updateSupplierInfo);
+    }
+    function updateSupplierInfo() {
+        const select = document.getElementById('supplierEmail');
+        const selectedOption = select.options[select.selectedIndex];
+        const outstanding = parseFloat(selectedOption.dataset.outstanding) || 0;
+        document.getElementById('supplierInfo').innerHTML = `Current Outstanding: <strong>₹${outstanding.toLocaleString()}</strong>`;
+    }
+    function recordPayment() {
+        const supplierEmail = document.getElementById('supplierEmail').value;
+        if (!supplierEmail) { alert('Select a supplier'); return; }
+        const amount = parseFloat(document.getElementById('amount').value);
+        if (isNaN(amount) || amount <= 0) { alert('Enter valid amount'); return; }
+        const payment = {
+            id: Date.now(),
+            date: document.getElementById('paymentDate').value,
+            supplierEmail: supplierEmail,
+            amount: amount,
+            reference: document.getElementById('reference').value.trim() || 'SUPPAY-' + Date.now()
+        };
+        try {
+            paySupplier(payment);
+            alert(`Payment of ₹${amount} recorded. Supplier outstanding updated.`);
+            window.location.href = 'supplier-master.html';
+        } catch(err) { alert('Error: ' + err.message); }
+    }
+    loadSuppliers();
+</script>
+</body>
+</html>
