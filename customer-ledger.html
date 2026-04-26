@@ -3,629 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Ledger – Auto Spares</title>
+    <title>Customer Ledger</title>
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: auto;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        h1, h2, h3 {
-            color: #0a7c71;
-        }
-        .customer-selector {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .payment-form {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #0a7c71;
-        }
-        .form-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            align-items: flex-end;
-        }
-        .form-group {
-            flex: 1;
-            min-width: 150px;
-        }
-        .form-group label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 4px;
-            color: #555;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-family: inherit;
-        }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        button:hover {
-            background: #09645a;
-        }
-        .btn-danger {
-            background: #dc3545;
-        }
-        .btn-danger:hover {
-            background: #c82333;
-        }
-        .btn-pdf {
-            background: #e67e22;
-        }
-        .btn-pdf:hover {
-            background: #d35400;
-        }
-        .period-filters {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin: 20px 0;
-            align-items: center;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            font-size: 13px;
-        }
-        th, td {
-            border: 1px solid #dee2e6;
-            padding: 8px;
-            text-align: left;
-            vertical-align: top;
-        }
-        th {
-            background: #0a7c71;
-            color: white;
-        }
-        .text-right {
-            text-align: right;
-        }
-        .balance-positive {
-            color: #28a745;
-            font-weight: bold;
-        }
-        .balance-negative {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        .statement-actions {
-            margin: 20px 0;
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        .summary-box {
-            background: #e9ecef;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        .summary-item {
-            flex: 1;
-            text-align: center;
-        }
-        hr {
-            margin: 20px 0;
-        }
-        @media print {
-            .no-print {
-                display: none !important;
-            }
-            body {
-                background: white;
-                padding: 0;
-            }
-            .container {
-                box-shadow: none;
-                padding: 0;
-            }
-        }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        .customer-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .balance-positive { color: #28a745; font-weight: bold; }
+        .balance-negative { color: #dc3545; font-weight: bold; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        .search-box { margin-bottom: 20px; display: flex; gap: 10px; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="data-manager.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>Customer Ledger & Payment Recording</h1>
-
-    <!-- Customer Selection -->
-    <div class="customer-selector no-print">
-        <div class="form-row">
-            <div class="form-group" style="flex:2;">
-                <label>Select Customer</label>
-                <select id="customerSelect"></select>
-            </div>
-            <div class="form-group">
-                <button onclick="loadCustomerLedger()">Load Ledger</button>
-            </div>
-        </div>
+    <h1>Customer Ledger</h1>
+    <div id="customerInfo" class="customer-info">Loading...</div>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by ref, type...">
+        <button onclick="filterLedger()">🔍 Search</button>
+        <button onclick="loadLedger()">🔄 Refresh</button>
+        <button onclick="exportToCSV()">📄 Export CSV</button>
     </div>
-
-    <!-- Payment Recording Form -->
-    <div class="payment-form no-print" id="paymentForm" style="display:none;">
-        <h3>Record Payment Received</h3>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Payment Date</label>
-                <input type="date" id="paymentDate">
-            </div>
-            <div class="form-group">
-                <label>Amount (₹)</label>
-                <input type="number" id="paymentAmount" step="0.01" placeholder="Enter amount">
-            </div>
-            <div class="form-group">
-                <label>Against Invoice (optional)</label>
-                <select id="paymentInvoiceSelect">
-                    <option value="">All outstanding (adjust outstanding)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Reference / Remarks</label>
-                <input type="text" id="paymentRemarks" placeholder="Cheque No, UTR, etc.">
-            </div>
-            <div class="form-group">
-                <button onclick="recordPayment()">Record Payment</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Period Filters -->
-    <div class="period-filters no-print">
-        <div class="form-group">
-            <label>Statement Period</label>
-            <select id="periodType">
-                <option value="all">All Time</option>
-                <option value="fy">Financial Year</option>
-                <option value="quarter">Quarter</option>
-                <option value="month">Month</option>
-                <option value="day">Day</option>
-                <option value="custom">Custom Range</option>
-            </select>
-        </div>
-        <div class="form-group" id="fyYearGroup" style="display:none;">
-            <label>Financial Year</label>
-            <select id="fyYear"></select>
-        </div>
-        <div class="form-group" id="quarterGroup" style="display:none;">
-            <label>Quarter</label>
-            <select id="quarterSelect">
-                <option value="1">Q1 (Apr-Jun)</option>
-                <option value="2">Q2 (Jul-Sep)</option>
-                <option value="3">Q3 (Oct-Dec)</option>
-                <option value="4">Q4 (Jan-Mar)</option>
-            </select>
-        </div>
-        <div class="form-group" id="monthGroup" style="display:none;">
-            <label>Month</label>
-            <input type="month" id="monthPicker">
-        </div>
-        <div class="form-group" id="dayGroup" style="display:none;">
-            <label>Date</label>
-            <input type="date" id="dayPicker">
-        </div>
-        <div class="form-group" id="customStartGroup" style="display:none;">
-            <label>Start Date</label>
-            <input type="date" id="customStart">
-        </div>
-        <div class="form-group" id="customEndGroup" style="display:none;">
-            <label>End Date</label>
-            <input type="date" id="customEnd">
-        </div>
-        <div class="form-group">
-            <button class="btn-pdf" onclick="generateStatementPDF()">📄 Generate Statement PDF</button>
-        </div>
-    </div>
-
-    <!-- Statement Table (will be shown after loading ledger) -->
-    <div id="statementContainer" style="display:none;">
-        <div class="summary-box" id="summaryBox"></div>
-        <div style="overflow-x:auto;">
-            <table id="statementTable">
-                <thead>
-                    <tr><th>Date</th><th>Transaction Type</th><th>Invoice No</th><th>Particulars</th><th class="text-right">Debit (₹)</th><th class="text-right">Credit (₹)</th><th class="text-right">Balance (₹)</th></tr>
-                </thead>
-                <tbody id="statementBody"></tbody>
-            </table>
-        </div>
-    </div>
+    <div id="ledgerTable"></div>
+    <button onclick="window.location.href='customer-master.html'">← Back to Customers</button>
 </div>
-
 <script>
-    // ---------- Data structures ----------
-    let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-    let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]'); // { id, customerEmail, date, amount, invoiceNo, remarks }
+    let customerEmail = localStorage.getItem('viewCustomerEmail');
+    let ledger = [];
+    let filtered = [];
+    let customer = null;
 
-    let currentCustomerEmail = null;
-
-    // Helper functions
-    function formatDate(dateStr) {
-        let d = new Date(dateStr);
-        return d.toLocaleDateString('en-IN');
-    }
-
-    function formatMoney(amt) {
-        return '₹' + amt.toFixed(2);
-    }
-
-    // Populate customer dropdown
-    function populateCustomerDropdown() {
-        const select = document.getElementById('customerSelect');
-        select.innerHTML = '<option value="">-- Select Customer --</option>';
-        customers.forEach(c => {
-            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
-        });
-    }
-
-    // Load ledger for selected customer
-    function loadCustomerLedger() {
-        const email = document.getElementById('customerSelect').value;
-        if (!email) {
-            alert('Please select a customer');
-            return;
-        }
-        currentCustomerEmail = email;
-        document.getElementById('paymentForm').style.display = 'block';
-        document.getElementById('statementContainer').style.display = 'block';
-        
-        // Populate invoice dropdown for payments
-        const customerInvoices = allInvoices.filter(inv => inv.buyer?.email === email);
-        const invoiceSelect = document.getElementById('paymentInvoiceSelect');
-        invoiceSelect.innerHTML = '<option value="">All outstanding (adjust outstanding)</option>';
-        customerInvoices.forEach(inv => {
-            invoiceSelect.innerHTML += `<option value="${inv.invoiceNo}">${inv.invoiceNo} - ₹${inv.grandTotal.toFixed(2)} (Due: ${inv.dueDate})</option>`;
-        });
-        
-        // Set default payment date to today
-        document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
-        
-        // Apply period filter and display statement
-        applyPeriodFilter();
-    }
-
-    // Record a payment
-    function recordPayment() {
-        if (!currentCustomerEmail) {
-            alert('No customer selected');
-            return;
-        }
-        const paymentDate = document.getElementById('paymentDate').value;
-        const amount = parseFloat(document.getElementById('paymentAmount').value);
-        const invoiceNo = document.getElementById('paymentInvoiceSelect').value;
-        const remarks = document.getElementById('paymentRemarks').value;
-        
-        if (!paymentDate || isNaN(amount) || amount <= 0) {
-            alert('Please enter valid payment amount and date');
-            return;
-        }
-        
-        const payment = {
-            id: Date.now(),
-            customerEmail: currentCustomerEmail,
-            date: paymentDate,
-            amount: amount,
-            invoiceNo: invoiceNo || null,
-            remarks: remarks || ''
-        };
-        payments.push(payment);
-        localStorage.setItem('customerPayments', JSON.stringify(payments));
-        
-        // Update customer outstanding in customers array
-        const customer = customers.find(c => c.email === currentCustomerEmail);
+    function loadLedger() {
+        if (!customerEmail) { document.getElementById('customerInfo').innerHTML = '<p style="color:red;">No customer selected.</p>'; return; }
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        customer = customers.find(c => c.email === customerEmail);
         if (customer) {
-            customer.outstanding = (customer.outstanding || 0) - amount;
-            if (customer.outstanding < 0) customer.outstanding = 0;
-            localStorage.setItem('customers', JSON.stringify(customers));
-        }
-        
-        alert('Payment recorded successfully');
-        document.getElementById('paymentAmount').value = '';
-        document.getElementById('paymentRemarks').value = '';
-        // Refresh statement
-        applyPeriodFilter();
-    }
-
-    // Get all transactions (invoices and payments) for a customer within date range
-    function getTransactions(customerEmail, startDate, endDate) {
-        const invoices = allInvoices.filter(inv => inv.buyer?.email === customerEmail);
-        const customerPayments = payments.filter(p => p.customerEmail === customerEmail);
-        
-        let transactions = [];
-        
-        // Add invoices
-        invoices.forEach(inv => {
-            const invDate = new Date(inv.date);
-            if (invDate >= startDate && invDate <= endDate) {
-                transactions.push({
-                    date: inv.date,
-                    type: 'Invoice',
-                    invoiceNo: inv.invoiceNo,
-                    particulars: `Invoice for ${inv.items.length} items`,
-                    debit: inv.grandTotal,
-                    credit: 0
-                });
-            }
-        });
-        
-        // Add payments
-        customerPayments.forEach(p => {
-            const payDate = new Date(p.date);
-            if (payDate >= startDate && payDate <= endDate) {
-                transactions.push({
-                    date: p.date,
-                    type: 'Payment Received',
-                    invoiceNo: p.invoiceNo || 'N/A',
-                    particulars: p.remarks || 'Payment received',
-                    debit: 0,
-                    credit: p.amount
-                });
-            }
-        });
-        
-        // Sort by date
-        transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-        return transactions;
-    }
-
-    // Compute opening balance before start date
-    function getOpeningBalance(customerEmail, startDate) {
-        // Get all transactions before startDate
-        const allInvs = allInvoices.filter(inv => inv.buyer?.email === customerEmail);
-        const allPays = payments.filter(p => p.customerEmail === customerEmail);
-        
-        let balance = 0;
-        allInvs.forEach(inv => {
-            const invDate = new Date(inv.date);
-            if (invDate < startDate) balance += inv.grandTotal;
-        });
-        allPays.forEach(p => {
-            const payDate = new Date(p.date);
-            if (payDate < startDate) balance -= p.amount;
-        });
-        return balance;
-    }
-
-    // Apply period filter and display statement
-    function applyPeriodFilter() {
-        if (!currentCustomerEmail) return;
-        
-        const periodType = document.getElementById('periodType').value;
-        let startDate, endDate;
-        const today = new Date();
-        
-        switch(periodType) {
-            case 'fy':
-                const fyYear = document.getElementById('fyYear').value;
-                if (!fyYear) {
-                    populateFYOptions();
-                    return;
-                }
-                const [startY, endY] = fyYear.split('-');
-                startDate = new Date(`${startY}-04-01`);
-                endDate = new Date(`${parseInt(endY)+2000}-03-31`);
-                break;
-            case 'quarter':
-                const quarter = parseInt(document.getElementById('quarterSelect').value);
-                const year = today.getFullYear();
-                let qStartMonth = (quarter-1)*3 + 3; // April=3? Actually Q1: Apr(3), May, Jun
-                // Adjust: Q1 = Apr-Jun (months 3,4,5)
-                const qStart = new Date(year, (quarter-1)*3 + 3, 1);
-                const qEnd = new Date(year, (quarter-1)*3 + 6, 0);
-                startDate = qStart;
-                endDate = qEnd;
-                break;
-            case 'month':
-                const monthVal = document.getElementById('monthPicker').value;
-                if (!monthVal) {
-                    document.getElementById('monthPicker').value = today.toISOString().slice(0,7);
-                    return;
-                }
-                const [mYear, mMonth] = monthVal.split('-');
-                startDate = new Date(parseInt(mYear), parseInt(mMonth)-1, 1);
-                endDate = new Date(parseInt(mYear), parseInt(mMonth), 0);
-                break;
-            case 'day':
-                const dayVal = document.getElementById('dayPicker').value;
-                if (!dayVal) {
-                    document.getElementById('dayPicker').value = today.toISOString().split('T')[0];
-                    return;
-                }
-                startDate = new Date(dayVal);
-                endDate = new Date(dayVal);
-                break;
-            case 'custom':
-                const customStart = document.getElementById('customStart').value;
-                const customEnd = document.getElementById('customEnd').value;
-                if (!customStart || !customEnd) {
-                    alert('Please select start and end dates');
-                    return;
-                }
-                startDate = new Date(customStart);
-                endDate = new Date(customEnd);
-                break;
-            default:
-                // All time
-                startDate = new Date(2000,0,1);
-                endDate = new Date(2099,11,31);
-        }
-        
-        // Ensure dates are valid
-        if (isNaN(startDate) || isNaN(endDate)) {
-            alert('Invalid date range');
+            document.getElementById('customerInfo').innerHTML = `<strong>${customer.name}</strong> (${customer.email})<br>Outstanding: ₹${(customer.outstanding || 0).toLocaleString()}`;
+        } else {
+            document.getElementById('customerInfo').innerHTML = '<p>Customer not found</p>';
             return;
         }
-        
-        const openingBalance = getOpeningBalance(currentCustomerEmail, startDate);
-        const transactions = getTransactions(currentCustomerEmail, startDate, endDate);
-        
-        // Build table
-        let balance = openingBalance;
-        let html = '';
-        transactions.forEach(t => {
-            if (t.debit > 0) balance += t.debit;
-            if (t.credit > 0) balance -= t.credit;
+        ledger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
+        ledger = ledger.filter(e => e.customerEmail === customerEmail).sort((a,b) => new Date(a.date) - new Date(b.date));
+        filtered = [...ledger];
+        displayLedger();
+    }
+
+    function displayLedger() {
+        let html = '<table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Running Balance</th><th>Narration</th></tr></thead><tbody>';
+        let balance = 0;
+        filtered.forEach(entry => {
+            if (entry.type === 'invoice') balance += entry.debit;
+            else if (entry.type === 'payment') balance -= entry.credit;
+            else balance += (entry.debit - entry.credit);
             html += `<tr>
-                <td>${formatDate(t.date)}</td>
-                <td>${t.type}</td>
-                <td>${t.invoiceNo}</td>
-                <td>${t.particulars}</td>
-                <td class="text-right">${t.debit > 0 ? formatMoney(t.debit) : '-'}</td>
-                <td class="text-right">${t.credit > 0 ? formatMoney(t.credit) : '-'}</td>
-                <td class="text-right ${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatMoney(balance)}</td>
+                <td>${entry.date}</td>
+                <td>${entry.type}</td>
+                <td>${entry.ref || '-'}</td>
+                <td>${entry.debit ? '₹' + entry.debit.toLocaleString() : '-'}</td>
+                <td>${entry.credit ? '₹' + entry.credit.toLocaleString() : '-'}</td>
+                <td class="${balance>=0?'balance-positive':'balance-negative'}">₹${balance.toLocaleString()}</td>
+                <td>${entry.narration || '-'}</td>
             </tr>`;
         });
-        
-        // Summary
-        const totalDebit = transactions.reduce((sum, t) => sum + t.debit, 0);
-        const totalCredit = transactions.reduce((sum, t) => sum + t.credit, 0);
-        const closingBalance = openingBalance + totalDebit - totalCredit;
-        
-        const summaryHtml = `
-            <div class="summary-item"><strong>Opening Balance</strong><br>${formatMoney(openingBalance)}</div>
-            <div class="summary-item"><strong>Total Sales (Invoices)</strong><br>${formatMoney(totalDebit)}</div>
-            <div class="summary-item"><strong>Total Payments Received</strong><br>${formatMoney(totalCredit)}</div>
-            <div class="summary-item"><strong>Closing Balance</strong><br><span class="${closingBalance >= 0 ? 'balance-positive' : 'balance-negative'}">${formatMoney(closingBalance)}</span></div>
-        `;
-        document.getElementById('summaryBox').innerHTML = summaryHtml;
-        
-        const tableHtml = `<thead><tr><th>Date</th><th>Type</th><th>Invoice No</th><th>Particulars</th><th class="text-right">Debit (₹)</th><th class="text-right">Credit (₹)</th><th class="text-right">Balance (₹)</th></thead><tbody>${html || '<tr><td colspan="7">No transactions in this period</td></tr>'}</tbody>`;
-        document.getElementById('statementTable').innerHTML = tableHtml;
+        html += '</tbody></table>';
+        document.getElementById('ledgerTable').innerHTML = html || '<p>No transactions.</p>';
     }
 
-    // Generate PDF statement
-    function generateStatementPDF() {
-        if (!currentCustomerEmail) {
-            alert('Please select a customer first');
-            return;
-        }
-        // Create a clone of the statement area for PDF
-        const customer = customers.find(c => c.email === currentCustomerEmail);
-        const periodType = document.getElementById('periodType').value;
-        let periodText = '';
-        switch(periodType) {
-            case 'fy': periodText = `Financial Year ${document.getElementById('fyYear').value}`; break;
-            case 'quarter': periodText = `Quarter ${document.getElementById('quarterSelect').value}`; break;
-            case 'month': periodText = `Month ${document.getElementById('monthPicker').value}`; break;
-            case 'day': periodText = `Day ${document.getElementById('dayPicker').value}`; break;
-            case 'custom': periodText = `${document.getElementById('customStart').value} to ${document.getElementById('customEnd').value}`; break;
-            default: periodText = 'All Time';
-        }
-        
-        const cloneDiv = document.createElement('div');
-        cloneDiv.style.padding = '20px';
-        cloneDiv.style.fontFamily = 'Roboto, sans-serif';
-        cloneDiv.style.maxWidth = '1200px';
-        cloneDiv.style.margin = '0 auto';
-        cloneDiv.style.backgroundColor = 'white';
-        cloneDiv.innerHTML = `
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h1 style="color:#0a7c71;">Auto Spares Solution</h1>
-                <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108 | GSTIN: 19ANOPD3300R1ZO</p>
-                <h2>Customer Ledger Statement</h2>
-                <p><strong>Customer:</strong> ${customer.name} (${customer.email})</p>
-                <p><strong>Period:</strong> ${periodText}</p>
-                <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
-            </div>
-            <div style="margin: 20px 0;">
-                ${document.getElementById('summaryBox').innerHTML}
-            </div>
-            <div style="overflow-x:auto;">
-                <table style="width:100%; border-collapse: collapse; font-size:12px;">
-                    ${document.getElementById('statementTable').outerHTML}
-                </table>
-            </div>
-            <div style="margin-top: 30px; text-align: right; font-size: 10px;">
-                This is a computer generated statement. Valid without signature.
-            </div>
-        `;
-        
-        const opt = {
-            margin: [0.2, 0.2, 0.2, 0.2],
-            filename: `Ledger_${customer.name}_${periodText.replace(/\s/g, '_')}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        };
-        html2pdf().set(opt).from(cloneDiv).save();
+    function filterLedger() {
+        const term = document.getElementById('searchInput').value.toLowerCase();
+        if (!term) filtered = [...ledger];
+        else filtered = ledger.filter(e => (e.ref && e.ref.toLowerCase().includes(term)) || e.type.toLowerCase().includes(term));
+        displayLedger();
     }
 
-    // Populate financial year dropdown
-    function populateFYOptions() {
-        const currentYear = new Date().getFullYear();
-        const fySelect = document.getElementById('fyYear');
-        fySelect.innerHTML = '';
-        for (let i = currentYear-2; i <= currentYear+1; i++) {
-            const start = i;
-            const end = i+1;
-            fySelect.innerHTML += `<option value="${start}-${end}">FY ${start}-${end}</option>`;
-        }
+    function exportToCSV() {
+        let csv = "Date,Type,Reference,Debit,Credit,Running Balance,Narration\n";
+        let balance = 0;
+        filtered.forEach(e => {
+            if (e.type === 'invoice') balance += e.debit;
+            else if (e.type === 'payment') balance -= e.credit;
+            else balance += (e.debit - e.credit);
+            csv += `"${e.date}","${e.type}","${e.ref || ''}",${e.debit || 0},${e.credit || 0},${balance},"${e.narration || ''}"\n`;
+        });
+        const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `customer_ledger_${customerEmail}.csv`; a.click(); URL.revokeObjectURL(url);
     }
-
-    // Toggle period input visibility
-    function togglePeriodInputs() {
-        const type = document.getElementById('periodType').value;
-        document.getElementById('fyYearGroup').style.display = type === 'fy' ? 'block' : 'none';
-        document.getElementById('quarterGroup').style.display = type === 'quarter' ? 'block' : 'none';
-        document.getElementById('monthGroup').style.display = type === 'month' ? 'block' : 'none';
-        document.getElementById('dayGroup').style.display = type === 'day' ? 'block' : 'none';
-        const customGroup = document.getElementById('customStartGroup');
-        const customEnd = document.getElementById('customEndGroup');
-        customGroup.style.display = type === 'custom' ? 'block' : 'none';
-        customEnd.style.display = type === 'custom' ? 'block' : 'none';
-        
-        if (type === 'fy' && !document.getElementById('fyYear').value) populateFYOptions();
-        if (type === 'month' && !document.getElementById('monthPicker').value) {
-            document.getElementById('monthPicker').value = new Date().toISOString().slice(0,7);
-        }
-        if (type === 'day' && !document.getElementById('dayPicker').value) {
-            document.getElementById('dayPicker').value = new Date().toISOString().split('T')[0];
-        }
-        if (currentCustomerEmail) applyPeriodFilter();
-    }
-
-    // Event listeners
-    document.getElementById('periodType').addEventListener('change', togglePeriodInputs);
-    document.getElementById('fyYear').addEventListener('change', () => applyPeriodFilter());
-    document.getElementById('quarterSelect').addEventListener('change', () => applyPeriodFilter());
-    document.getElementById('monthPicker').addEventListener('change', () => applyPeriodFilter());
-    document.getElementById('dayPicker').addEventListener('change', () => applyPeriodFilter());
-    document.getElementById('customStart').addEventListener('change', () => applyPeriodFilter());
-    document.getElementById('customEnd').addEventListener('change', () => applyPeriodFilter());
-    
-    populateCustomerDropdown();
-    togglePeriodInputs();
+    loadLedger();
 </script>
 </body>
-    </html>
+</html>
