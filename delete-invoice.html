@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Invoice – Reverse Stock & Outstanding</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .delete-btn { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .tab { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
+        .tab button { background-color: #f1f1f1; float: left; border: none; outline: none; cursor: pointer; padding: 10px 16px; margin-right: 5px; }
+        .tab button.active { background-color: #0a7c71; color: white; }
+        .tabcontent { display: none; }
+    </style>
+    <script src="data-manager.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>Delete Invoice (Reverse Effects)</h1>
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'Sales')">Sales Invoices</button>
+        <button class="tablinks" onclick="openTab(event, 'Purchase')">Purchase Invoices</button>
+    </div>
+    <div id="Sales" class="tabcontent" style="display:block;">
+        <h2>Sales Invoices</h2>
+        <div id="salesTable"></div>
+    </div>
+    <div id="Purchase" class="tabcontent">
+        <h2>Purchase Invoices</h2>
+        <div id="purchaseTable"></div>
+    </div>
+</div>
+<script>
+    function openTab(evt, tabName) {
+        document.querySelectorAll('.tabcontent').forEach(div => div.style.display = 'none');
+        document.querySelectorAll('.tablinks').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        evt.currentTarget.classList.add('active');
+        if (tabName === 'Sales') loadSalesInvoices();
+        else loadPurchaseInvoices();
+    }
+    function loadSalesInvoices() {
+        const invoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+        if (invoices.length === 0) { document.getElementById('salesTable').innerHTML = '<p>No sales invoices.</p>'; return; }
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        invoices.forEach(inv => {
+            html += `<tr>
+                <td>${inv.invoiceNo}</td><td>${inv.date}</td><td>${inv.customerEmail}</td><td>₹${inv.total.toLocaleString()}</td>
+                <td><button class="delete-btn" onclick="deleteSalesInvoice('${inv.id}')">Delete & Reverse</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('salesTable').innerHTML = html;
+    }
+    function loadPurchaseInvoices() {
+        const invoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        if (invoices.length === 0) { document.getElementById('purchaseTable').innerHTML = '<p>No purchase invoices.</p>'; return; }
+        let html = '<td><thead><tr><th>PO No</th><th>Date</th><th>Supplier</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        invoices.forEach(inv => {
+            html += `<tr>
+                <td>${inv.poNo}</td><td>${inv.date}</td><td>${inv.supplierEmail}</td><td>₹${inv.total.toLocaleString()}</td>
+                <td><button class="delete-btn" onclick="deletePurchaseInvoice('${inv.id}')">Delete & Reverse</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('purchaseTable').innerHTML = html;
+    }
+    function deleteSalesInvoice(id) {
+        if (!confirm('Delete this sales invoice? Stock will be added back, customer outstanding reduced.')) return;
+        try {
+            const result = deleteSalesInvoice(id); // from data-manager.js
+            if (result) alert('Invoice deleted and reversed.');
+            else alert('Failed to delete invoice.');
+            loadSalesInvoices();
+        } catch(e) { alert('Error: ' + e.message); }
+    }
+    function deletePurchaseInvoice(id) {
+        if (!confirm('Delete this purchase invoice? Stock will be reduced, supplier outstanding reduced.')) return;
+        try {
+            const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+            const invoice = purchaseInvoices.find(i => i.id == id);
+            if (!invoice) { alert('Invoice not found'); return; }
+            // Reverse stock
+            let products = getProducts();
+            for (let item of invoice.items) {
+                let product = products.find(p => p.id == item.productId);
+                if (product) product.currentStock -= item.quantity;
+            }
+            saveProducts(products);
+            // Remove invoice
+            const remaining = purchaseInvoices.filter(i => i.id != id);
+            localStorage.setItem('purchaseInvoices', JSON.stringify(remaining));
+            // Reverse supplier outstanding (using paySupplier? simpler: directly update)
+            let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+            let supplier = suppliers.find(s => s.email === invoice.supplierEmail);
+            if (supplier) {
+                supplier.outstanding -= invoice.total;
+                if (supplier.outstanding < 0) supplier.outstanding = 0;
+                localStorage.setItem('suppliers', JSON.stringify(suppliers));
+            }
+            alert('Purchase invoice deleted and stock reverted.');
+            loadPurchaseInvoices();
+        } catch(e) { alert('Error: ' + e.message); }
+    }
+    // Load initial view
+    loadSalesInvoices();
+</script>
+</body>
+</html>
