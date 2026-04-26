@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
-        /* ... same styles as before ... (keep unchanged) */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -200,6 +199,8 @@
             margin-top: 10px;
         }
     </style>
+    <script src="data-manager.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
@@ -318,7 +319,7 @@
             <tr><td style="text-align:right;">Subtotal (after discount):  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):   </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):   </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:   </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:   <tr><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
@@ -367,14 +368,11 @@
     <button onclick="window.close()">❌ Close</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
     // ========== DATA FROM localStorage ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
-    // Ensure each item has an hsn property (if not, add empty)
     cart = cart.map(i => ({ ...i, hsn: i.hsn || '' }));
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
     if (currentUser) {
@@ -403,7 +401,7 @@
             cgstLabel.innerHTML = 'CGST (9%):';
             sgstLabel.innerHTML = 'SGST (9%):';
         }
-        renderItemsAndTaxSummary(); // recalc with correct tax
+        renderItemsAndTaxSummary();
     }
 
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
@@ -528,7 +526,7 @@
                 <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
-            </table>`;
+            </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
 
@@ -549,7 +547,7 @@
                 <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
-            </table>`;
+            </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
     }
@@ -566,7 +564,7 @@
         const item = cart.find(i => i.part === part);
         if (item) {
             item.hsn = hsnValue;
-            renderItemsAndTaxSummary(); // refresh tax groups
+            renderItemsAndTaxSummary();
         }
     }
 
@@ -599,94 +597,88 @@
         document.getElementById('dueDate').innerText = formatDate(dueDate);
     }
 
+    // ========== SAVE INVOICE - INTEGRATED WITH data-manager.js ==========
     function saveInvoice() {
-        if (cart.length === 0) { alert('Cart empty'); return; }
+        if (cart.length === 0) {
+            alert('Cart empty. Please add items first.');
+            return;
+        }
+
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const creditLimit = parseFloat(document.getElementById('creditLimit').value) || 0;
         const totals = calculateTotalsAndTaxGroups();
         const finalNo = getAndIncrementInvoiceNumber(type);
-        let invoice = {
-            invoiceNo: finalNo,
-            date: document.getElementById('invoiceDate').innerText,
-            dueDate: document.getElementById('dueDate').innerText,
-            finYear: getFinancialYear(),
-            invoiceType: type,
-            buyer: {
-                name: document.getElementById('buyerName').value,
-                address: document.getElementById('buyerAddress').value,
-                gstin: document.getElementById('buyerGstin').value,
-                state: document.getElementById('buyerState').value,
-                phone: document.getElementById('buyerPhone').value,
-                email: document.getElementById('buyerEmail').value
-            },
-            consignee: {
-                name: document.getElementById('consigneeName').value,
-                address: document.getElementById('consigneeAddress').value,
-                phone: document.getElementById('consigneePhone').value
-            },
-            orderDetails: {
-                customerCode: document.getElementById('customerCode').value,
-                salesOrderNo: document.getElementById('salesOrderNo').value,
-                referenceNo: document.getElementById('referenceNo').value,
-                paymentTerms: document.getElementById('paymentTermsField').value
-            },
-            dispatchDetails: {
-                docNo: document.getElementById('dispatchDocNo').value,
-                transportMode: document.getElementById('transportMode').value,
-                vehicleNo: document.getElementById('vehicleNo').value,
-                cartons: document.getElementById('cartons').value
-            },
-            items: cart.map(i => ({
-                part: i.part,
-                desc: i.desc,
-                hsn: i.hsn || '',
-                qty: i.qty,
-                price: i.price,
-                discount: i.discount || 0,
-                total: (i.price * i.qty) * (1 - (i.discount||0)/100)
-            })),
-            subtotal: totals.subtotal,
-            cgst: totals.cgstTotal,
-            sgst: totals.sgstTotal,
-            igst: totals.igstTotal,
-            grandTotal: totals.grand,
-            status: type === 'cash' ? 'Paid' : 'Pending',
-            isLocalGst: totals.isLocal
+
+        // Buyer details
+        const buyer = {
+            name: document.getElementById('buyerName').value.trim(),
+            email: document.getElementById('buyerEmail').value.trim(),
+            address: document.getElementById('buyerAddress').value,
+            phone: document.getElementById('buyerPhone').value.trim(),
+            gstin: document.getElementById('buyerGstin').value.trim(),
+            state: document.getElementById('buyerState').value.trim()
         };
-        if (invoice.buyer.email) {
-            let cust = customers.find(c => c.email === invoice.buyer.email);
-            if (!cust) {
-                cust = { name: invoice.buyer.name, email: invoice.buyer.email, phone: invoice.buyer.phone, address: invoice.buyer.address, gstin: invoice.buyer.gstin, creditLimit, outstanding: 0, totalPurchased: 0 };
-                customers.push(cust);
-            }
-            if (type === 'credit') {
-                if (cust.outstanding + totals.grand > cust.creditLimit) { alert(`Credit limit exceeded!`); return; }
-                cust.outstanding += totals.grand;
-            }
-            cust.totalPurchased += totals.grand;
+
+        // Ensure customer exists in customers array (create if not)
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        let existingCustomer = customers.find(c => c.email === buyer.email);
+        if (!existingCustomer && buyer.email) {
+            const newCust = {
+                id: Date.now(),
+                name: buyer.name,
+                email: buyer.email,
+                phone: buyer.phone,
+                address: buyer.address,
+                gstin: buyer.gstin,
+                state: buyer.state,
+                outstanding: 0,
+                totalPurchased: 0,
+                creditLimit: parseFloat(document.getElementById('creditLimit').value) || 50000,
+                status: 'active',
+                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
+                createdAt: new Date().toISOString()
+            };
+            customers.push(newCust);
             localStorage.setItem('customers', JSON.stringify(customers));
+            existingCustomer = newCust;
         }
-        allInvoices.push(invoice);
-        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
 
-        // Stock deduction
-        let stockMovements = JSON.parse(localStorage.getItem('stockMovements') || '[]');
-        cart.forEach(item => {
-            stockMovements.push({
-                id: Date.now() + Math.random(),
-                part: item.part,
-                type: 'OUT',
-                quantity: item.qty,
-                date: new Date().toISOString(),
-                source: `Invoice ${finalNo}`,
-                remarks: `Sold to ${invoice.buyer.name || 'Customer'}`
-            });
-        });
-        localStorage.setItem('stockMovements', JSON.stringify(stockMovements));
+        if (!buyer.email) {
+            alert('Customer email is required to link invoice.');
+            return;
+        }
 
-        localStorage.setItem('invoiceCart', '[]');
-        alert(`Invoice ${finalNo} saved!`);
-        window.close();
+        // Build items array for createSalesInvoice
+        const items = cart.map(item => ({
+            productId: item.part,   // using part number as product ID
+            quantity: item.qty,
+            price: item.price
+        }));
+
+        // Convert date from "DD/MM/YYYY" to "YYYY-MM-DD"
+        const dateParts = document.getElementById('invoiceDate').innerText.split('/');
+        const invoiceDateFormatted = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+
+        const invoice = {
+            id: Date.now(),
+            date: invoiceDateFormatted,
+            customerEmail: buyer.email,
+            items: items,
+            total: totals.grand,
+            invoiceNo: finalNo,
+            status: type === 'cash' ? 'paid' : 'pending'
+        };
+
+        try {
+            // Central function from data-manager.js
+            createSalesInvoice(invoice);
+            alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced.\nCustomer outstanding updated.\nLedger entry created.`);
+
+            // Clear cart and close window
+            localStorage.setItem('invoiceCart', '[]');
+            window.close();
+        } catch (err) {
+            alert('Error saving invoice: ' + err.message);
+        }
     }
 
     function printInvoice() {
@@ -753,6 +745,7 @@
         });
     }
 
+    // Event listeners
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
             document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
@@ -764,10 +757,11 @@
     const paymentTermsInput = document.getElementById('paymentTerms');
     if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
 
+    // Initialization
     setDates();
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
     updateGstDisplay();
 </script>
 </body>
-</html>
+    </html>
