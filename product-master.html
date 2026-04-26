@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Master – Auto Spares</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        h1, h2 { color: #0a7c71; }
+        .form-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 180px;
+        }
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover { background: #09645a; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: left;
+        }
+        th { background: #0a7c71; color: white; }
+        .low-stock { background-color: #fff3cd; }
+        .action-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
+        @media (max-width: 768px) {
+            .form-row { flex-direction: column; }
+            table { font-size: 12px; }
+        }
+    </style>
+    <script src="data-manager.js"></script>
+</head>
+<body>
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>Product Master</h1>
+        <div>
+            <a href="dashboard.html" style="background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">Dashboard</a>
+            <a href="invoice-stock.html" style="background: #0a7c71; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">+ New Invoice</a>
+        </div>
+    </div>
+
+    <!-- Add/Edit Product Form -->
+    <div class="form-section">
+        <h2 id="formTitle">Add New Product</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Product Name *</label>
+                <input type="text" id="prodName" placeholder="e.g., Brake Pad">
+            </div>
+            <div class="form-group">
+                <label>SKU *</label>
+                <input type="text" id="prodSku" placeholder="Unique code">
+            </div>
+            <div class="form-group">
+                <label>Unit</label>
+                <input type="text" id="prodUnit" value="pc" placeholder="pc, kg, box">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Selling Price (₹)</label>
+                <input type="number" id="prodPrice" step="0.01" value="0">
+            </div>
+            <div class="form-group">
+                <label>Current Stock</label>
+                <input type="number" id="prodStock" step="1" value="0">
+            </div>
+            <div class="form-group">
+                <label>Reorder Level</label>
+                <input type="number" id="prodReorder" step="1" value="10">
+            </div>
+        </div>
+        <div class="form-row">
+            <button onclick="saveProduct()">💾 Save Product</button>
+            <button class="btn-warning" onclick="clearForm()">Clear</button>
+            <button id="cancelEditBtn" class="btn-danger" style="display:none;" onclick="cancelEdit()">Cancel Edit</button>
+        </div>
+    </div>
+
+    <!-- Search and Product List -->
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by name, SKU...">
+        <button onclick="searchProducts()">🔍 Search</button>
+        <button onclick="loadProducts()">🔄 Refresh</button>
+        <button onclick="exportToCSV()">📄 Export CSV</button>
+    </div>
+    <div id="productsTable"></div>
+</div>
+
+<script>
+    let products = [];
+    let editId = null;
+
+    function loadProducts() {
+        products = getProducts();  // from data-manager.js
+        displayProducts();
+    }
+
+    function displayProducts() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        let filtered = products;
+        if (searchTerm) {
+            filtered = products.filter(p => 
+                p.name?.toLowerCase().includes(searchTerm) ||
+                p.sku?.toLowerCase().includes(searchTerm)
+            );
+        }
+        if (filtered.length === 0) {
+            document.getElementById('productsTable').innerHTML = '<p>No products found.</p>';
+            return;
+        }
+        let html = '</table><thead><tr><th>SKU</th><th>Name</th><th>Unit</th><th>Price</th><th>Stock</th><th>Reorder</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        filtered.forEach(p => {
+            const lowStock = (p.currentStock || 0) <= (p.reorderLevel || 0);
+            html += `<tr class="${lowStock ? 'low-stock' : ''}">
+                <td>${escapeHtml(p.sku)}</td>
+                <td><strong>${escapeHtml(p.name)}</strong></td>
+                <td>${escapeHtml(p.unit)}</td>
+                <td>₹${(p.price || 0).toLocaleString()}</td>
+                <td>${(p.currentStock || 0).toLocaleString()}</td>
+                <td>${(p.reorderLevel || 0)}</td>
+                <td>${lowStock ? '⚠️ Low Stock' : 'OK'}</td>
+                <td class="action-buttons">
+                    <button onclick="editProduct('${p.id}')" style="background:#17a2b8;">✏️ Edit</button>
+                    <button onclick="deleteProduct('${p.id}')" class="btn-danger">🗑️ Delete</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('productsTable').innerHTML = html;
+    }
+
+    function saveProduct() {
+        const name = document.getElementById('prodName').value.trim();
+        const sku = document.getElementById('prodSku').value.trim();
+        if (!name || !sku) { alert('Product Name and SKU are required'); return; }
+
+        const productData = {
+            id: editId || Date.now(),
+            name: name,
+            sku: sku,
+            unit: document.getElementById('prodUnit').value,
+            price: parseFloat(document.getElementById('prodPrice').value) || 0,
+            currentStock: parseInt(document.getElementById('prodStock').value) || 0,
+            reorderLevel: parseInt(document.getElementById('prodReorder').value) || 0,
+            updatedAt: new Date().toISOString()
+        };
+        if (editId === null) {
+            productData.createdAt = new Date().toISOString();
+            products.push(productData);
+        } else {
+            const index = products.findIndex(p => p.id == editId);
+            productData.createdAt = products[index].createdAt;
+            products[index] = productData;
+        }
+        saveProducts(products);  // from data-manager.js
+        alert('Product saved!');
+        clearForm();
+        loadProducts();
+    }
+
+    function editProduct(id) {
+        const product = products.find(p => p.id == id);
+        if (!product) return;
+        editId = id;
+        document.getElementById('formTitle').innerHTML = 'Edit Product';
+        document.getElementById('prodName').value = product.name;
+        document.getElementById('prodSku').value = product.sku;
+        document.getElementById('prodUnit').value = product.unit || 'pc';
+        document.getElementById('prodPrice').value = product.price || 0;
+        document.getElementById('prodStock').value = product.currentStock || 0;
+        document.getElementById('prodReorder').value = product.reorderLevel || 0;
+        document.getElementById('cancelEditBtn').style.display = 'inline-block';
+    }
+
+    function deleteProduct(id) {
+        if (!confirm('Delete this product? This may break existing invoices.')) return;
+        products = products.filter(p => p.id != id);
+        saveProducts(products);
+        loadProducts();
+    }
+
+    function clearForm() {
+        editId = null;
+        document.getElementById('formTitle').innerHTML = 'Add New Product';
+        document.getElementById('prodName').value = '';
+        document.getElementById('prodSku').value = '';
+        document.getElementById('prodUnit').value = 'pc';
+        document.getElementById('prodPrice').value = '0';
+        document.getElementById('prodStock').value = '0';
+        document.getElementById('prodReorder').value = '10';
+        document.getElementById('cancelEditBtn').style.display = 'none';
+    }
+    function cancelEdit() { clearForm(); }
+    function searchProducts() { displayProducts(); }
+    function exportToCSV() {
+        let csv = "SKU,Name,Unit,Price,Current Stock,Reorder Level\n";
+        products.forEach(p => {
+            csv += `"${p.sku}","${p.name}","${p.unit}",${p.price},${p.currentStock},${p.reorderLevel}\n`;
+        });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'products.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+    loadProducts();
+</script>
+</body>
+</html>
