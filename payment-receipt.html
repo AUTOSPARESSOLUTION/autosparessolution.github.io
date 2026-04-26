@@ -3,197 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Receipt – Auto Spares</title>
+    <title>Payment Receipt – Customer</title>
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .receipt-container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border: 1px solid #dee2e6;
-        }
-        .header {
-            background: #0a7c71;
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-            border-radius: 8px;
-        }
-        .logo-area { display: flex; align-items: center; gap: 15px; }
-        .logo-area img { height: 60px; }
-        .company-details h1 { margin: 0; font-size: 24px; }
-        .company-details p { margin: 3px 0 0; font-size: 12px; }
-        .receipt-title h2 { margin: 0; font-size: 20px; }
-        .info-box { background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
-        .info-row { display: flex; margin-bottom: 8px; }
-        .info-label { width: 130px; font-weight: 600; }
-        .info-value { flex: 1; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
-        th { background: #f8f9fa; }
-        .totals { text-align: right; margin-top: 20px; }
-        .totals table { width: 300px; margin-left: auto; }
-        .totals td { border: none; padding: 5px; }
-        .signature-box { margin-top: 30px; text-align: right; border-top: 1px solid #333; padding-top: 10px; width: 250px; margin-left: auto; }
-        .actions { margin-top: 30px; display: flex; gap: 15px; justify-content: flex-end; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
-        button:hover { background: #09645a; }
-        input, select, textarea { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
-        @media print { .actions { display: none; } body { background: white; padding: 0; } .receipt-container { box-shadow: none; padding: 0; } }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        .info { background: #e9ecef; padding: 10px; border-radius: 6px; margin: 15px 0; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="data-manager.js"></script>
 </head>
 <body>
-<div class="receipt-container" id="receiptContainer">
-    <div class="header">
-        <div class="logo-area">
-            <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60?text=ASS'">
-            <div class="company-details">
-                <h1>Auto Spares Solution</h1>
-                <p>GSTIN: 19ANOPD3300R1ZO</p>
-                <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-            </div>
-        </div>
-        <div class="receipt-title">
-            <h2>PAYMENT RECEIPT</h2>
-            <p><strong>Receipt No:</strong> <span id="receiptNo"></span></p>
-            <p><strong>Date:</strong> <span id="receiptDate"></span></p>
-        </div>
+<div class="container">
+    <h1>Customer Payment Receipt</h1>
+    <div class="form-group">
+        <label>Customer *</label>
+        <select id="customerEmail"><option value="">-- Select Customer --</option></select>
     </div>
-
-    <div class="info-box">
-        <h3>Received From</h3>
-        <div class="info-row"><div class="info-label">Customer Name:</div><div class="info-value"><input type="text" id="customerName" placeholder="Customer name"></div></div>
-        <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="customerAddress" rows="2" placeholder="Address"></textarea></div></div>
-        <div class="info-row"><div class="info-label">Phone:</div><div class="info-value"><input type="text" id="customerPhone"></div></div>
-        <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="customerEmail"></div></div>
+    <div class="form-group">
+        <label>Payment Date</label>
+        <input type="date" id="paymentDate">
     </div>
-
-    <div class="info-box">
-        <h3>Payment Details</h3>
-        <div class="info-row"><div class="info-label">Against Invoice No:</div><div class="info-value"><input type="text" id="invoiceNo" placeholder="Optional"></div></div>
-        <div class="info-row"><div class="info-label">Payment Date:</div><div class="info-value"><input type="date" id="paymentDate"></div></div>
-        <div class="info-row"><div class="info-label">Amount (₹):</div><div class="info-value"><input type="number" id="amount" step="0.01" placeholder="Enter amount"></div></div>
-        <div class="info-row"><div class="info-label">Mode of Payment:</div><div class="info-value">
-            <select id="paymentMode">
-                <option value="Cash">Cash</option>
-                <option value="Cheque">Cheque</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="UPI">UPI</option>
-                <option value="Card">Card</option>
-            </select>
-        </div></div>
-        <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo" placeholder="Cheque No / UTR / Transaction ID"></div></div>
-        <div class="info-row"><div class="info-label">Remarks:</div><div class="info-value"><textarea id="remarks" rows="2" placeholder="Any remarks"></textarea></div></div>
+    <div class="form-group">
+        <label>Amount (₹) *</label>
+        <input type="number" id="amount" step="0.01">
     </div>
-
-    <div class="totals">
-        <table>
-            <tr><td style="text-align:right;">Amount Paid:</td><td style="text-align:right;">₹<span id="amountPaid">0.00</span></td></tr>
-        </table>
+    <div class="form-group">
+        <label>Reference / Cheque No.</label>
+        <input type="text" id="reference">
     </div>
-
-    <div class="signature-box">
-        For Auto Spares Solution<br>
-        (Authorised Signatory)
+    <div class="form-group">
+        <label>Payment Mode</label>
+        <select id="mode"><option value="cash">Cash</option><option value="bank">Bank Transfer</option><option value="cheque">Cheque</option></select>
     </div>
+    <div id="customerInfo" class="info">Select a customer to see outstanding.</div>
+    <button onclick="recordPayment()">💾 Record Payment</button>
+    <button onclick="window.location.href='customer-master.html'">Cancel</button>
 </div>
-
-<div class="actions">
-    <button onclick="saveReceipt()">💾 Save Receipt & Record Payment</button>
-    <button onclick="downloadPDF()">📄 Download PDF</button>
-    <button onclick="window.print()">🖨️ Print</button>
-    <button onclick="window.close()">Close</button>
-</div>
-
 <script>
-    // Generate receipt number (sequential)
-    let receiptCounter = localStorage.getItem('receiptCounter') || 1;
-    function generateReceiptNo() {
-        let no = 'REC-' + new Date().getFullYear() + '-' + receiptCounter.toString().padStart(4,'0');
-        receiptCounter++;
-        localStorage.setItem('receiptCounter', receiptCounter);
-        return no;
+    let customers = [];
+    function loadCustomers() {
+        customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const select = document.getElementById('customerEmail');
+        select.innerHTML = '<option value="">-- Select Customer --</option>';
+        customers.forEach(c => {
+            select.innerHTML += `<option value="${c.email}" data-outstanding="${c.outstanding || 0}">${c.name} (${c.email}) - Outstanding: ₹${(c.outstanding || 0).toLocaleString()}</option>`;
+        });
+        document.getElementById('paymentDate').value = new Date().toISOString().slice(0,10);
+        select.addEventListener('change', updateCustomerInfo);
     }
-    document.getElementById('receiptNo').innerText = generateReceiptNo();
-    document.getElementById('receiptDate').innerText = new Date().toLocaleDateString('en-IN');
-    document.getElementById('paymentDate').valueAsDate = new Date();
-
-    // Auto-fill customer if logged in
-    let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-    if (currentUser) {
-        document.getElementById('customerName').value = currentUser.name || '';
-        document.getElementById('customerAddress').value = currentUser.address || '';
-        document.getElementById('customerPhone').value = currentUser.phone || '';
-        document.getElementById('customerEmail').value = currentUser.email || '';
+    function updateCustomerInfo() {
+        const select = document.getElementById('customerEmail');
+        const selectedOption = select.options[select.selectedIndex];
+        const outstanding = parseFloat(selectedOption.dataset.outstanding) || 0;
+        document.getElementById('customerInfo').innerHTML = `Current Outstanding: <strong>₹${outstanding.toLocaleString()}</strong>`;
     }
-
-    document.getElementById('amount').addEventListener('input', function() {
-        document.getElementById('amountPaid').innerText = parseFloat(this.value || 0).toFixed(2);
-    });
-
-    function saveReceipt() {
+    function recordPayment() {
+        const customerEmail = document.getElementById('customerEmail').value;
+        if (!customerEmail) { alert('Select a customer'); return; }
         const amount = parseFloat(document.getElementById('amount').value);
         if (isNaN(amount) || amount <= 0) { alert('Enter valid amount'); return; }
-        const receipt = {
-            receiptNo: document.getElementById('receiptNo').innerText,
-            date: document.getElementById('receiptDate').innerText,
-            customer: {
-                name: document.getElementById('customerName').value,
-                address: document.getElementById('customerAddress').value,
-                phone: document.getElementById('customerPhone').value,
-                email: document.getElementById('customerEmail').value
-            },
-            invoiceNo: document.getElementById('invoiceNo').value,
-            paymentDate: document.getElementById('paymentDate').value,
+        const payment = {
+            id: Date.now(),
+            date: document.getElementById('paymentDate').value,
+            customerEmail: customerEmail,
             amount: amount,
-            mode: document.getElementById('paymentMode').value,
-            reference: document.getElementById('referenceNo').value,
-            remarks: document.getElementById('remarks').value
+            reference: document.getElementById('reference').value.trim() || 'PAY-' + Date.now(),
+            mode: document.getElementById('mode').value
         };
-        let receipts = JSON.parse(localStorage.getItem('paymentReceipts') || '[]');
-        receipts.push(receipt);
-        localStorage.setItem('paymentReceipts', JSON.stringify(receipts));
-
-        // Also update customer ledger (reduce outstanding if invoice is linked)
-        if (receipt.invoiceNo) {
-            let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-            let invoice = allInvoices.find(i => i.invoiceNo === receipt.invoiceNo);
-            if (invoice && invoice.status !== 'Paid') {
-                // Reduce outstanding in customer object
-                let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-                let customer = customers.find(c => c.email === receipt.customer.email);
-                if (customer) {
-                    customer.outstanding -= amount;
-                    if (customer.outstanding < 0) customer.outstanding = 0;
-                    localStorage.setItem('customers', JSON.stringify(customers));
-                }
-                // Optionally mark invoice as paid if outstanding becomes zero
-                if (customer && customer.outstanding <= 0) invoice.status = 'Paid';
-                localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-            }
-        }
-        alert('Receipt saved and payment recorded.');
+        try {
+            receiveCustomerPayment(payment);
+            alert(`Payment of ₹${amount} recorded. Outstanding updated.`);
+            window.location.href = 'customer-master.html';
+        } catch(err) { alert('Error: ' + err.message); }
     }
-
-    function downloadPDF() {
-        const element = document.getElementById('receiptContainer');
-        const opt = { margin: [0.2,0.2,0.2,0.2], filename: `Receipt_${document.getElementById('receiptNo').innerText}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
-        html2pdf().set(opt).from(element).save();
-    }
+    loadCustomers();
 </script>
 </body>
 </html>
