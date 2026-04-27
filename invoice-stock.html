@@ -227,8 +227,9 @@
             <label><input type="radio" name="invoiceType" value="credit"> Credit Bill</label>
         </div>
         <div id="creditFields" style="display:none;">
-            <label>Credit Limit (₹):</label> <input type="number" id="creditLimit" placeholder="Limit" step="1000" value="50000">
-            <label>Payment Terms (days):</label> <input type="number" id="paymentTerms" value="30" style="width:70px;">
+            <label>Payment Terms (days):</label> 
+            <input type="number" id="paymentTerms" value="30" step="1" min="1" style="width:80px;">
+            <span style="margin-left:10px;">Due date will be invoice date + this number</span>
         </div>
     </div>
 
@@ -263,7 +264,7 @@
                 <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode" class="editable" placeholder="Code"></div></div>
                 <div class="info-row"><div class="info-label">Sales Order No:</div><div class="info-value"><input type="text" id="salesOrderNo" class="editable" placeholder="SO No."></div></div>
                 <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo" class="editable" placeholder="Ref No."></div></div>
-                <div class="info-row"><div class="info-label">Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
+                <div class="info-row"><div class="info-label">Order Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
             </div>
         </div>
         <div style="flex: 1;">
@@ -277,7 +278,7 @@
         </div>
     </div>
 
-    <!-- Items Table (with editable HSN and Discount) -->
+    <!-- Items Table -->
     <table class="items-table">
         <thead>
             <tr>
@@ -298,7 +299,7 @@
         <tbody id="itemsBody"></tbody>
     </table>
 
-    <!-- Tax Summary Table (grouped by HSN) -->
+    <!-- Tax Summary Table -->
     <table class="tax-summary-table">
         <thead>
             <tr>
@@ -319,45 +320,25 @@
             <tr><td style="text-align:right;">Subtotal (after discount):  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):   </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):   </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:   <tr><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:   </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
-    <!-- Payment QR Code and Bank Details Box -->
+    <!-- Payment QR Code and Bank Details -->
     <div class="qr-box">
         <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
-            <div>
-                <img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;">
-            </div>
-            <div>
-                <strong>Bank Details:</strong><br>
-                Account Name: Auto Spares Solution<br>
-                Bank: Union Bank of India<br>
-                Account No: 021111100007383<br>
-                IFSC: UBINO802115<br>
-                UPI: ass08@uboi
-            </div>
+            <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
+            <div><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</div>
         </div>
     </div>
 
-    <!-- Customer Stamp & Signature Box + Company Signature Box -->
+    <!-- Signatures -->
     <div class="signature-row">
-        <div class="signature-box">
-            Customer's Stamp & Signature<br>
-            <span style="font-size: 10px;">(Receiver's acknowledgment)</span>
-        </div>
-        <div class="signature-box">
-            For Auto Spares Solution<br>
-            (Authorised Signatory)<br>
-            <span style="font-size: 10px;">(Stamp & Signature)</span>
-        </div>
+        <div class="signature-box">Customer's Stamp & Signature<br><span style="font-size: 10px;">(Receiver's acknowledgment)</span></div>
+        <div class="signature-box">For Auto Spares Solution<br>(Authorised Signatory)<br><span style="font-size: 10px;">(Stamp & Signature)</span></div>
     </div>
 
-    <!-- Footer Legal Line -->
-    <div class="footer-legal">
-        This is a computer generated invoice. All disputes are subject to Howrah jurisdiction only.
-    </div>
-
+    <div class="footer-legal">This is a computer generated invoice. All disputes are subject to Howrah jurisdiction only.</div>
     <div id="pageNumber" class="page-number"></div>
 </div>
 
@@ -403,9 +384,9 @@
         }
         renderItemsAndTaxSummary();
     }
-
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
+    // --- Financial Year ---
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -414,38 +395,9 @@
         else return `${year-1}-${year.toString().slice(-2)}`;
     }
 
-    function getNextInvoiceNumber(type) {
-        const finYear = getFinancialYear();
-        let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
-        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-        let cnt = parseInt(localStorage.getItem(key)) || 1;
-        return { invoiceNo: prefix + cnt.toString().padStart(4,'0'), key, cnt };
-    }
-
-    function updateInvoiceNumberDisplay() {
-        const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const { invoiceNo } = getNextInvoiceNumber(type);
-        document.getElementById('invoiceNo').innerText = invoiceNo;
-    }
-
-    function getReusableInvoiceNumber(type) {
-        const finYear = getFinancialYear();
-        let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
-        let available = deletedNumbers.filter(n => n.type === type && n.finYear === finYear).sort((a,b) => a.number - b.number);
-        if (available.length > 0) {
-            const reused = available[0];
-            const remaining = deletedNumbers.filter(n => !(n.type === type && n.finYear === finYear && n.number === reused.number));
-            localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(remaining));
-            let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-            return prefix + reused.number.toString().padStart(4,'0');
-        }
-        return null;
-    }
-
+    // --- Invoice Numbering (NO GAPS – strict sequential, no reuse) ---
     function getAndIncrementInvoiceNumber(type) {
         const finYear = getFinancialYear();
-        const reused = getReusableInvoiceNumber(type);
-        if (reused) return reused;
         let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
         let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
         let cnt = parseInt(localStorage.getItem(key)) || 1;
@@ -454,16 +406,55 @@
         return invNo;
     }
 
-    function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
+    function updateInvoiceNumberDisplay() {
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        const invoiceNo = getAndIncrementInvoiceNumber(type);  // just preview, but it increments! We need preview without increment.
+        // Better to show the number that will be used when saving.
+        // We'll calculate next number without incrementing.
+        const finYear = getFinancialYear();
+        let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
+        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+        let cnt = parseInt(localStorage.getItem(key)) || 1;
+        document.getElementById('invoiceNo').innerText = prefix + cnt.toString().padStart(4,'0');
+    }
 
+    // --- Due Date Logic ---
     function computeDueDate(invoiceDate, type, paymentTermsDays) {
         const date = new Date(invoiceDate);
         if (type === 'cash') return date;
-        date.setDate(date.getDate() + paymentTermsDays);
+        // For credit bill, add the number of days from paymentTerms
+        if (paymentTermsDays && !isNaN(paymentTermsDays)) {
+            date.setDate(date.getDate() + paymentTermsDays);
+        } else {
+            date.setDate(date.getDate() + 30); // default 30 days
+        }
         return date;
     }
 
-    // Recalculate totals and tax groups
+    function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
+
+    function updateDueDate() {
+        const invoiceDateStr = document.getElementById('invoiceDate').innerText;
+        const parts = invoiceDateStr.split('/');
+        const invoiceDate = new Date(parts[2], parts[1]-1, parts[0]);
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        let paymentTermsDays = parseInt(document.getElementById('paymentTerms').value);
+        if (isNaN(paymentTermsDays)) paymentTermsDays = 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTermsDays);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
+    }
+
+    function setDates() {
+        const invoiceDate = new Date();
+        document.getElementById('invoiceDate').innerText = formatDate(invoiceDate);
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        let paymentTermsDays = parseInt(document.getElementById('paymentTerms').value);
+        if (isNaN(paymentTermsDays)) paymentTermsDays = 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTermsDays);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
+    }
+
+    // --- Cart calculations ---
     function calculateTotalsAndTaxGroups() {
         let sub = 0;
         let taxGroups = {};
@@ -515,9 +506,7 @@
                 <td style="text-align:center;">${idx+1}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
-                <td style="word-wrap:break-word;">
-                    <input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)">
-                </td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
                 <td style="text-align:center;">${item.qty}</td>
                 <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
                 <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
@@ -570,34 +559,10 @@
 
     function escapeHtml(str) {
         if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
+        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    function setDates() {
-        const invoiceDate = new Date();
-        document.getElementById('invoiceDate').innerText = formatDate(invoiceDate);
-        const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
-        const dueDate = computeDueDate(invoiceDate, type, paymentTerms);
-        document.getElementById('dueDate').innerText = formatDate(dueDate);
-    }
-
-    function updateDueDate() {
-        const invoiceDateStr = document.getElementById('invoiceDate').innerText;
-        const parts = invoiceDateStr.split('/');
-        const invoiceDate = new Date(parts[2], parts[1]-1, parts[0]);
-        const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
-        const dueDate = computeDueDate(invoiceDate, type, paymentTerms);
-        document.getElementById('dueDate').innerText = formatDate(dueDate);
-    }
-
-    // ========== SAVE INVOICE - INTEGRATED WITH data-manager.js ==========
+    // --- Save Invoice (Integrated) ---
     function saveInvoice() {
         if (cart.length === 0) {
             alert('Cart empty. Please add items first.');
@@ -606,9 +571,8 @@
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const totals = calculateTotalsAndTaxGroups();
-        const finalNo = getAndIncrementInvoiceNumber(type);
+        const finalNo = getAndIncrementInvoiceNumber(type);  // increments the counter
 
-        // Buyer details
         const buyer = {
             name: document.getElementById('buyerName').value.trim(),
             email: document.getElementById('buyerEmail').value.trim(),
@@ -618,7 +582,7 @@
             state: document.getElementById('buyerState').value.trim()
         };
 
-        // Ensure customer exists in customers array (create if not)
+        // Ensure customer exists
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         let existingCustomer = customers.find(c => c.email === buyer.email);
         if (!existingCustomer && buyer.email) {
@@ -647,14 +611,12 @@
             return;
         }
 
-        // Build items array for createSalesInvoice
         const items = cart.map(item => ({
-            productId: item.part,   // using part number as product ID
+            productId: item.part,
             quantity: item.qty,
             price: item.price
         }));
 
-        // Convert date from "DD/MM/YYYY" to "YYYY-MM-DD"
         const dateParts = document.getElementById('invoiceDate').innerText.split('/');
         const invoiceDateFormatted = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
 
@@ -669,11 +631,8 @@
         };
 
         try {
-            // Central function from data-manager.js
             createSalesInvoice(invoice);
             alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced.\nCustomer outstanding updated.\nLedger entry created.`);
-
-            // Clear cart and close window
             localStorage.setItem('invoiceCart', '[]');
             window.close();
         } catch (err) {
@@ -681,6 +640,7 @@
         }
     }
 
+    // --- Print and PDF functions ---
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -729,7 +689,6 @@
         clone.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
         const typeSelector = clone.querySelector('.invoice-type');
         if (typeSelector) typeSelector.style.display = 'none';
-        
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
         const opt = {
@@ -745,17 +704,27 @@
         });
     }
 
-    // Event listeners
+    // --- Event Listeners ---
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
+            const creditDiv = document.getElementById('creditFields');
+            if (this.value === 'credit') {
+                creditDiv.style.display = 'flex';
+            } else {
+                creditDiv.style.display = 'none';
+            }
             updateInvoiceNumberDisplay();
             updateDueDate();
             updateGstDisplay();
         });
     });
+
     const paymentTermsInput = document.getElementById('paymentTerms');
-    if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
+    if (paymentTermsInput) {
+        paymentTermsInput.addEventListener('change', function() {
+            updateDueDate();
+        });
+    }
 
     // Initialization
     setDates();
@@ -764,4 +733,4 @@
     updateGstDisplay();
 </script>
 </body>
-    </html>
+                                                                                 </html>
