@@ -9,48 +9,127 @@
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
         .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; }
+        .tab { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
+        .tab button { background: #f1f1f1; float: left; border: none; outline: none; cursor: pointer; padding: 10px 16px; margin-right: 5px; font-size: 14px; }
+        .tab button.active { background: #0a7c71; color: white; }
+        .tabcontent { display: none; padding: 10px 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; border: 1px solid #dee2e6; }
         th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
-        .search-box { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .search-box { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
         button:hover { background: #09645a; }
         .btn-edit { background: #17a2b8; }
         .btn-delete { background: #dc3545; }
         .btn-pdf { background: #e67e22; }
-        .btn-pdf:hover { background: #d35400; }
+        .btn-sync { background: #6c757d; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>Order History (All Invoices)</h1>
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by Invoice No, Customer..." style="width: 300px; padding: 8px;">
-        <button onclick="filterOrders()">Search</button>
-        <button onclick="exportToCSV()">Export CSV</button>
+    <h1>Order History</h1>
+    <div style="margin-bottom: 20px;">
+        <button class="btn-sync" onclick="syncCountersFromInvoices()">🔄 Sync Counters from Existing Invoices</button>
+        <button onclick="exportAllToCSV()">📄 Export All CSV</button>
     </div>
-    <div id="ordersTable"></div>
+
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'Cash')">Cash Bills</button>
+        <button class="tablinks" onclick="openTab(event, 'Credit')">Credit Bills</button>
+    </div>
+
+    <div id="Cash" class="tabcontent" style="display:block;">
+        <div class="search-box">
+            <input type="text" id="searchCash" placeholder="Search by Invoice No, Customer..." style="width: 250px;">
+            <button onclick="filterCash()">Search</button>
+            <button onclick="exportCashToCSV()">Export CSV</button>
+        </div>
+        <div id="cashTable"></div>
+    </div>
+
+    <div id="Credit" class="tabcontent">
+        <div class="search-box">
+            <input type="text" id="searchCredit" placeholder="Search by Invoice No, Customer..." style="width: 250px;">
+            <button onclick="filterCredit()">Search</button>
+            <button onclick="exportCreditToCSV()">Export CSV</button>
+        </div>
+        <div id="creditTable"></div>
+    </div>
     <button onclick="window.location.href='index.html'">Back to Store</button>
 </div>
 
 <script>
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
 
-    function displayOrders(filter = '') {
-        let filtered = allInvoices;
+    // Helper to get financial year from date string (DD/MM/YYYY)
+    function getFinancialYearFromDate(dateStr) {
+        if (!dateStr) return null;
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return null;
+        const year = parseInt(parts[2]);
+        const month = parseInt(parts[1]);
+        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
+        else return `${year-1}-${year.toString().slice(-2)}`;
+    }
+
+    // Sync counters: scan all invoices, find max number per type/year, update localStorage
+    function syncCountersFromInvoices() {
+        const cashMax = { max: 0, finYear: null };
+        const creditMax = { max: 0, finYear: null };
+
+        allInvoices.forEach(inv => {
+            const finYear = getFinancialYearFromDate(inv.date);
+            if (!finYear) return;
+            if (inv.invoiceType === 'cash') {
+                const match = inv.invoiceNo.match(/CASH\/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > cashMax.max) {
+                        cashMax.max = num;
+                        cashMax.finYear = finYear;
+                    }
+                }
+            } else if (inv.invoiceType === 'credit') {
+                const match = inv.invoiceNo.match(/\/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > creditMax.max) {
+                        creditMax.max = num;
+                        creditMax.finYear = finYear;
+                    }
+                }
+            }
+        });
+
+        if (cashMax.finYear) {
+            localStorage.setItem(`cashCounter_${cashMax.finYear}`, cashMax.max + 1);
+            console.log(`Cash counter set to ${cashMax.max + 1} for ${cashMax.finYear}`);
+        }
+        if (creditMax.finYear) {
+            localStorage.setItem(`creditCounter_${creditMax.finYear}`, creditMax.max + 1);
+            console.log(`Credit counter set to ${creditMax.max + 1} for ${creditMax.finYear}`);
+        }
+        alert('Counters synced. Next invoices will continue from last number.');
+        filterCash();
+        filterCredit();
+    }
+
+    // Display cash bills
+    function displayCash(filter = '') {
+        let cashInvoices = allInvoices.filter(inv => inv.invoiceType === 'cash');
         if (filter) {
-            filtered = allInvoices.filter(inv => 
+            cashInvoices = cashInvoices.filter(inv => 
                 inv.invoiceNo.toLowerCase().includes(filter) ||
                 (inv.buyer?.name && inv.buyer.name.toLowerCase().includes(filter))
             );
         }
-        if (filtered.length === 0) {
-            document.getElementById('ordersTable').innerHTML = '<p>No invoices found.</p>';
+        if (cashInvoices.length === 0) {
+            document.getElementById('cashTable').innerHTML = '<p>No cash bills found.</p>';
             return;
         }
-        let html = '<table><thead></tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
-        filtered.forEach(inv => {
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        cashInvoices.forEach(inv => {
             html += `<tr>
                 <td>${inv.invoiceNo}</td>
                 <td>${inv.date}</td>
@@ -65,7 +144,51 @@
             </tr>`;
         });
         html += '</tbody></table>';
-        document.getElementById('ordersTable').innerHTML = html;
+        document.getElementById('cashTable').innerHTML = html;
+    }
+
+    // Display credit bills
+    function displayCredit(filter = '') {
+        let creditInvoices = allInvoices.filter(inv => inv.invoiceType === 'credit');
+        if (filter) {
+            creditInvoices = creditInvoices.filter(inv => 
+                inv.invoiceNo.toLowerCase().includes(filter) ||
+                (inv.buyer?.name && inv.buyer.name.toLowerCase().includes(filter))
+            );
+        }
+        if (creditInvoices.length === 0) {
+            document.getElementById('creditTable').innerHTML = '<p>No credit bills found.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        creditInvoices.forEach(inv => {
+            html += `<tr>
+                <td>${inv.invoiceNo}</td>
+                <td>${inv.date}</td>
+                <td>${inv.buyer?.name || 'Guest'}</td>
+                <td>₹${inv.grandTotal.toFixed(2)}</td>
+                <td>${inv.status}</td>
+                <td>
+                    <button class="btn-edit" onclick="editInvoice('${inv.invoiceNo}')">Edit</button>
+                    <button class="btn-delete" onclick="deleteInvoice('${inv.invoiceNo}')">Delete</button>
+                    <button class="btn-pdf" onclick="downloadInvoicePDF('${inv.invoiceNo}')">PDF</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('creditTable').innerHTML = html;
+    }
+
+    function filterCash() { displayCash(document.getElementById('searchCash').value.toLowerCase()); }
+    function filterCredit() { displayCredit(document.getElementById('searchCredit').value.toLowerCase()); }
+
+    function openTab(evt, tabName) {
+        document.querySelectorAll('.tabcontent').forEach(div => div.style.display = 'none');
+        document.querySelectorAll('.tablinks').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        evt.currentTarget.classList.add('active');
+        if (tabName === 'Cash') filterCash();
+        else filterCredit();
     }
 
     function editInvoice(invoiceNo) {
@@ -92,10 +215,11 @@
         allInvoices = allInvoices.filter(i => i.invoiceNo !== invoiceNo);
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
         alert(`Invoice ${invoiceNo} deleted.`);
-        displayOrders(document.getElementById('searchInput').value.toLowerCase());
+        filterCash();
+        filterCredit();
     }
 
-    // ========== PDF GENERATION – EXACT LAYOUT, NO STRAY BANNER, WRAPPING FIXED ==========
+    // ==================== PDF GENERATION (identical to working version) ====================
     function downloadInvoicePDF(invoiceNo) {
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!invoice) { alert('Invoice not found'); return; }
@@ -175,7 +299,7 @@
             </tr>`;
         }
 
-        // Build clean container – no trailing banners, company name always visible
+        // Build clean container – company name always visible
         const container = document.createElement('div');
         container.style.maxWidth = '1200px';
         container.style.margin = '0 auto';
@@ -295,7 +419,7 @@
                 </div>
             </div>
 
-            <!-- Footer – only one line, no extra banners -->
+            <!-- Footer -->
             <div style="font-size:9px; text-align:center; margin-top:20px; color:#555; border-top:1px solid #dee2e6; padding-top:10px;">
                 This is a computer generated invoice. All disputes are subject to Howrah jurisdiction only.
             </div>
@@ -312,15 +436,36 @@
     }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-    function filterOrders() { displayOrders(document.getElementById('searchInput').value.toLowerCase()); }
-    function exportToCSV() {
+
+    // CSV exports
+    function exportAllToCSV() {
         let csv = "Invoice No,Date,Customer,Amount,Status,Type\n";
         allInvoices.forEach(inv => { csv += `"${inv.invoiceNo}",${inv.date},"${inv.buyer?.name || 'Guest'}",${inv.grandTotal},${inv.status},${inv.invoiceType}\n`; });
-        const blob = new Blob([csv], {type: 'text/csv'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'orders_backup.csv'; a.click(); URL.revokeObjectURL(url);
+        downloadCSV(csv, 'all_invoices.csv');
     }
-    displayOrders();
+    function exportCashToCSV() {
+        let csv = "Invoice No,Date,Customer,Amount,Status\n";
+        allInvoices.filter(inv => inv.invoiceType === 'cash').forEach(inv => { csv += `"${inv.invoiceNo}",${inv.date},"${inv.buyer?.name || 'Guest'}",${inv.grandTotal},${inv.status}\n`; });
+        downloadCSV(csv, 'cash_bills.csv');
+    }
+    function exportCreditToCSV() {
+        let csv = "Invoice No,Date,Customer,Amount,Status\n";
+        allInvoices.filter(inv => inv.invoiceType === 'credit').forEach(inv => { csv += `"${inv.invoiceNo}",${inv.date},"${inv.buyer?.name || 'Guest'}",${inv.grandTotal},${inv.status}\n`; });
+        downloadCSV(csv, 'credit_bills.csv');
+    }
+    function downloadCSV(content, filename) {
+        const blob = new Blob([content], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // Initial load
+    displayCash();
+    displayCredit();
 </script>
 </body>
-    </html>
+</html>
