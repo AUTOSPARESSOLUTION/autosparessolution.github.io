@@ -395,38 +395,39 @@
         else return `${year-1}-${year.toString().slice(-2)}`;
     }
 
-    // --- Invoice Numbering (NO GAPS – strict sequential, no reuse) ---
-    function getAndIncrementInvoiceNumber(type) {
+    // --- Get next invoice number from existing invoices (max + 1) ---
+    function getNextInvoiceNumber(type) {
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const finYear = getFinancialYear();
-        let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
         let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-        let cnt = parseInt(localStorage.getItem(key)) || 1;
-        let invNo = prefix + cnt.toString().padStart(4,'0');
-        localStorage.setItem(key, cnt + 1);
-        return invNo;
+        let maxNumber = 0;
+        allInvoices.forEach(inv => {
+            if (inv.invoiceType === type && inv.invoiceNo.startsWith(prefix)) {
+                const match = inv.invoiceNo.match(/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > maxNumber) maxNumber = num;
+                }
+            }
+        });
+        const nextNumber = maxNumber + 1;
+        return prefix + nextNumber.toString().padStart(4, '0');
     }
 
     function updateInvoiceNumberDisplay() {
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const invoiceNo = getAndIncrementInvoiceNumber(type);  // just preview, but it increments! We need preview without increment.
-        // Better to show the number that will be used when saving.
-        // We'll calculate next number without incrementing.
-        const finYear = getFinancialYear();
-        let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
-        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-        let cnt = parseInt(localStorage.getItem(key)) || 1;
-        document.getElementById('invoiceNo').innerText = prefix + cnt.toString().padStart(4,'0');
+        const invoiceNo = getNextInvoiceNumber(type);
+        document.getElementById('invoiceNo').innerText = invoiceNo;
     }
 
     // --- Due Date Logic ---
     function computeDueDate(invoiceDate, type, paymentTermsDays) {
         const date = new Date(invoiceDate);
         if (type === 'cash') return date;
-        // For credit bill, add the number of days from paymentTerms
         if (paymentTermsDays && !isNaN(paymentTermsDays)) {
             date.setDate(date.getDate() + paymentTermsDays);
         } else {
-            date.setDate(date.getDate() + 30); // default 30 days
+            date.setDate(date.getDate() + 30);
         }
         return date;
     }
@@ -454,7 +455,7 @@
         document.getElementById('dueDate').innerText = formatDate(dueDate);
     }
 
-    // --- Cart calculations ---
+    // --- Cart calculations (same as before) ---
     function calculateTotalsAndTaxGroups() {
         let sub = 0;
         let taxGroups = {};
@@ -571,7 +572,9 @@
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const totals = calculateTotalsAndTaxGroups();
-        const finalNo = getAndIncrementInvoiceNumber(type);  // increments the counter
+        
+        // Get the next number directly from existing invoices (max+1)
+        const finalNo = getNextInvoiceNumber(type);
 
         const buyer = {
             name: document.getElementById('buyerName').value.trim(),
@@ -627,7 +630,37 @@
             items: items,
             total: totals.grand,
             invoiceNo: finalNo,
-            status: type === 'cash' ? 'paid' : 'pending'
+            invoiceType: type,
+            status: type === 'cash' ? 'Paid' : 'Pending',
+            grandTotal: totals.grand,
+            buyer: buyer,
+            consignee: {
+                name: document.getElementById('consigneeName').value,
+                address: document.getElementById('consigneeAddress').value,
+                phone: document.getElementById('consigneePhone').value
+            },
+            orderDetails: {
+                customerCode: document.getElementById('customerCode').value,
+                salesOrderNo: document.getElementById('salesOrderNo').value,
+                referenceNo: document.getElementById('referenceNo').value,
+                paymentTerms: document.getElementById('paymentTermsField').value
+            },
+            dispatchDetails: {
+                docNo: document.getElementById('dispatchDocNo').value,
+                transportMode: document.getElementById('transportMode').value,
+                vehicleNo: document.getElementById('vehicleNo').value,
+                cartons: document.getElementById('cartons').value
+            },
+            dueDate: document.getElementById('dueDate').innerText,
+            finYear: getFinancialYear(),
+            items: cart.map(item => ({
+                part: item.part,
+                desc: item.desc,
+                hsn: item.hsn || '',
+                qty: item.qty,
+                price: item.price,
+                discount: item.discount || 0
+            }))
         };
 
         try {
@@ -640,7 +673,7 @@
         }
     }
 
-    // --- Print and PDF functions ---
+    // --- Print and PDF functions (identical to your working code) ---
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -733,4 +766,4 @@
     updateGstDisplay();
 </script>
 </body>
-                                                                                                              </html>
+                    </html>
