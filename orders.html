@@ -11,12 +11,15 @@
         table { width: 100%; border-collapse: collapse; margin-top: 20px; border: 1px solid #dee2e6; }
         th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
-        .search-box { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .search-box { margin-bottom: 20px; }
         button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
+        button:hover { background: #09645a; }
         .btn-edit { background: #17a2b8; }
+        .btn-edit:hover { background: #138496; }
         .btn-delete { background: #dc3545; }
+        .btn-delete:hover { background: #c82333; }
         .btn-pdf { background: #e67e22; }
-        button:hover { opacity: 0.8; }
+        .btn-pdf:hover { background: #d35400; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -33,7 +36,6 @@
 </div>
 
 <script>
-    // === ORIGINAL DATA LOADER (from your working code) ===
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
 
     function displayOrders(filter = '') {
@@ -48,9 +50,7 @@
             document.getElementById('ordersTable').innerHTML = '<p>No invoices found.</p>';
             return;
         }
-        let html = '<table><thead><tr>
-            <th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th>
-        </table></thead><tbody>';
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Name</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(inv => {
             html += `<tr>
                 <td>${inv.invoiceNo}</td>
@@ -79,8 +79,6 @@
         if (!confirm(`Delete invoice ${invoiceNo}?`)) return;
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!invoice) return;
-
-        // Update customer outstanding
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const customer = customers.find(c => c.email === invoice.buyer?.email);
         if (customer) {
@@ -89,28 +87,24 @@
             customer.totalPurchased -= invoice.grandTotal;
             localStorage.setItem('customers', JSON.stringify(customers));
         }
-
-        // Mark invoice number for reuse
         let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
         let number = parseInt(invoice.invoiceNo.split('/').pop());
         deletedNumbers.push({ type: invoice.invoiceType, finYear: invoice.finYear, number: number });
         localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(deletedNumbers));
-
-        // Remove from allInvoices
         allInvoices = allInvoices.filter(i => i.invoiceNo !== invoiceNo);
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
         alert(`Invoice ${invoiceNo} deleted.`);
         displayOrders(document.getElementById('searchInput').value.toLowerCase());
     }
 
-    // === IMPROVED PDF GENERATION (fixes company name, overlap, layout) ===
+    // ================== IMPROVED PDF GENERATION ==================
     function downloadInvoicePDF(invoiceNo) {
         const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
         if (!invoice) { alert('Invoice not found'); return; }
 
         const isLocalGst = invoice.buyer?.gstin && invoice.buyer.gstin.startsWith('19');
-
-        // Calculate totals from items
+        
+        // Recalculate totals from items
         let subtotal = 0;
         let taxGroups = {};
         invoice.items.forEach(item => {
@@ -140,7 +134,7 @@
         const roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
 
-        // Build items table HTML (with fixed % widths to avoid overlap)
+        // Build items table HTML with fixed column widths
         let itemsHtml = '';
         invoice.items.forEach((item, idx) => {
             const taxable = item.price * item.qty * (1 - (item.discount || 0) / 100);
@@ -182,7 +176,7 @@
             </tr>`;
         }
 
-        // Build PDF container (A4 friendly)
+        // Build full PDF container
         const container = document.createElement('div');
         container.style.padding = '15px';
         container.style.fontFamily = 'Roboto, sans-serif';
@@ -199,7 +193,7 @@
                 </div>
                 <div style="text-align:right;">
                     <h2 style="margin:0; font-size:18px;">TAX INVOICE</h2>
-                    <p style="margin:3px 0;"><strong>Invoice No:</strong> ${invoice.invoiceNo}<br>
+                    <p><strong>Invoice No:</strong> ${invoice.invoiceNo}<br>
                     <strong>Date:</strong> ${invoice.date}<br>
                     <strong>Due Date:</strong> ${invoice.dueDate}</p>
                 </div>
@@ -239,7 +233,7 @@
                         <th style="border:1px solid #dee2e6; padding:4px; width:8%;">${isLocalGst ? 'CGST' : 'IGST'}</th>
                         ${isLocalGst ? '<th style="border:1px solid #dee2e6; padding:4px; width:8%;">SGST</th>' : ''}
                         <th style="border:1px solid #dee2e6; padding:4px; width:9%;">Total</th>
-                    </table>
+                    </tr>
                 </thead>
                 <tbody>${itemsHtml}</tbody>
             </table>
@@ -280,14 +274,11 @@
     function filterOrders() { displayOrders(document.getElementById('searchInput').value.toLowerCase()); }
     function exportToCSV() {
         let csv = "Invoice No,Date,Customer,Amount,Status,Type\n";
-        allInvoices.forEach(inv => {
-            csv += `"${inv.invoiceNo}",${inv.date},"${inv.buyer?.name || 'Guest'}",${inv.grandTotal},${inv.status},${inv.invoiceType}\n`;
-        });
+        allInvoices.forEach(inv => { csv += `"${inv.invoiceNo}",${inv.date},"${inv.buyer?.name || 'Guest'}",${inv.grandTotal},${inv.status},${inv.invoiceType}\n`; });
         const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = 'orders_backup.csv'; a.click(); URL.revokeObjectURL(url);
     }
-
     displayOrders();
 </script>
 </body>
