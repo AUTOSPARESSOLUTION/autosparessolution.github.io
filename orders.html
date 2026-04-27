@@ -13,55 +13,68 @@
         th { background: #0a7c71; color: white; }
         .search-box { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
-        button:hover { background: #09645a; }
-        .btn-edit { background: #17a2b8; }
-        .btn-delete { background: #dc3545; }
-        .btn-pdf { background: #e67e22; }
-        .btn-pdf:hover { background: #d35400; }
+        .diagnostic { background: #f8f9fa; border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; font-family: monospace; font-size: 12px; display: none; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="data-manager.js"></script>
 </head>
 <body>
 <div class="container">
     <h1>Order History (All Invoices)</h1>
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by Invoice No, Customer Name..." style="width: 300px; padding: 8px;">
+        <input type="text" id="searchInput" placeholder="Search by Invoice No, Customer..." style="width: 300px; padding: 8px;">
         <button onclick="filterOrders()">Search</button>
-        <button onclick="exportToCSV()">Export to CSV</button>
-        <button onclick="syncInvoices()">Sync Legacy Invoices</button>
+        <button onclick="exportToCSV()">Export CSV</button>
+        <button onclick="showDiagnostic()">🔧 Diagnose</button>
+        <button onclick="refreshInvoices()">Refresh</button>
     </div>
+    <div id="diagnostic" class="diagnostic"></div>
     <div id="ordersTable"></div>
     <button onclick="window.location.href='index.html'">Back to Store</button>
 </div>
 
 <script>
-    // Helper: get all invoices from both new and old storage
-    function getAllInvoices() {
-        let invoices = [];
-        // New integrated invoices (from data-manager.js)
-        if (typeof getSalesInvoices === 'function') {
-            invoices = getSalesInvoices();
-        } else {
-            invoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        }
-        // Legacy invoices (from old invoice-stock.html)
-        const legacyInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        // Merge without duplicates (by invoiceNo)
-        const merged = [...invoices];
-        legacyInvoices.forEach(leg => {
-            if (!merged.some(inv => inv.invoiceNo === leg.invoiceNo)) {
-                merged.push(leg);
-            }
-        });
-        return merged;
-    }
-
     let allInvoices = [];
 
+    // Try multiple possible localStorage keys
+    function getAllInvoicesFromStorage() {
+        const possibleKeys = ['salesInvoices', 'allInvoices', 'invoices', 'customerInvoices'];
+        let combined = [];
+        for (let key of possibleKeys) {
+            const data = localStorage.getItem(key);
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (Array.isArray(parsed) && parsed.length) {
+                        combined = combined.concat(parsed);
+                    }
+                } catch(e) {}
+            }
+        }
+        // Remove duplicates by invoiceNo (or id if invoiceNo missing)
+        const unique = [];
+        const seen = new Set();
+        for (let inv of combined) {
+            let id = inv.invoiceNo || inv.id;
+            if (!seen.has(id)) {
+                seen.add(id);
+                unique.push(inv);
+            }
+        }
+        return unique;
+    }
+
     function refreshInvoices() {
-        allInvoices = getAllInvoices();
+        allInvoices = getAllInvoicesFromStorage();
         displayOrders();
+        // Show diagnostic info if no invoices found
+        if (allInvoices.length === 0) {
+            document.getElementById('diagnostic').style.display = 'block';
+            document.getElementById('diagnostic').innerHTML = `⚠️ No invoices found in localStorage.<br>
+            Checked keys: salesInvoices, allInvoices, invoices, customerInvoices.<br>
+            Raw localStorage contents: <br>${JSON.stringify(localStorage, null, 2)}`;
+        } else {
+            document.getElementById('diagnostic').style.display = 'none';
+        }
     }
 
     function displayOrders(filter = '') {
@@ -74,30 +87,32 @@
             );
         }
         if (filtered.length === 0) {
-            document.getElementById('ordersTable').innerHTML = '<p>No invoices found.</p>';
+            document.getElementById('ordersTable').innerHTML = '<p>No invoices found. Click "Diagnose" to see storage details.</p>';
             return;
         }
         let html = '<table><thead><tr>
             <th>Invoice No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Status</th><th>Type</th><th>Actions</th>
         </tr></thead><tbody>';
         filtered.forEach(inv => {
-            const customerName = inv.buyer?.name || inv.customerEmail || 'Guest';
+            const invoiceNo = inv.invoiceNo || inv.id || 'N/A';
+            const date = inv.date || (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : '');
+            const customerName = inv.buyer?.name || inv.customerEmail || inv.customerName || 'Guest';
             const amount = inv.grandTotal || inv.total || 0;
             const status = inv.status || (inv.invoiceType === 'cash' ? 'Paid' : 'Pending');
             const type = inv.invoiceType || (inv.status === 'paid' ? 'cash' : 'credit');
             html += `<tr>
-                <td>${inv.invoiceNo || 'N/A'}</td>
-                <td>${inv.date || ''}</td>
+                <td>${escapeHtml(invoiceNo)}</td>
+                <td>${escapeHtml(date)}</td>
                 <td>${escapeHtml(customerName)}</td>
-                <td>₹${amount.toFixed(2)}</td>
-                <td>${status}</td>
-                <td>${type}</td>
+                <td>₹${parseFloat(amount).toFixed(2)}</td>
+                <td>${escapeHtml(status)}</td>
+                <td>${escapeHtml(type)}</td>
                 <td>
-                    <button class="btn-edit" onclick="editInvoice('${inv.invoiceNo}')">Edit</button>
-                    <button class="btn-delete" onclick="deleteInvoice('${inv.invoiceNo}')">Delete</button>
-                    <button class="btn-pdf" onclick="downloadInvoicePDF('${inv.invoiceNo}')">PDF</button>
-                </td>
-            </table>`;
+                    <button class="btn-edit" onclick="editInvoice('${invoiceNo}')">Edit</button>
+                    <button class="btn-delete" onclick="deleteInvoice('${invoiceNo}')">Delete</button>
+                    <button class="btn-pdf" onclick="downloadInvoicePDF('${invoiceNo}')">PDF</button>
+                 </td>
+            </tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('ordersTable').innerHTML = html;
@@ -110,240 +125,147 @@
 
     function deleteInvoice(invoiceNo) {
         if (!confirm(`Delete invoice ${invoiceNo}?`)) return;
-        const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
+        const invoice = allInvoices.find(i => (i.invoiceNo || i.id) === invoiceNo);
         if (!invoice) return;
 
-        // Update customer outstanding if applicable
-        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        const customerEmail = invoice.customerEmail || invoice.buyer?.email;
-        const customer = customers.find(c => c.email === customerEmail);
-        if (customer) {
-            if (invoice.invoiceType === 'credit' || invoice.status === 'pending') {
-                customer.outstanding = Math.max(0, (customer.outstanding || 0) - (invoice.grandTotal || invoice.total || 0));
+        // Remove from all localStorage keys that contain it
+        const possibleKeys = ['salesInvoices', 'allInvoices', 'invoices'];
+        for (let key of possibleKeys) {
+            let data = localStorage.getItem(key);
+            if (data) {
+                let arr = JSON.parse(data);
+                if (Array.isArray(arr)) {
+                    const newArr = arr.filter(i => (i.invoiceNo || i.id) !== invoiceNo);
+                    localStorage.setItem(key, JSON.stringify(newArr));
+                }
             }
-            customer.totalPurchased = Math.max(0, (customer.totalPurchased || 0) - (invoice.grandTotal || invoice.total || 0));
-            localStorage.setItem('customers', JSON.stringify(customers));
         }
-
-        // Remove from storage
-        let newInvoices = allInvoices.filter(i => i.invoiceNo !== invoiceNo);
-        // Save back to both locations
-        localStorage.setItem('salesInvoices', JSON.stringify(newInvoices.filter(i => i.id)));
-        localStorage.setItem('allInvoices', JSON.stringify(newInvoices));
         refreshInvoices();
         alert(`Invoice ${invoiceNo} deleted.`);
     }
 
-    function syncInvoices() {
-        // Force sync from localStorage keys
-        refreshInvoices();
-        alert('Invoices synced.');
-    }
-
-    // Improved PDF generation with proper layout
     function downloadInvoicePDF(invoiceNo) {
-        const invoice = allInvoices.find(i => i.invoiceNo === invoiceNo);
+        const invoice = allInvoices.find(i => (i.invoiceNo || i.id) === invoiceNo);
         if (!invoice) { alert('Invoice not found'); return; }
 
         const isLocalGst = invoice.buyer?.gstin && invoice.buyer.gstin.startsWith('19');
-        
-        // Recalculate totals from items
-        let subtotal = 0;
-        let taxGroups = {};
         const items = invoice.items || [];
+        
+        // Calculate totals
+        let subtotal = 0;
         items.forEach(item => {
             const qty = item.qty || 1;
             const price = item.price || 0;
             const discount = item.discount || 0;
             const taxable = price * qty * (1 - discount / 100);
             subtotal += taxable;
-            let cgst = 0, sgst = 0, igst = 0;
-            if (isLocalGst) {
-                cgst = taxable * 0.09;
-                sgst = taxable * 0.09;
-            } else {
-                igst = taxable * 0.18;
-            }
-            const hsn = item.hsn || '';
-            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
-            taxGroups[hsn].taxable += taxable;
-            taxGroups[hsn].cgst += cgst;
-            taxGroups[hsn].sgst += sgst;
-            taxGroups[hsn].igst += igst;
         });
-        let cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
-        for (let hsn in taxGroups) {
-            cgstTotal += taxGroups[hsn].cgst;
-            sgstTotal += taxGroups[hsn].sgst;
-            igstTotal += taxGroups[hsn].igst;
-        }
-        let grand = subtotal + (isLocalGst ? cgstTotal + sgstTotal : igstTotal);
+        const cgstTotal = subtotal * 0.09;
+        const sgstTotal = subtotal * 0.09;
+        const igstTotal = subtotal * 0.18;
+        let grand = isLocalGst ? subtotal + cgstTotal + sgstTotal : subtotal + igstTotal;
         const roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
 
-        // Build items table HTML with fixed column widths to avoid overlap
+        // Build items HTML
         let itemsHtml = '';
         items.forEach((item, idx) => {
             const qty = item.qty || 1;
             const price = item.price || 0;
             const discount = item.discount || 0;
             const taxable = price * qty * (1 - discount / 100);
-            let cgst = 0, sgst = 0, igst = 0;
-            if (isLocalGst) {
-                cgst = taxable * 0.09;
-                sgst = taxable * 0.09;
-            } else {
-                igst = taxable * 0.18;
-            }
-            const totalItem = taxable + (isLocalGst ? cgst + sgst : igst);
+            const cgst = isLocalGst ? taxable * 0.09 : 0;
+            const sgst = isLocalGst ? taxable * 0.09 : 0;
+            const igst = isLocalGst ? 0 : taxable * 0.18;
+            const totalItem = taxable + cgst + sgst + igst;
             itemsHtml += `<tr>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center; width:5%;">${idx+1}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; word-break:break-word; width:12%;">${escapeHtml(item.part || '')}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; word-break:break-word; width:18%;">${escapeHtml(item.desc || '')}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; width:8%;">${escapeHtml(item.hsn || '')}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center; width:5%;">${qty}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right; width:8%;">₹${price.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center; width:6%;">${discount}%</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right; width:8%;">₹${taxable.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center; width:5%;">18%</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right; width:8%;">${isLocalGst ? '₹'+cgst.toFixed(2) : '₹'+igst.toFixed(2)}</td>
-                ${isLocalGst ? `<td style="border:1px solid #dee2e6; padding:4px; text-align:right; width:8%;">₹${sgst.toFixed(2)}</td>` : ''}
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right; width:9%;">₹${totalItem.toFixed(2)}</td>
-            </tr>`;
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${idx+1}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; word-break:break-word;">${escapeHtml(item.part || '')}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; word-break:break-word;">${escapeHtml(item.desc || '')}</td>
+                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.hsn || '')}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${qty}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${price.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${discount}%</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">18%</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">${isLocalGst ? '₹'+cgst.toFixed(2) : '₹'+igst.toFixed(2)}</td>
+                ${isLocalGst ? `<td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</td>` : ''}
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
+             </tr>`;
         });
 
-        // Tax summary
-        let taxHtml = '';
-        for (let hsn in taxGroups) {
-            const g = taxGroups[hsn];
-            const totalTax = g.cgst + g.sgst + g.igst;
-            taxHtml += `<tr>
-                <td style="border:1px solid #dee2e6; padding:4px;">${hsn || 'N/A'}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">${isLocalGst ? '₹'+g.cgst.toFixed(2) : '₹'+g.igst.toFixed(2)}</td>
-                ${isLocalGst ? `<td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${g.sgst.toFixed(2)}</td>` : ''}
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${totalTax.toFixed(2)}</td>
-            </tr>`;
-        }
-
-        // Build full PDF container
         const container = document.createElement('div');
         container.style.padding = '15px';
         container.style.fontFamily = 'Roboto, sans-serif';
         container.style.maxWidth = '1100px';
         container.style.margin = '0 auto';
         container.style.backgroundColor = 'white';
-        container.style.fontSize = '11px';
-        
-        // Ensure company header is always visible (text + optional logo)
         container.innerHTML = `
-            <div style="background: #0a7c71; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; border-radius: 6px 6px 0 0;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="background:white; border-radius:8px; padding:5px;">
-                        <img src="images/ASS.jpg" alt="Logo" style="height: 50px;" onerror="this.style.display='none'">
-                    </div>
-                    <div>
-                        <h1 style="margin:0; font-size:22px;">Auto Spares Solution</h1>
-                        <p style="margin:2px 0 0; font-size:11px;">GSTIN: 19ANOPD3300R1ZO</p>
-                        <p style="margin:0; font-size:11px;">101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-                    </div>
+            <div style="background: #0a7c71; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <h1 style="margin:0; font-size:22px;">Auto Spares Solution</h1>
+                    <p style="margin:2px 0 0;">GSTIN: 19ANOPD3300R1ZO</p>
+                    <p style="margin:0;">101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
                 </div>
                 <div style="text-align:right;">
                     <h2 style="margin:0; font-size:18px;">TAX INVOICE</h2>
-                    <p style="margin:3px 0;"><strong>Invoice No:</strong> ${invoice.invoiceNo}<br>
+                    <p><strong>Invoice No:</strong> ${invoice.invoiceNo || invoice.id}<br>
                     <strong>Date:</strong> ${invoice.date}<br>
                     <strong>Due Date:</strong> ${invoice.dueDate || ''}</p>
                 </div>
             </div>
-            <div style="display:flex; gap:15px; flex-wrap:wrap; margin:15px 0;">
-                <div style="flex:1; background:#f8f9fa; padding:8px; border-radius:6px;">
-                    <h3 style="margin:0 0 5px; font-size:12px; color:#0a7c71;">Buyer (Bill to)</h3>
-                    <p style="margin:2px 0;">${escapeHtml(invoice.buyer?.name || invoice.customerEmail || '')}<br>${escapeHtml(invoice.buyer?.address || '')}<br>GSTIN: ${escapeHtml(invoice.buyer?.gstin || '')}<br>State: ${escapeHtml(invoice.buyer?.state || '')}<br>Phone: ${escapeHtml(invoice.buyer?.phone || '')}<br>Email: ${escapeHtml(invoice.buyer?.email || '')}</p>
+            <div style="display:flex; gap:15px; margin:15px 0;">
+                <div style="flex:1; background:#f8f9fa; padding:8px;">
+                    <h3 style="margin:0 0 5px;">Buyer (Bill to)</h3>
+                    <p>${escapeHtml(invoice.buyer?.name || invoice.customerEmail)}<br>${escapeHtml(invoice.buyer?.address || '')}<br>GSTIN: ${escapeHtml(invoice.buyer?.gstin || '')}<br>Phone: ${escapeHtml(invoice.buyer?.phone || '')}</p>
                 </div>
-                <div style="flex:1; background:#f8f9fa; padding:8px; border-radius:6px;">
-                    <h3 style="margin:0 0 5px; font-size:12px; color:#0a7c71;">Consignee (Ship to)</h3>
+                <div style="flex:1; background:#f8f9fa; padding:8px;">
+                    <h3 style="margin:0 0 5px;">Consignee (Ship to)</h3>
                     <p>${escapeHtml(invoice.consignee?.name || '')}<br>${escapeHtml(invoice.consignee?.address || '')}<br>Phone: ${escapeHtml(invoice.consignee?.phone || '')}</p>
                 </div>
             </div>
-            <div style="display:flex; gap:15px; flex-wrap:wrap; margin-bottom:15px;">
-                <div style="flex:1; background:#f8f9fa; padding:8px; border-radius:6px;">
-                    <h3 style="margin:0 0 5px; font-size:12px; color:#0a7c71;">Order Details</h3>
-                    <p>Customer Code: ${escapeHtml(invoice.orderDetails?.customerCode || '')}<br>SO No: ${escapeHtml(invoice.orderDetails?.salesOrderNo || '')}<br>Ref No: ${escapeHtml(invoice.orderDetails?.referenceNo || '')}<br>Payment Terms: ${escapeHtml(invoice.orderDetails?.paymentTerms || '')}</p>
-                </div>
-                <div style="flex:1; background:#f8f9fa; padding:8px; border-radius:6px;">
-                    <h3 style="margin:0 0 5px; font-size:12px; color:#0a7c71;">Dispatch Details</h3>
-                    <p>Doc No: ${escapeHtml(invoice.dispatchDetails?.docNo || '')}<br>Mode: ${escapeHtml(invoice.dispatchDetails?.transportMode || '')}<br>Vehicle No: ${escapeHtml(invoice.dispatchDetails?.vehicleNo || '')}<br>Cartons: ${escapeHtml(invoice.dispatchDetails?.cartons || '')}</p>
-                </div>
-            </div>
-            <table style="width:100%; border-collapse:collapse; margin:15px 0; font-size:10px; table-layout:fixed;">
-                <thead>
-                    <tr style="background:#f8f9fa;">
-                        <th style="border:1px solid #dee2e6; padding:4px; width:5%;">#</th>
-                        <th style="border:1px solid #de2e6; padding:4px; width:12%;">Part No</th>
-                        <th style="border:1px solid #dee2e6; padding:4px; width:18%;">Description</th>
-                        <th style="border:1px solid #dee2e6; padding:4px; width:8%;">HSN</th>
-                        <th style="border:1px solid #dee2e6; padding:4px; width:5%;">Qty</th>
-                        <th style="border:1px solid #dee2e6; padding:4px; width:8%;">Price</th>
-                        <th style="border:1px solid #dee2e6; padding:4px; width:6%;">Disc%</th>
-                        <th style="border:1px solid #dee2e6; padding:4px; width:8%;">Taxable</th>
-                        <th style="border:1px solid #dee2e6; padding:4px; width:5%;">GST%</th>
-                        <th style="border:1px solid #dee2e6; padding:4px; width:8%;">${isLocalGst ? 'CGST' : 'IGST'}</th>
-                        ${isLocalGst ? '<th style="border:1px solid #dee2e6; padding:4px; width:8%;">SGST</th>' : ''}
-                        <th style="border:1px solid #dee2e6; padding:4px; width:9%;">Total</th>
-                    </tr>
-                </thead>
-                <tbody>${itemsHtml}</tbody>
-            </table>
-            <table style="width:100%; border-collapse:collapse; margin:10px 0; font-size:10px;">
-                <thead><tr style="background:#f8f9fa;"><th>HSN</th><th>Taxable Value</th><th>${isLocalGst ? 'CGST' : 'IGST'}</th>${isLocalGst ? '<th>SGST</th>' : ''}<th>Total Tax</th></tr></thead>
-                <tbody>${taxHtml}</tbody>
-            </table>
-            <div style="text-align:right;">
-                <table style="width:280px; margin-left:auto; border-collapse:collapse;">
-                    <tr><td style="text-align:right; padding:2px;">Subtotal (after discount):</td><td style="text-align:right;">₹${subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">${isLocalGst ? 'CGST (9%):' : 'IGST (18%):'}</td><td style="text-align:right;">${isLocalGst ? '₹'+cgstTotal.toFixed(2) : '₹'+igstTotal.toFixed(2)}</td></tr>
-                    ${isLocalGst ? `<tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹${sgstTotal.toFixed(2)}</td></tr>` : ''}
-                    <tr><td style="text-align:right;">Round Off:</td><td style="text-align:right;">₹${roundOff.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>
+            <table style="width:100%; border-collapse:collapse; font-size:10px;">${itemsHtml}</table>
+            <div style="text-align:right; margin-top:10px;">
+                <table style="width:280px; margin-left:auto;">
+                    <tr><td>Subtotal:</td><td>₹${subtotal.toFixed(2)}</td></tr>
+                    <tr><td>${isLocalGst ? 'CGST (9%):' : 'IGST (18%):'}</td><td>${isLocalGst ? '₹'+cgstTotal.toFixed(2) : '₹'+igstTotal.toFixed(2)}</td></tr>
+                    ${isLocalGst ? `<tr><td>SGST (9%):</td><td>₹${sgstTotal.toFixed(2)}</td></tr>` : ''}
+                    <tr><td>Round Off:</td><td>₹${roundOff.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td>Grand Total:</td><td>₹${grand.toFixed(2)}</td></tr>
                 </table>
             </div>
-            <div style="margin-top:15px; background:#f8f9fa; padding:8px; border-radius:6px;">
-                <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
-                    <div><img src="images/ASS.QR.jpg" alt="QR" style="max-width:80px;" onerror="this.style.display='none'"></div>
-                    <div><strong>Bank Details:</strong><br>Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</div>
-                </div>
+            <div style="margin-top:15px; border-top:1px solid #ccc; padding-top:10px; text-align:center; font-size:9px;">
+                This is a computer generated invoice. All disputes subject to Howrah jurisdiction only.
             </div>
-            <div style="display:flex; justify-content:space-between; margin-top:15px;">
-                <div style="width:45%; text-align:center; border-top:1px solid #333; padding-top:5px;">Customer's Stamp & Signature<br><span style="font-size:9px;">(Receiver's acknowledgment)</span></div>
-                <div style="width:45%; text-align:center; border-top:1px solid #333; padding-top:5px;">For Auto Spares Solution<br>(Authorised Signatory)<br><span style="font-size:9px;">(Stamp & Signature)</span></div>
-            </div>
-            <div style="margin-top:15px; font-size:8px; text-align:center; border-top:1px solid #dee2e6; padding-top:8px;">This is a computer generated invoice. All disputes subject to Howrah jurisdiction only.</div>
         `;
 
-        const opt = {
-            margin: [0.2, 0.2, 0.2, 0.2],
-            filename: `Invoice_${invoice.invoiceNo}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, letterRendering: true, useCORS: true },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        };
-        html2pdf().set(opt).from(container).save();
+        html2pdf().set({ margin: 0.2, filename: `Invoice_${invoice.invoiceNo || invoice.id}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } }).from(container).save();
+    }
+
+    function showDiagnostic() {
+        const diag = document.getElementById('diagnostic');
+        diag.style.display = 'block';
+        const keys = ['salesInvoices', 'allInvoices', 'invoices', 'customerInvoices'];
+        let info = '<strong>Storage Diagnostic</strong><br>';
+        for (let k of keys) {
+            const val = localStorage.getItem(k);
+            info += `${k}: ${val ? val.substring(0, 200) + '...' : 'empty'}<br>`;
+        }
+        diag.innerHTML = info;
     }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-    function filterOrders() { const term = document.getElementById('searchInput').value.toLowerCase(); displayOrders(term); }
+    function filterOrders() { displayOrders(document.getElementById('searchInput').value.toLowerCase()); }
     function exportToCSV() {
         let csv = "Invoice No,Date,Customer,Amount,Status,Type\n";
         allInvoices.forEach(inv => {
-            const customer = inv.buyer?.name || inv.customerEmail || 'Guest';
-            csv += `"${inv.invoiceNo}",${inv.date},"${customer}",${inv.grandTotal || inv.total || 0},${inv.status},${inv.invoiceType}\n`;
+            csv += `"${inv.invoiceNo || inv.id}",${inv.date},"${inv.buyer?.name || inv.customerEmail}",${inv.grandTotal || inv.total},${inv.status},${inv.invoiceType}\n`;
         });
         const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'orders_backup.csv'; a.click(); URL.revokeObjectURL(url);
+        const a = document.createElement('a'); a.href = url; a.download = 'orders.csv'; a.click(); URL.revokeObjectURL(url);
     }
     
-    // Initial load
     refreshInvoices();
 </script>
 </body>
