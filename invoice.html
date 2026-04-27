@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto Spares – Professional Invoice</title>
+    <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -19,10 +19,7 @@
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             padding: 0 15px 15px 15px;
-            border: 1px solid #dee2e6; /* Professional border */
-        }
-        .no-print {
-            display: flex;
+            border: 1px solid #dee2e6;
         }
         @media print {
             .no-print, .actions, .invoice-type, button, input, textarea, select {
@@ -124,12 +121,12 @@
             overflow-wrap: break-word;
             white-space: normal;
         }
-        .items-table th:nth-child(1) { width: 5%; }
+        .items-table th:nth-child(1) { width: 4%; }
         .items-table th:nth-child(2) { width: 10%; }
-        .items-table th:nth-child(3) { width: 15%; }
+        .items-table th:nth-child(3) { width: 12%; }
         .items-table th:nth-child(4) { width: 8%; }
-        .items-table th:nth-child(5) { width: 5%; }
-        .items-table th:nth-child(6) { width: 8%; }
+        .items-table th:nth-child(5) { width: 4%; }
+        .items-table th:nth-child(6) { width: 7%; }
         .items-table th:nth-child(7) { width: 6%; }
         .items-table th:nth-child(8) { width: 8%; }
         .items-table th:nth-child(9) { width: 6%; }
@@ -141,29 +138,33 @@
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
         .totals table { width: 280px; margin-left: auto; }
         .totals td { border: none; padding: 3px; }
-        .footer-box {
-            margin-top: 30px;
+        .qr-box, .carton-box {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 12px 0;
             border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            background: #f9f9f9;
         }
-        .bank-details, .terms {
-            font-size: 11px;
-            margin-bottom: 10px;
+        .qr-box img { max-width: 120px; height: auto; }
+        .signature-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            gap: 20px;
         }
         .signature-box {
-            margin-top: 20px;
-            text-align: right;
-            display: flex;
-            justify-content: flex-end;
-        }
-        .signature-box div {
-            width: 250px;
+            text-align: center;
+            width: 45%;
             border-top: 1px solid #333;
             padding-top: 5px;
-            font-size: 11px;
+        }
+        .footer-legal {
+            font-size: 9px;
             text-align: center;
+            margin-top: 20px;
+            color: #555;
+            border-top: 1px solid #dee2e6;
+            padding-top: 10px;
         }
         .actions {
             margin-top: 30px;
@@ -191,7 +192,15 @@
             flex-wrap: wrap;
             font-size: 13px;
         }
+        .page-number {
+            text-align: center;
+            font-size: 10px;
+            color: #777;
+            margin-top: 10px;
+        }
     </style>
+    <script src="data-manager.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
@@ -218,8 +227,9 @@
             <label><input type="radio" name="invoiceType" value="credit"> Credit Bill</label>
         </div>
         <div id="creditFields" style="display:none;">
-            <label>Credit Limit (₹):</label> <input type="number" id="creditLimit" placeholder="Limit" step="1000" value="50000">
-            <label>Payment Terms (days):</label> <input type="number" id="paymentTerms" value="30" style="width:70px;">
+            <label>Payment Terms (days):</label> 
+            <input type="number" id="paymentTerms" value="30" step="1" min="1" style="width:80px;">
+            <span style="margin-left:10px;">Due date = Invoice date + this number</span>
         </div>
     </div>
 
@@ -254,7 +264,7 @@
                 <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode" class="editable" placeholder="Code"></div></div>
                 <div class="info-row"><div class="info-label">Sales Order No:</div><div class="info-value"><input type="text" id="salesOrderNo" class="editable" placeholder="SO No."></div></div>
                 <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo" class="editable" placeholder="Ref No."></div></div>
-                <div class="info-row"><div class="info-label">Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
+                <div class="info-row"><div class="info-label">Order Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
             </div>
         </div>
         <div style="flex: 1;">
@@ -263,72 +273,51 @@
                 <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo" class="editable" placeholder="Doc No."></div></div>
                 <div class="info-row"><div class="info-label">Mode of Transport:</div><div class="info-value"><input type="text" id="transportMode" class="editable" placeholder="Road/Rail/Air"></div></div>
                 <div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value"><input type="text" id="vehicleNo" class="editable" placeholder="Optional"></div></div>
+                <div class="info-row"><div class="info-label">No. of Cartons:</div><div class="info-value"><input type="text" id="cartons" class="editable" placeholder="Number of cartons"></div></div>
             </div>
         </div>
     </div>
 
-    <!-- Items Table with HSN and Discount -->
-    <table class="items-table" id="itemsTable">
+    <!-- Items Table -->
+    <table class="items-table">
         <thead>
-            <tr>
-                <th>#</th>
-                <th>Part No</th>
-                <th>Description</th>
-                <th>HSN/SAC</th>
-                <th>Qty</th>
-                <th>Unit Price (₹)</th>
-                <th>Disc %</th>
-                <th>Taxable (₹)</th>
-                <th>GST%</th>
-                <th>CGST (₹)</th>
-                <th>SGST (₹)</th>
-                <th>Total (₹)</th>
-            </tr>
+            <tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
         </thead>
         <tbody id="itemsBody"></tbody>
     </table>
 
-    <!-- Tax Summary Table (grouped by HSN) -->
+    <!-- Tax Summary Table -->
     <table class="tax-summary-table">
-        <thead>
-            <tr>
-                <th>HSN/SAC</th>
-                <th>Taxable Value (₹)</th>
-                <th>CGST (₹)</th>
-                <th>SGST (₹)</th>
-                <th>IGST (₹)</th>
-                <th>Total Tax (₹)</th>
-            </tr>
-        </thead>
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
     <!-- Totals -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%):  </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%):  </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
-    <!-- Footer Box -->
-    <div class="footer-box">
-        <div class="bank-details">
-            <strong>Bank Details:</strong> Auto Spares Solution, Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi
-        </div>
-        <div class="terms">
-            <strong>Terms:</strong> Goods once sold will not be taken back. Interest @24% on bills unpaid after 30 days.
-        </div>
-        <div class="signature-box">
-            <div>
-                For Auto Spares Solution<br>
-                (Authorised Signatory)<br>
-                <span style="font-size: 10px;">(Stamp & Signature)</span>
-            </div>
+    <!-- Payment QR and Bank Details -->
+    <div class="qr-box">
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+            <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
+            <div><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</div>
         </div>
     </div>
+
+    <!-- Signatures -->
+    <div class="signature-row">
+        <div class="signature-box">Customer's Stamp & Signature<br><span style="font-size: 10px;">(Receiver's acknowledgment)</span></div>
+        <div class="signature-box">For Auto Spares Solution<br>(Authorised Signatory)<br><span style="font-size: 10px;">(Stamp & Signature)</span></div>
+    </div>
+
+    <div class="footer-legal">This is a computer generated invoice. All disputes are subject to Howrah jurisdiction only.</div>
+    <div id="pageNumber" class="page-number"></div>
 </div>
 
 <div class="actions no-print">
@@ -338,12 +327,11 @@
     <button onclick="window.close()">❌ Close</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
     // ========== DATA FROM localStorage ==========
-    const cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    cart = cart.map(i => ({ ...i, hsn: i.hsn || '' }));
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
     if (currentUser) {
@@ -355,6 +343,28 @@
         document.getElementById('buyerState').value = currentUser.state || '';
     }
 
+    // Helper: check if customer GSTIN is local (starts with "19")
+    function isLocalGst() {
+        const gst = document.getElementById('buyerGstin').value.trim();
+        return gst.startsWith('19');
+    }
+
+    function updateGstDisplay() {
+        const isLocal = isLocalGst();
+        const cgstLabel = document.getElementById('gstLabel1');
+        const sgstLabel = document.getElementById('gstLabel2');
+        if (!isLocal) {
+            cgstLabel.innerHTML = 'IGST (18%):';
+            sgstLabel.innerHTML = '';
+        } else {
+            cgstLabel.innerHTML = 'CGST (9%):';
+            sgstLabel.innerHTML = 'SGST (9%):';
+        }
+        renderItemsAndTaxSummary();
+    }
+    document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
+
+    // --- Financial Year ---
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -363,123 +373,151 @@
         else return `${year-1}-${year.toString().slice(-2)}`;
     }
 
+    // --- Get next invoice number from existing invoices (max + 1) ---
     function getNextInvoiceNumber(type) {
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const finYear = getFinancialYear();
-        let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
         let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-        let cnt = parseInt(localStorage.getItem(key)) || 1;
-        return { invoiceNo: prefix + cnt.toString().padStart(4,'0'), key, cnt };
+        let maxNumber = 0;
+        allInvoices.forEach(inv => {
+            if (inv.invoiceType === type && inv.invoiceNo.startsWith(prefix)) {
+                const match = inv.invoiceNo.match(/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > maxNumber) maxNumber = num;
+                }
+            }
+        });
+        const nextNumber = maxNumber + 1;
+        return prefix + nextNumber.toString().padStart(4, '0');
     }
 
     function updateInvoiceNumberDisplay() {
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const { invoiceNo } = getNextInvoiceNumber(type);
+        const invoiceNo = getNextInvoiceNumber(type);
         document.getElementById('invoiceNo').innerText = invoiceNo;
     }
 
-    function getReusableInvoiceNumber(type) {
-        const finYear = getFinancialYear();
-        let deletedNumbers = JSON.parse(localStorage.getItem('deletedInvoiceNumbers') || '[]');
-        let available = deletedNumbers.filter(n => n.type === type && n.finYear === finYear).sort((a,b) => a.number - b.number);
-        if (available.length > 0) {
-            const reused = available[0];
-            const remaining = deletedNumbers.filter(n => !(n.type === type && n.finYear === finYear && n.number === reused.number));
-            localStorage.setItem('deletedInvoiceNumbers', JSON.stringify(remaining));
-            let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-            return prefix + reused.number.toString().padStart(4,'0');
+    // --- Due Date Logic ---
+    function computeDueDate(invoiceDate, type, paymentTermsDays) {
+        const date = new Date(invoiceDate);
+        if (type === 'cash') return date;
+        if (paymentTermsDays && !isNaN(paymentTermsDays)) {
+            date.setDate(date.getDate() + paymentTermsDays);
+        } else {
+            date.setDate(date.getDate() + 30);
         }
-        return null;
-    }
-
-    function getAndIncrementInvoiceNumber(type) {
-        const finYear = getFinancialYear();
-        const reused = getReusableInvoiceNumber(type);
-        if (reused) return reused;
-        let key = (type === 'credit') ? `creditCounter_${finYear}` : `cashCounter_${finYear}`;
-        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-        let cnt = parseInt(localStorage.getItem(key)) || 1;
-        let invNo = prefix + cnt.toString().padStart(4,'0');
-        localStorage.setItem(key, cnt + 1);
-        return invNo;
+        return date;
     }
 
     function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
 
-    function computeDueDate(invoiceDate, type, paymentTermsDays) {
-        const date = new Date(invoiceDate);
-        if (type === 'cash') return date;
-        date.setDate(date.getDate() + paymentTermsDays);
-        return date;
+    function updateDueDate() {
+        const invoiceDateStr = document.getElementById('invoiceDate').innerText;
+        const parts = invoiceDateStr.split('/');
+        const invoiceDate = new Date(parts[2], parts[1]-1, parts[0]);
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        let paymentTermsDays = parseInt(document.getElementById('paymentTerms').value);
+        if (isNaN(paymentTermsDays)) paymentTermsDays = 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTermsDays);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
     }
 
+    function setDates() {
+        const invoiceDate = new Date();
+        document.getElementById('invoiceDate').innerText = formatDate(invoiceDate);
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        let paymentTermsDays = parseInt(document.getElementById('paymentTerms').value);
+        if (isNaN(paymentTermsDays)) paymentTermsDays = 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTermsDays);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
+    }
+
+    // --- Cart calculations (handles local/out-of-state GST) ---
     function calculateTotalsAndTaxGroups() {
-        let sub = 0, cgst = 0, sgst = 0;
-        let taxGroups = {}; // key = hsn
-        cart.forEach(item => {
-            const hsn = item.hsn || '';
-            const taxable = (item.price * item.qty) * (1 - (item.discount || 0) / 100);
+        let sub = 0;
+        let taxGroups = {};
+        const isLocal = isLocalGst();
+        cart.forEach(i => {
+            const hsn = i.hsn || '';
+            const taxable = (i.price * i.qty) * (1 - (i.discount || 0) / 100);
             sub += taxable;
-            const cgstVal = taxable * 0.09;
-            const sgstVal = taxable * 0.09;
-            cgst += cgstVal;
-            sgst += sgstVal;
-            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0 };
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
             taxGroups[hsn].taxable += taxable;
-            taxGroups[hsn].cgst += cgstVal;
-            taxGroups[hsn].sgst += sgstVal;
+            taxGroups[hsn].cgst += cgst;
+            taxGroups[hsn].sgst += sgst;
+            taxGroups[hsn].igst += igst;
         });
-        let grand = sub + cgst + sgst;
+        let cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
+        for (let hsn in taxGroups) {
+            cgstTotal += taxGroups[hsn].cgst;
+            sgstTotal += taxGroups[hsn].sgst;
+            igstTotal += taxGroups[hsn].igst;
+        }
+        let grand = sub + (isLocal ? cgstTotal + sgstTotal : igstTotal);
         let roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
-        return { subtotal: sub, cgstTotal: cgst, sgstTotal: sgst, roundOff, grand, taxGroups };
+        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, roundOff, grand, taxGroups, isLocal };
     }
 
     function renderItemsAndTaxSummary() {
         let itemsHtml = '';
-        const totals = calculateTotalsAndTaxGroups();
+        const isLocal = isLocalGst();
         cart.forEach((item, idx) => {
             const discount = item.discount || 0;
             const taxable = (item.price * item.qty) * (1 - discount / 100);
-            const cgstVal = taxable * 0.09;
-            const sgstVal = taxable * 0.09;
-            const totalItem = taxable + cgstVal + sgstVal;
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             itemsHtml += `<tr>
                 <td style="text-align:center;">${idx+1}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.hsn)}</td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
                 <td style="text-align:center;">${item.qty}</td>
                 <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
                 <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
                 <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
                 <td style="text-align:center;">18%</td>
-                <td style="text-align:right;">₹${cgstVal.toFixed(2)}</td>
-                <td style="text-align:right;">₹${sgstVal.toFixed(2)}</td>
+                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
 
-        // Tax summary
-        let taxHtml = '';
-        for (let hsn in totals.taxGroups) {
-            const g = totals.taxGroups[hsn];
-            const totalTax = g.cgst + g.sgst;
-            taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">₹${g.cgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹0.00</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
-            </tr>`;
-        }
-        document.getElementById('taxSummaryBody').innerHTML = taxHtml;
-
+        const totals = calculateTotalsAndTaxGroups();
         document.getElementById('subtotal').innerText = totals.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = totals.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = totals.sgstTotal.toFixed(2);
         document.getElementById('grandTotal').innerText = totals.grand.toFixed(2);
+
+        let taxHtml = '';
+        for (let hsn in totals.taxGroups) {
+            const g = totals.taxGroups[hsn];
+            const totalTax = g.cgst + g.sgst + g.igst;
+            taxHtml += `<tr>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+            </tr>`;
+        }
+        document.getElementById('taxSummaryBody').innerHTML = taxHtml;
     }
 
     function updateDiscount(part, discPercent) {
@@ -490,55 +528,89 @@
         }
     }
 
+    function updateHsn(part, hsnValue) {
+        const item = cart.find(i => i.part === part);
+        if (item) {
+            item.hsn = hsnValue;
+            renderItemsAndTaxSummary();
+        }
+    }
+
     function escapeHtml(str) {
         if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
+        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    function setDates() {
-        const invoiceDate = new Date();
-        document.getElementById('invoiceDate').innerText = formatDate(invoiceDate);
-        const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
-        const dueDate = computeDueDate(invoiceDate, type, paymentTerms);
-        document.getElementById('dueDate').innerText = formatDate(dueDate);
-    }
-
-    function updateDueDate() {
-        const invoiceDateStr = document.getElementById('invoiceDate').innerText;
-        const parts = invoiceDateStr.split('/');
-        const invoiceDate = new Date(parts[2], parts[1]-1, parts[0]);
-        const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const paymentTerms = parseInt(document.getElementById('paymentTerms').value) || 30;
-        const dueDate = computeDueDate(invoiceDate, type, paymentTerms);
-        document.getElementById('dueDate').innerText = formatDate(dueDate);
-    }
-
+    // --- Save Invoice (Integrated with data-manager.js) ---
     function saveInvoice() {
-        if (cart.length === 0) { alert('Cart empty'); return; }
+        if (cart.length === 0) {
+            alert('Cart empty. Please add items first.');
+            return;
+        }
+
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const creditLimit = parseFloat(document.getElementById('creditLimit').value) || 0;
-        let totals = calculateTotalsAndTaxGroups();
-        const finalNo = getAndIncrementInvoiceNumber(type);
-        let invoice = {
+        const totals = calculateTotalsAndTaxGroups();
+        const finalNo = getNextInvoiceNumber(type);   // gets the next number based on existing invoices
+
+        const buyer = {
+            name: document.getElementById('buyerName').value.trim(),
+            email: document.getElementById('buyerEmail').value.trim(),
+            address: document.getElementById('buyerAddress').value,
+            phone: document.getElementById('buyerPhone').value.trim(),
+            gstin: document.getElementById('buyerGstin').value.trim(),
+            state: document.getElementById('buyerState').value.trim()
+        };
+
+        // Ensure customer exists
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        let existingCustomer = customers.find(c => c.email === buyer.email);
+        if (!existingCustomer && buyer.email) {
+            const newCust = {
+                id: Date.now(),
+                name: buyer.name,
+                email: buyer.email,
+                phone: buyer.phone,
+                address: buyer.address,
+                gstin: buyer.gstin,
+                state: buyer.state,
+                outstanding: 0,
+                totalPurchased: 0,
+                creditLimit: parseFloat(document.getElementById('creditLimit').value) || 50000,
+                status: 'active',
+                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
+                createdAt: new Date().toISOString()
+            };
+            customers.push(newCust);
+            localStorage.setItem('customers', JSON.stringify(customers));
+            existingCustomer = newCust;
+        }
+
+        if (!buyer.email) {
+            alert('Customer email is required to link invoice.');
+            return;
+        }
+
+        // Build items array for createSalesInvoice
+        const items = cart.map(item => ({
+            productId: item.part,
+            quantity: item.qty,
+            price: item.price
+        }));
+
+        const dateParts = document.getElementById('invoiceDate').innerText.split('/');
+        const invoiceDateFormatted = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+
+        const invoice = {
+            id: Date.now(),
+            date: invoiceDateFormatted,
+            customerEmail: buyer.email,
+            items: items,
+            total: totals.grand,
             invoiceNo: finalNo,
-            date: document.getElementById('invoiceDate').innerText,
-            dueDate: document.getElementById('dueDate').innerText,
-            finYear: getFinancialYear(),
             invoiceType: type,
-            buyer: {
-                name: document.getElementById('buyerName').value,
-                address: document.getElementById('buyerAddress').value,
-                gstin: document.getElementById('buyerGstin').value,
-                state: document.getElementById('buyerState').value,
-                phone: document.getElementById('buyerPhone').value,
-                email: document.getElementById('buyerEmail').value
-            },
+            status: type === 'cash' ? 'Paid' : 'Pending',
+            grandTotal: totals.grand,
+            buyer: buyer,
             consignee: {
                 name: document.getElementById('consigneeName').value,
                 address: document.getElementById('consigneeAddress').value,
@@ -553,37 +625,33 @@
             dispatchDetails: {
                 docNo: document.getElementById('dispatchDocNo').value,
                 transportMode: document.getElementById('transportMode').value,
-                vehicleNo: document.getElementById('vehicleNo').value
+                vehicleNo: document.getElementById('vehicleNo').value,
+                cartons: document.getElementById('cartons').value
             },
-            items: cart.map(i => ({ part: i.part, desc: i.desc, hsn: i.hsn || '', qty: i.qty, price: i.price, discount: i.discount || 0, total: (i.price * i.qty) * (1 - (i.discount||0)/100) })),
-            subtotal: totals.subtotal,
-            cgst: totals.cgstTotal,
-            sgst: totals.sgstTotal,
-            roundOff: totals.roundOff,
-            grandTotal: totals.grand,
-            taxGroups: totals.taxGroups,
-            status: type === 'cash' ? 'Paid' : 'Pending'
+            dueDate: document.getElementById('dueDate').innerText,
+            finYear: getFinancialYear(),
+            items: cart.map(item => ({
+                part: item.part,
+                desc: item.desc,
+                hsn: item.hsn || '',
+                qty: item.qty,
+                price: item.price,
+                discount: item.discount || 0
+            }))
         };
-        if (invoice.buyer.email) {
-            let cust = customers.find(c => c.email === invoice.buyer.email);
-            if (!cust) {
-                cust = { name: invoice.buyer.name, email: invoice.buyer.email, phone: invoice.buyer.phone, address: invoice.buyer.address, gstin: invoice.buyer.gstin, creditLimit, outstanding: 0, totalPurchased: 0 };
-                customers.push(cust);
-            }
-            if (type === 'credit') {
-                if (cust.outstanding + totals.grand > cust.creditLimit) { alert(`Credit limit exceeded!`); return; }
-                cust.outstanding += totals.grand;
-            }
-            cust.totalPurchased += totals.grand;
-            localStorage.setItem('customers', JSON.stringify(customers));
+
+        try {
+            // Call the central function from data-manager.js
+            createSalesInvoice(invoice);
+            alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced.\nCustomer outstanding updated.\nLedger entry created.`);
+            localStorage.setItem('invoiceCart', '[]');
+            window.close();
+        } catch (err) {
+            alert('Error saving invoice: ' + err.message);
         }
-        allInvoices.push(invoice);
-        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-        localStorage.setItem('invoiceCart', '[]');
-        alert(`Invoice ${finalNo} saved!`);
-        window.close();
     }
 
+    // --- Print and PDF functions (identical to working version) ---
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -632,7 +700,6 @@
         clone.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
         const typeSelector = clone.querySelector('.invoice-type');
         if (typeSelector) typeSelector.style.display = 'none';
-        
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
         const opt = {
@@ -648,19 +715,26 @@
         });
     }
 
+    // --- Event Listeners ---
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
+            const creditDiv = document.getElementById('creditFields');
+            if (this.value === 'credit') creditDiv.style.display = 'flex';
+            else creditDiv.style.display = 'none';
             updateInvoiceNumberDisplay();
             updateDueDate();
+            updateGstDisplay();
         });
     });
+
     const paymentTermsInput = document.getElementById('paymentTerms');
     if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
 
+    // Initialization
     setDates();
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
+    updateGstDisplay();
 </script>
 </body>
-    </html>
+                                          </html>
