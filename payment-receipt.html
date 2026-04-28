@@ -3,85 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Receipt – Customer</title>
+    <title>Payment Receipt – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
-        .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
-        h1 { color: #0a7c71; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: 600; margin-bottom: 5px; }
-        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-        button { background: #0a7c71; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
-        .info { background: #e9ecef; padding: 10px; border-radius: 6px; margin: 15px 0; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        h1, h2 { color: #0a7c71; }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        button:hover { background: #09645a; }
+        .flex-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .flex-row > div {
+            flex: 1;
+        }
+        .receipt-container {
+            background: white;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Roboto', sans-serif;
+        }
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #0a7c71;
+            padding-bottom: 10px;
+        }
+        .receipt-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0a7c71;
+        }
+        .customer-details, .payment-details {
+            margin-bottom: 20px;
+        }
+        .detail-row {
+            display: flex;
+            margin-bottom: 8px;
+        }
+        .detail-label {
+            width: 140px;
+            font-weight: 600;
+            color: #555;
+        }
+        .detail-value {
+            flex: 1;
+        }
+        .signature-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+        .signature-box {
+            width: 45%;
+            text-align: center;
+            border-top: 1px solid #333;
+            padding-top: 5px;
+        }
+        .footer {
+            font-size: 10px;
+            text-align: center;
+            margin-top: 20px;
+            color: #777;
+        }
     </style>
-    <script src="data-manager.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>Customer Payment Receipt</h1>
+    <h1><i class="fas fa-receipt"></i> Payment Receipt</h1>
+    
     <div class="form-group">
         <label>Customer *</label>
-        <select id="customerEmail"><option value="">-- Select Customer --</option></select>
+        <div class="flex-row">
+            <select id="customerSelect" style="flex:2;">
+                <option value="">-- Select Customer --</option>
+            </select>
+            <input type="email" id="customerEmail" placeholder="Or enter email directly" style="flex:1;">
+        </div>
     </div>
+
+    <div class="flex-row">
+        <div class="form-group">
+            <label>Payment Date</label>
+            <input type="date" id="paymentDate">
+        </div>
+        <div class="form-group">
+            <label>Amount (₹) *</label>
+            <input type="number" id="amount" step="0.01" placeholder="Enter amount">
+        </div>
+    </div>
+
+    <div class="flex-row">
+        <div class="form-group">
+            <label>Payment Mode</label>
+            <select id="mode">
+                <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cheque">Cheque</option>
+                <option value="UPI">UPI</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Reference / Cheque No.</label>
+            <input type="text" id="reference" placeholder="Optional">
+        </div>
+    </div>
+
     <div class="form-group">
-        <label>Payment Date</label>
-        <input type="date" id="paymentDate">
+        <label>Remarks (optional)</label>
+        <textarea id="remarks" rows="2" placeholder="Any notes..."></textarea>
     </div>
-    <div class="form-group">
-        <label>Amount (₹) *</label>
-        <input type="number" id="amount" step="0.01">
+
+    <div style="margin-top: 20px;">
+        <button onclick="recordPayment()"><i class="fas fa-save"></i> Save & Print Receipt</button>
+        <button onclick="generatePDF()"><i class="fas fa-file-pdf"></i> Generate PDF Only</button>
+        <button onclick="window.location.href='index.html'">Cancel</button>
     </div>
-    <div class="form-group">
-        <label>Reference / Cheque No.</label>
-        <input type="text" id="reference">
-    </div>
-    <div class="form-group">
-        <label>Payment Mode</label>
-        <select id="mode"><option value="cash">Cash</option><option value="bank">Bank Transfer</option><option value="cheque">Cheque</option></select>
-    </div>
-    <div id="customerInfo" class="info">Select a customer to see outstanding.</div>
-    <button onclick="recordPayment()">💾 Record Payment</button>
-    <button onclick="window.location.href='customer-master.html'">Cancel</button>
+
+    <div id="customerInfo" style="margin-top: 15px; font-size: 13px; background: #f8f9fa; padding: 8px; border-radius: 6px;"></div>
 </div>
+
 <script>
-    let customers = [];
-    function loadCustomers() {
-        customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        const select = document.getElementById('customerEmail');
+    let currentCustomer = null;
+    let receiptData = null;
+
+    function refreshCustomerDropdown() {
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const select = document.getElementById('customerSelect');
         select.innerHTML = '<option value="">-- Select Customer --</option>';
         customers.forEach(c => {
-            select.innerHTML += `<option value="${c.email}" data-outstanding="${c.outstanding || 0}">${c.name} (${c.email}) - Outstanding: ₹${(c.outstanding || 0).toLocaleString()}</option>`;
+            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
         });
-        document.getElementById('paymentDate').value = new Date().toISOString().slice(0,10);
-        select.addEventListener('change', updateCustomerInfo);
     }
+
     function updateCustomerInfo() {
-        const select = document.getElementById('customerEmail');
-        const selectedOption = select.options[select.selectedIndex];
-        const outstanding = parseFloat(selectedOption.dataset.outstanding) || 0;
-        document.getElementById('customerInfo').innerHTML = `Current Outstanding: <strong>₹${outstanding.toLocaleString()}</strong>`;
+        let email = document.getElementById('customerSelect').value;
+        if (!email) email = document.getElementById('customerEmail').value.trim();
+        if (!email) {
+            document.getElementById('customerInfo').innerHTML = '';
+            currentCustomer = null;
+            return;
+        }
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        currentCustomer = customers.find(c => c.email === email);
+        if (currentCustomer) {
+            document.getElementById('customerInfo').innerHTML = `
+                <strong>${currentCustomer.name}</strong> | Outstanding: ₹${(currentCustomer.outstanding||0).toLocaleString()}
+            `;
+        } else {
+            document.getElementById('customerInfo').innerHTML = '<span style="color:red;">Customer not found. Please add in Customer Master.</span>';
+            currentCustomer = null;
+        }
     }
+
+    document.getElementById('customerSelect').addEventListener('change', updateCustomerInfo);
+    document.getElementById('customerEmail').addEventListener('input', updateCustomerInfo);
+
     function recordPayment() {
-        const customerEmail = document.getElementById('customerEmail').value;
-        if (!customerEmail) { alert('Select a customer'); return; }
+        let email = document.getElementById('customerSelect').value;
+        if (!email) email = document.getElementById('customerEmail').value.trim();
+        if (!email) { alert('Please select or enter customer email'); return; }
         const amount = parseFloat(document.getElementById('amount').value);
         if (isNaN(amount) || amount <= 0) { alert('Enter valid amount'); return; }
+        
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const customer = customers.find(c => c.email === email);
+        if (!customer) { alert('Customer not found in master'); return; }
+        
         const payment = {
             id: Date.now(),
-            date: document.getElementById('paymentDate').value,
-            customerEmail: customerEmail,
+            date: document.getElementById('paymentDate').value || new Date().toISOString().slice(0,10),
+            customerEmail: email,
             amount: amount,
-            reference: document.getElementById('reference').value.trim() || 'PAY-' + Date.now(),
-            mode: document.getElementById('mode').value
+            reference: document.getElementById('reference').value.trim() || 'N/A',
+            mode: document.getElementById('mode').value,
+            remarks: document.getElementById('remarks').value
         };
-        try {
-            receiveCustomerPayment(payment);
-            alert(`Payment of ₹${amount} recorded. Outstanding updated.`);
-            window.location.href = 'customer-master.html';
-        } catch(err) { alert('Error: ' + err.message); }
+        
+        // Update customer outstanding
+        customer.outstanding = (customer.outstanding || 0) - amount;
+        if (customer.outstanding < 0) customer.outstanding = 0;
+        localStorage.setItem('customers', JSON.stringify(customers));
+        
+        // Store payment in separate array
+        let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
+        payments.push(payment);
+        localStorage.setItem('customerPayments', JSON.stringify(payments));
+        
+        // Also add to customer ledger if you have one (optional)
+        let ledger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
+        ledger.push({
+            id: Date.now(),
+            customerEmail: email,
+            date: payment.date,
+            type: 'payment',
+            ref: payment.reference,
+            debit: 0,
+            credit: amount,
+            balance: customer.outstanding,
+            narration: payment.remarks || 'Payment received'
+        });
+        localStorage.setItem('customerLedger', JSON.stringify(ledger));
+        
+        alert(`Payment of ₹${amount.toFixed(2)} recorded. Outstanding updated.`);
+        
+        // Store receipt data for PDF
+        receiptData = { customer, payment };
+        generatePDF(); // auto generate PDF receipt
     }
-    loadCustomers();
+
+    function generatePDF() {
+        if (!receiptData) {
+            // Try to use current form data without saving? 
+            // Better: require save first
+            alert('Please click "Save & Print Receipt" first to record the payment.');
+            return;
+        }
+        const { customer, payment } = receiptData;
+        
+        const receiptDiv = document.createElement('div');
+        receiptDiv.className = 'receipt-container';
+        receiptDiv.innerHTML = `
+            <div class="receipt-header">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <img src="images/ASS.jpg" alt="Logo" style="height: 50px;" onerror="this.style.display='none'">
+                    <div>
+                        <div class="receipt-title">Auto Spares Solution</div>
+                        <div>GSTIN: 19ANOPD3300R1ZO</div>
+                        <div>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</div>
+                    </div>
+                </div>
+                <h2 style="margin: 10px 0 0;">PAYMENT RECEIPT</h2>
+                <p>Receipt No: ${payment.id}</p>
+            </div>
+            <div class="customer-details">
+                <h3>Customer Details</h3>
+                <div class="detail-row"><div class="detail-label">Name:</div><div class="detail-value">${escapeHtml(customer.name)}</div></div>
+                <div class="detail-row"><div class="detail-label">Email:</div><div class="detail-value">${escapeHtml(customer.email)}</div></div>
+                <div class="detail-row"><div class="detail-label">Phone:</div><div class="detail-value">${escapeHtml(customer.phone)}</div></div>
+                <div class="detail-row"><div class="detail-label">Address:</div><div class="detail-value">${escapeHtml(customer.address || '')}</div></div>
+            </div>
+            <div class="payment-details">
+                <h3>Payment Details</h3>
+                <div class="detail-row"><div class="detail-label">Date:</div><div class="detail-value">${payment.date}</div></div>
+                <div class="detail-row"><div class="detail-label">Amount:</div><div class="detail-value">₹${payment.amount.toFixed(2)}</div></div>
+                <div class="detail-row"><div class="detail-label">Mode:</div><div class="detail-value">${payment.mode}</div></div>
+                <div class="detail-row"><div class="detail-label">Reference:</div><div class="detail-value">${payment.reference}</div></div>
+                <div class="detail-row"><div class="detail-label">Remarks:</div><div class="detail-value">${payment.remarks || '-'}</div></div>
+            </div>
+            <div class="signature-row">
+                <div class="signature-box">Customer Signature</div>
+                <div class="signature-box">For Auto Spares Solution</div>
+            </div>
+            <div class="footer">
+                This is a computer generated receipt. Valid with stamp & signature.<br>
+                Thank you for your business!
+            </div>
+        `;
+        
+        const opt = {
+            margin: [0.2, 0.2, 0.2, 0.2],
+            filename: `Payment_Receipt_${payment.id}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(receiptDiv).save().then(() => {
+            // Optionally clear form after PDF is generated
+            document.getElementById('amount').value = '';
+            document.getElementById('reference').value = '';
+            document.getElementById('remarks').value = '';
+            receiptData = null;
+        });
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    
+    // Set default date
+    document.getElementById('paymentDate').value = new Date().toISOString().slice(0,10);
+    refreshCustomerDropdown();
 </script>
 </body>
-</html>
+    </html>
