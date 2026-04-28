@@ -1071,6 +1071,8 @@ function extractYouTubeId(url) {
             users.push(newUser);
             localStorage.setItem('users', JSON.stringify(users));
             currentUser = newUser;
+            // Save currentUser to localStorage for invoice page
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
             showUserProfile();
             showToast("Registration successful!");
             document.getElementById("register-form").reset();
@@ -1118,6 +1120,9 @@ function extractYouTubeId(url) {
             currentUser.isAdmin = true;
         }
         
+        // Save currentUser to localStorage for invoice page
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        
         showUserProfile();
         showToast("Login successful!");
         updateDeliveryEstimator();
@@ -1131,31 +1136,13 @@ function extractYouTubeId(url) {
         showToast("Invalid email or password", true);
     }
 }
-       /* function login() {
-    const email = document.getElementById("login-email").value;
-    const password = document.getElementById("login-password").value;
-    const user = users.find(u => u.email === email && u.password === password);
-    if (user) {
-        currentUser = user;
-        // If your email is admin@autosparessolution.com, set isAdmin
-        if (email === "dipankar@autosparessolution.com") {
-            currentUser.isAdmin = true;
+        function logout() { 
+            currentUser = null; 
+            localStorage.removeItem('currentUser');  // clear stored user
+            showLoginForm(); 
+            showToast("Logged out"); 
+            updateDeliveryEstimator(); 
         }
-        showUserProfile();
-        showToast("Login successful!");
-        updateDeliveryEstimator();
-    } else {
-        showToast("Invalid email or password", true);
-    }
-}*/
-     /*   function login() {
-            const email = document.getElementById("login-email").value;
-            const password = document.getElementById("login-password").value;
-            const user = users.find(u => u.email === email && u.password === password);
-            if (user) { currentUser = user; showUserProfile(); showToast("Login successful!"); updateDeliveryEstimator(); }
-            else showToast("Invalid email or password", true);
-        }*/
-        function logout() { currentUser = null; showLoginForm(); showToast("Logged out"); updateDeliveryEstimator(); }
 
         // ========== PRODUCT LOADING ==========
         function loadProducts() {
@@ -1393,7 +1380,7 @@ if (preloader) {
             const existing = cart.find(i => i.part === part);
             const product = allProducts.find(p => p.part === part);
             if (existing) existing.qty += qty;
-            else cart.push({ part, price, qty, desc: product?.desc || part, boxQty: product?.boxQty || 1, masterCarton: product?.masterCarton || 1, hsn: product?.hsn || '' });
+            else cart.push({ part, price, qty, desc: product?.desc || part, boxQty: product?.boxQty || 1, masterCarton: product?.masterCarton || 1, hsn: product?.hsn || '', discount: 0 });
             updateCartUI();
             showToast(`${part} added to cart`);
         }
@@ -1483,9 +1470,18 @@ function generateInvoice() {
         showToast('Cart is empty', true);
         return;
     }
-    localStorage.setItem('invoiceCart', JSON.stringify(cart));
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-    window.open('invoice.html', '_blank');
+    // Ensure cart items have all required fields (discount, hsn)
+    const enhancedCart = cart.map(item => ({
+        ...item,
+        discount: item.discount || 0,
+        hsn: item.hsn || ''
+    }));
+    localStorage.setItem('invoiceCart', JSON.stringify(enhancedCart));
+    // Save current user for invoice pre-fill
+    if (currentUser) {
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    }
+    window.open('invoice-stock.html', '_blank');
 }
         function printLastInvoice() {
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
@@ -1604,51 +1600,6 @@ function generateInvoice() {
     document.getElementById('infoModalBody').innerHTML = html;
     document.getElementById('infoModal').style.display = 'block';
 }
-       /* function showProductInfo(part) {
-    const product = allProducts.find(p => p.part === part);
-    if (!product) return;
-
-    // Check if we have any local application info
-    const hasLocalInfo = (product.make && product.make !== '') ||
-                         (product.model && product.model !== '') ||
-                         (product.year_start && product.year_start !== '') ||
-                         (product.segment && product.segment !== '');
-
-    let html = `
-        <p><strong>Part Number:</strong> ${product.part}</p>
-        <p><strong>Description:</strong> ${product.desc}</p>
-        <p><strong>Brand:</strong> ${product.brand}</p>
-        <p><strong>Stock:</strong> ${product.stock}</p>
-        <p><strong>Price:</strong> ₹${product.price.toFixed(2)}</p>
-    `;
-
-    if (hasLocalInfo) {
-        // Show local application data
-        if (product.make) html += `<p><strong>Make:</strong> ${product.make}</p>`;
-        if (product.model) html += `<p><strong>Model:</strong> ${product.model}</p>`;
-        if (product.year_start || product.year_end) {
-            let yearRange = product.year_start || '';
-            if (product.year_end) yearRange += ` - ${product.year_end}`;
-            html += `<p><strong>Year:</strong> ${yearRange}</p>`;
-        }
-        if (product.segment) html += `<p><strong>Segment:</strong> ${product.segment}</p>`;
-        if (product.engine) html += `<p><strong>Engine:</strong> ${product.engine}</p>`;
-        if (product.notes) html += `<p><strong>Notes:</strong> ${product.notes}</p>`;
-    } else {
-        // No local data – offer online search
-        html += `<p><strong>Application info not available in our database.</strong></p>`;
-        html += `<p>You can search online using the part number:</p>`;
-        html += `<div style="display: flex; gap: 1rem; margin-top: 1rem;">`;
-        html += `<a href="https://www.google.com/search?q=auto+part+${encodeURIComponent(product.part)}+${encodeURIComponent(product.brand)}" target="_blank" class="btn" style="background:#4285f4;">Search Google</a>`;
-        html += `<a href="https://boodmo.com/search/?q=${encodeURIComponent(product.part)}" target="_blank" class="btn" style="background:#ff6b6b;">Search Boodmo</a>`;
-        html += `</div>`;
-        // You can add more sites like Amazon, eBay, etc.
-    }
-
-    document.getElementById('infoModalBody').innerHTML = html;
-    document.getElementById('infoModal').style.display = 'block';
-}*/
-
         // ========== VIDEO MODAL ==========
 function openVideoModal(url, part) {
     // Create a temporary gallery with just this video
@@ -1667,19 +1618,6 @@ function openVideoModal(url, part) {
     }
     openGallery(mediaList, 0);
 }
-/*function openProductImage(part, imgElement) {
-    // Build a media list starting with the clicked image
-    let mediaList = [imgElement.src];
-
-    // If you have extra media (from CSV column R), add them too
-    if (window.productMediaMap && window.productMediaMap[part]) {
-        const extra = window.productMediaMap[part].filter(url => url !== imgElement.src);
-        mediaList = mediaList.concat(extra);
-    }
-
-    // Open the gallery at the first item
-    openGallery(mediaList, 0);
-}*/
         let currentGallery = [], currentGalleryIndex = 0;
         function openGallery(media, idx) { currentGallery = media; currentGalleryIndex = idx; updateGallery(); document.getElementById('galleryModal').style.display='block'; }
         function closeGallery() {
@@ -1750,45 +1688,6 @@ function openVideoModal(url, part) {
         });
     }
 }
-
-        /*function updateGallery() {
-    const url = currentGallery[currentGalleryIndex];
-    const container = document.getElementById('gallery-media');
-    container.innerHTML = '';
-
-    if (url.match(/\.(mp4|webm|ogg)$/i)) {
-        // Direct video file
-        container.innerHTML = `<video controls style="width:100%; height:100%;"><source src="${url}"></video>`;
-    } else if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('youtube.com/shorts')) {
-        // YouTube video
-        const videoId = extractYouTubeId(url);
-        if (videoId) {
-            const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=0&enablejsapi=1`;
-            container.innerHTML = `<iframe src="${embedUrl}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-        } else {
-            container.innerHTML = `<p>Video ID not found. <a href="${url}" target="_blank">Click to watch</a></p>`;
-        }
-    } else if (url.includes('vimeo.com')) {
-        // Vimeo video
-        const vimeoId = url.split('/').pop().split('?')[0];
-        const embedUrl = `https://player.vimeo.com/video/${vimeoId}`;
-        container.innerHTML = `<iframe src="${embedUrl}" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
-    } else {
-        // Assume image
-        container.innerHTML = `<img src="${url}" style="max-width:100%; max-height:100%; object-fit:contain;">`;
-    }
-
-    // Update thumbnails (unchanged)
-    const thumbDiv = document.getElementById('gallery-thumbnails');
-    thumbDiv.innerHTML = '';
-    currentGallery.forEach((u, i) => {
-        const thumb = document.createElement('div');
-        thumb.className = 'thumbnail-item' + (i === currentGalleryIndex ? ' active' : '');
-        thumb.innerHTML = `<img src="${u}" onerror="this.src='images/default.png';">`;
-        thumb.onclick = () => { currentGalleryIndex = i; updateGallery(); };
-        thumbDiv.appendChild(thumb);
-    });
-}*/
         // ========== EVENT LISTENERS ==========
         cartLink.addEventListener('click', e => { e.preventDefault(); cartSidebar.classList.toggle('active'); });
         closeCartBtn.addEventListener('click', () => cartSidebar.classList.remove('active'));
@@ -1816,26 +1715,31 @@ if (galleryCloseBtn) {
 }
 
         // ========== INIT ==========
-        loadProducts();
+        // Load currentUser from localStorage on page load
         const savedUser = localStorage.getItem('currentUser');
-        if (savedUser) { currentUser = JSON.parse(savedUser); showUserProfile(); updateDeliveryEstimator(); }
+        if (savedUser) { 
+            currentUser = JSON.parse(savedUser); 
+            showUserProfile(); 
+            updateDeliveryEstimator(); 
+        }
+        loadProducts();
         // After loading products and other init code
-// Initialize navigation based on user role after page loads
-if (typeof updateNavigationByRole === 'function') {
-    updateNavigationByRole();
-}
+        // Initialize navigation based on user role after page loads
+        if (typeof updateNavigationByRole === 'function') {
+            updateNavigationByRole();
+        }
 
-// Also update navigation when user logs out
-const originalLogout = logout;
-logout = function() {
-    originalLogout();
-    if (typeof updateNavigationByRole === 'function') {
-        updateNavigationByRole();
-    }
-};
+        // Also update navigation when user logs out
+        const originalLogout = logout;
+        logout = function() {
+            originalLogout();
+            if (typeof updateNavigationByRole === 'function') {
+                updateNavigationByRole();
+            }
+        };
     </script>
    
     </div>
 </div>
 </body>
-</html>
+    </html>
