@@ -229,7 +229,7 @@
         <div id="creditFields" style="display:none;">
             <label>Payment Terms (days):</label> 
             <input type="number" id="paymentTerms" value="30" step="1" min="1" style="width:80px;">
-            <span style="margin-left:10px;">Due date will be invoice date + this number</span>
+            <span style="margin-left:10px;">Due date = Invoice date + this number</span>
         </div>
     </div>
 
@@ -238,6 +238,15 @@
         <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
                 <h3>Buyer (Bill to)</h3>
+                <!-- Customer Quick Select (visible only to admin) -->
+                <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
+                    <div class="info-label">Quick Select:</div>
+                    <div class="info-value">
+                        <select id="quickCustomerSelect" onchange="loadCustomerData()">
+                            <option value="">-- Select Customer (Admin only) --</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
                 <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
                 <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN"></div></div>
@@ -281,50 +290,28 @@
     <!-- Items Table -->
     <table class="items-table">
         <thead>
-            <tr>
-                <th>#</th>
-                <th>Part No</th>
-                <th>Description</th>
-                <th>HSN/SAC</th>
-                <th>Qty</th>
-                <th>Unit Price (₹)</th>
-                <th>Disc %</th>
-                <th>Taxable (₹)</th>
-                <th>GST%</th>
-                <th>CGST (₹)</th>
-                <th>SGST (₹)</th>
-                <th>Total (₹)</th>
-            </tr>
+            <tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
         </thead>
         <tbody id="itemsBody"></tbody>
     </table>
 
     <!-- Tax Summary Table -->
     <table class="tax-summary-table">
-        <thead>
-            <tr>
-                <th>HSN/SAC</th>
-                <th>Taxable Value (₹)</th>
-                <th>CGST (₹)</th>
-                <th>SGST (₹)</th>
-                <th>IGST (₹)</th>
-                <th>Total Tax (₹)</th>
-            </tr>
-        </thead>
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
     <!-- Totals -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):  </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):   </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):   </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:   </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
-    <!-- Payment QR Code and Bank Details -->
+    <!-- Payment QR and Bank Details -->
     <div class="qr-box">
         <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
             <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
@@ -356,6 +343,7 @@
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
+    // Pre‑fill buyer fields from logged‑in user
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
         document.getElementById('buyerAddress').value = currentUser.address || '';
@@ -363,6 +351,40 @@
         document.getElementById('buyerEmail').value = currentUser.email || '';
         document.getElementById('buyerGstin').value = currentUser.gstin || '';
         document.getElementById('buyerState').value = currentUser.state || '';
+    }
+
+    // ========== ADMIN CUSTOMER QUICK SELECT ==========
+    // Check if current user is admin
+    if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
+        document.getElementById('adminCustomerSelect').style.display = 'flex';
+        populateCustomerSelect();
+    }
+
+    function populateCustomerSelect() {
+        const select = document.getElementById('quickCustomerSelect');
+        customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        select.innerHTML = '<option value="">-- Select Customer (Admin only) --</option>';
+        customers.forEach(c => {
+            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+        });
+    }
+
+    function loadCustomerData() {
+        const select = document.getElementById('quickCustomerSelect');
+        const email = select.value;
+        if (!email) return;
+        const cust = customers.find(c => c.email === email);
+        if (cust) {
+            document.getElementById('buyerName').value = cust.name || '';
+            document.getElementById('buyerAddress').value = cust.address || '';
+            document.getElementById('buyerPhone').value = cust.phone || '';
+            document.getElementById('buyerEmail').value = cust.email || '';
+            document.getElementById('buyerGstin').value = cust.gstin || '';
+            document.getElementById('buyerState').value = cust.state || '';
+            document.getElementById('customerCode').value = cust.customerCode || '';
+            // Also update GST display
+            updateGstDisplay();
+        }
     }
 
     // Helper: check if customer GSTIN is local (starts with "19")
@@ -455,7 +477,7 @@
         document.getElementById('dueDate').innerText = formatDate(dueDate);
     }
 
-    // --- Cart calculations (same as before) ---
+    // --- Cart calculations ---
     function calculateTotalsAndTaxGroups() {
         let sub = 0;
         let taxGroups = {};
@@ -572,8 +594,6 @@
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const totals = calculateTotalsAndTaxGroups();
-        
-        // Get the next number directly from existing invoices (max+1)
         const finalNo = getNextInvoiceNumber(type);
 
         const buyer = {
@@ -599,7 +619,7 @@
                 state: buyer.state,
                 outstanding: 0,
                 totalPurchased: 0,
-                creditLimit: parseFloat(document.getElementById('creditLimit').value) || 50000,
+                creditLimit: parseFloat(document.getElementById('creditLimit')?.value) || 50000,
                 status: 'active',
                 customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
                 createdAt: new Date().toISOString()
@@ -673,7 +693,7 @@
         }
     }
 
-    // --- Print and PDF functions (identical to your working code) ---
+    // --- Print and PDF functions ---
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -741,11 +761,8 @@
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
             const creditDiv = document.getElementById('creditFields');
-            if (this.value === 'credit') {
-                creditDiv.style.display = 'flex';
-            } else {
-                creditDiv.style.display = 'none';
-            }
+            if (this.value === 'credit') creditDiv.style.display = 'flex';
+            else creditDiv.style.display = 'none';
             updateInvoiceNumberDisplay();
             updateDueDate();
             updateGstDisplay();
@@ -753,11 +770,7 @@
     });
 
     const paymentTermsInput = document.getElementById('paymentTerms');
-    if (paymentTermsInput) {
-        paymentTermsInput.addEventListener('change', function() {
-            updateDueDate();
-        });
-    }
+    if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
 
     // Initialization
     setDates();
@@ -766,4 +779,4 @@
     updateGstDisplay();
 </script>
 </body>
-                    </html>
+                </html>
