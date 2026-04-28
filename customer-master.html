@@ -110,13 +110,6 @@
             table { font-size: 12px; }
         }
     </style>
-    <script src="data-manager.js"></script>
-    <script src="access-control.js"></script>
-    <script>
-        if (typeof checkAccess === 'function') {
-            checkAccess('customer-master.html');
-        }
-    </script>
 </head>
 <body>
 <div class="container">
@@ -206,10 +199,8 @@
     let customers = [];
     let editId = null;
 
-    // Load customers from localStorage (shared with data-manager.js)
     function loadCustomers() {
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        // Ensure each customer has required fields
         customers.forEach(c => {
             if (!c.customerCode) c.customerCode = generateCustomerCode();
             if (c.outstanding === undefined) c.outstanding = 0;
@@ -217,14 +208,16 @@
         });
         localStorage.setItem('customers', JSON.stringify(customers));
         displayCustomers();
+        console.log('Customers loaded:', customers.length);
     }
 
     function generateCustomerCode() {
-        const maxCode = customers.reduce((max, c) => {
-            const num = parseInt((c.customerCode || 'CUST0').replace('CUST', ''));
-            return isNaN(num) ? max : Math.max(max, num);
-        }, 0);
-        return 'CUST' + (maxCode + 1).toString().padStart(4, '0');
+        let maxNum = 0;
+        customers.forEach(c => {
+            let num = parseInt((c.customerCode || 'CUST0').replace('CUST', ''));
+            if (!isNaN(num) && num > maxNum) maxNum = num;
+        });
+        return 'CUST' + (maxNum + 1).toString().padStart(4, '0');
     }
 
     function displayCustomers() {
@@ -232,9 +225,9 @@
         let filtered = customers;
         if (searchTerm) {
             filtered = customers.filter(c => 
-                c.name?.toLowerCase().includes(searchTerm) ||
-                c.email?.toLowerCase().includes(searchTerm) ||
-                c.phone?.includes(searchTerm) ||
+                (c.name && c.name.toLowerCase().includes(searchTerm)) ||
+                (c.email && c.email.toLowerCase().includes(searchTerm)) ||
+                (c.phone && c.phone.includes(searchTerm)) ||
                 (c.gstin && c.gstin.toLowerCase().includes(searchTerm)) ||
                 (c.customerCode && c.customerCode.toLowerCase().includes(searchTerm))
             );
@@ -271,8 +264,8 @@
         document.getElementById('customersTable').innerHTML = html;
     }
 
-    // Save or update customer
     function saveCustomer() {
+        console.log('saveCustomer called');
         const name = document.getElementById('custName').value.trim();
         const email = document.getElementById('custEmail').value.trim();
         const phone = document.getElementById('custPhone').value.trim();
@@ -280,7 +273,6 @@
             alert('Please fill Name, Email, and Phone');
             return;
         }
-        // Check duplicate email (except when editing)
         if (editId === null && customers.some(c => c.email === email)) {
             alert('Customer with this email already exists!');
             return;
@@ -308,29 +300,27 @@
         } else {
             const oldCustomer = customers.find(c => c.id == editId);
             if (oldCustomer) {
-                customerData.outstanding = oldCustomer.outstanding || 0;
-                customerData.totalPurchased = oldCustomer.totalPurchased || 0;
+                customerData.outstanding = oldCustomer.outstanding;
+                customerData.totalPurchased = oldCustomer.totalPurchased;
                 customerData.createdAt = oldCustomer.createdAt;
             }
             const index = customers.findIndex(c => c.id == editId);
             customers[index] = customerData;
         }
         localStorage.setItem('customers', JSON.stringify(customers));
-        // Also sync to users (for login compatibility)
         syncToUsers(customerData);
         alert('Customer saved successfully!');
         clearForm();
-        loadCustomers(); // refresh display
+        loadCustomers();
     }
 
-    // Sync to users array (so they can login)
     function syncToUsers(customer) {
         let users = JSON.parse(localStorage.getItem('users') || '[]');
         const existingIndex = users.findIndex(u => u.email === customer.email);
         const userData = {
             name: customer.name,
             email: customer.email,
-            password: customer.email.split('@')[0] + '123', // default password
+            password: customer.email.split('@')[0] + '123',
             phone: customer.phone,
             business: customer.business,
             gstin: customer.gstin,
@@ -347,7 +337,6 @@
         localStorage.setItem('users', JSON.stringify(users));
     }
 
-    // Sync all existing users as customers (one‑time)
     function syncCustomersFromUsers() {
         const users = JSON.parse(localStorage.getItem('users') || '[]');
         let added = 0;
@@ -435,7 +424,7 @@
     }
 
     function searchCustomers() { displayCustomers(); }
-    
+
     function exportToCSV() {
         let csv = "Customer Code,Name,Email,Phone,Address,PIN,GSTIN,State,Business,Credit Limit,Outstanding,Status\n";
         customers.forEach(c => {
@@ -455,8 +444,8 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    // Load on page ready
+    // Initialize
     loadCustomers();
 </script>
 </body>
-</html>
+    </html>
