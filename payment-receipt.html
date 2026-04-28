@@ -22,22 +22,10 @@
             padding: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         }
-        h1, h2 { color: #0a7c71; }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 5px;
-            font-size: 13px;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
+        h1 { color: #0a7c71; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 13px; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         button {
             background: #0a7c71;
             color: white;
@@ -46,69 +34,11 @@
             border-radius: 6px;
             cursor: pointer;
             margin-right: 10px;
-            font-size: 14px;
         }
         button:hover { background: #09645a; }
-        .flex-row {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        .flex-row > div {
-            flex: 1;
-        }
-        .receipt-container {
-            background: white;
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-family: 'Roboto', sans-serif;
-        }
-        .receipt-header {
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #0a7c71;
-            padding-bottom: 10px;
-        }
-        .receipt-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #0a7c71;
-        }
-        .customer-details, .payment-details {
-            margin-bottom: 20px;
-        }
-        .detail-row {
-            display: flex;
-            margin-bottom: 8px;
-        }
-        .detail-label {
-            width: 140px;
-            font-weight: 600;
-            color: #555;
-        }
-        .detail-value {
-            flex: 1;
-        }
-        .signature-row {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 30px;
-        }
-        .signature-box {
-            width: 45%;
-            text-align: center;
-            border-top: 1px solid #333;
-            padding-top: 5px;
-        }
-        .footer {
-            font-size: 10px;
-            text-align: center;
-            margin-top: 20px;
-            color: #777;
-        }
+        .flex-row { display: flex; gap: 15px; flex-wrap: wrap; }
+        .flex-row > div { flex: 1; }
+        .customer-info { margin-top: 15px; background: #f8f9fa; padding: 8px; border-radius: 6px; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -159,16 +89,39 @@
 
     <div style="margin-top: 20px;">
         <button onclick="recordPayment()"><i class="fas fa-save"></i> Save & Print Receipt</button>
-        <button onclick="generatePDF()"><i class="fas fa-file-pdf"></i> Generate PDF Only</button>
+        <button onclick="window.location.href='payment-receipts-list.html'"><i class="fas fa-list"></i> View All Receipts</button>
         <button onclick="window.location.href='index.html'">Cancel</button>
     </div>
 
-    <div id="customerInfo" style="margin-top: 15px; font-size: 13px; background: #f8f9fa; padding: 8px; border-radius: 6px;"></div>
+    <div id="customerInfo" class="customer-info" style="display:none;"></div>
 </div>
 
 <script>
     let currentCustomer = null;
-    let receiptData = null;
+    let paymentToPrint = null;
+
+    function getFinancialYear() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
+        else return `${year-1}-${year.toString().slice(-2)}`;
+    }
+
+    function getNextReceiptNumber() {
+        const finYear = getFinancialYear();
+        let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
+        let maxNum = 0;
+        const prefix = `PR/${finYear}/`;
+        payments.forEach(p => {
+            if (p.receiptNo && p.receiptNo.startsWith(prefix)) {
+                const num = parseInt(p.receiptNo.split('/').pop());
+                if (!isNaN(num) && num > maxNum) maxNum = num;
+            }
+        });
+        const nextNum = maxNum + 1;
+        return prefix + nextNum.toString().padStart(4, '0');
+    }
 
     function refreshCustomerDropdown() {
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
@@ -182,19 +135,20 @@
     function updateCustomerInfo() {
         let email = document.getElementById('customerSelect').value;
         if (!email) email = document.getElementById('customerEmail').value.trim();
+        const infoDiv = document.getElementById('customerInfo');
         if (!email) {
-            document.getElementById('customerInfo').innerHTML = '';
+            infoDiv.style.display = 'none';
             currentCustomer = null;
             return;
         }
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         currentCustomer = customers.find(c => c.email === email);
         if (currentCustomer) {
-            document.getElementById('customerInfo').innerHTML = `
-                <strong>${currentCustomer.name}</strong> | Outstanding: ₹${(currentCustomer.outstanding||0).toLocaleString()}
-            `;
+            infoDiv.innerHTML = `<strong>${currentCustomer.name}</strong> | Outstanding: ₹${(currentCustomer.outstanding||0).toLocaleString()}`;
+            infoDiv.style.display = 'block';
         } else {
-            document.getElementById('customerInfo').innerHTML = '<span style="color:red;">Customer not found. Please add in Customer Master.</span>';
+            infoDiv.innerHTML = '<span style="color:red;">Customer not found. Please add in Customer Master.</span>';
+            infoDiv.style.display = 'block';
             currentCustomer = null;
         }
     }
@@ -213,8 +167,10 @@
         const customer = customers.find(c => c.email === email);
         if (!customer) { alert('Customer not found in master'); return; }
         
+        const receiptNo = getNextReceiptNumber();
         const payment = {
             id: Date.now(),
+            receiptNo: receiptNo,
             date: document.getElementById('paymentDate').value || new Date().toISOString().slice(0,10),
             customerEmail: email,
             amount: amount,
@@ -228,19 +184,19 @@
         if (customer.outstanding < 0) customer.outstanding = 0;
         localStorage.setItem('customers', JSON.stringify(customers));
         
-        // Store payment in separate array
+        // Store payment
         let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
         payments.push(payment);
         localStorage.setItem('customerPayments', JSON.stringify(payments));
         
-        // Also add to customer ledger if you have one (optional)
+        // Also add to customer ledger
         let ledger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
         ledger.push({
             id: Date.now(),
             customerEmail: email,
             date: payment.date,
             type: 'payment',
-            ref: payment.reference,
+            ref: payment.receiptNo,
             debit: 0,
             credit: amount,
             balance: customer.outstanding,
@@ -248,83 +204,80 @@
         });
         localStorage.setItem('customerLedger', JSON.stringify(ledger));
         
-        alert(`Payment of ₹${amount.toFixed(2)} recorded. Outstanding updated.`);
+        alert(`Receipt ${receiptNo} saved!\nAmount: ₹${amount.toFixed(2)}`);
         
-        // Store receipt data for PDF
-        receiptData = { customer, payment };
-        generatePDF(); // auto generate PDF receipt
+        // Store for PDF and generate
+        paymentToPrint = { payment, customer };
+        generateReceiptPDF();
+        
+        // Clear form fields (optional)
+        document.getElementById('amount').value = '';
+        document.getElementById('reference').value = '';
+        document.getElementById('remarks').value = '';
+        updateCustomerInfo();
     }
 
-    function generatePDF() {
-        if (!receiptData) {
-            // Try to use current form data without saving? 
-            // Better: require save first
-            alert('Please click "Save & Print Receipt" first to record the payment.');
-            return;
-        }
-        const { customer, payment } = receiptData;
-        
+    function generateReceiptPDF() {
+        if (!paymentToPrint) return;
+        const { payment, customer } = paymentToPrint;
         const receiptDiv = document.createElement('div');
-        receiptDiv.className = 'receipt-container';
+        receiptDiv.style.maxWidth = '800px';
+        receiptDiv.style.margin = '0 auto';
+        receiptDiv.style.backgroundColor = 'white';
+        receiptDiv.style.padding = '20px';
+        receiptDiv.style.fontFamily = 'Roboto, sans-serif';
+        receiptDiv.style.border = '1px solid #ccc';
         receiptDiv.innerHTML = `
-            <div class="receipt-header">
-                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                    <img src="images/ASS.jpg" alt="Logo" style="height: 50px;" onerror="this.style.display='none'">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
+                    <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.style.display='none'">
                     <div>
-                        <div class="receipt-title">Auto Spares Solution</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #0a7c71;">Auto Spares Solution</div>
                         <div>GSTIN: 19ANOPD3300R1ZO</div>
                         <div>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</div>
                     </div>
                 </div>
-                <h2 style="margin: 10px 0 0;">PAYMENT RECEIPT</h2>
-                <p>Receipt No: ${payment.id}</p>
+                <h2 style="margin-top: 15px;">PAYMENT RECEIPT</h2>
+                <p>Receipt No: ${payment.receiptNo}</p>
             </div>
-            <div class="customer-details">
+            <div style="margin-bottom: 20px;">
                 <h3>Customer Details</h3>
-                <div class="detail-row"><div class="detail-label">Name:</div><div class="detail-value">${escapeHtml(customer.name)}</div></div>
-                <div class="detail-row"><div class="detail-label">Email:</div><div class="detail-value">${escapeHtml(customer.email)}</div></div>
-                <div class="detail-row"><div class="detail-label">Phone:</div><div class="detail-value">${escapeHtml(customer.phone)}</div></div>
-                <div class="detail-row"><div class="detail-label">Address:</div><div class="detail-value">${escapeHtml(customer.address || '')}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Name:</div><div>${escapeHtml(customer.name)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Email:</div><div>${escapeHtml(customer.email)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Phone:</div><div>${escapeHtml(customer.phone)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Address:</div><div>${escapeHtml(customer.address || '')}</div></div>
             </div>
-            <div class="payment-details">
+            <div style="margin-bottom: 20px;">
                 <h3>Payment Details</h3>
-                <div class="detail-row"><div class="detail-label">Date:</div><div class="detail-value">${payment.date}</div></div>
-                <div class="detail-row"><div class="detail-label">Amount:</div><div class="detail-value">₹${payment.amount.toFixed(2)}</div></div>
-                <div class="detail-row"><div class="detail-label">Mode:</div><div class="detail-value">${payment.mode}</div></div>
-                <div class="detail-row"><div class="detail-label">Reference:</div><div class="detail-value">${payment.reference}</div></div>
-                <div class="detail-row"><div class="detail-label">Remarks:</div><div class="detail-value">${payment.remarks || '-'}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Date:</div><div>${payment.date}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Amount:</div><div>₹${payment.amount.toFixed(2)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Mode:</div><div>${payment.mode || 'Cash'}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Reference:</div><div>${escapeHtml(payment.reference || '-')}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Remarks:</div><div>${escapeHtml(payment.remarks || '-')}</div></div>
             </div>
-            <div class="signature-row">
-                <div class="signature-box">Customer Signature</div>
-                <div class="signature-box">For Auto Spares Solution</div>
+            <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                <div style="text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px;">Customer Signature</div>
+                <div style="text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px;">For Auto Spares Solution</div>
             </div>
-            <div class="footer">
-                This is a computer generated receipt. Valid with stamp & signature.<br>
-                Thank you for your business!
+            <div style="font-size: 10px; text-align: center; margin-top: 20px; color: #777;">
+                This is a computer generated receipt. Valid with stamp & signature.<br>Thank you for your business!
             </div>
         `;
-        
         const opt = {
             margin: [0.2, 0.2, 0.2, 0.2],
-            filename: `Payment_Receipt_${payment.id}.pdf`,
+            filename: `Payment_Receipt_${payment.receiptNo}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2 },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
-        html2pdf().set(opt).from(receiptDiv).save().then(() => {
-            // Optionally clear form after PDF is generated
-            document.getElementById('amount').value = '';
-            document.getElementById('reference').value = '';
-            document.getElementById('remarks').value = '';
-            receiptData = null;
-        });
+        html2pdf().set(opt).from(receiptDiv).save();
+        paymentToPrint = null;
     }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-    
-    // Set default date
+
     document.getElementById('paymentDate').value = new Date().toISOString().slice(0,10);
     refreshCustomerDropdown();
 </script>
 </body>
-    </html>
+</html>
