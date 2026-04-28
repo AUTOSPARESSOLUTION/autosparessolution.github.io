@@ -23,53 +23,21 @@
             flex-wrap: wrap;
             gap: 15px;
             margin-bottom: 15px;
+            align-items: flex-end;
         }
-        .form-group {
-            flex: 1;
-            min-width: 180px;
-        }
-        label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
+        .form-group { flex: 1; min-width: 180px; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
         .btn-pdf { background: #e67e22; }
         .btn-edit { background: #17a2b8; }
-        .search-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        th, td {
-            border: 1px solid #dee2e6;
-            padding: 10px;
-            text-align: left;
-            vertical-align: top;
-        }
+        .btn-small { background: #28a745; padding: 6px 12px; font-size: 12px; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         .debug { background: #fff3cd; padding: 10px; font-family: monospace; font-size: 12px; display: none; margin-bottom: 15px; }
+        .inline-add { margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -85,7 +53,9 @@
                 <select id="customerSelect">
                     <option value="">-- Select Customer --</option>
                 </select>
-                <input type="email" id="customerEmailDirect" placeholder="Or enter email directly" style="margin-top:5px;">
+                <div class="inline-add">
+                    <button type="button" class="btn-small" onclick="showAddCustomerForm()"><i class="fas fa-user-plus"></i> + Add New Customer</button>
+                </div>
             </div>
             <div class="form-group">
                 <label>Payment Date</label>
@@ -121,6 +91,22 @@
         </div>
     </div>
 
+    <!-- Quick Add Customer Modal (simple inline) -->
+    <div id="addCustomerModal" style="display:none; background:#fff; border:1px solid #ccc; padding:15px; margin-bottom:15px; border-radius:8px;">
+        <h3>Add New Customer</h3>
+        <div class="form-row">
+            <div class="form-group"><label>Name *</label><input type="text" id="newCustName" placeholder="Customer name"></div>
+            <div class="form-group"><label>Email *</label><input type="email" id="newCustEmail" placeholder="customer@example.com"></div>
+            <div class="form-group"><label>Phone</label><input type="text" id="newCustPhone" placeholder="Phone"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Address</label><textarea id="newCustAddress" rows="1" placeholder="Address"></textarea></div>
+            <div class="form-group"><label>GSTIN</label><input type="text" id="newCustGstin" placeholder="GSTIN"></div>
+        </div>
+        <button onclick="saveNewCustomer()">Save Customer</button>
+        <button onclick="hideAddCustomerForm()">Cancel</button>
+    </div>
+
     <!-- ========== LIST / TABLE SECTION ========== -->
     <div class="table-section">
         <h2><i class="fas fa-list"></i> All Receipts</h2>
@@ -146,9 +132,13 @@
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const select = document.getElementById('customerSelect');
         select.innerHTML = '<option value="">-- Select Customer --</option>';
-        customers.forEach(c => {
-            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
-        });
+        if (customers.length === 0) {
+            select.innerHTML += '<option disabled>No customers found. Click "+ Add New Customer"</option>';
+        } else {
+            customers.forEach(c => {
+                select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+            });
+        }
     }
 
     function getFinancialYear() {
@@ -171,32 +161,59 @@
         return `PR/${finYear}/` + (maxNum + 1).toString().padStart(4, '0');
     }
 
+    function showAddCustomerForm() {
+        document.getElementById('addCustomerModal').style.display = 'block';
+    }
+    function hideAddCustomerForm() {
+        document.getElementById('addCustomerModal').style.display = 'none';
+        document.getElementById('newCustName').value = '';
+        document.getElementById('newCustEmail').value = '';
+        document.getElementById('newCustPhone').value = '';
+        document.getElementById('newCustAddress').value = '';
+        document.getElementById('newCustGstin').value = '';
+    }
+    function saveNewCustomer() {
+        const name = document.getElementById('newCustName').value.trim();
+        const email = document.getElementById('newCustEmail').value.trim();
+        if (!name || !email) { alert('Name and Email are required'); return; }
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        if (customers.find(c => c.email === email)) {
+            alert('Customer with this email already exists');
+            return;
+        }
+        const newCustomer = {
+            id: Date.now(),
+            name: name,
+            email: email,
+            phone: document.getElementById('newCustPhone').value,
+            address: document.getElementById('newCustAddress').value,
+            gstin: document.getElementById('newCustGstin').value,
+            state: '',
+            creditLimit: 50000,
+            outstanding: 0,
+            totalPurchased: 0,
+            status: 'active',
+            customerCode: 'CUST' + (customers.length + 1).toString().padStart(4,'0'),
+            createdAt: new Date().toISOString()
+        };
+        customers.push(newCustomer);
+        localStorage.setItem('customers', JSON.stringify(customers));
+        refreshCustomerDropdown();
+        hideAddCustomerForm();
+        alert('Customer added successfully');
+    }
+
     function addPayment() {
         let email = document.getElementById('customerSelect').value;
-        if (!email) email = document.getElementById('customerEmailDirect').value.trim();
-        if (!email) { alert('Please select or enter customer email'); return; }
+        if (!email) { alert('Please select a customer'); return; }
         const amount = parseFloat(document.getElementById('amount').value);
         if (isNaN(amount) || amount <= 0) { alert('Enter valid amount'); return; }
 
-        // Ensure customer exists in customers array (if not, create a minimal one)
+        // Ensure customer exists in customers array (just in case)
         let customer = customers.find(c => c.email === email);
         if (!customer) {
-            // Create placeholder customer
-            customer = {
-                id: Date.now(),
-                name: email.split('@')[0],
-                email: email,
-                phone: '',
-                outstanding: 0,
-                totalPurchased: 0,
-                creditLimit: 50000,
-                status: 'active',
-                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4,'0'),
-                createdAt: new Date().toISOString()
-            };
-            customers.push(customer);
-            localStorage.setItem('customers', JSON.stringify(customers));
-            refreshCustomerDropdown();
+            alert('Customer not found. Please add via Customer Master or "+ Add New Customer".');
+            return;
         }
 
         const receiptNo = getNextReceiptNumber();
@@ -242,7 +259,6 @@
 
     function clearForm() {
         document.getElementById('customerSelect').value = '';
-        document.getElementById('customerEmailDirect').value = '';
         document.getElementById('amount').value = '';
         document.getElementById('reference').value = '';
         document.getElementById('remarks').value = '';
@@ -252,6 +268,7 @@
     function loadPayments() {
         payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        refreshCustomerDropdown();
         displayReceipts();
     }
 
@@ -271,9 +288,7 @@
             return;
         }
         filtered.sort((a,b) => b.receiptNo.localeCompare(a.receiptNo));
-        let html = '<table><thead><tr>
-            <th>Receipt No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Mode</th><th>Reference</th><th>Actions</th>
-        </tr></thead><tbody>';
+        let html = '<table><thead>运转<th>Receipt No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Mode</th><th>Reference</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(p => {
             const cust = customers.find(c => c.email === p.customerEmail);
             const customerName = cust ? cust.name : p.customerEmail;
@@ -290,7 +305,7 @@
                 </td>
             </tr>`;
         });
-        html += '</tbody></table>';
+        html += '</tbody><table>';
         document.getElementById('paymentsTable').innerHTML = html;
     }
 
@@ -331,14 +346,26 @@
     }
 
     function filterReceipts() { displayReceipts(document.getElementById('searchInput').value.toLowerCase()); }
-    function exportAllToCSV() { /* same as before */ }
-    function showDebug() { /* same as before */ }
+    function exportAllToCSV() {
+        if (payments.length === 0) { alert('No receipts to export'); return; }
+        let csv = "Receipt No,Date,Customer Email,Amount,Mode,Reference,Remarks\n";
+        payments.forEach(p => {
+            csv += `"${p.receiptNo}",${p.date},"${p.customerEmail}",${p.amount},"${p.mode || 'Cash'}","${p.reference || ''}","${p.remarks || ''}"\n`;
+        });
+        const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'payment_receipts.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+    function showDebug() {
+        const debugDiv = document.getElementById('debugPanel');
+        debugDiv.style.display = 'block';
+        debugDiv.innerHTML = `<strong>Customers:</strong> ${JSON.stringify(customers, null, 2)}<br><br>
+                              <strong>Payments:</strong> ${JSON.stringify(payments, null, 2)}`;
+    }
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
     // Initial setup
     document.getElementById('paymentDate').value = new Date().toISOString().slice(0,10);
-    refreshCustomerDropdown();
     loadPayments();
 </script>
 </body>
-    </html>
+                </html>
