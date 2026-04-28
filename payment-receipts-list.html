@@ -3,45 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>All Payment Receipts – Auto Spares</title>
+    <title>Payment Receipts – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        .company-header {
-            background: #0a7c71;
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            border-radius: 8px;
-            margin-bottom: 25px;
-        }
-        .logo-area {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .logo-area img { height: 50px; object-fit: contain; }
-        .company-details h1 { margin: 0; font-size: 22px; }
-        .company-details p { margin: 2px 0 0; font-size: 11px; opacity: 0.9; }
-        .page-title h2 { margin: 0; font-size: 18px; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
         .form-section, .table-section {
             background: #f8f9fa;
             border-radius: 8px;
@@ -49,44 +18,16 @@
             margin-bottom: 30px;
             border: 1px solid #dee2e6;
         }
-        .form-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 15px;
-            align-items: flex-end;
-        }
+        .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; align-items: flex-end; }
         .form-group { flex: 1; min-width: 180px; }
         label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
         input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
         .btn-pdf { background: #e67e22; }
         .btn-edit { background: #17a2b8; }
-        .search-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        th, td {
-            border: 1px solid #dee2e6;
-            padding: 10px;
-            text-align: left;
-            vertical-align: top;
-        }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         .modal {
             display: none;
@@ -118,21 +59,9 @@
 </head>
 <body>
 <div class="container">
-    <!-- Company Header -->
-    <div class="company-header">
-        <div class="logo-area">
-            <img src="images/ASS.jpg" alt="Logo" onerror="this.style.display='none'">
-            <div class="company-details">
-                <h1>Auto Spares Solution</h1>
-                <p>GSTIN: 19ANOPD3300R1ZO | 101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
-            </div>
-        </div>
-        <div class="page-title">
-            <h2><i class="fas fa-receipt"></i> Payment Receipts</h2>
-        </div>
-    </div>
+    <h1><i class="fas fa-receipt"></i> Payment Receipts</h1>
 
-    <!-- Add New Receipt Form -->
+    <!-- Add New Payment Form -->
     <div class="form-section">
         <h3><i class="fas fa-plus-circle"></i> Record New Payment</h3>
         <div class="form-row">
@@ -153,7 +82,7 @@
         </div>
         <button onclick="addNewPayment()"><i class="fas fa-save"></i> Save Receipt</button>
         <button onclick="clearForm()">Clear</button>
-        <button onclick="migrateAndLoadAll()" style="background:#6c757d;"><i class="fas fa-database"></i> Migrate & Refresh</button>
+        <button onclick="migrateAndLoadAll()" style="background:#6c757d;"><i class="fas fa-database"></i> Migrate Old Receipts</button>
     </div>
 
     <!-- All Receipts Table -->
@@ -281,10 +210,10 @@
             });
         }
         if (filtered.length === 0) {
-            document.getElementById('receiptsTable').innerHTML = '<p>No receipts found. Click "Migrate & Refresh" to scan old data.</p>';
+            document.getElementById('receiptsTable').innerHTML = '<p>No receipts found. Click "Migrate Old Receipts" to scan existing data.</p>';
             return;
         }
-        let html = '<tr><thead>运转<th>#</th><th>Receipt No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Mode</th><th>Reference</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<table><thead>运转<th>#</th><th>Receipt No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Mode</th><th>Reference</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach((r, idx) => {
             let cust = customers.find(c => c.email === r.customerEmail);
             let customerName = cust ? cust.name : r.customerEmail;
@@ -302,11 +231,11 @@
                 </td>
             </tr>`;
         });
-        html += '</tbody></table>';
+        html += '</tbody></tr>';
         document.getElementById('receiptsTable').innerHTML = html;
     }
 
-    // ========== Add new payment ==========
+    // ========== Add new payment (with sequential receipt number) ==========
     function addNewPayment() {
         let email = document.getElementById('customerSelect').value;
         if (!email) { alert('Select a customer'); return; }
@@ -415,30 +344,67 @@
         refreshDisplay();
     }
 
-    // ========== PDF generation ==========
-    function generateReceiptPDF(id) {
-        let r = receipts.find(r => r.id == id);
-        if (!r) return;
-        let cust = customers.find(c => c.email === r.customerEmail);
-        if (!cust) return;
-        let pdfDiv = document.createElement('div');
-        pdfDiv.style.padding = '20px';
-        pdfDiv.style.fontFamily = 'Roboto, sans-serif';
-        pdfDiv.style.backgroundColor = 'white';
-        pdfDiv.style.maxWidth = '800px';
-        pdfDiv.style.margin = '0 auto';
-        pdfDiv.innerHTML = `
-            <div style="background:#0a7c71; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center; border-radius:6px 6px 0 0;">
-                <div><img src="images/ASS.jpg" style="height:50px;" onerror="this.style.display='none'"> <span style="font-size:20px; font-weight:bold;">Auto Spares Solution</span><br>GSTIN: 19ANOPD3300R1ZO<br>101, 1st floor, Howrah, WB 711108</div>
-                <div><div style="font-size:18px;">PAYMENT RECEIPT</div><div>${r.receiptNo}</div></div>
+    // ========== PDF generation – EXACT format as your provided code ==========
+    function generateReceiptPDF(paymentId) {
+        const payment = receipts.find(p => p.id == paymentId);
+        if (!payment) { alert('Payment not found'); return; }
+        const customer = customers.find(c => c.email === payment.customerEmail);
+        if (!customer) { alert('Customer not found'); return; }
+
+        const receiptDiv = document.createElement('div');
+        receiptDiv.style.maxWidth = '800px';
+        receiptDiv.style.margin = '0 auto';
+        receiptDiv.style.backgroundColor = 'white';
+        receiptDiv.style.padding = '20px';
+        receiptDiv.style.fontFamily = 'Roboto, sans-serif';
+        receiptDiv.style.border = '1px solid #ccc';
+        receiptDiv.innerHTML = `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
+                    <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.style.display='none'">
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold; color: #0a7c71;">Auto Spares Solution</div>
+                        <div>GSTIN: 19ANOPD3300R1ZO</div>
+                        <div>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</div>
+                    </div>
+                </div>
+                <h2 style="margin-top: 15px;">PAYMENT RECEIPT</h2>
+                <p>Receipt No: ${payment.receiptNo}</p>
             </div>
-            <div style="margin:20px;"><h3>Customer Details</h3><p>${escapeHtml(cust.name)}<br>${escapeHtml(cust.email)}<br>${escapeHtml(cust.phone)}<br>${escapeHtml(cust.address || '')}</p></div>
-            <div style="margin:20px;"><h3>Payment Details</h3><p>Date: ${r.date}<br>Amount: ₹${r.amount.toFixed(2)}<br>Mode: ${r.mode}<br>Reference: ${escapeHtml(r.reference)}<br>Remarks: ${escapeHtml(r.remarks)}</p></div>
-            <div style="margin-top:20px; text-align:center; border-top:1px solid #aaa; padding-top:10px;">Thank you for your business!</div>
+            <div style="margin-bottom: 20px;">
+                <h3>Customer Details</h3>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Name:</div><div>${escapeHtml(customer.name)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Email:</div><div>${escapeHtml(customer.email)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Phone:</div><div>${escapeHtml(customer.phone)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Address:</div><div>${escapeHtml(customer.address || '')}</div></div>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h3>Payment Details</h3>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Date:</div><div>${payment.date}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Amount:</div><div>₹${payment.amount.toFixed(2)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Mode:</div><div>${payment.mode || 'Cash'}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Reference:</div><div>${escapeHtml(payment.reference || '-')}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Remarks:</div><div>${escapeHtml(payment.remarks || '-')}</div></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                <div style="text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px;">Customer Signature</div>
+                <div style="text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px;">For Auto Spares Solution</div>
+            </div>
+            <div style="font-size: 10px; text-align: center; margin-top: 20px; color: #777;">
+                This is a computer generated receipt. Valid with stamp & signature.<br>Thank you for your business!
+            </div>
         `;
-        html2pdf().set({ margin: 0.2, filename: `Receipt_${r.receiptNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4' } }).from(pdfDiv).save();
+        const opt = {
+            margin: [0.2, 0.2, 0.2, 0.2],
+            filename: `Payment_Receipt_${payment.receiptNo}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(receiptDiv).save();
     }
 
+    // ========== Search, export, helpers ==========
     function filterReceipts() { displayReceipts(document.getElementById('searchInput').value.toLowerCase()); }
     function exportToCSV() {
         if (!receipts.length) return;
@@ -447,8 +413,6 @@
         let blob = new Blob([csv], {type:'text/csv'});
         let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'payment_receipts.csv'; a.click(); URL.revokeObjectURL(blob);
     }
-
-    // Customer modal
     function showAddCustomerModal() { document.getElementById('addCustomerModal').style.display = 'block'; }
     function closeAddCustomerModal() { document.getElementById('addCustomerModal').style.display = 'none'; }
     function saveNewCustomer() {
@@ -462,7 +426,6 @@
         closeAddCustomerModal();
         alert('Customer added');
     }
-
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
     // Initialization
@@ -470,4 +433,4 @@
     refreshDisplay();
 </script>
 </body>
-                                                                                                                                                                                                                                                                                                                                                                              </html>
+    </html>
