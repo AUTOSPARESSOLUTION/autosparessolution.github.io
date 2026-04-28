@@ -156,6 +156,15 @@
         <div style="flex:1;">
             <div class="info-box">
                 <h3>Bill To</h3>
+                <!-- Customer Quick Select (visible only to admin) -->
+                <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
+                    <div class="info-label">Quick Select:</div>
+                    <div class="info-value">
+                        <select id="quickCustomerSelect" onchange="loadCustomerData()">
+                            <option value="">-- Select Customer (Admin only) --</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="customerName" placeholder="Customer name"></div></div>
                 <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="customerAddress" rows="2"></textarea></div></div>
                 <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="customerGstin"></div></div>
@@ -166,12 +175,10 @@
         </div>
     </div>
 
-    <!-- Items (dynamic) -->
     <h3>Items</h3>
     <div id="itemsContainer"></div>
     <button class="add-item" onclick="addItemRow()"><i class="fas fa-plus"></i> Add Item</button>
 
-    <!-- Totals -->
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
@@ -181,7 +188,6 @@
         </table>
     </div>
 
-    <!-- Footer & Signature -->
     <div class="footer-box">
         <p><strong>Terms:</strong> This is a proforma invoice – not a tax invoice. Payment required before order processing.</p>
         <div class="signature-box">
@@ -236,11 +242,11 @@
             discount: item.discount || 0
         }));
     } else {
-        addItemRow(); // one empty row
+        addItemRow();
     }
 
-    // Prefill customer data from logged-in user
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    // Prefill customer data from logged‑in user
+    let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     if (currentUser) {
         document.getElementById('customerName').value = currentUser.name || '';
         document.getElementById('customerAddress').value = currentUser.address || '';
@@ -255,6 +261,37 @@
     document.getElementById('proformaDate').innerText = new Date().toLocaleDateString('en-IN');
     let valid = new Date(); valid.setDate(valid.getDate() + 15);
     document.getElementById('validUntil').innerText = valid.toLocaleDateString('en-IN');
+
+    // ---------- Admin Customer Quick Select ----------
+    if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
+        document.getElementById('adminCustomerSelect').style.display = 'flex';
+        populateCustomerSelect();
+    }
+
+    function populateCustomerSelect() {
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const select = document.getElementById('quickCustomerSelect');
+        select.innerHTML = '<option value="">-- Select Customer (Admin only) --</option>';
+        customers.forEach(c => {
+            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+        });
+    }
+
+    function loadCustomerData() {
+        const select = document.getElementById('quickCustomerSelect');
+        const email = select.value;
+        if (!email) return;
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const cust = customers.find(c => c.email === email);
+        if (cust) {
+            document.getElementById('customerName').value = cust.name || '';
+            document.getElementById('customerAddress').value = cust.address || '';
+            document.getElementById('customerPhone').value = cust.phone || '';
+            document.getElementById('customerEmail').value = cust.email || '';
+            document.getElementById('customerGstin').value = cust.gstin || '';
+            document.getElementById('customerState').value = cust.state || '';
+        }
+    }
 
     // ---------- UI Functions ----------
     function addItemRow() {
@@ -311,7 +348,6 @@
         document.getElementById('grandTotal').innerText = grand.toFixed(2);
     }
 
-    // ---------- Save Proforma ----------
     function saveProforma() {
         if (items.length === 0 || (items.length === 1 && !items[0].part)) {
             alert('Please add at least one item');
@@ -343,7 +379,6 @@
         window.close();
     }
 
-    // ---------- Convert to Sales Invoice ----------
     function convertToInvoice() {
         if (items.length === 0) { alert('No items to convert'); return; }
         const customerEmail = document.getElementById('customerEmail').value.trim();
@@ -351,11 +386,9 @@
             alert('Customer email is required to convert to invoice');
             return;
         }
-        // Ensure customer exists in customers array
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         let customer = customers.find(c => c.email === customerEmail);
         if (!customer) {
-            // Create minimal customer record
             customer = {
                 id: Date.now(),
                 name: document.getElementById('customerName').value,
@@ -374,32 +407,34 @@
             customers.push(customer);
             localStorage.setItem('customers', JSON.stringify(customers));
         }
-        // Prepare invoice data
         const invoiceItems = items.map(item => ({
-            productId: item.part,   // using part as productId
+            productId: item.part,
             quantity: item.qty,
             price: item.price
         }));
-        const invoiceDate = new Date().toISOString().slice(0,10);
         const invoice = {
             id: Date.now(),
-            date: invoiceDate,
+            date: new Date().toISOString().slice(0,10),
             customerEmail: customerEmail,
             items: invoiceItems,
             total: parseFloat(document.getElementById('grandTotal').innerText),
-            invoiceNo: 'INV-' + Date.now(),  // will be replaced by invoice-stock.html's numbering
+            invoiceNo: 'INV-' + Date.now(),
             status: 'pending'
         };
         try {
-            createSalesInvoice(invoice);   // from data-manager.js
+            createSalesInvoice(invoice);
             alert('Proforma converted to Sales Invoice! Stock & customer outstanding updated.');
+            if (confirm('Delete this proforma after conversion?')) {
+                let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
+                proformas = proformas.filter(p => p.id != this.proformaId);
+                localStorage.setItem('proformas', JSON.stringify(proformas));
+            }
             window.close();
         } catch(err) {
-            alert('Error creating invoice: ' + err.message);
+            alert('Error: ' + err.message);
         }
     }
 
-    // ---------- PDF Generation ----------
     function downloadPDF() {
         const element = document.getElementById('proformaContainer');
         const opt = {
@@ -417,7 +452,6 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    // Render items on load
     renderItems();
 </script>
 </body>
