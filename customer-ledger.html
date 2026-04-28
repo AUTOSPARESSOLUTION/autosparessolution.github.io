@@ -3,99 +3,274 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Ledger</title>
+    <title>Customer Ledger – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
-        h1 { color: #0a7c71; }
-        .customer-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0a7c71; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+        }
+        h1, h2 { color: #0a7c71; }
+        .customer-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0a7c71;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
         th { background: #0a7c71; color: white; }
         .balance-positive { color: #28a745; font-weight: bold; }
         .balance-negative { color: #dc3545; font-weight: bold; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
-        .search-box { margin-bottom: 20px; display: flex; gap: 10px; }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #09645a; }
+        .back-btn {
+            background: #6c757d;
+            margin-top: 20px;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            min-width: 200px;
+        }
     </style>
-    <script src="data-manager.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>Customer Ledger</h1>
-    <div id="customerInfo" class="customer-info">Loading...</div>
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by ref, type...">
-        <button onclick="filterLedger()">🔍 Search</button>
-        <button onclick="loadLedger()">🔄 Refresh</button>
-        <button onclick="exportToCSV()">📄 Export CSV</button>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1><i class="fas fa-book"></i> Customer Ledger</h1>
+        <a href="customer-master.html" class="back-btn" style="background:#6c757d; color:white; padding:8px 16px; border-radius:6px; text-decoration:none;"><i class="fas fa-arrow-left"></i> Back to Customers</a>
     </div>
-    <div id="ledgerTable"></div>
-    <button onclick="window.location.href='customer-master.html'">← Back to Customers</button>
-</div>
-<script>
-    let customerEmail = localStorage.getItem('viewCustomerEmail');
-    let ledger = [];
-    let filtered = [];
-    let customer = null;
+    
+    <div id="customerInfo" class="customer-info">Select a customer from the master or use the dropdown below.</div>
 
-    function loadLedger() {
-        if (!customerEmail) { document.getElementById('customerInfo').innerHTML = '<p style="color:red;">No customer selected.</p>'; return; }
-        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        customer = customers.find(c => c.email === customerEmail);
-        if (customer) {
-            document.getElementById('customerInfo').innerHTML = `<strong>${customer.name}</strong> (${customer.email})<br>Outstanding: ₹${(customer.outstanding || 0).toLocaleString()}`;
-        } else {
-            document.getElementById('customerInfo').innerHTML = '<p>Customer not found</p>';
-            return;
+    <div class="search-box">
+        <select id="customerSelect" style="flex:1; padding:8px;">
+            <option value="">-- Load a customer --</option>
+        </select>
+        <button onclick="loadCustomerLedger()"><i class="fas fa-sync-alt"></i> Load Ledger</button>
+        <button onclick="exportLedgerToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <input type="text" id="searchRef" placeholder="Search by Ref/Invoice No...">
+        <button onclick="filterTable()"><i class="fas fa-search"></i> Search</button>
+    </div>
+
+    <div id="ledgerTable"></div>
+</div>
+
+<script>
+    let currentCustomer = null;
+    let allTransactions = [];   // unified transaction list
+    let filteredTransactions = [];
+
+    // Load customers into dropdown
+    function loadCustomers() {
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const select = document.getElementById('customerSelect');
+        select.innerHTML = '<option value="">-- Load a customer --</option>';
+        customers.forEach(c => {
+            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+        });
+        // Check if we came from Customer Master (email stored)
+        const viewEmail = localStorage.getItem('viewCustomerEmail');
+        if (viewEmail) {
+            select.value = viewEmail;
+            loadCustomerLedger();
+            localStorage.removeItem('viewCustomerEmail'); // clear after use
         }
-        ledger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
-        ledger = ledger.filter(e => e.customerEmail === customerEmail).sort((a,b) => new Date(a.date) - new Date(b.date));
-        filtered = [...ledger];
-        displayLedger();
     }
 
+    // Build transaction list from invoices and payments
+    function buildTransactions(customerEmail) {
+        const transactions = [];
+        // 1. Get all sales invoices (from allInvoices)
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        const customerInvoices = allInvoices.filter(inv => inv.buyer?.email === customerEmail || inv.customerEmail === customerEmail);
+        customerInvoices.forEach(inv => {
+            transactions.push({
+                date: inv.date,
+                type: 'Invoice',
+                ref: inv.invoiceNo,
+                debit: inv.grandTotal || inv.total || 0,
+                credit: 0,
+                balance: 0,
+                narration: `Invoice for items`
+            });
+        });
+
+        // 2. Get customer payments
+        const allPayments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
+        const customerPayments = allPayments.filter(p => p.customerEmail === customerEmail);
+        customerPayments.forEach(p => {
+            transactions.push({
+                date: p.date,
+                type: 'Payment',
+                ref: p.reference || 'Payment',
+                debit: 0,
+                credit: p.amount,
+                balance: 0,
+                narration: `Payment via ${p.mode || 'cash'}`
+            });
+        });
+
+        // 3. Sort by date (oldest first)
+        transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
+        return transactions;
+    }
+
+    // Calculate running balance and display
     function displayLedger() {
-        let html = '<table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Running Balance</th><th>Narration</th></tr></thead><tbody>';
-        let balance = 0;
-        filtered.forEach(entry => {
-            if (entry.type === 'invoice') balance += entry.debit;
-            else if (entry.type === 'payment') balance -= entry.credit;
-            else balance += (entry.debit - entry.credit);
+        if (!currentCustomer) return;
+        let runningBalance = currentCustomer.openingBalance || 0;
+        const transactionsWithBalance = allTransactions.map(t => {
+            runningBalance += (t.debit - t.credit);
+            return { ...t, balance: runningBalance };
+        });
+        filteredTransactions = transactionsWithBalance;
+
+        if (filteredTransactions.length === 0) {
+            document.getElementById('ledgerTable').innerHTML = '<p>No transactions found for this customer.</p>';
+            return;
+        }
+
+        let html = '</table><thead><tr>
+            <th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Running Balance (₹)</th><th>Narration</th>
+        </tr></thead><tbody>';
+        filteredTransactions.forEach(t => {
             html += `<tr>
-                <td>${entry.date}</td>
-                <td>${entry.type}</td>
-                <td>${entry.ref || '-'}</td>
-                <td>${entry.debit ? '₹' + entry.debit.toLocaleString() : '-'}</td>
-                <td>${entry.credit ? '₹' + entry.credit.toLocaleString() : '-'}</td>
-                <td class="${balance>=0?'balance-positive':'balance-negative'}">₹${balance.toLocaleString()}</td>
-                <td>${entry.narration || '-'}</td>
+                <td>${t.date}</td>
+                <td>${t.type}</td>
+                <td>${escapeHtml(t.ref)}</td>
+                <td>${t.debit > 0 ? '₹' + t.debit.toLocaleString() : '-'}</td>
+                <td>${t.credit > 0 ? '₹' + t.credit.toLocaleString() : '-'}</td>
+                <td class="${t.balance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${t.balance.toLocaleString()}</td>
+                <td>${escapeHtml(t.narration)}</td>
             </tr>`;
         });
         html += '</tbody></table>';
-        document.getElementById('ledgerTable').innerHTML = html || '<p>No transactions.</p>';
+        document.getElementById('ledgerTable').innerHTML = html;
     }
 
-    function filterLedger() {
-        const term = document.getElementById('searchInput').value.toLowerCase();
-        if (!term) filtered = [...ledger];
-        else filtered = ledger.filter(e => (e.ref && e.ref.toLowerCase().includes(term)) || e.type.toLowerCase().includes(term));
+    async function loadCustomerLedger() {
+        const email = document.getElementById('customerSelect').value;
+        if (!email) {
+            alert('Please select a customer');
+            return;
+        }
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        currentCustomer = customers.find(c => c.email === email);
+        if (!currentCustomer) {
+            alert('Customer not found');
+            return;
+        }
+
+        document.getElementById('customerInfo').innerHTML = `
+            <strong>${escapeHtml(currentCustomer.name)}</strong><br>
+            Email: ${escapeHtml(currentCustomer.email)} | Phone: ${escapeHtml(currentCustomer.phone)}<br>
+            Outstanding: <strong class="${(currentCustomer.outstanding||0)>=0?'balance-positive':'balance-negative'}">₹${(currentCustomer.outstanding||0).toLocaleString()}</strong>
+        `;
+
+        allTransactions = buildTransactions(email);
         displayLedger();
     }
 
-    function exportToCSV() {
-        let csv = "Date,Type,Reference,Debit,Credit,Running Balance,Narration\n";
-        let balance = 0;
-        filtered.forEach(e => {
-            if (e.type === 'invoice') balance += e.debit;
-            else if (e.type === 'payment') balance -= e.credit;
-            else balance += (e.debit - e.credit);
-            csv += `"${e.date}","${e.type}","${e.ref || ''}",${e.debit || 0},${e.credit || 0},${balance},"${e.narration || ''}"\n`;
+    function filterTable() {
+        const searchTerm = document.getElementById('searchRef').value.toLowerCase();
+        if (!searchTerm) {
+            displayLedger(); // reset to full
+            return;
+        }
+        const filtered = allTransactions.filter(t => 
+            (t.ref && t.ref.toLowerCase().includes(searchTerm)) ||
+            (t.type && t.type.toLowerCase().includes(searchTerm))
+        );
+        // recalc balance for filtered?
+        if (filtered.length === 0) {
+            document.getElementById('ledgerTable').innerHTML = '<p>No matching transactions.</p>';
+            return;
+        }
+        let running = currentCustomer.openingBalance || 0;
+        const transWithBalance = filtered.map(t => {
+            running += (t.debit - t.credit);
+            return { ...t, balance: running };
         });
-        const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = `customer_ledger_${customerEmail}.csv`; a.click(); URL.revokeObjectURL(url);
+        filteredTransactions = transWithBalance;
+        let html = '</table><thead>…</thead><tbody>';
+        // similar to displayLedger but using filteredTransactions
+        html = '<table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Running Balance (₹)</th><th>Narration</th></tr></thead><tbody>';
+        filteredTransactions.forEach(t => {
+            html += `<tr>
+                <td>${t.date}</td>
+                <td>${t.type}</td>
+                <td>${escapeHtml(t.ref)}</td>
+                <td>${t.debit > 0 ? '₹' + t.debit.toLocaleString() : '-'}</td>
+                <td>${t.credit > 0 ? '₹' + t.credit.toLocaleString() : '-'}</td>
+                <td class="${t.balance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${t.balance.toLocaleString()}</td>
+                <td>${escapeHtml(t.narration)}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('ledgerTable').innerHTML = html;
     }
-    loadLedger();
+
+    function exportLedgerToCSV() {
+        if (!filteredTransactions.length) {
+            alert('No data to export');
+            return;
+        }
+        let csv = "Date,Type,Reference,Debit,Credit,Running Balance,Narration\n";
+        filteredTransactions.forEach(t => {
+            csv += `"${t.date}","${t.type}","${t.ref}",${t.debit},${t.credit},${t.balance},"${t.narration}"\n`;
+        });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `customer_ledger_${currentCustomer.email}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+    loadCustomers();
 </script>
 </body>
 </html>
