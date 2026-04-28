@@ -3,94 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Supplier Ledger</title>
+    <title>Supplier Ledger – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
         h1 { color: #0a7c71; }
-        .supplier-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0a7c71; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        .supplier-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0a7c71;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
         th { background: #0a7c71; color: white; }
         .balance-positive { color: #28a745; font-weight: bold; }
         .balance-negative { color: #dc3545; font-weight: bold; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover { background: #09645a; }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        .back-link {
+            background: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+        }
     </style>
-    <script src="data-manager.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>Supplier Ledger</h1>
-    <div id="supplierInfo" class="supplier-info">Loading...</div>
-    <div>
-        <input type="text" id="searchInput" placeholder="Search by ref, type..." style="padding:8px;width:200px;">
-        <button onclick="filterLedger()">Search</button>
-        <button onclick="loadLedger()">Refresh</button>
-        <button onclick="exportToCSV()">Export CSV</button>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1><i class="fas fa-book"></i> Supplier Ledger</h1>
+        <a href="supplier-master.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Suppliers</a>
     </div>
-    <div id="ledgerTable"></div>
-    <button onclick="window.location.href='supplier-master.html'">← Back to Suppliers</button>
-</div>
-<script>
-    let supplierEmail = localStorage.getItem('viewSupplierEmail');
-    let ledger = [];
-    let filtered = [];
-    let supplier = null;
 
-    function loadLedger() {
-        if (!supplierEmail) { document.getElementById('supplierInfo').innerHTML = '<p style="color:red;">No supplier selected.</p>'; return; }
-        let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        supplier = suppliers.find(s => s.email === supplierEmail);
-        if (supplier) {
-            document.getElementById('supplierInfo').innerHTML = `<strong>${supplier.name}</strong> (${supplier.email})<br>Outstanding: ₹${(supplier.outstanding || 0).toLocaleString()}`;
-        } else {
-            document.getElementById('supplierInfo').innerHTML = '<p>Supplier not found</p>';
+    <div id="supplierInfo" class="supplier-info">Select or enter supplier email</div>
+
+    <div class="search-box">
+        <select id="supplierSelect" style="flex:1;">
+            <option value="">-- Select Supplier --</option>
+        </select>
+        <span style="color:#555;">OR</span>
+        <input type="email" id="supplierEmailInput" placeholder="Enter supplier email directly" style="flex:1;">
+        <button onclick="loadLedgerByEmail()"><i class="fas fa-chart-line"></i> Load Ledger</button>
+        <button onclick="refreshDropdown()"><i class="fas fa-sync-alt"></i> Refresh List</button>
+        <button onclick="exportLedger()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <input type="text" id="searchRef" placeholder="Search by ref...">
+        <button onclick="filterLedger()"><i class="fas fa-search"></i> Search</button>
+    </div>
+
+    <div id="ledgerTable"></div>
+</div>
+
+<script>
+    let currentSupplier = null;
+    let allTransactions = [];
+
+    function refreshDropdown() {
+        const suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+        const select = document.getElementById('supplierSelect');
+        select.innerHTML = '<option value="">-- Select Supplier --</option>';
+        suppliers.forEach(s => {
+            select.innerHTML += `<option value="${s.email}">${s.name} (${s.email})</option>`;
+        });
+        // Auto-select if coming from Supplier Master
+        const viewEmail = localStorage.getItem('viewSupplierEmail');
+        if (viewEmail) {
+            select.value = viewEmail;
+            localStorage.removeItem('viewSupplierEmail');
+            loadLedgerByEmail();
+        }
+    }
+
+    function loadLedgerByEmail() {
+        let email = document.getElementById('supplierSelect').value;
+        if (!email) email = document.getElementById('supplierEmailInput').value.trim();
+        if (!email) {
+            alert('Please select or enter a supplier email');
             return;
         }
-        ledger = JSON.parse(localStorage.getItem('supplierLedger') || '[]');
-        ledger = ledger.filter(e => e.supplierEmail === supplierEmail).sort((a,b) => new Date(a.date) - new Date(b.date));
-        filtered = [...ledger];
+        const suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+        currentSupplier = suppliers.find(s => s.email === email);
+        if (!currentSupplier) {
+            alert(`Supplier with email "${email}" not found. Please add in Supplier Master.`);
+            return;
+        }
+
+        document.getElementById('supplierInfo').innerHTML = `
+            <strong>${escapeHtml(currentSupplier.name)}</strong><br>
+            Email: ${escapeHtml(currentSupplier.email)} | Phone: ${escapeHtml(currentSupplier.phone)}<br>
+            Outstanding: <strong>₹${(currentSupplier.outstanding||0).toLocaleString()}</strong>
+        `;
+
+        // Build transactions
+        const transactions = [];
+        // Purchase invoices
+        const allPurchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        const supplierInvoices = allPurchaseInvoices.filter(inv => inv.supplier?.email === email || inv.supplierEmail === email);
+        supplierInvoices.forEach(inv => {
+            transactions.push({
+                date: inv.date,
+                type: 'Purchase',
+                ref: inv.poNo || inv.invoiceNo,
+                debit: inv.grandTotal || inv.total || 0,   // increase outstanding (supplier owes more)
+                credit: 0,
+                narration: `Purchase Invoice`
+            });
+        });
+
+        // Supplier payments
+        const allPayments = JSON.parse(localStorage.getItem('supplierPayments') || '[]');
+        const supplierPayments = allPayments.filter(p => p.supplierEmail === email);
+        supplierPayments.forEach(p => {
+            transactions.push({
+                date: p.date,
+                type: 'Payment',
+                ref: p.reference || 'Payment',
+                debit: 0,
+                credit: p.amount,
+                narration: `Payment`
+            });
+        });
+
+        transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
+        allTransactions = transactions;
         displayLedger();
     }
 
     function displayLedger() {
-        let html = '<table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Running Balance</th><th>Narration</th></tr></thead><tbody>';
-        let balance = supplier.openingBalance || 0;
-        filtered.forEach(entry => {
-            balance += (entry.debit || 0) - (entry.credit || 0);
+        if (!currentSupplier) return;
+        let running = currentSupplier.openingBalance || 0;
+        let html = '<td><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>';
+        allTransactions.forEach(t => {
+            running += (t.debit - t.credit);
             html += `<tr>
-                <td>${entry.date}</td>
-                <td>${entry.type}</td>
-                <td>${entry.ref || '-'}</td>
-                <td>${entry.debit ? '₹' + entry.debit.toLocaleString() : '-'}</td>
-                <td>${entry.credit ? '₹' + entry.credit.toLocaleString() : '-'}</td>
-                <td class="${balance>=0?'balance-positive':'balance-negative'}">₹${balance.toLocaleString()}</td>
-                <td>${entry.narration || '-'}</td>
+                <td>${t.date}</td>
+                <td>${t.type}</td>
+                <td>${escapeHtml(t.ref)}</td>
+                <td>${t.debit ? '₹'+t.debit.toLocaleString() : '-'}</td>
+                <td>${t.credit ? '₹'+t.credit.toLocaleString() : '-'}</td>
+                <td class="${running>=0?'balance-positive':'balance-negative'}">₹${running.toLocaleString()}</td>
+                <td>${escapeHtml(t.narration)}</td>
             </tr>`;
         });
         html += '</tbody></table>';
-        document.getElementById('ledgerTable').innerHTML = html || '<p>No transactions.</p>';
+        document.getElementById('ledgerTable').innerHTML = html;
     }
 
     function filterLedger() {
-        const term = document.getElementById('searchInput').value.toLowerCase();
-        if (!term) filtered = [...ledger];
-        else filtered = ledger.filter(e => (e.ref && e.ref.toLowerCase().includes(term)) || e.type.toLowerCase().includes(term));
-        displayLedger();
+        const term = document.getElementById('searchRef').value.toLowerCase();
+        if (!term) {
+            displayLedger();
+            return;
+        }
+        const filtered = allTransactions.filter(t => 
+            (t.ref && t.ref.toLowerCase().includes(term)) || 
+            t.type.toLowerCase().includes(term)
+        );
+        if (filtered.length === 0) {
+            document.getElementById('ledgerTable').innerHTML = '<p>No matching transactions.</p>';
+            return;
+        }
+        let running = currentSupplier.openingBalance || 0;
+        let html = '<table><thead>…</thead><tbody>';
+        filtered.forEach(t => {
+            running += (t.debit - t.credit);
+            html += `<tr>
+                <td>${t.date}</td>
+                <td>${t.type}</td>
+                <td>${escapeHtml(t.ref)}</td>
+                <td>${t.debit ? '₹'+t.debit.toLocaleString() : '-'}</td>
+                <td>${t.credit ? '₹'+t.credit.toLocaleString() : '-'}</td>
+                <td class="${running>=0?'balance-positive':'balance-negative'}">₹${running.toLocaleString()}</td>
+                <td>${escapeHtml(t.narration)}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('ledgerTable').innerHTML = html;
     }
 
-    function exportToCSV() {
-        let csv = "Date,Type,Reference,Debit,Credit,Running Balance,Narration\n";
-        let balance = supplier.openingBalance || 0;
-        filtered.forEach(e => {
-            balance += (e.debit||0) - (e.credit||0);
-            csv += `"${e.date}","${e.type}","${e.ref || ''}",${e.debit||0},${e.credit||0},${balance},"${e.narration||''}"\n`;
+    function exportLedger() {
+        if (!allTransactions.length) {
+            alert('No data to export');
+            return;
+        }
+        let csv = "Date,Type,Reference,Debit,Credit,Balance,Narration\n";
+        let running = currentSupplier.openingBalance || 0;
+        allTransactions.forEach(t => {
+            running += (t.debit - t.credit);
+            csv += `"${t.date}","${t.type}","${t.ref}",${t.debit},${t.credit},${running},"${t.narration}"\n`;
         });
-        const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = `supplier_ledger_${supplierEmail}.csv`; a.click(); URL.revokeObjectURL(url);
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `supplier_ledger_${currentSupplier.email}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
     }
-    loadLedger();
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+    refreshDropdown();
 </script>
 </body>
-</html>
+    </html>
