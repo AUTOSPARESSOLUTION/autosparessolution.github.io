@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Receipts – Auto Spares</title>
+    <title>Payment Receipts List – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
@@ -13,20 +12,23 @@
         h1 { color: #0a7c71; }
         .search-box { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; vertical-align: top; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
         .btn-pdf { background: #e67e22; }
+        .btn-edit { background: #17a2b8; }
+        .btn-new { background: #28a745; text-decoration: none; display: inline-block; }
+        a { text-decoration: none; }
     </style>
 </head>
 <body>
 <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1><i class="fas fa-receipt"></i> Payment Receipts</h1>
-        <a href="payment-receipt.html" style="background: #28a745; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;"><i class="fas fa-plus"></i> New Payment</a>
+        <a href="payment-receipt.html" class="btn-new" style="background: #28a745; color: white; padding: 8px 16px; border-radius: 6px;"><i class="fas fa-plus"></i> New Payment</a>
     </div>
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by customer name, email, receipt no..." style="flex:1; padding: 8px;">
+        <input type="text" id="searchInput" placeholder="Search by Receipt No, Customer Name, Email..." style="flex:1; padding: 8px;">
         <button onclick="filterReceipts()"><i class="fas fa-search"></i> Search</button>
         <button onclick="loadPayments()"><i class="fas fa-sync-alt"></i> Refresh</button>
         <button onclick="exportAllToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
@@ -42,36 +44,42 @@
     function loadPayments() {
         payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        displayPayments();
+        displayReceipts();
     }
 
-    function displayPayments(filter = '') {
+    function displayReceipts(filter = '') {
         let filtered = payments;
         if (filter) {
             const term = filter.toLowerCase();
             filtered = payments.filter(p => {
                 const cust = customers.find(c => c.email === p.customerEmail);
-                return (p.id && p.id.toString().includes(term)) ||
-                       (p.reference && p.reference.toLowerCase().includes(term)) ||
-                       (cust && (cust.name.toLowerCase().includes(term) || cust.email.toLowerCase().includes(term)));
+                return (p.receiptNo && p.receiptNo.toLowerCase().includes(term)) ||
+                       (cust && (cust.name.toLowerCase().includes(term) || cust.email.toLowerCase().includes(term))) ||
+                       (p.reference && p.reference.toLowerCase().includes(term));
             });
         }
         if (filtered.length === 0) {
             document.getElementById('paymentsTable').innerHTML = '<p>No payment receipts found.</p>';
             return;
         }
-        let html = '｜DSML｜<thead><tr><th>Receipt No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Mode</th><th>Reference</th><th>Actions</th></tr></thead><tbody>';
+        filtered.sort((a,b) => b.receiptNo.localeCompare(a.receiptNo));
+        let html = '<table><thead><tr>
+            <th>Receipt No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Mode</th><th>Reference</th><th>Actions</th>
+        </tr></thead><tbody>';
         filtered.forEach(p => {
             const cust = customers.find(c => c.email === p.customerEmail);
             const customerName = cust ? cust.name : p.customerEmail;
             html += `<tr>
-                <td>${p.id}</td>
+                <td><strong>${escapeHtml(p.receiptNo)}</strong></td>
                 <td>${p.date}</td>
                 <td>${escapeHtml(customerName)}</td>
                 <td>₹${p.amount.toFixed(2)}</td>
                 <td>${p.mode || 'Cash'}</td>
                 <td>${escapeHtml(p.reference || '-')}</td>
-                <td><button class="btn-pdf" onclick="generateReceiptPDF('${p.id}')"><i class="fas fa-file-pdf"></i> PDF Receipt</button></td>
+                <td>
+                    <button class="btn-pdf" onclick="generateReceiptPDF('${p.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
+                    <button class="btn-edit" onclick="editPayment('${p.id}')"><i class="fas fa-edit"></i> Edit</button>
+                </td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -84,6 +92,7 @@
         const customer = customers.find(c => c.email === payment.customerEmail);
         if (!customer) { alert('Customer not found'); return; }
 
+        // Build PDF as before (same as in payment-receipt.html)
         const receiptDiv = document.createElement('div');
         receiptDiv.style.maxWidth = '800px';
         receiptDiv.style.margin = '0 auto';
@@ -102,34 +111,32 @@
                     </div>
                 </div>
                 <h2 style="margin-top: 15px;">PAYMENT RECEIPT</h2>
-                <p>Receipt No: ${payment.id}</p>
+                <p>Receipt No: ${payment.receiptNo}</p>
             </div>
             <div style="margin-bottom: 20px;">
                 <h3>Customer Details</h3>
-                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Name:</div><div>${escapeHtml(customer.name)}</div></div>
-                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Email:</div><div>${escapeHtml(customer.email)}</div></div>
-                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Phone:</div><div>${escapeHtml(customer.phone)}</div></div>
-                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Address:</div><div>${escapeHtml(customer.address || '')}</div></div>
+                <div><strong>Name:</strong> ${escapeHtml(customer.name)}</div>
+                <div><strong>Email:</strong> ${escapeHtml(customer.email)}</div>
+                <div><strong>Phone:</strong> ${escapeHtml(customer.phone)}</div>
+                <div><strong>Address:</strong> ${escapeHtml(customer.address || '')}</div>
             </div>
             <div style="margin-bottom: 20px;">
                 <h3>Payment Details</h3>
-                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Date:</div><div>${payment.date}</div></div>
-                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Amount:</div><div>₹${payment.amount.toFixed(2)}</div></div>
-                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Mode:</div><div>${payment.mode || 'Cash'}</div></div>
-                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Reference:</div><div>${escapeHtml(payment.reference || '-')}</div></div>
-                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Remarks:</div><div>${escapeHtml(payment.remarks || '-')}</div></div>
+                <div><strong>Date:</strong> ${payment.date}</div>
+                <div><strong>Amount:</strong> ₹${payment.amount.toFixed(2)}</div>
+                <div><strong>Mode:</strong> ${payment.mode || 'Cash'}</div>
+                <div><strong>Reference:</strong> ${escapeHtml(payment.reference || '-')}</div>
+                <div><strong>Remarks:</strong> ${escapeHtml(payment.remarks || '-')}</div>
             </div>
             <div style="display: flex; justify-content: space-between; margin-top: 30px;">
                 <div style="text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px;">Customer Signature</div>
                 <div style="text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px;">For Auto Spares Solution</div>
             </div>
-            <div style="font-size: 10px; text-align: center; margin-top: 20px; color: #777;">
-                This is a computer generated receipt. Valid with stamp & signature.<br>Thank you for your business!
-            </div>
+            <div style="font-size: 10px; text-align: center; margin-top: 20px; color: #777;">Thank you for your business!</div>
         `;
         const opt = {
             margin: [0.2, 0.2, 0.2, 0.2],
-            filename: `Payment_Receipt_${payment.id}.pdf`,
+            filename: `Payment_Receipt_${payment.receiptNo}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2 },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
@@ -137,16 +144,21 @@
         html2pdf().set(opt).from(receiptDiv).save();
     }
 
+    function editPayment(paymentId) {
+        localStorage.setItem('editPaymentId', paymentId);
+        window.open('edit-payment.html', '_blank');
+    }
+
     function filterReceipts() {
         const term = document.getElementById('searchInput').value.toLowerCase();
-        displayPayments(term);
+        displayReceipts(term);
     }
 
     function exportAllToCSV() {
+        if (payments.length === 0) { alert('No receipts to export'); return; }
         let csv = "Receipt No,Date,Customer Email,Amount,Mode,Reference,Remarks\n";
         payments.forEach(p => {
-            const cust = customers.find(c => c.email === p.customerEmail);
-            csv += `"${p.id}",${p.date},"${p.customerEmail}",${p.amount},"${p.mode || 'Cash'}","${p.reference || ''}","${p.remarks || ''}"\n`;
+            csv += `"${p.receiptNo}",${p.date},"${p.customerEmail}",${p.amount},"${p.mode || 'Cash'}","${p.reference || ''}","${p.remarks || ''}"\n`;
         });
         const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
