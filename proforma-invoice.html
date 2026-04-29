@@ -8,7 +8,7 @@
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        /* Same styles as before – keep unchanged */
+        /* ======= STYLES – same as before ======= */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -157,7 +157,6 @@
         <div style="flex:1;">
             <div class="info-box">
                 <h3>Bill To</h3>
-                <!-- Customer Quick Select (visible only to admin) -->
                 <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
                     <div class="info-label">Quick Select:</div>
                     <div class="info-value">
@@ -182,10 +181,10 @@
 
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
@@ -206,28 +205,60 @@
 </div>
 
 <script>
-    // ---------- Financial Year & Proforma Number (based on existing proformas) ----------
-    function getFinancialYear() {
+    // ---------- Helper: Normalise proformas (exactly like list page) ----------
+    function getNormalisedProformas() {
+        let raw = localStorage.getItem('proformas');
+        if (!raw) raw = '[]';
+        let proformas = [];
+        try {
+            proformas = JSON.parse(raw);
+        } catch(e) { proformas = []; }
+        // Normalise each proforma
+        return proformas.map(p => {
+            let customer = p.customer || {};
+            if (!customer.name && p.customerName) customer.name = p.customerName;
+            if (!customer.email && p.customerEmail) customer.email = p.customerEmail;
+            if (!customer.phone && p.customerPhone) customer.phone = p.customerPhone;
+            if (!customer.address && p.customerAddress) customer.address = p.customerAddress;
+            if (!customer.gstin && p.customerGstin) customer.gstin = p.customerGstin;
+            if (!customer.state && p.customerState) customer.state = p.customerState;
+            return {
+                id: p.id || p.proformaId || Date.now(),
+                proformaNo: p.proformaNo || p.invoiceNo || 'N/A',
+                date: p.date || (p.createdAt ? p.createdAt.slice(0,10) : 'N/A'),
+                validUntil: p.validUntil || p.validTill || '',
+                customer: customer,
+                items: p.items || [],
+                subtotal: p.subtotal || 0,
+                cgst: p.cgst || 0,
+                sgst: p.sgst || 0,
+                grandTotal: p.grandTotal || p.total || 0
+            };
+        });
+    }
+
+    // ---------- Get the next proforma number based on existing (normalised) proformas ----------
+    function getNextProformaNumber() {
+        const proformas = getNormalisedProformas();
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
-        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
-        else return `${year-1}-${year.toString().slice(-2)}`;
-    }
-
-    function getNextProformaNumber() {
-        const finYear = getFinancialYear();
-        const existing = JSON.parse(localStorage.getItem('proformas') || '[]');
-        let maxNum = 0;
+        const finYear = (month >= 4) ? `${year}-${(year+1).toString().slice(-2)}` : `${year-1}-${year.toString().slice(-2)}`;
         const prefix = `PROF/${finYear}/`;
-        existing.forEach(p => {
+        let maxNum = 0;
+        proformas.forEach(p => {
             if (p.proformaNo && p.proformaNo.startsWith(prefix)) {
-                let num = parseInt(p.proformaNo.split('/').pop());
-                if (!isNaN(num) && num > maxNum) maxNum = num;
+                let match = p.proformaNo.match(/\/(\d+)$/);
+                if (match) {
+                    let num = parseInt(match[1]);
+                    if (!isNaN(num) && num > maxNum) maxNum = num;
+                }
             }
         });
         const nextNum = maxNum + 1;
-        return prefix + nextNum.toString().padStart(4, '0');
+        const nextNo = prefix + nextNum.toString().padStart(4, '0');
+        console.log(`Next proforma number: ${nextNo} (max from existing: ${maxNum})`);
+        return nextNo;
     }
 
     // Load cart from localStorage
@@ -242,6 +273,7 @@
             price: item.price,
             discount: item.discount || 0
         }));
+        console.log('Loaded cart items:', items);
     } else {
         addItemRow();
     }
@@ -373,9 +405,9 @@
             sgst: parseFloat(document.getElementById('sgstTotal').innerText),
             grandTotal: parseFloat(document.getElementById('grandTotal').innerText)
         };
-        let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
-        proformas.push(proforma);
-        localStorage.setItem('proformas', JSON.stringify(proformas));
+        let existing = JSON.parse(localStorage.getItem('proformas') || '[]');
+        existing.push(proforma);
+        localStorage.setItem('proformas', JSON.stringify(existing));
         alert('Proforma saved successfully');
         window.close();
     }
@@ -419,16 +451,16 @@
             customerEmail: customerEmail,
             items: invoiceItems,
             total: parseFloat(document.getElementById('grandTotal').innerText),
-            invoiceNo: 'INV-' + Date.now(), // will be replaced by invoice-stock.html's numbering
+            invoiceNo: 'INV-' + Date.now(),
             status: 'pending'
         };
         try {
             createSalesInvoice(invoice);
             alert('Proforma converted to Sales Invoice! Stock & customer outstanding updated.');
             if (confirm('Delete this proforma after conversion?')) {
-                let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
-                proformas = proformas.filter(p => p.id != this.proformaId);
-                localStorage.setItem('proformas', JSON.stringify(proformas));
+                let all = JSON.parse(localStorage.getItem('proformas') || '[]');
+                all = all.filter(p => p.id != proforma.id);
+                localStorage.setItem('proformas', JSON.stringify(all));
             }
             window.close();
         } catch(err) {
@@ -456,4 +488,4 @@
     renderItems();
 </script>
 </body>
-    </html>
+               </html>
