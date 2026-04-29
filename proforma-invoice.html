@@ -8,6 +8,7 @@
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
+        /* Same styles as before – keep unchanged */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -205,7 +206,7 @@
 </div>
 
 <script>
-    // ---------- Financial Year & Proforma Number ----------
+    // ---------- Financial Year & Proforma Number (based on existing proformas) ----------
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -216,7 +217,7 @@
 
     function getNextProformaNumber() {
         const finYear = getFinancialYear();
-        let existing = JSON.parse(localStorage.getItem('proformas') || '[]');
+        const existing = JSON.parse(localStorage.getItem('proformas') || '[]');
         let maxNum = 0;
         const prefix = `PROF/${finYear}/`;
         existing.forEach(p => {
@@ -418,7 +419,7 @@
             customerEmail: customerEmail,
             items: invoiceItems,
             total: parseFloat(document.getElementById('grandTotal').innerText),
-            invoiceNo: 'INV-' + Date.now(),
+            invoiceNo: 'INV-' + Date.now(), // will be replaced by invoice-stock.html's numbering
             status: 'pending'
         };
         try {
