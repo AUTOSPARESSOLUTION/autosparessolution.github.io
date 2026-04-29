@@ -20,6 +20,7 @@
         .btn-pdf { background: #e67e22; }
         .btn-edit { background: #17a2b8; }
         .btn-delete { background: #dc3545; }
+        .btn-copy { background: #6f42c1; }
         .btn-new { background: #28a745; text-decoration: none; display: inline-block; }
         .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; display: none; font-family: monospace; font-size: 12px; }
     </style>
@@ -74,7 +75,7 @@
             const bNo = b.invoiceNo || b.poNo || '';
             return bNo.localeCompare(aNo);
         });
-        let html = '<table><thead>运转<th>#</th><th>Invoice No</th><th>Date</th><th>Supplier</th><th>Amount (₹)</th><th>Due Date</th><th>Actions</th></tr></thead><tbody>';
+        let html = '</table><thead>运转<th>#</th><th>Invoice No</th><th>Date</th><th>Supplier</th><th>Amount (₹)</th><th>Due Date</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach((inv, idx) => {
             const invNo = inv.invoiceNo || inv.poNo || 'N/A';
             const amount = inv.total || inv.grandTotal || 0;
@@ -89,16 +90,17 @@
                 <td>${inv.dueDate || '-'}</td>
                 <td><div class="action-buttons">
                     <button class="btn-pdf" onclick="generatePDF('${inv.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
+                    <button class="btn-copy" onclick="copyInvoice('${inv.id}')"><i class="fas fa-copy"></i> Copy</button>
                     <button class="btn-edit" onclick="editInvoice('${inv.id}')"><i class="fas fa-edit"></i> Edit</button>
                     <button class="btn-delete" onclick="deleteInvoice('${inv.id}')"><i class="fas fa-trash"></i> Delete</button>
                 </div></td>
             </tr>`;
         });
-        html += '</tbody><tr>';
+        html += '</tbody></table>';
         document.getElementById('invoicesTable').innerHTML = html;
     }
 
-    // Helper to get supplier object from invoice (supports multiple structures)
+    // Helper to get supplier object from invoice
     function getSupplier(inv) {
         if (inv.supplier && inv.supplier.email) return inv.supplier;
         if (inv.supplierEmail) return suppliers.find(s => s.email === inv.supplierEmail);
@@ -106,6 +108,67 @@
         return null;
     }
 
+    // Financial year helper (same as in purchase-invoice-stock.html)
+    function getFinancialYear() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
+        else return `${year-1}-${year.toString().slice(-2)}`;
+    }
+
+    // Get next purchase invoice number (max + 1 for current financial year)
+    function getNextPurchaseInvoiceNumber() {
+        const finYear = getFinancialYear();
+        let maxNum = 0;
+        const prefix = `PUR/${finYear}/`;
+        purchaseInvoices.forEach(inv => {
+            const invNo = inv.invoiceNo || inv.poNo || '';
+            if (invNo.startsWith(prefix)) {
+                let match = invNo.match(/\/(\d+)$/);
+                if (match) {
+                    let num = parseInt(match[1]);
+                    if (!isNaN(num) && num > maxNum) maxNum = num;
+                }
+            }
+        });
+        const nextNum = maxNum + 1;
+        return prefix + nextNum.toString().padStart(4, '0');
+    }
+
+    // Copy invoice function
+    function copyInvoice(invoiceId) {
+        const original = purchaseInvoices.find(i => i.id == invoiceId);
+        if (!original) { alert('Original invoice not found'); return; }
+
+        const newInvoiceNo = getNextPurchaseInvoiceNumber();
+        const newDate = new Date().toISOString().slice(0,10);
+        const newDueDate = new Date();
+        newDueDate.setDate(newDueDate.getDate() + 30);
+        const newDueDateStr = newDueDate.toISOString().slice(0,10);
+
+        // Create a copy without the id and with new numbers
+        const copyInvoice = {
+            ...original,
+            id: Date.now(),
+            invoiceNo: newInvoiceNo,
+            poNo: newInvoiceNo,
+            date: newDate,
+            dueDate: newDueDateStr,
+            // Keep the same items, supplier, total
+            items: original.items.map(item => ({ ...item })), // shallow copy
+            copiedFrom: original.id  // optional, keep track
+        };
+        // Remove any temporary fields that might cause issues
+        delete copyInvoice._id;
+        
+        purchaseInvoices.push(copyInvoice);
+        localStorage.setItem('purchaseInvoices', JSON.stringify(purchaseInvoices));
+        alert(`Invoice copied as ${newInvoiceNo}`);
+        loadInvoices(); // refresh the list
+    }
+
+    // PDF generation (same as before, improved to show supplier and item details)
     function generatePDF(invoiceId) {
         const invoice = purchaseInvoices.find(i => i.id == invoiceId);
         if (!invoice) { alert('Invoice not found'); return; }
@@ -129,20 +192,27 @@
             const cgst = taxable * 0.09;
             const sgst = taxable * 0.09;
             const total = taxable + cgst + sgst;
-            const productName = item.productId || item.part || '';
+            const partNo = item.productId || item.part || '';
+            const desc = item.desc || item.productName || '';
+            const hsn = item.hsn || '';
+            const disc = item.discount || 0;
+            const taxableAfterDisc = taxable * (1 - disc/100);
+            const cgstAfter = taxableAfterDisc * 0.09;
+            const sgstAfter = taxableAfterDisc * 0.09;
+            const totalAfter = taxableAfterDisc + cgstAfter + sgstAfter;
             itemsHtml += `<tr>
                 <td style="border:1px solid #dee2e6; padding:6px;">${idx+1}</td>
-                <td style="border:1px solid #dee2e6; padding:6px;">${escapeHtml(productName)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:6px;">-</strong></td>
-                <td style="border:1px solid #dee2e6; padding:6px;">-</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px;">${escapeHtml(partNo)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px;">${escapeHtml(desc)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px;">${escapeHtml(hsn)}</strong></td>
                 <td style="border:1px solid #dee2e6; padding:6px; text-align:center;">${qty}</strong></td>
                 <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${cost.toFixed(2)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:6px; text-align:center;">0%</strong></td>
-                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px; text-align:center;">${disc}%</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${taxableAfterDisc.toFixed(2)}</strong></td>
                 <td style="border:1px solid #dee2e6; padding:6px; text-align:center;">18%</strong></td>
-                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${cgst.toFixed(2)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${sgst.toFixed(2)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${total.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${cgstAfter.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${sgstAfter.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${totalAfter.toFixed(2)}</strong></td>
             </tr>`;
         });
         
@@ -154,7 +224,7 @@
             <div style="margin:15px 0;"><strong>Supplier:</strong> ${escapeHtml(supplier.name || invoice.supplierEmail || invoice.supplierName)}<br>${escapeHtml(supplier.address || '')}<br>GSTIN: ${escapeHtml(supplier.gstin || '')}<br>Phone: ${escapeHtml(supplier.phone || '')}</div>
             <table style="width:100%; border-collapse:collapse; font-size:11px;"><thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Unit Cost</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead><tbody>${itemsHtml}</tbody></table>
             <div style="text-align:right; margin-top:10px;">
-                Subtotal: ₹${amount.toFixed(2)}<br>
+                Subtotal after discount: ₹${(amount).toFixed(2)}<br>
                 CGST (9%): ₹${(amount*0.09).toFixed(2)}<br>
                 SGST (9%): ₹${(amount*0.09).toFixed(2)}<br>
                 <strong>Grand Total: ₹${amount.toFixed(2)}</strong>
