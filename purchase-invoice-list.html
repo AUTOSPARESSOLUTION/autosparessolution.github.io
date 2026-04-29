@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Purchase Invoices – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -21,6 +22,7 @@
         .btn-delete { background: #dc3545; }
         .btn-new { background: #28a745; text-decoration: none; display: inline-block; }
         .action-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
+        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; display: none; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -34,7 +36,9 @@
         <button onclick="filterInvoices()"><i class="fas fa-search"></i> Search</button>
         <button onclick="loadInvoices()"><i class="fas fa-sync-alt"></i> Refresh</button>
         <button onclick="exportToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <button onclick="toggleDebug()"><i class="fas fa-bug"></i> Debug</button>
     </div>
+    <div id="debugPanel" class="debug"></div>
     <div id="invoicesTable"></div>
     <button onclick="window.location.href='index.html'" style="margin-top: 20px;">Back to Dashboard</button>
 </div>
@@ -46,6 +50,7 @@
     function loadInvoices() {
         purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+        console.log('Loaded purchase invoices:', purchaseInvoices.length);
         displayInvoices();
     }
 
@@ -55,7 +60,8 @@
             const term = filter.toLowerCase();
             filtered = purchaseInvoices.filter(inv => {
                 const supplier = suppliers.find(s => s.email === inv.supplierEmail);
-                return inv.invoiceNo.toLowerCase().includes(term) ||
+                const invNo = inv.invoiceNo || inv.poNo || '';
+                return invNo.toLowerCase().includes(term) ||
                        (supplier && supplier.name.toLowerCase().includes(term));
             });
         }
@@ -63,17 +69,23 @@
             document.getElementById('invoicesTable').innerHTML = '<p>No purchase invoices found.</p>';
             return;
         }
-        filtered.sort((a,b) => b.invoiceNo.localeCompare(a.invoiceNo));
-        let html = '<tr><thead>运转<th>#</th><th>Invoice No</th><th>Date</th><th>Supplier</th><th>Amount (₹)</th><th>Due Date</th><th>Actions</th></tr></thead><tbody>';
+        filtered.sort((a,b) => {
+            const aNo = a.invoiceNo || a.poNo || '';
+            const bNo = b.invoiceNo || b.poNo || '';
+            return bNo.localeCompare(aNo);
+        });
+        let html = '<table><thead>运转<th>#</th><th>Invoice No</th><th>Date</th><th>Supplier</th><th>Amount (₹)</th><th>Due Date</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach((inv, idx) => {
+            const invNo = inv.invoiceNo || inv.poNo || 'N/A';
+            const amount = inv.total || inv.grandTotal || 0;
             const supplier = suppliers.find(s => s.email === inv.supplierEmail);
-            const supplierName = supplier ? supplier.name : inv.supplierEmail;
+            const supplierName = supplier ? supplier.name : inv.supplierEmail || 'Unknown';
             html += `<tr>
                 <td>${idx+1}</td>
-                <td><strong>${escapeHtml(inv.invoiceNo)}</strong></td>
-                <td>${inv.date}</td>
+                <td><strong>${escapeHtml(invNo)}</strong></td>
+                <td>${inv.date || ''}</td>
                 <td>${escapeHtml(supplierName)}</strong></td>
-                <td>₹${inv.total.toFixed(2)}</strong></td>
+                <td>₹${parseFloat(amount).toFixed(2)}</strong></td>
                 <td>${inv.dueDate || '-'}</td>
                 <td><div class="action-buttons">
                     <button class="btn-pdf" onclick="generatePDF('${inv.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
@@ -82,7 +94,7 @@
                 </div></td>
             </tr>`;
         });
-        html += '</tbody></table>';
+        html += '</tbody><table>';
         document.getElementById('invoicesTable').innerHTML = html;
     }
 
@@ -90,26 +102,33 @@
         const invoice = purchaseInvoices.find(i => i.id == invoiceId);
         if (!invoice) { alert('Invoice not found'); return; }
         const supplier = suppliers.find(s => s.email === invoice.supplierEmail) || {};
+        const invNo = invoice.invoiceNo || invoice.poNo || 'N/A';
+        const amount = invoice.total || invoice.grandTotal || 0;
+        const items = invoice.items || [];
+        
         const container = document.createElement('div');
         container.style.maxWidth = '1200px';
         container.style.margin = '0 auto';
         container.style.backgroundColor = 'white';
         container.style.padding = '20px';
         container.style.fontFamily = 'Roboto, sans-serif';
-        // Build items table
+        
         let itemsHtml = '';
-        invoice.items.forEach((item, idx) => {
-            const taxable = item.quantity * item.cost;
+        items.forEach((item, idx) => {
+            const qty = item.quantity || 1;
+            const cost = item.cost || 0;
+            const taxable = qty * cost;
             const cgst = taxable * 0.09;
             const sgst = taxable * 0.09;
             const total = taxable + cgst + sgst;
+            const productName = item.productId || '';
             itemsHtml += `<tr>
                 <td style="border:1px solid #dee2e6; padding:6px;">${idx+1}</td>
-                <td style="border:1px solid #dee2e6; padding:6px;">${escapeHtml(item.productId)}</td>
-                <td style="border:1px solid #dee2e6; padding:6px;">${escapeHtml(item.productId)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px;">${escapeHtml(productName)}</td>
                 <td style="border:1px solid #dee2e6; padding:6px;">-</td>
-                <td style="border:1px solid #dee2e6; padding:6px; text-align:center;">${item.quantity}</td>
-                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${item.cost.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px;">-</td>
+                <td style="border:1px solid #dee2e6; padding:6px; text-align:center;">${qty}</td>
+                <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${cost.toFixed(2)}</td>
                 <td style="border:1px solid #dee2e6; padding:6px; text-align:center;">0%</td>
                 <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${taxable.toFixed(2)}</td>
                 <td style="border:1px solid #dee2e6; padding:6px; text-align:center;">18%</td>
@@ -118,17 +137,24 @@
                 <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${total.toFixed(2)}</td>
             </tr>`;
         });
+        
         container.innerHTML = `
             <div style="background:#0a7c71; color:white; padding:15px; display:flex; justify-content:space-between;">
-                <div><img src="images/ASS.jpg" style="height:50px;" onerror="this.style.display='none'"> <span style="font-size:20px;">Auto Spares Solution</span><br>GSTIN: 19ANOPD3300R1ZO<br>101, 1st floor, Howrah</div>
-                <div><div style="font-size:18px;">PURCHASE INVOICE</div><div>${invoice.invoiceNo}</div><div>${invoice.date}</div></div>
+                <div><img src="images/ASS.jpg" style="height:50px;" onerror="this.style.display='none'"> <span style="font-size:20px;">Auto Spares Solution</span><br>GSTIN: 19ANOPD3300R1ZO<br>101, 1st floor, Howrah, WB 711108</div>
+                <div><div style="font-size:18px;">PURCHASE INVOICE</div><div>${invNo}</div><div>${invoice.date || ''}</div></div>
             </div>
-            <div style="margin:15px 0;"><strong>Supplier:</strong> ${escapeHtml(supplier.name || invoice.supplierEmail)}<br>${escapeHtml(supplier.address || '')}<br>GSTIN: ${escapeHtml(supplier.gstin || '')}</div>
+            <div style="margin:15px 0;"><strong>Supplier:</strong> ${escapeHtml(supplier.name || invoice.supplierEmail)}<br>${escapeHtml(supplier.address || '')}<br>GSTIN: ${escapeHtml(supplier.gstin || '')}<br>Phone: ${escapeHtml(supplier.phone || '')}</div>
             <table style="width:100%; border-collapse:collapse; font-size:11px;"><thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Unit Cost</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead><tbody>${itemsHtml}</tbody></table>
-            <div style="text-align:right;">Subtotal: ₹${invoice.total.toFixed(2)}<br>CGST: ₹${(invoice.total*0.09).toFixed(2)}<br>SGST: ₹${(invoice.total*0.09).toFixed(2)}<br><strong>Grand Total: ₹${invoice.total.toFixed(2)}</strong></div>
-            <div style="margin-top:20px; text-align:center;">Thank you for your business.</div>
+            <div style="text-align:right; margin-top:10px;">
+                Subtotal: ₹${amount.toFixed(2)}<br>
+                CGST (9%): ₹${(amount*0.09).toFixed(2)}<br>
+                SGST (9%): ₹${(amount*0.09).toFixed(2)}<br>
+                <strong>Grand Total: ₹${amount.toFixed(2)}</strong>
+            </div>
+            <div style="margin-top:20px; text-align:center;">This is a computer generated invoice. Thank you for your business.</div>
         `;
-        html2pdf().set({ margin: 0.2, filename: `Purchase_${invoice.invoiceNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4' } }).from(container).save();
+        const opt = { margin: [0.2,0.2,0.2,0.2], filename: `Purchase_${invNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+        html2pdf().set(opt).from(container).save();
     }
 
     function editInvoice(invoiceId) {
@@ -140,31 +166,35 @@
         if (!confirm('Delete this purchase invoice? This will reverse stock and supplier outstanding.')) return;
         const invoice = purchaseInvoices.find(i => i.id == invoiceId);
         if (!invoice) return;
-        // Reverse stock and supplier outstanding using a custom function or direct manipulation
         try {
-            // Get current products and suppliers
-            let products = getProducts();
-            let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-            // Reverse stock: subtract quantities
-            for (let item of invoice.items) {
-                let product = products.find(p => p.id == item.productId);
-                if (product) {
-                    product.currentStock = (product.currentStock || 0) - item.quantity;
-                    if (product.currentStock < 0) product.currentStock = 0;
+            // Check if getProducts and saveProducts exist (from data-manager.js)
+            if (typeof getProducts === 'function') {
+                let products = getProducts();
+                let allSuppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+                // Reverse stock
+                for (let item of (invoice.items || [])) {
+                    let product = products.find(p => p.id == item.productId);
+                    if (product) {
+                        product.currentStock = (product.currentStock || 0) - (item.quantity || 0);
+                        if (product.currentStock < 0) product.currentStock = 0;
+                    }
                 }
-            }
-            saveProducts(products);
-            // Reverse supplier outstanding
-            let supplier = suppliers.find(s => s.email === invoice.supplierEmail);
-            if (supplier) {
-                supplier.outstanding = (supplier.outstanding || 0) - invoice.total;
-                if (supplier.outstanding < 0) supplier.outstanding = 0;
-                localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                saveProducts(products);
+                // Reverse supplier outstanding
+                let supplier = allSuppliers.find(s => s.email === invoice.supplierEmail);
+                if (supplier) {
+                    const amount = invoice.total || invoice.grandTotal || 0;
+                    supplier.outstanding = (supplier.outstanding || 0) - amount;
+                    if (supplier.outstanding < 0) supplier.outstanding = 0;
+                    localStorage.setItem('suppliers', JSON.stringify(allSuppliers));
+                }
+            } else {
+                console.warn('data-manager.js not loaded, stock/supplier reversal skipped');
             }
             // Remove from purchaseInvoices
             purchaseInvoices = purchaseInvoices.filter(i => i.id != invoiceId);
             localStorage.setItem('purchaseInvoices', JSON.stringify(purchaseInvoices));
-            alert('Purchase invoice deleted and stock/supplier reversed.');
+            alert('Purchase invoice deleted.');
             loadInvoices();
         } catch(err) {
             alert('Error deleting invoice: ' + err.message);
@@ -172,11 +202,14 @@
     }
 
     function filterInvoices() { displayInvoices(document.getElementById('searchInput').value.toLowerCase()); }
+    
     function exportToCSV() {
         if (!purchaseInvoices.length) return;
         let csv = "Invoice No,Date,Supplier Email,Amount,Due Date\n";
         purchaseInvoices.forEach(i => {
-            csv += `"${i.invoiceNo}",${i.date},"${i.supplierEmail}",${i.total},${i.dueDate}\n`;
+            const invNo = i.invoiceNo || i.poNo || '';
+            const amount = i.total || i.grandTotal || 0;
+            csv += `"${invNo}",${i.date || ''},"${i.supplierEmail || ''}",${amount},${i.dueDate || ''}\n`;
         });
         const blob = new Blob([csv], {type:'text/csv'});
         const a = document.createElement('a');
@@ -185,7 +218,20 @@
         a.click();
         URL.revokeObjectURL(blob);
     }
+
+    function toggleDebug() {
+        const panel = document.getElementById('debugPanel');
+        if (panel.style.display === 'none' || panel.style.display === '') {
+            let raw = localStorage.getItem('purchaseInvoices');
+            panel.innerHTML = `<strong>Raw purchaseInvoices in localStorage:</strong><br><pre>${raw || 'null'}</pre>`;
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    
     loadInvoices();
 </script>
 </body>
