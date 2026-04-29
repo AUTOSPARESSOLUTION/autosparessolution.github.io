@@ -148,13 +148,6 @@
             font-size: 14px;
         }
         button:hover { background: #09645a; }
-        .invoice-type {
-            background: #f8f9fa;
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            font-size: 13px;
-        }
         .page-number { text-align: center; font-size: 10px; color: #777; margin-top: 10px; }
         .item-row {
             background: #f9f9f9;
@@ -192,7 +185,7 @@
         </div>
     </div>
 
-    <!-- Supplier Details with Admin Quick Select -->
+    <!-- Supplier Details -->
     <div class="info-box">
         <h3>Supplier Details</h3>
         <div class="info-row no-print" id="adminSupplierSelect" style="display:none;">
@@ -229,7 +222,7 @@
     </table>
     <div class="totals">
         <table>
-            </table><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
@@ -413,17 +406,17 @@
             const totalItem = taxable + cgst + sgst;
             itemsHtml += `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.hsn)}</td>
-                <td style="text-align:center;">${qty}</td>
-                <td style="text-align:right;">₹${price.toFixed(2)}</td>
-                <td style="text-align:center;">${disc}%</td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="text-align:center;">18%</td>
-                <td style="text-align:right;">₹${cgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${sgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.hsn)}</strong></td>
+                <td style="text-align:center;">${qty}</strong></td>
+                <td style="text-align:right;">₹${price.toFixed(2)}</strong></td>
+                <td style="text-align:center;">${disc}%</strong></td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="text-align:center;">18%</strong></td>
+                <td style="text-align:right;">₹${cgst.toFixed(2)}</strong></td>
+                <td style="text-align:right;">₹${sgst.toFixed(2)}</strong></td>
+                <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
@@ -434,11 +427,11 @@
             const g = taxGroups[hsn];
             const totalTax = g.cgst + g.sgst;
             taxHtml += `<tr>
-                <td>${hsn || 'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">₹${g.cgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+                <td>${hsn || 'N/A'}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">₹${g.cgst.toFixed(2)}</strong></td>
+                <td style="text-align:right;">₹${g.sgst.toFixed(2)}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -564,7 +557,7 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    // Set default date and invoice number preview
+    // Set default date and invoice number
     document.getElementById('invoiceDate').innerText = new Date().toLocaleDateString('en-IN');
     const due = new Date(); due.setDate(due.getDate() + 30);
     document.getElementById('dueDate').innerText = due.toLocaleDateString('en-IN');
@@ -575,4 +568,4 @@
     loadMasterData();
 </script>
 </body>
-    </html>
+            </html>
