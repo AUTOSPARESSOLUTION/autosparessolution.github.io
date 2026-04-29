@@ -8,6 +8,7 @@
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
+        /* Same styles as previous quotation – you can reuse your existing styles */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -204,7 +205,7 @@
 </div>
 
 <script>
-    // ---------- Financial Year & Number ----------
+    // ---------- Financial Year & Quotation Number (based on existing quotations) ----------
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -215,7 +216,7 @@
 
     function getNextQuotationNumber() {
         const finYear = getFinancialYear();
-        let existing = JSON.parse(localStorage.getItem('quotations') || '[]');
+        const existing = JSON.parse(localStorage.getItem('quotations') || '[]');
         let maxNum = 0;
         const prefix = `QTN/${finYear}/`;
         existing.forEach(q => {
@@ -244,6 +245,7 @@
         addItemRow();
     }
 
+    // Prefill customer data from logged‑in user
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     if (currentUser) {
         document.getElementById('customerName').value = currentUser.name || '';
@@ -254,12 +256,13 @@
         document.getElementById('customerState').value = currentUser.state || '';
     }
 
+    // Set dates
     document.getElementById('quotationNo').innerText = getNextQuotationNumber();
     document.getElementById('quotationDate').innerText = new Date().toLocaleDateString('en-IN');
     let valid = new Date(); valid.setDate(valid.getDate() + 15);
     document.getElementById('validUntil').innerText = valid.toLocaleDateString('en-IN');
 
-    // Admin Quick Select
+    // ---------- Admin Customer Quick Select ----------
     if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
         document.getElementById('adminCustomerSelect').style.display = 'flex';
         populateCustomerSelect();
@@ -290,6 +293,7 @@
         }
     }
 
+    // ---------- UI Functions ----------
     function addItemRow() {
         items.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0 });
         renderItems();
@@ -414,7 +418,7 @@
             customerEmail: customerEmail,
             items: invoiceItems,
             total: parseFloat(document.getElementById('grandTotal').innerText),
-            invoiceNo: 'INV-' + Date.now(),
+            invoiceNo: 'INV-' + Date.now(), // will be replaced by invoice-stock.html's numbering
             status: 'pending'
         };
         try {
@@ -451,4 +455,4 @@
     renderItems();
 </script>
 </body>
-    </html>
+            </html>
