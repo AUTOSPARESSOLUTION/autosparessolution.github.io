@@ -23,6 +23,7 @@
         .btn-copy { background: #6f42c1; }
         .btn-new { background: #28a745; text-decoration: none; display: inline-block; }
         .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; display: none; font-family: monospace; font-size: 12px; white-space: pre-wrap; }
+        .empty-items { color: #dc3545; font-style: italic; }
     </style>
 </head>
 <body>
@@ -46,11 +47,12 @@
 <script>
     let purchaseInvoices = [];
     let suppliers = [];
+    let products = [];
 
     function loadInvoices() {
         purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        console.log('Invoices loaded:', purchaseInvoices.length);
+        products = getProducts();
         displayInvoices();
     }
 
@@ -99,7 +101,6 @@
         document.getElementById('invoicesTable').innerHTML = html;
     }
 
-    // Helper to get supplier object
     function getSupplier(inv) {
         if (inv.supplier && inv.supplier.email) return inv.supplier;
         if (inv.supplierEmail) return suppliers.find(s => s.email === inv.supplierEmail);
@@ -107,19 +108,26 @@
         return null;
     }
 
-    // Normalise item fields (handles different naming)
-    function normaliseItem(item) {
+    // -------------------------------------------------------------
+    // Normalise any item to a standard format with part, desc, qty, cost, discount
+    function normaliseItem(rawItem) {
+        let part = rawItem.part || rawItem.productId || rawItem.sku || '';
+        let desc = rawItem.desc || rawItem.productName || '';
+        // If description missing but we have productId and products array, try to fetch product name
+        if (!desc && part && products) {
+            const prod = products.find(p => p.id == part || p.sku == part);
+            if (prod) desc = prod.name;
+        }
         return {
-            part: item.part || item.productId || item.sku || '',
-            desc: item.desc || item.productName || '',
-            hsn: item.hsn || '',
-            qty: item.quantity || item.qty || 1,
-            cost: item.cost || item.price || 0,
-            discount: item.discount || 0
+            part: part,
+            desc: desc,
+            hsn: rawItem.hsn || '',
+            qty: rawItem.quantity || rawItem.qty || 1,
+            cost: rawItem.cost || rawItem.price || 0,
+            discount: rawItem.discount || 0
         };
     }
 
-    // PDF generation (robust item display)
     function generatePDF(invoiceId) {
         const invoice = purchaseInvoices.find(i => i.id == invoiceId);
         if (!invoice) { alert('Invoice not found'); return; }
@@ -136,8 +144,11 @@
         container.style.fontFamily = 'Roboto, sans-serif';
         
         let itemsHtml = '';
+        let hasItems = false;
         rawItems.forEach((item, idx) => {
             const norm = normaliseItem(item);
+            if (!norm.part && !norm.desc) return; // skip completely empty
+            hasItems = true;
             const qty = norm.qty;
             const cost = norm.cost;
             const disc = norm.discount;
@@ -160,6 +171,9 @@
                 <td style="border:1px solid #dee2e6; padding:6px; text-align:right;">₹${total.toFixed(2)}</strong></td>
             </tr>`;
         });
+        if (!hasItems) {
+            itemsHtml = '<tr><td colspan="12" style="text-align:center;">No item details found for this invoice. Please edit and add items.</td></tr>';
+        }
         
         container.innerHTML = `
             <div style="background:#0a7c71; color:white; padding:15px; display:flex; justify-content:space-between;">
@@ -180,7 +194,7 @@
         html2pdf().set(opt).from(container).save();
     }
 
-    // Copy, edit, delete functions (keep as before)
+    // Copy, edit, delete, etc. (unchanged from previous working version)
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -244,10 +258,8 @@
                 for (let item of (invoice.items || [])) {
                     let norm = normaliseItem(item);
                     let product = products.find(p => p.id == norm.part || p.sku == norm.part);
-                    if (product) {
-                        product.currentStock = (product.currentStock || 0) - norm.qty;
-                        if (product.currentStock < 0) product.currentStock = 0;
-                    }
+                    if (product) product.currentStock -= norm.qty;
+                    if (product && product.currentStock < 0) product.currentStock = 0;
                 }
                 saveProducts(products);
                 let supplier = getSupplier(invoice);
