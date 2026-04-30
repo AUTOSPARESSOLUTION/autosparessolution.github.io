@@ -9,29 +9,25 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
         h1 { color: #0a7c71; }
         .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
         .form-group { flex: 1; min-width: 180px; }
         label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
         input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
-        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
-        th { background: #f1f3f5; }
         .item-row { background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         .item-row input, .item-row select { flex: 1; min-width: 100px; }
         .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; cursor: pointer; }
         .totals { text-align: right; margin-top: 20px; }
+        .totals p { margin: 5px 0; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1><i class="fas fa-edit"></i> Edit Purchase Invoice</h1>
-    <div id="warningMsg" style="background:#fff3cd; padding:10px; display:none;"></div>
-
     <div class="form-row">
-        <div class="form-group"><label>Invoice No (read‑only)</label><input type="text" id="invoiceNo" readonly></div>
+        <div class="form-group"><label>Invoice No</label><input type="text" id="invoiceNo" readonly></div>
         <div class="form-group"><label>Invoice Date</label><input type="date" id="invoiceDate"></div>
         <div class="form-group"><label>Due Date</label><input type="date" id="dueDate"></div>
     </div>
@@ -45,7 +41,7 @@
         <div class="form-group"><label>Supplier Phone</label><input type="text" id="supplierPhone"></div>
     </div>
 
-    <h3>Items Purchased</h3>
+    <h3>Items</h3>
     <div id="itemsContainer"></div>
     <button class="add-item" onclick="addItem()">+ Add Item</button>
 
@@ -63,8 +59,19 @@
 <script>
     let originalInvoice = null;
     let items = [];
-    let products = [];
     let suppliers = [];
+
+    function normaliseItem(item) {
+        return {
+            productId: item.productId || item.part || item.sku || '',
+            part: item.part || item.productId || '',
+            desc: item.desc || item.productName || '',
+            hsn: item.hsn || '',
+            qty: item.quantity || item.qty || 1,
+            cost: item.cost || item.price || 0,
+            discount: item.discount || 0
+        };
+    }
 
     function loadInvoice() {
         const invoiceId = localStorage.getItem('editPurchaseInvoiceId');
@@ -72,7 +79,6 @@
         const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         originalInvoice = purchaseInvoices.find(i => i.id == invoiceId);
         if (!originalInvoice) { alert('Invoice not found'); window.close(); return; }
-        products = getProducts();
         suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
         const supplier = suppliers.find(s => s.email === originalInvoice.supplierEmail) || originalInvoice.supplier || {};
         document.getElementById('invoiceNo').value = originalInvoice.invoiceNo || originalInvoice.poNo || '';
@@ -83,23 +89,14 @@
         document.getElementById('supplierGstin').value = supplier.gstin || '';
         document.getElementById('supplierAddress').value = supplier.address || '';
         document.getElementById('supplierPhone').value = supplier.phone || '';
-        // Convert original items to editable format
-        items = (originalInvoice.items || []).map(item => ({
-            productId: item.productId,
-            productName: (products.find(p => p.id == item.productId) || {}).name || '',
-            qty: item.quantity,
-            cost: item.cost,
-            discount: item.discount || 0,
-            desc: item.desc || '',
-            hsn: item.hsn || '',
-            part: item.productId || item.part || ''
-        }));
+        // Normalise items
+        items = (originalInvoice.items || []).map(item => normaliseItem(item));
         renderItems();
         recalcTotals();
     }
 
     function addItem() {
-        items.push({ productId: '', productName: '', qty: 1, cost: 0, discount: 0, desc: '', hsn: '', part: '' });
+        items.push({ productId: '', part: '', desc: '', hsn: '', qty: 1, cost: 0, discount: 0 });
         renderItems();
     }
 
@@ -111,15 +108,6 @@
 
     function updateItem(idx, field, value) {
         items[idx][field] = value;
-        if (field === 'productId') {
-            const product = products.find(p => p.id == value);
-            if (product) {
-                items[idx].productName = product.name;
-                items[idx].part = product.sku || product.id;
-                items[idx].desc = product.name;
-                items[idx].hsn = product.hsn || '';
-            }
-        }
         renderItems();
         recalcTotals();
     }
@@ -128,19 +116,14 @@
         const container = document.getElementById('itemsContainer');
         container.innerHTML = '';
         items.forEach((item, idx) => {
-            let productOptions = '<option value="">-- Select Product --</option>';
-            products.forEach(p => {
-                productOptions += `<option value="${p.id}" ${item.productId == p.id ? 'selected' : ''}>${p.name} (${p.sku}) - Stock: ${p.currentStock}</option>`;
-            });
             const div = document.createElement('div');
             div.className = 'item-row';
             div.innerHTML = `
-                <select onchange="updateItem(${idx}, 'productId', this.value)" style="flex:2;">${productOptions}</select>
-                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:1;">
+                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:2;">
                 <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="flex:2;">
                 <input type="text" placeholder="HSN" value="${escapeHtml(item.hsn)}" onchange="updateItem(${idx}, 'hsn', this.value)" style="flex:1;">
                 <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
-                <input type="number" placeholder="Cost (₹)" value="${item.cost}" step="0.01" onchange="updateItem(${idx}, 'cost', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Unit Cost" value="${item.cost}" step="0.01" onchange="updateItem(${idx}, 'cost', parseFloat(this.value))" style="flex:1;">
                 <input type="number" placeholder="Disc %" value="${item.discount}" step="0.01" onchange="updateItem(${idx}, 'discount', parseFloat(this.value))" style="flex:1;">
                 <button class="remove-item" onclick="removeItem(${idx})">X</button>
             `;
@@ -196,8 +179,9 @@
         // Reverse old stock and outstanding
         let products = getProducts();
         for (let oldItem of originalInvoice.items) {
-            let prod = products.find(p => p.id == oldItem.productId);
-            if (prod) prod.currentStock -= oldItem.quantity;
+            let norm = normaliseItem(oldItem);
+            let prod = products.find(p => p.id == norm.productId || p.sku == norm.productId);
+            if (prod) prod.currentStock -= norm.qty;
         }
         let oldSupplier = suppliers.find(s => s.email === originalInvoice.supplierEmail);
         if (oldSupplier) oldSupplier.outstanding -= (originalInvoice.total || originalInvoice.grandTotal || 0);
@@ -205,9 +189,9 @@
         const totals = recalcTotals();
         const newInvoiceItems = [];
         for (let item of items) {
-            if (!item.productId) continue;
+            if (!item.part) continue;
             newInvoiceItems.push({
-                productId: item.productId,
+                productId: item.part,
                 quantity: item.qty,
                 cost: item.cost,
                 discount: item.discount,
@@ -215,14 +199,13 @@
                 hsn: item.hsn,
                 part: item.part
             });
-            let prod = products.find(p => p.id == item.productId);
+            let prod = products.find(p => p.id == item.part || p.sku == item.part);
             if (prod) prod.currentStock += item.qty;
             else {
-                // Create new product
                 let newProd = {
-                    id: item.productId,
+                    id: item.part,
                     name: item.desc || item.part,
-                    sku: item.productId,
+                    sku: item.part,
                     currentStock: item.qty,
                     unit: 'pc',
                     price: item.cost,
