@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Purchase Invoice – Auto Spares (Stock Integrated)</title>
+    <title>Purchase Entry – Supplier Bill / Credit Note (Stock Integrated)</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
         body {
@@ -12,213 +13,309 @@
             margin: 0;
             padding: 20px;
         }
-        .invoice-container {
+        .container {
             max-width: 1200px;
-            margin: 0 auto;
+            margin: auto;
             background: white;
             border-radius: 12px;
+            padding: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            padding: 0 15px 15px 15px;
-            border: 1px solid #dee2e6;
         }
-        .company-header {
-            background: #0a7c71;
-            color: white;
-            padding: 15px 20px;
+        h1, h2, h3 { color: #0a7c71; }
+        .form-row {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
             flex-wrap: wrap;
-            margin: 0 -15px 15px -15px;
+            gap: 15px;
+            margin-bottom: 20px;
         }
-        .logo-area { display: flex; align-items: center; gap: 15px; }
-        .logo-area img { height: 60px; }
-        .company-details h1 { margin: 0; font-size: 24px; }
-        .company-details p { margin: 3px 0 0; font-size: 12px; opacity: 0.8; }
-        .invoice-title h2 { margin: 0; font-size: 20px; }
-        .info-box {
-            background: #f8f9fa;
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 12px;
-            width: 100%;
+        .form-group {
+            flex: 1;
+            min-width: 200px;
         }
-        .info-box h3 {
-            margin: 0 0 8px;
-            font-size: 14px;
-            color: #0a7c71;
-            border-bottom: 1px solid #dee2e6;
-            padding-bottom: 4px;
-        }
-        .info-row { display: flex; margin-bottom: 5px; font-size: 12px; }
-        .info-label { width: 110px; font-weight: 600; color: #555; }
-        .info-value { flex: 1; }
-        input, textarea, select {
-            width: 100%;
-            padding: 4px 6px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+        label {
+            display: block;
             font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #555;
         }
-        .items-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; table-layout: fixed; }
-        .items-table th, .items-table td { border: 1px solid #dee2e6; padding: 6px 4px; text-align: left; vertical-align: top; word-wrap: break-word; }
-        .items-table th { background: #f8f9fa; }
-        .totals { text-align: right; margin-top: 15px; }
-        .totals table { width: 280px; margin-left: auto; }
-        .qr-box { background: #f8f9fa; border-radius: 6px; padding: 10px; margin: 12px 0; border: 1px solid #dee2e6; }
-        .signature-row { display: flex; justify-content: space-between; margin-top: 20px; gap: 20px; }
-        .signature-box { text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px; }
-        .actions { margin-top: 30px; display: flex; gap: 15px; justify-content: flex-end; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
-        button:hover { background: #09645a; }
-        .item-row { background: #f9f9f9; padding: 8px; border-radius: 6px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .item-row input { flex: 1; min-width: 80px; }
-        .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; cursor: pointer; }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-family: inherit;
+        }
+        .item-row {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .item-row input { flex: 1; min-width: 100px; }
+        .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
         .add-item { background: #28a745; margin-bottom: 15px; }
-        @media print { .actions, button, input, textarea, select { display: none; } }
+        .totals { text-align: right; margin-top: 20px; }
+        .totals table { width: 300px; margin-left: auto; }
+        .totals td { padding: 5px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
+        button:hover { background: #09645a; }
+        .btn-danger { background: #6c757d; }
+        .credit-note-section { margin-top: 20px; border-top: 1px solid #dee2e6; padding-top: 20px; }
+        hr { margin: 20px 0; }
     </style>
     <script src="data-manager.js"></script>
 </head>
 <body>
-<div class="invoice-container" id="invoiceContainer">
-    <div class="company-header">
-        <div class="logo-area"><img src="images/ASS.jpg" alt="Logo" onerror="this.style.display='none'"><div class="company-details"><h1>Auto Spares Solution</h1><p>GSTIN: 19ANOPD3300R1ZO</p><p>101, 1st floor, Howrah, WB 711108</p></div></div>
-        <div class="invoice-title"><h2>PURCHASE INVOICE</h2><p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p><p><strong>Date:</strong> <span id="invoiceDate"></span></p><p><strong>Due Date:</strong> <span id="dueDate"></span></p></div>
-    </div>
-    <div class="info-box">
-        <h3>Supplier Details</h3>
-        <div class="info-row no-print" id="adminSupplierSelect" style="display:none;">
-            <div class="info-label">Quick Select:</div><div class="info-value"><select id="quickSupplierSelect" onchange="loadSupplierData()"><option value="">-- Select Supplier (Admin only) --</option></select></div>
+<div class="container">
+    <h1>Purchase Entry (Stock Integrated)</h1>
+    <hr>
+
+    <!-- Supplier Details -->
+    <div class="form-row">
+        <div class="form-group">
+            <label>Supplier *</label>
+            <!-- Admin quick-select (visible only to admin) -->
+            <div id="adminSupplierSelect" style="display:none;">
+                <select id="quickSupplierSelect" onchange="loadSupplierData()" style="margin-bottom:5px;">
+                    <option value="">-- Quick Select (Admin only) --</option>
+                </select>
+            </div>
+            <select id="supplierSelect">
+                <option value="">-- Select existing or type new --</option>
+            </select>
+            <input type="text" id="supplierName" placeholder="Or enter new supplier name" style="margin-top:5px;">
         </div>
-        <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="supplierName" placeholder="Supplier name"></div></div>
-        <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="supplierAddress" rows="2"></textarea></div></div>
-        <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="supplierGstin"></div></div>
-        <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="supplierState"></div></div>
-        <div class="info-row"><div class="info-label">Phone:</div><div class="info-value"><input type="text" id="supplierPhone"></div></div>
-        <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="supplierEmail"></div></div>
+        <div class="form-group"><label>Supplier GSTIN</label><input type="text" id="supplierGstin"></div>
+        <div class="form-group"><label>Supplier Phone</label><input type="text" id="supplierPhone"></div>
     </div>
+    <div class="form-row">
+        <div class="form-group"><label>Supplier Address</label><textarea id="supplierAddress" rows="2"></textarea></div>
+    </div>
+
+    <!-- Bill Details -->
+    <div class="form-row">
+        <div class="form-group"><label>Purchase Invoice No *</label><input type="text" id="purchaseInvoiceNo" placeholder="Leave blank for auto‑generated"></div>
+        <div class="form-group"><label>Invoice Date</label><input type="date" id="purchaseDate"></div>
+        <div class="form-group"><label>Due Date</label><input type="date" id="purchaseDueDate"></div>
+        <div class="form-group"><label>Payment Terms (days)</label><input type="number" id="paymentTerms" value="30"></div>
+    </div>
+
+    <!-- Items Table (fully manual entry) -->
     <h3>Items Purchased</h3>
     <div id="itemsContainer"></div>
-    <button class="add-item" onclick="addItemRow()">+ Add Item</button>
-    <table class="items-table"><thead><tr><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Unit Cost</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead><tbody id="itemsBody"></tbody></table>
-    <div class="totals"><table><tr><td>Subtotal:</td><td>₹<span id="subtotal">0.00</span></td></tr><tr><td>CGST (9%):</td><td>₹<span id="cgstTotal">0.00</span></td></tr><tr><td>SGST (9%):</td><td>₹<span id="sgstTotal">0.00</span></td></tr><tr style="font-weight:bold;"><td>Grand Total:</td><td>₹<span id="grandTotal">0.00</span></td></tr></table></div>
-    <div class="qr-box"><div><img src="images/ASS.QR.jpg" style="max-width:120px;" onerror="this.style.display='none'"><div><strong>Bank Details:</strong><br>Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</div></div></div>
-    <div class="signature-row"><div class="signature-box">Supplier's Stamp & Signature</div><div class="signature-box">For Auto Spares Solution</div></div>
+    <button class="add-item" onclick="addItemRow()"><i class="fas fa-plus"></i> Add Item</button>
+
+    <!-- Totals -->
+    <div class="totals">
+        <table>
+            <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+        </table>
+    </div>
+
+    <div>
+        <button onclick="savePurchaseInvoice()">💾 Save Purchase Invoice</button>
+        <button class="btn-danger" onclick="window.close()">Cancel</button>
+    </div>
+
+    <!-- Credit Note Entry Section -->
+    <div class="credit-note-section">
+        <h3>Record Credit Note (Supplier Return)</h3>
+        <div class="form-row">
+            <div class="form-group"><label>Credit Note Date</label><input type="date" id="creditDate"></div>
+            <div class="form-group"><label>Amount (₹)</label><input type="number" id="creditAmount" step="0.01" placeholder="Enter amount"></div>
+            <div class="form-group"><label>Against Invoice (optional)</label><select id="creditInvoiceSelect"><option value="">All outstanding</option></select></div>
+            <div class="form-group"><label>Reason / Remarks</label><input type="text" id="creditRemarks" placeholder="Return reason"></div>
+            <div class="form-group"><button onclick="recordCreditNote()">Record Credit Note</button></div>
+        </div>
+    </div>
 </div>
-<div class="actions"><button onclick="savePurchaseInvoice()">💾 Save Invoice</button><button onclick="window.close()">Close</button></div>
 
 <script>
-    let items = [];
+    let items = [];              // each item: { part, desc, hsn, qty, cost, discount }
     let suppliers = [];
-    let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-    let invoiceNumber = '';
+    let purchaseInvoices = [];
 
+    // ---------- Financial Year & Auto‑Numbering ----------
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
-        return (month >= 4) ? `${year}-${(year+1).toString().slice(-2)}` : `${year-1}-${year.toString().slice(-2)}`;
+        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
+        else return `${year-1}-${year.toString().slice(-2)}`;
     }
-    function getNextInvoiceNumber() {
+
+    function getNextPurchaseInvoiceNumber() {
         const finYear = getFinancialYear();
-        const existing = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-        let max = 0;
+        const all = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        let maxNum = 0;
         const prefix = `PUR/${finYear}/`;
-        existing.forEach(inv => {
-            let no = inv.invoiceNo || '';
-            if (no.startsWith(prefix)) {
-                let num = parseInt(no.split('/').pop());
-                if (!isNaN(num) && num > max) max = num;
+        all.forEach(inv => {
+            const invNo = inv.invoiceNo || inv.poNo || '';
+            if (invNo.startsWith(prefix)) {
+                const match = invNo.match(/\/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (!isNaN(num) && num > maxNum) maxNum = num;
+                }
             }
         });
-        return prefix + (max+1).toString().padStart(4,'0');
+        const nextNum = maxNum + 1;
+        return prefix + nextNum.toString().padStart(4, '0');
     }
 
-    function loadCart() {
+    // ---------- Load cart from localStorage (set by index.html) ----------
+    function loadCartItems() {
         const cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
-        if (cart.length) {
-            items = cart.map(i => ({ part: i.part, desc: i.desc, hsn: i.hsn || '', qty: i.qty, cost: i.price, discount: i.discount || 0 }));
+        if (cart.length > 0) {
+            items = cart.map(item => ({
+                part: item.part,
+                desc: item.desc,
+                hsn: item.hsn || '',
+                qty: item.qty,
+                cost: item.price,       // purchase cost
+                discount: item.discount || 0
+            }));
+            console.log('Loaded purchase cart:', items);
         } else {
-            addItemRow();
+            addItemRow(); // start with one empty row
         }
-        renderItemsAndTotals();
+        renderItems();
+        recalcTotals();
     }
 
-    function loadSuppliers() {
-        suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        const sel = document.getElementById('quickSupplierSelect');
-        sel.innerHTML = '<option value="">-- Select Supplier (Admin) --</option>';
-        suppliers.forEach(s => sel.innerHTML += `<option value="${s.email}">${s.name} (${s.email})</option>`);
-        if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
-            document.getElementById('adminSupplierSelect').style.display = 'flex';
-        }
-        document.getElementById('supplierSelect')?.addEventListener('change', function() {
-            const opt = this.options[this.selectedIndex];
-            if (opt.value) {
-                document.getElementById('supplierName').value = opt.dataset.name || '';
-                document.getElementById('supplierGstin').value = opt.dataset.gstin || '';
-                document.getElementById('supplierPhone').value = opt.dataset.phone || '';
-                document.getElementById('supplierAddress').value = opt.dataset.address || '';
-            }
-        });
-    }
-
+    // ---------- Load suppliers & populate dropdown ----------
     function loadSupplierData() {
+        suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+        const supplierSelect = document.getElementById('supplierSelect');
+        supplierSelect.innerHTML = '<option value="">-- Select existing supplier --</option>';
+        suppliers.forEach(sup => {
+            supplierSelect.innerHTML += `<option value="${sup.email}" data-name="${sup.name}" data-gstin="${sup.gstin || ''}" data-phone="${sup.phone || ''}" data-address="${sup.address || ''}">${sup.name} (${sup.email})</option>`;
+        });
+        supplierSelect.addEventListener('change', function() {
+            const selected = supplierSelect.options[supplierSelect.selectedIndex];
+            if (selected.value) {
+                document.getElementById('supplierName').value = selected.dataset.name || '';
+                document.getElementById('supplierGstin').value = selected.dataset.gstin || '';
+                document.getElementById('supplierPhone').value = selected.dataset.phone || '';
+                document.getElementById('supplierAddress').value = selected.dataset.address || '';
+            } else {
+                document.getElementById('supplierName').value = '';
+                document.getElementById('supplierGstin').value = '';
+                document.getElementById('supplierPhone').value = '';
+                document.getElementById('supplierAddress').value = '';
+            }
+            populateInvoiceDropdown();
+        });
+
+        // Admin quick-select
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
+            document.getElementById('adminSupplierSelect').style.display = 'block';
+            const quickSelect = document.getElementById('quickSupplierSelect');
+            quickSelect.innerHTML = '<option value="">-- Quick Select (Admin only) --</option>';
+            suppliers.forEach(sup => {
+                quickSelect.innerHTML += `<option value="${sup.email}" data-name="${sup.name}" data-gstin="${sup.gstin || ''}" data-phone="${sup.phone || ''}" data-address="${sup.address || ''}">${sup.name} (${sup.email})</option>`;
+            });
+        }
+    }
+
+    function loadSupplierDataFromQuick() {
         const email = document.getElementById('quickSupplierSelect').value;
         if (!email) return;
         const sup = suppliers.find(s => s.email === email);
         if (sup) {
             document.getElementById('supplierName').value = sup.name;
-            document.getElementById('supplierAddress').value = sup.address || '';
             document.getElementById('supplierGstin').value = sup.gstin || '';
-            document.getElementById('supplierState').value = sup.state || '';
             document.getElementById('supplierPhone').value = sup.phone || '';
-            document.getElementById('supplierEmail').value = sup.email;
+            document.getElementById('supplierAddress').value = sup.address || '';
+            // Also set the main select
+            const mainSelect = document.getElementById('supplierSelect');
+            mainSelect.value = email;
         }
     }
 
-    function addItemRow() { items.push({ part: '', desc: '', hsn: '', qty: 1, cost: 0, discount: 0 }); renderItemsAndTotals(); }
-    function removeItemRow(idx) { items.splice(idx,1); renderItemsAndTotals(); }
-    function updateItem(idx, field, val) { items[idx][field] = val; renderItemsAndTotals(); }
+    // ---------- Items UI ----------
+    function addItemRow() {
+        items.push({ part: '', desc: '', hsn: '', qty: 1, cost: 0, discount: 0 });
+        renderItems();
+        recalcTotals();
+    }
 
-    function renderItemsAndTotals() {
+    function removeItemRow(idx) {
+        items.splice(idx, 1);
+        renderItems();
+        recalcTotals();
+    }
+
+    function updateItem(idx, field, value) {
+        items[idx][field] = value;
+        recalcTotals();
+    }
+
+    function renderItems() {
         const container = document.getElementById('itemsContainer');
         container.innerHTML = '';
         items.forEach((item, idx) => {
             const div = document.createElement('div');
             div.className = 'item-row';
             div.innerHTML = `
-                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx},'part',this.value)" style="flex:2;">
-                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx},'desc',this.value)" style="flex:3;">
-                <input type="text" placeholder="HSN" value="${escapeHtml(item.hsn)}" onchange="updateItem(${idx},'hsn',this.value)" style="flex:1;">
-                <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx},'qty',parseFloat(this.value))" style="flex:1;">
-                <input type="number" placeholder="Unit Cost" value="${item.cost}" step="0.01" onchange="updateItem(${idx},'cost',parseFloat(this.value))" style="flex:1;">
-                <input type="number" placeholder="Disc %" value="${item.discount}" step="0.01" onchange="updateItem(${idx},'discount',parseFloat(this.value))" style="flex:1;">
+                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:2;">
+                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="flex:3;">
+                <input type="text" placeholder="HSN" value="${escapeHtml(item.hsn)}" onchange="updateItem(${idx}, 'hsn', this.value)" style="flex:1;">
+                <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Cost (₹)" value="${item.cost}" step="0.01" onchange="updateItem(${idx}, 'cost', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Disc %" value="${item.discount}" step="0.01" onchange="updateItem(${idx}, 'discount', parseFloat(this.value))" style="flex:1;">
                 <button class="remove-item" onclick="removeItemRow(${idx})">X</button>
             `;
             container.appendChild(div);
         });
+    }
+
+    function recalcTotals() {
         let subtotal = 0;
-        items.forEach(i => subtotal += i.qty * i.cost * (1 - i.discount/100));
-        let cgst = subtotal * 0.09, sgst = subtotal * 0.09, grand = subtotal + cgst + sgst;
+        items.forEach(item => {
+            const qty = item.qty || 0;
+            const cost = item.cost || 0;
+            const disc = item.discount || 0;
+            const taxable = qty * cost * (1 - disc / 100);
+            subtotal += taxable;
+        });
+        const cgst = subtotal * 0.09;
+        const sgst = subtotal * 0.09;
+        const grand = Math.round(subtotal + cgst + sgst);
         document.getElementById('subtotal').innerText = subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = cgst.toFixed(2);
         document.getElementById('sgstTotal').innerText = sgst.toFixed(2);
         document.getElementById('grandTotal').innerText = grand.toFixed(2);
-        let itemsBody = '';
-        items.forEach((i, idx) => {
-            const taxable = i.qty * i.cost * (1 - i.discount/100);
-            const c = taxable * 0.09, s = taxable * 0.09;
-            itemsBody += `<tr><td>${idx+1}</td><td>${escapeHtml(i.part)}</td><td>${escapeHtml(i.desc)}</td><td>${escapeHtml(i.hsn)}</td><td>${i.qty}</td><td>₹${i.cost.toFixed(2)}</td><td>${i.discount}%</td><td>₹${taxable.toFixed(2)}</td><td>18%</td><td>₹${c.toFixed(2)}</td><td>₹${s.toFixed(2)}</td><td>₹${(taxable+c+s).toFixed(2)}</td></tr>`;
-        });
-        document.getElementById('itemsBody').innerHTML = itemsBody;
     }
 
+    // ---------- Save Purchase Invoice ----------
     function savePurchaseInvoice() {
-        let supplierEmail = document.getElementById('supplierEmail').value.trim();
+        let supplierEmail = document.getElementById('supplierSelect').value;
         let supplierName = document.getElementById('supplierName').value.trim();
-        if (!supplierName && !supplierEmail) { alert('Supplier name or email required'); return; }
-        if (items.length === 0 || items.every(i => !i.part)) { alert('Add at least one item'); return; }
+        if (!supplierName && !supplierEmail) {
+            alert('Please select or enter a supplier name');
+            return;
+        }
+        let invoiceNo = document.getElementById('purchaseInvoiceNo').value.trim();
+        if (!invoiceNo) {
+            invoiceNo = getNextPurchaseInvoiceNumber();
+            document.getElementById('purchaseInvoiceNo').value = invoiceNo;
+        }
+        if (items.length === 0 || items.every(i => !i.part)) {
+            alert('Please add at least one item (Part No required)');
+            return;
+        }
+
+        // Find or create supplier
         let supplier = suppliers.find(s => s.email === supplierEmail || s.name === supplierName);
         if (!supplier) {
             supplier = {
@@ -228,45 +325,112 @@
                 phone: document.getElementById('supplierPhone').value,
                 gstin: document.getElementById('supplierGstin').value,
                 address: document.getElementById('supplierAddress').value,
-                state: document.getElementById('supplierState').value,
+                state: '',  // optional
                 creditLimit: 50000,
                 openingBalance: 0,
                 outstanding: 0,
-                supplierCode: 'SUP' + (suppliers.length+1).toString().padStart(4,'0'),
+                status: 'active',
+                supplierCode: 'SUP' + (suppliers.length + 1).toString().padStart(4, '0'),
                 createdAt: new Date().toISOString()
             };
             suppliers.push(supplier);
             localStorage.setItem('suppliers', JSON.stringify(suppliers));
         }
-        const invoiceNo = getNextInvoiceNumber();
+
+        // Build purchase items (productId will be part number)
+        const purchaseItems = [];
+        for (let item of items) {
+            if (!item.part) continue;
+            purchaseItems.push({
+                productId: item.part,
+                quantity: item.qty,
+                cost: item.cost,
+                discount: item.discount,
+                desc: item.desc,
+                hsn: item.hsn
+            });
+        }
+
+        const purchaseDate = document.getElementById('purchaseDate').value || new Date().toISOString().split('T')[0];
+        const dueDate = document.getElementById('purchaseDueDate').value;
+
         const purchase = {
             id: Date.now(),
+            date: purchaseDate,
+            supplierEmail: supplier.email,
+            items: purchaseItems,
+            total: parseFloat(document.getElementById('grandTotal').innerText),
             invoiceNo: invoiceNo,
             poNo: invoiceNo,
-            date: new Date().toISOString().slice(0,10),
-            dueDate: new Date(Date.now() + 30*86400000).toISOString().slice(0,10),
-            supplierEmail: supplier.email,
-            supplier: supplier,
-            items: items.map(i => ({
-                part: i.part, desc: i.desc, hsn: i.hsn, quantity: i.qty, cost: i.cost, discount: i.discount
-            })),
-            total: parseFloat(document.getElementById('grandTotal').innerText),
-            grandTotal: parseFloat(document.getElementById('grandTotal').innerText)
+            dueDate: dueDate,
+            finYear: getFinancialYear()
         };
+
         try {
-            createPurchaseInvoice(purchase);
-            alert(`Purchase invoice ${invoiceNo} saved.`);
+            createPurchaseInvoice(purchase); // defined in data-manager.js
+            alert(`Purchase invoice ${invoiceNo} saved! Stock increased, supplier outstanding updated.`);
+            // Clear cart from localStorage and close
             localStorage.setItem('invoiceCart', '[]');
             window.close();
-        } catch(e) { alert('Error: ' + e.message); }
+        } catch (err) {
+            alert('Error saving purchase invoice: ' + err.message);
+        }
     }
 
-    function escapeHtml(s) { return s.replace(/[&<>]/g, m => m=='&'?'&amp;':m=='<'?'&lt;':'&gt;'); }
-    document.getElementById('invoiceNo').innerText = getNextInvoiceNumber();
-    document.getElementById('invoiceDate').innerText = new Date().toLocaleDateString('en-IN');
-    document.getElementById('dueDate').innerText = new Date(Date.now()+30*86400000).toLocaleDateString('en-IN');
-    loadSuppliers();
-    loadCart();
+    // ---------- Credit Note ----------
+    function recordCreditNote() {
+        const supplierName = document.getElementById('supplierName').value.trim();
+        if (!supplierName) { alert('Select a supplier first'); return; }
+        const creditDate = document.getElementById('creditDate').value;
+        const amount = parseFloat(document.getElementById('creditAmount').value);
+        const invoiceNo = document.getElementById('creditInvoiceSelect').value;
+        const remarks = document.getElementById('creditRemarks').value;
+        if (!creditDate || isNaN(amount) || amount <= 0) { alert('Enter valid date and amount'); return; }
+
+        let supplier = suppliers.find(s => s.name === supplierName);
+        if (!supplier) { alert('Supplier not found in master'); return; }
+
+        supplier.outstanding = Math.max(0, (supplier.outstanding || 0) - amount);
+        localStorage.setItem('suppliers', JSON.stringify(suppliers));
+
+        let supplierCreditNotes = JSON.parse(localStorage.getItem('supplierCreditNotes') || '[]');
+        supplierCreditNotes.push({
+            id: Date.now(),
+            supplierName: supplierName,
+            date: creditDate,
+            amount: amount,
+            invoiceNo: invoiceNo || null,
+            remarks: remarks || 'Credit Note',
+            type: 'credit_note'
+        });
+        localStorage.setItem('supplierCreditNotes', JSON.stringify(supplierCreditNotes));
+        alert('Credit note recorded. Supplier outstanding reduced.');
+        document.getElementById('creditAmount').value = '';
+        document.getElementById('creditRemarks').value = '';
+    }
+
+    function populateInvoiceDropdown() {
+        const supplierName = document.getElementById('supplierName').value.trim();
+        const select = document.getElementById('creditInvoiceSelect');
+        if (!supplierName) { select.innerHTML = '<option value="">All outstanding</option>'; return; }
+        const invoices = purchaseInvoices.filter(inv => inv.supplier?.name === supplierName);
+        select.innerHTML = '<option value="">All outstanding</option>';
+        invoices.forEach(inv => {
+            select.innerHTML += `<option value="${inv.invoiceNo}">${inv.invoiceNo} - ₹${inv.total.toFixed(2)} (Due: ${inv.dueDate})</option>`;
+        });
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+    // ---------- Initialisation ----------
+    document.getElementById('purchaseDate').valueAsDate = new Date();
+    const due = new Date(); due.setDate(due.getDate() + 30);
+    document.getElementById('purchaseDueDate').valueAsDate = due;
+    document.getElementById('creditDate').valueAsDate = new Date();
+
+    loadSupplierData();
+    loadCartItems();   // loads items from invoiceCart (set by index.html)
+    purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
 </script>
 </body>
-                                                                                                                                                         </html>
+    </html>
