@@ -106,18 +106,42 @@
     <div class="form-section">
         <h2 id="formTitle">Add New Product</h2>
         <div class="form-row">
-            <div class="form-group"><label>Product Name *</label><input type="text" id="prodName" placeholder="e.g., Brake Pad"></div>
-            <div class="form-group"><label>SKU / Part No *</label><input type="text" id="prodSku" placeholder="Unique code"></div>
-            <div class="form-group"><label>HSN / SAC</label><input type="text" id="prodHsn" placeholder="HSN code"></div>
+            <div class="form-group">
+                <label>Product Name / Description *</label>
+                <input type="text" id="prodName" placeholder="e.g., Brake Pad">
+            </div>
+            <div class="form-group">
+                <label>SKU / Part Number *</label>
+                <input type="text" id="prodSku" placeholder="Unique code (e.g., BP-123)">
+            </div>
+            <div class="form-group">
+                <label>HSN / SAC</label>
+                <input type="text" id="prodHsn" placeholder="HSN code">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Unit</label><input type="text" id="prodUnit" value="pc"></div>
-            <div class="form-group"><label>Selling Price (₹)</label><input type="number" id="prodPrice" step="0.01" value="0"></div>
-            <div class="form-group"><label>Current Stock</label><input type="number" id="prodStock" step="1" value="0"></div>
+            <div class="form-group">
+                <label>Unit</label>
+                <input type="text" id="prodUnit" value="pc">
+            </div>
+            <div class="form-group">
+                <label>Selling Price (₹)</label>
+                <input type="number" id="prodPrice" step="0.01" value="0">
+            </div>
+            <div class="form-group">
+                <label>Current Stock</label>
+                <input type="number" id="prodStock" step="1" value="0">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Reorder Level</label><input type="number" id="prodReorder" step="1" value="10"></div>
-            <div class="form-group"><label>Cost Price (optional)</label><input type="number" id="prodCost" step="0.01" value="0"></div>
+            <div class="form-group">
+                <label>Reorder Level</label>
+                <input type="number" id="prodReorder" step="1" value="10">
+            </div>
+            <div class="form-group">
+                <label>Cost Price (optional)</label>
+                <input type="number" id="prodCost" step="0.01" value="0">
+            </div>
         </div>
         <div class="form-row">
             <button onclick="saveProduct()">💾 Save Product</button>
@@ -126,7 +150,7 @@
         </div>
     </div>
 
-    <!-- Search and Product List -->
+    <!-- Search and Product List (Table Format) -->
     <div class="search-box">
         <input type="text" id="searchInput" placeholder="Search by name, SKU, HSN...">
         <button onclick="searchProducts()">🔍 Search</button>
@@ -141,36 +165,38 @@
     let editId = null;
 
     function loadProducts() {
-        products = getProducts();
+        products = getProducts();  // from data-manager.js
         displayProducts();
     }
 
     function displayProducts() {
-        const term = document.getElementById('searchInput').value.toLowerCase();
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         let filtered = products;
-        if (term) {
+        if (searchTerm) {
             filtered = products.filter(p => 
-                (p.name && p.name.toLowerCase().includes(term)) ||
-                (p.sku && p.sku.toLowerCase().includes(term)) ||
-                (p.hsn && p.hsn.toLowerCase().includes(term))
+                p.name?.toLowerCase().includes(searchTerm) ||
+                p.sku?.toLowerCase().includes(searchTerm) ||
+                (p.hsn && p.hsn.toLowerCase().includes(searchTerm))
             );
         }
         if (filtered.length === 0) {
             document.getElementById('productsTable').innerHTML = '<p>No products found.</p>';
             return;
         }
-        let html = '<td><thead>运转<th>SKU</th><th>Name</th><th>HSN</th><th>Unit</th><th>Price (₹)</th><th>Stock</th><th>Reorder</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<td><thead>运转
+            <th>SKU</th><th>Name</th><th>HSN</th><th>Unit</th><th>Price (₹)</th><th>Stock</th><th>Reorder</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody>';
         filtered.forEach(p => {
-            const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
-            html += `<tr class="${low ? 'low-stock' : ''}">
+            const lowStock = (p.currentStock || 0) <= (p.reorderLevel || 0);
+            html += `<tr class="${lowStock ? 'low-stock' : ''}">
                 <td>${escapeHtml(p.sku)}</strong></td>
                 <td><strong>${escapeHtml(p.name)}</strong></td>
-                <td>${escapeHtml(p.hsn || '')}</strong></td>
-                <td>${escapeHtml(p.unit || 'pc')}</strong></td>
-                <td>₹${(p.price || 0).toLocaleString()}</strong></td>
-                <td>${(p.currentStock || 0).toLocaleString()}</strong></td>
+                <td>${escapeHtml(p.hsn || '')}</td>
+                <td>${escapeHtml(p.unit || 'pc')}</td>
+                <td>₹${(p.price || 0).toLocaleString()}</td>
+                <td>${(p.currentStock || 0).toLocaleString()}</td>
                 <td>${(p.reorderLevel || 0)}</strong></td>
-                <td>${low ? '⚠️ Low Stock' : 'OK'}</strong></td>
+                <td>${lowStock ? '⚠️ Low Stock' : 'OK'}</td>
                 <td class="action-buttons">
                     <button onclick="editProduct('${p.id}')" style="background:#17a2b8;">✏️ Edit</button>
                     <button onclick="deleteProduct('${p.id}')" class="btn-danger">🗑️ Delete</button>
@@ -185,6 +211,7 @@
         const name = document.getElementById('prodName').value.trim();
         const sku = document.getElementById('prodSku').value.trim();
         if (!name || !sku) { alert('Product Name and SKU are required'); return; }
+
         const productData = {
             id: editId || Date.now(),
             name: name,
@@ -201,9 +228,9 @@
             productData.createdAt = new Date().toISOString();
             products.push(productData);
         } else {
-            const idx = products.findIndex(p => p.id == editId);
-            productData.createdAt = products[idx].createdAt;
-            products[idx] = productData;
+            const index = products.findIndex(p => p.id == editId);
+            productData.createdAt = products[index].createdAt;
+            products[index] = productData;
         }
         saveProducts(products);
         alert('Product saved!');
@@ -212,23 +239,23 @@
     }
 
     function editProduct(id) {
-        const p = products.find(p => p.id == id);
-        if (!p) return;
+        const product = products.find(p => p.id == id);
+        if (!product) return;
         editId = id;
         document.getElementById('formTitle').innerHTML = 'Edit Product';
-        document.getElementById('prodName').value = p.name;
-        document.getElementById('prodSku').value = p.sku;
-        document.getElementById('prodHsn').value = p.hsn || '';
-        document.getElementById('prodUnit').value = p.unit || 'pc';
-        document.getElementById('prodPrice').value = p.price || 0;
-        document.getElementById('prodStock').value = p.currentStock || 0;
-        document.getElementById('prodReorder').value = p.reorderLevel || 0;
-        document.getElementById('prodCost').value = p.costPrice || 0;
+        document.getElementById('prodName').value = product.name;
+        document.getElementById('prodSku').value = product.sku;
+        document.getElementById('prodHsn').value = product.hsn || '';
+        document.getElementById('prodUnit').value = product.unit || 'pc';
+        document.getElementById('prodPrice').value = product.price || 0;
+        document.getElementById('prodStock').value = product.currentStock || 0;
+        document.getElementById('prodReorder').value = product.reorderLevel || 0;
+        document.getElementById('prodCost').value = product.costPrice || 0;
         document.getElementById('cancelEditBtn').style.display = 'inline-block';
     }
 
     function deleteProduct(id) {
-        if (!confirm('Delete this product? It may affect invoices.')) return;
+        if (!confirm('Delete this product? This may affect existing invoices.')) return;
         products = products.filter(p => p.id != id);
         saveProducts(products);
         loadProducts();
@@ -252,30 +279,35 @@
 
     async function importFromCSV() {
         try {
-            const res = await fetch('prices.csv');
-            const csv = await res.text();
-            const lines = csv.split('\n');
+            const response = await fetch('prices.csv');
+            const csvText = await response.text();
+            const lines = csvText.split('\n');
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
             const partIdx = headers.indexOf('part');
             const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
-            const hsnIdx = headers.indexOf('hsn');
-            const priceIdx = headers.indexOf('price');
-            const stockIdx = headers.indexOf('stock');
+            const hsnIdx = headers.indexOf('hsn') !== -1 ? headers.indexOf('hsn') : null;
+            const priceIdx = headers.indexOf('price') !== -1 ? headers.indexOf('price') : headers.indexOf('sellingprice');
+            const stockIdx = headers.indexOf('stock') !== -1 ? headers.indexOf('stock') : null;
             let imported = 0;
-            let prods = getProducts();
-            for (let i=1; i<lines.length; i++) {
+            let products = getProducts();
+            for (let i = 1; i < lines.length; i++) {
                 const cols = lines[i].split(',');
+                if (cols.length < 2) continue;
                 const part = cols[partIdx]?.trim();
                 if (!part) continue;
-                if (!prods.find(p => p.sku === part)) {
-                    prods.push({
+                const name = descIdx !== -1 ? cols[descIdx]?.trim() || part : part;
+                const hsn = hsnIdx !== -1 ? cols[hsnIdx]?.trim() : '';
+                const price = priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0;
+                const stock = stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0;
+                if (!products.find(p => p.sku === part)) {
+                    products.push({
                         id: Date.now() + Math.random(),
-                        name: descIdx !== -1 ? cols[descIdx]?.trim() || part : part,
+                        name: name,
                         sku: part,
-                        hsn: hsnIdx !== -1 ? cols[hsnIdx]?.trim() : '',
+                        hsn: hsn,
                         unit: 'pc',
-                        price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
-                        currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
+                        price: price,
+                        currentStock: stock,
                         reorderLevel: 10,
                         costPrice: 0,
                         createdAt: new Date().toISOString()
@@ -283,15 +315,15 @@
                     imported++;
                 }
             }
-            if (imported) {
-                saveProducts(prods);
-                alert(`${imported} products imported.`);
+            if (imported > 0) {
+                saveProducts(products);
+                alert(`${imported} products imported from CSV.`);
                 loadProducts();
             } else {
-                alert('No new products found.');
+                alert('No new products found in CSV (all already exist).');
             }
-        } catch(e) {
-            alert('Import error: ' + e.message);
+        } catch (err) {
+            alert('Error importing CSV: ' + err.message);
         }
     }
 
@@ -300,12 +332,21 @@
         products.forEach(p => {
             csv += `"${p.sku}","${p.name}","${p.hsn || ''}","${p.unit || 'pc'}",${p.price || 0},${p.currentStock || 0},${p.reorderLevel || 0}\n`;
         });
-        const blob = new Blob([csv], {type:'text/csv'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'products.csv'; a.click(); URL.revokeObjectURL(blob);
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'products.csv';
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
-    function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
+    }
+
     loadProducts();
 </script>
 </body>
-</html>
+    </html>
