@@ -5,15 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Product Master – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="data-manager.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         h1, h2 { color: #0a7c71; }
         .form-section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
         .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
         .form-group { flex: 1; min-width: 180px; }
-        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #555; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
         input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
         button:hover { background: #09645a; }
@@ -29,30 +30,29 @@
         .action-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
         @media (max-width: 768px) { .form-row { flex-direction: column; } table { font-size: 12px; } }
     </style>
-    <script src="data-manager.js"></script>
 </head>
 <body>
 <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1>Product Master</h1>
         <div>
-            <a href="dashboard.html" style="background:#6c757d; color:white; padding:8px 16px; border-radius:6px; text-decoration:none;">Dashboard</a>
             <button onclick="importFromCSV()" style="background:#28a745;"><i class="fas fa-file-csv"></i> Import CSV</button>
-            <a href="invoice-stock.html" style="background:#0a7c71; color:white; padding:8px 16px; border-radius:6px; text-decoration:none;">+ Invoice</a>
+            <a href="dashboard.html" style="background:#6c757d; color:white; padding:8px 16px; border-radius:6px; text-decoration:none;">Dashboard</a>
         </div>
     </div>
 
+    <!-- Add/Edit Product Form -->
     <div class="form-section">
         <h2 id="formTitle">Add New Product</h2>
         <div class="form-row">
             <div class="form-group"><label>Product Name *</label><input type="text" id="prodName"></div>
             <div class="form-group"><label>SKU / Part No *</label><input type="text" id="prodSku"></div>
-            <div class="form-group"><label>Brand</label><input type="text" id="prodBrand" placeholder="e.g., Bosch, TVS"></div>
+            <div class="form-group"><label>Brand</label><input type="text" id="prodBrand"></div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Make (Manufacturer)</label><input type="text" id="prodMake" placeholder="e.g., Maruti, Tata"></div>
-            <div class="form-group"><label>Product Line Code</label><input type="number" id="prodLineCode" placeholder="e.g., 1001"></div>
-            <div class="form-group"><label>Group (Category)</label><input type="text" id="prodGroup" placeholder="e.g., Engine, Brake"></div>
+            <div class="form-group"><label>Make</label><input type="text" id="prodMake"></div>
+            <div class="form-group"><label>Line Code</label><input type="number" id="prodLineCode"></div>
+            <div class="form-group"><label>Group</label><input type="text" id="prodGroup"></div>
         </div>
         <div class="form-row">
             <div class="form-group"><label>HSN</label><input type="text" id="prodHsn"></div>
@@ -62,7 +62,7 @@
         <div class="form-row">
             <div class="form-group"><label>Current Stock</label><input type="number" id="prodStock" step="1" value="0"></div>
             <div class="form-group"><label>Reorder Level</label><input type="number" id="prodReorder" step="1" value="10"></div>
-            <div class="form-group"><label>Cost Price</label><input type="number" id="prodCost" step="0.01" value="0"></div>
+            <div class="form-group"><label>Cost Price (optional)</label><input type="number" id="prodCost" step="0.01" value="0"></div>
         </div>
         <div class="form-row">
             <button onclick="saveProduct()">💾 Save</button>
@@ -71,6 +71,7 @@
         </div>
     </div>
 
+    <!-- Search & Table -->
     <div class="search-box">
         <input type="text" id="searchInput" placeholder="Search by name, SKU, brand, make, group...">
         <button onclick="searchProducts()">🔍 Search</button>
@@ -78,6 +79,7 @@
         <button onclick="exportToCSV()">📄 Export CSV</button>
     </div>
     <div id="productsTable"></div>
+    <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back</button>
 </div>
 
 <script>
@@ -103,30 +105,33 @@
             );
         }
         if (filtered.length === 0) {
-            document.getElementById('productsTable').innerHTML = '<p>No products found.</p>';
+            document.getElementById('productsTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv.</p>';
             return;
         }
-        let html = '<tr><thead>运转<th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Line Code</th><th>Group</th><th>HSN</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        let html = '</td><thead>
+            <th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Line Code</th><th>Group</th><th>HSN</th><th>Unit</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody>';
         filtered.forEach(p => {
             const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
             html += `<tr class="${low ? 'low-stock' : ''}">
                 <td>${escapeHtml(p.sku)}</strong></td>
                 <td><strong>${escapeHtml(p.name)}</strong></td>
-                <td>${escapeHtml(p.brand || '')}</td>
-                <td>${escapeHtml(p.make || '')}</td>
+                <td>${escapeHtml(p.brand || '-')}</td>
+                <td>${escapeHtml(p.make || '-')}</td>
                 <td>${p.lineCode || '-'}</td>
-                <td>${escapeHtml(p.group || '')}</td>
-                <td>${escapeHtml(p.hsn || '')}</td>
+                <td>${escapeHtml(p.group || '-')}</td>
+                <td>${escapeHtml(p.hsn || '-')}</td>
+                <td>${escapeHtml(p.unit || 'pc')}</td>
                 <td>₹${(p.price || 0).toLocaleString()}</td>
                 <td>${(p.currentStock || 0).toLocaleString()}</td>
                 <td>${low ? '⚠️ Low' : 'OK'}</td>
                 <td class="action-buttons">
                     <button onclick="editProduct('${p.id}')" style="background:#17a2b8;">✏️ Edit</button>
                     <button onclick="deleteProduct('${p.id}')" class="btn-danger">🗑️ Delete</button>
-                  </strong></td>
-            </tr>`;
+                </strong></td>
+            <table>`;
         });
-        html += '</tbody></table>';
+        html += '</tbody><table>';
         document.getElementById('productsTable').innerHTML = html;
     }
 
@@ -255,22 +260,24 @@
                 alert(`${imported} products imported.`);
                 loadProducts();
             } else {
-                alert('No new products found.');
+                alert('No new products found. They may already exist.');
             }
-        } catch(e) { alert('Error: ' + e.message); }
+        } catch(e) {
+            alert('Error importing CSV: ' + e.message);
+        }
     }
 
     function exportToCSV() {
-        let csv = "SKU,Name,Brand,Make,Line Code,Group,HSN,Price,Stock,Reorder Level\n";
+        let csv = "SKU,Name,Brand,Make,Line Code,Group,HSN,Unit,Price,Stock,Reorder Level\n";
         products.forEach(p => {
-            csv += `"${p.sku}","${p.name}","${p.brand || ''}","${p.make || ''}","${p.lineCode || ''}","${p.group || ''}","${p.hsn || ''}",${p.price || 0},${p.currentStock || 0},${p.reorderLevel || 0}\n`;
+            csv += `"${p.sku}","${p.name}","${p.brand || ''}","${p.make || ''}","${p.lineCode || ''}","${p.group || ''}","${p.hsn || ''}","${p.unit || 'pc'}",${p.price || 0},${p.currentStock || 0},${p.reorderLevel || 0}\n`;
         });
         const blob = new Blob([csv], {type:'text/csv'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'products.csv'; a.click(); URL.revokeObjectURL(url);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'products.csv'; a.click(); URL.revokeObjectURL(blob);
     }
-    function escapeHtml(s) { return s.replace(/[&<>]/g, m => m=='&'?'&amp;':m=='<'?'&lt;':'&gt;'); }
+
+    function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     loadProducts();
 </script>
 </body>
-        </html>
+    </html>
