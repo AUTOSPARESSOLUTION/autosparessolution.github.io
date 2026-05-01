@@ -9,99 +9,53 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
         h1 { color: #0a7c71; }
-        .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
-        .filter-group { flex: 1; min-width: 180px; }
-        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
-        select, input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         .low-stock { background-color: #fff3cd; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
         .export-btn { background: #6c757d; }
-        .import-btn { background: #28a745; }
-        @media (max-width: 768px) { .filter-box { flex-direction: column; align-items: stretch; } }
+        @media (max-width: 768px) { table { font-size: 12px; } }
     </style>
 </head>
 <body>
 <div class="container">
     <h1><i class="fas fa-chart-line"></i> Stock Report</h1>
-    <div class="filter-box">
-        <div class="filter-group"><label>Filter by Brand</label><select id="brandFilter"><option value="">All</option></select></div>
-        <div class="filter-group"><label>Filter by Make</label><select id="makeFilter"><option value="">All</option></select></div>
-        <div class="filter-group">
-            <button onclick="refreshReport()"><i class="fas fa-sync-alt"></i> Refresh</button>
-            <button onclick="importFromCSV()" class="import-btn"><i class="fas fa-file-csv"></i> Import CSV</button>
-            <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
-        </div>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by SKU, Name, Brand..." style="flex:1; padding: 8px;">
+        <button onclick="searchProducts()">🔍 Search</button>
+        <button onclick="loadReport()">🔄 Refresh</button>
+        <button onclick="exportToCSV()" class="export-btn">📄 Export CSV</button>
     </div>
     <div id="stockTable"></div>
     <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
 </div>
 
 <script>
-    // The import function (identical to Product Master's)
-    async function importFromCSV() {
-        try {
-            const res = await fetch('prices.csv');
-            const csv = await res.text();
-            const lines = csv.split('\n');
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-            const partIdx = headers.indexOf('part');
-            const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
-            const brandIdx = headers.indexOf('brand');
-            const makeIdx = headers.indexOf('make');
-            const priceIdx = headers.indexOf('price');
-            const stockIdx = headers.indexOf('stock');
-            let imported = 0;
-            let products = getProducts();
-            for (let i = 1; i < lines.length; i++) {
-                const cols = lines[i].split(',');
-                const part = cols[partIdx]?.trim();
-                if (!part) continue;
-                if (!products.find(p => p.sku === part)) {
-                    products.push({
-                        id: Date.now() + Math.random(),
-                        name: descIdx !== -1 ? cols[descIdx]?.trim() || part : part,
-                        sku: part,
-                        brand: brandIdx !== -1 ? cols[brandIdx]?.trim() : '',
-                        make: makeIdx !== -1 ? cols[makeIdx]?.trim() : '',
-                        price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
-                        currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
-                        reorderLevel: 10,
-                        createdAt: new Date().toISOString()
-                    });
-                    imported++;
-                }
-            }
-            if (imported) {
-                saveProducts(products);
-                alert(`${imported} products imported.`);
-                refreshReport();
-                populateFilters();
-            } else {
-                alert('All products already exist.');
-            }
-        } catch(e) {
-            alert('Import error: ' + e.message);
-        }
+    function loadReport() {
+        let products = getProducts();
+        displayProducts(products);
     }
 
-    function refreshReport() {
-        let products = getProducts();
-        const brand = document.getElementById('brandFilter').value;
-        const make = document.getElementById('makeFilter').value;
+    function displayProducts(products, filter = '') {
         let filtered = products;
-        if (brand) filtered = filtered.filter(p => p.brand === brand);
-        if (make) filtered = filtered.filter(p => p.make === make);
-        filtered.sort((a,b) => a.name.localeCompare(b.name));
+        if (filter) {
+            const term = filter.toLowerCase();
+            filtered = products.filter(p =>
+                p.sku?.toLowerCase().includes(term) ||
+                p.name?.toLowerCase().includes(term) ||
+                p.brand?.toLowerCase().includes(term) ||
+                p.make?.toLowerCase().includes(term)
+            );
+        }
         if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv (or add products in Product Master).</p>';
+            document.getElementById('stockTable').innerHTML = '<p>No products found. Please import products via Product Master first.</p>';
             return;
         }
-        let html = '<tr><thead>
+        let html = '<table><thead>
             <th>SKU</th><th>Product Name</th><th>Brand</th><th>Make</th><th>Stock</th><th>Price (₹)</th><th>Status</th>
         </tr></thead><tbody>';
         filtered.forEach(p => {
@@ -120,18 +74,14 @@
         document.getElementById('stockTable').innerHTML = html;
     }
 
-    function populateFilters() {
-        const products = getProducts();
-        const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
-        const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
-        const brandSelect = document.getElementById('brandFilter');
-        brandSelect.innerHTML = '<option value="">All</option>' + brands.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
-        const makeSelect = document.getElementById('makeFilter');
-        makeSelect.innerHTML = '<option value="">All</option>' + makes.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+    function searchProducts() {
+        let products = getProducts();
+        const term = document.getElementById('searchInput').value.toLowerCase();
+        displayProducts(products, term);
     }
 
     function exportToCSV() {
-        const products = getProducts();
+        let products = getProducts();
         if (!products.length) { alert('No data to export'); return; }
         let csv = "SKU,Product Name,Brand,Make,Stock,Price (₹),Status\n";
         products.forEach(p => {
@@ -149,8 +99,7 @@
     function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     function escapeCsv(s) { return `"${s.replace(/"/g, '""')}"`; }
 
-    populateFilters();
-    refreshReport();
+    loadReport();
 </script>
 </body>
 </html>
