@@ -9,15 +9,17 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; }
-        .search-box { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .search-box { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         .low-stock { background-color: #fff3cd; }
         button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
+        .import-btn { background: #28a745; }
         .export-btn { background: #6c757d; }
+        .debug { background: #e9ecef; padding: 5px; margin-bottom: 10px; font-family: monospace; display: none; }
         @media (max-width: 768px) { table { font-size: 12px; } }
     </style>
 </head>
@@ -25,25 +27,73 @@
 <div class="container">
     <h1><i class="fas fa-chart-line"></i> Stock Report</h1>
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by SKU, Name, Brand..." style="flex:1; padding: 8px;">
+        <input type="text" id="searchInput" placeholder="Search by SKU, Name, Brand, Make..." style="flex:1; padding: 8px;">
         <button onclick="searchProducts()">🔍 Search</button>
         <button onclick="loadReport()">🔄 Refresh</button>
+        <button onclick="importFromCSV()" class="import-btn"><i class="fas fa-file-csv"></i> Import CSV</button>
         <button onclick="exportToCSV()" class="export-btn">📄 Export CSV</button>
+        <button onclick="toggleDebug()" style="background:#ffc107; color:#333;">🐞 Debug</button>
     </div>
+    <div id="debugPanel" class="debug"></div>
     <div id="stockTable"></div>
     <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
 </div>
 
 <script>
-    function loadReport() {
-        let products = getProducts();
-        displayProducts(products);
+    async function importFromCSV() {
+        try {
+            const res = await fetch('prices.csv');
+            const csv = await res.text();
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const partIdx = headers.indexOf('part');
+            const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
+            const brandIdx = headers.indexOf('brand');
+            const makeIdx = headers.indexOf('make');
+            const priceIdx = headers.indexOf('price');
+            const stockIdx = headers.indexOf('stock');
+            let products = getProducts();
+            let imported = 0;
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                const part = cols[partIdx]?.trim();
+                if (!part) continue;
+                if (!products.find(p => p.sku === part)) {
+                    products.push({
+                        id: Date.now() + Math.random(),
+                        name: descIdx !== -1 ? cols[descIdx]?.trim() || part : part,
+                        sku: part,
+                        brand: brandIdx !== -1 ? cols[brandIdx]?.trim() : '',
+                        make: makeIdx !== -1 ? cols[makeIdx]?.trim() : '',
+                        price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
+                        currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
+                        reorderLevel: 10,
+                        createdAt: new Date().toISOString()
+                    });
+                    imported++;
+                }
+            }
+            if (imported > 0) {
+                saveProducts(products);
+                alert(`${imported} products imported.`);
+                loadReport();
+            } else {
+                alert('No new products found.');
+            }
+        } catch(e) {
+            alert('Import error: ' + e.message);
+        }
     }
 
-    function displayProducts(products, filter = '') {
+    function loadReport() {
+        const products = getProducts();
+        displayProducts(products, document.getElementById('searchInput').value);
+    }
+
+    function displayProducts(products, searchTerm = '') {
         let filtered = products;
-        if (filter) {
-            const term = filter.toLowerCase();
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
             filtered = products.filter(p =>
                 p.sku?.toLowerCase().includes(term) ||
                 p.name?.toLowerCase().includes(term) ||
@@ -52,7 +102,7 @@
             );
         }
         if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products found. Please import products via Product Master first.</p>';
+            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv, or add products in Product Master.</p>';
             return;
         }
         let html = '<table><thead>
@@ -68,20 +118,20 @@
                 <td>${p.currentStock || 0}</td>
                 <td>₹${(p.price || 0).toFixed(2)}</strong></td>
                 <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low Stock' : 'OK'}</td>
-            </tr>`;
+            <tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('stockTable').innerHTML = html;
     }
 
     function searchProducts() {
-        let products = getProducts();
-        const term = document.getElementById('searchInput').value.toLowerCase();
+        const products = getProducts();
+        const term = document.getElementById('searchInput').value;
         displayProducts(products, term);
     }
 
     function exportToCSV() {
-        let products = getProducts();
+        const products = getProducts();
         if (!products.length) { alert('No data to export'); return; }
         let csv = "SKU,Product Name,Brand,Make,Stock,Price (₹),Status\n";
         products.forEach(p => {
@@ -89,11 +139,19 @@
             csv += `"${escapeCsv(p.sku)}","${escapeCsv(p.name)}","${escapeCsv(p.brand || '')}","${escapeCsv(p.make || '')}",${p.currentStock || 0},${p.price || 0},"${status}"\n`;
         });
         const blob = new Blob([csv], {type:'text/csv'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'stock_report.csv';
-        a.click();
-        URL.revokeObjectURL(blob);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
+    }
+
+    function toggleDebug() {
+        const panel = document.getElementById('debugPanel');
+        if (panel.style.display === 'none' || panel.style.display === '') {
+            const products = getProducts();
+            panel.innerHTML = `<strong>Products in localStorage:</strong> ${products.length}<br>` +
+                              (products.length > 0 ? `First product: ${JSON.stringify(products[0], null, 2)}` : 'No products.');
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
     }
 
     function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
