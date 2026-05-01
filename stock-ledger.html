@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Ledger – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="data-manager.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
+        .filter-group { flex: 1; min-width: 200px; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        select, input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
+        th { background: #0a7c71; color: white; }
+        .in { color: #28a745; }
+        .out { color: #dc3545; }
+        .export-btn { background: #6c757d; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-boxes"></i> Stock Ledger</h1>
+    <div class="filter-box">
+        <div class="filter-group">
+            <label>Filter by Brand</label>
+            <select id="brandFilter">
+                <option value="">-- All Brands --</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Filter by Make</label>
+            <select id="makeFilter">
+                <option value="">-- All Makes --</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Or Select a Product</label>
+            <select id="productFilter">
+                <option value="">-- All Products --</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <button onclick="loadLedger()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
+        </div>
+    </div>
+    <div id="ledgerTable">Loading...</div>
+    <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
+</div>
+
+<script>
+    let products = [];
+    let transactions = [];
+
+    function loadData() {
+        products = getProducts();
+        transactions = getInventoryTransactions();
+        populateFilters();
+        displayLedger();
+    }
+
+    function populateFilters() {
+        // Brand dropdown
+        const brands = new Set();
+        products.forEach(p => { if (p.brand) brands.add(p.brand); });
+        const brandSelect = document.getElementById('brandFilter');
+        brandSelect.innerHTML = '<option value="">-- All Brands --</option>';
+        [...brands].sort().forEach(b => {
+            brandSelect.innerHTML += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
+        });
+
+        // Make dropdown
+        const makes = new Set();
+        products.forEach(p => { if (p.make) makes.add(p.make); });
+        const makeSelect = document.getElementById('makeFilter');
+        makeSelect.innerHTML = '<option value="">-- All Makes --</option>';
+        [...makes].sort().forEach(m => {
+            makeSelect.innerHTML += `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`;
+        });
+
+        // Product dropdown
+        const productSelect = document.getElementById('productFilter');
+        productSelect.innerHTML = '<option value="">-- All Products --</option>';
+        products.forEach(p => {
+            productSelect.innerHTML += `<option value="${p.id}">${escapeHtml(p.name)} (${p.sku})</option>`;
+        });
+    }
+
+    function getFilteredProducts() {
+        const brand = document.getElementById('brandFilter').value;
+        const make = document.getElementById('makeFilter').value;
+        const productId = document.getElementById('productFilter').value;
+        if (productId) return products.filter(p => p.id == productId);
+        return products.filter(p => 
+            (!brand || p.brand === brand) &&
+            (!make || p.make === make)
+        );
+    }
+
+    function displayLedger() {
+        const filteredProducts = getFilteredProducts();
+        if (filteredProducts.length === 0) {
+            document.getElementById('ledgerTable').innerHTML = '<p>No products match the filter.</p>';
+            return;
+        }
+        let html = '<table><thead>运转<th>Product</th><th>SKU</th><th>Brand</th><th>Make</th><th>Date</th><th>Transaction Type</th><th>In (+)</th><th>Out (-)</th><th>Running Balance</th><th>Reference</th></tr></thead><tbody>';
+        for (let prod of filteredProducts) {
+            let balance = 0;
+            const prodTransactions = transactions.filter(t => t.productId == prod.id).sort((a,b) => new Date(a.date) - new Date(b.date));
+            if (prodTransactions.length === 0) {
+                html += `<tr>
+                    <td>${escapeHtml(prod.name)}</strong></td>
+                    <td>${escapeHtml(prod.sku)}</strong></td>
+                    <td>${escapeHtml(prod.brand || '-')}</td>
+                    <td>${escapeHtml(prod.make || '-')}</td>
+                    <td colspan="6">No transactions</strong></td>
+                </tr>`;
+                continue;
+            }
+            for (let t of prodTransactions) {
+                let inQty = 0, outQty = 0;
+                if (t.type === 'purchase' || t.type === 'sales_return' || (t.type === 'adjustment' && t.quantity > 0)) {
+                    inQty = Math.abs(t.quantity);
+                    balance += inQty;
+                } else if (t.type === 'sales' || (t.type === 'adjustment' && t.quantity < 0)) {
+                    outQty = Math.abs(t.quantity);
+                    balance -= outQty;
+                } else if (t.type === 'transfer') {
+                    inQty = 0; outQty = 0;
+                }
+                const typeLabel = t.type === 'purchase' ? 'Purchase' : t.type === 'sales' ? 'Sales' : t.type === 'adjustment' ? 'Adjustment' : t.type === 'transfer' ? 'Transfer' : t.type;
+                html += `<tr>
+                    <td>${escapeHtml(prod.name)}</strong></td>
+                    <td>${escapeHtml(prod.sku)}</strong></td>
+                    <td>${escapeHtml(prod.brand || '-')}</td>
+                    <td>${escapeHtml(prod.make || '-')}</td>
+                    <td>${new Date(t.date).toLocaleDateString()} </strong></td>
+                    <td>${typeLabel} </strong></td>
+                    <td class="in">${inQty > 0 ? inQty : '-'}</strong></td>
+                    <td class="out">${outQty > 0 ? outQty : '-'}</strong></td>
+                    <td>${balance}</strong></td>
+                    <td>${escapeHtml(t.ref || '-')}</strong></td>
+                </tr>`;
+            }
+        }
+        html += '</tbody></table>';
+        document.getElementById('ledgerTable').innerHTML = html;
+    }
+
+    function loadLedger() {
+        transactions = getInventoryTransactions();
+        products = getProducts();
+        displayLedger();
+    }
+
+    function exportToCSV() {
+        const filteredProducts = getFilteredProducts();
+        if (filteredProducts.length === 0) return;
+        let csv = "Product Name,SKU,Brand,Make,Date,Transaction Type,In,Out,Running Balance,Reference\n";
+        for (let prod of filteredProducts) {
+            let balance = 0;
+            const prodTransactions = transactions.filter(t => t.productId == prod.id).sort((a,b) => new Date(a.date) - new Date(b.date));
+            for (let t of prodTransactions) {
+                let inQty = 0, outQty = 0;
+                if (t.type === 'purchase' || t.type === 'sales_return' || (t.type === 'adjustment' && t.quantity > 0)) {
+                    inQty = Math.abs(t.quantity);
+                    balance += inQty;
+                } else if (t.type === 'sales' || (t.type === 'adjustment' && t.quantity < 0)) {
+                    outQty = Math.abs(t.quantity);
+                    balance -= outQty;
+                }
+                csv += `"${escapeCsv(prod.name)}","${escapeCsv(prod.sku)}","${escapeCsv(prod.brand || '')}","${escapeCsv(prod.make || '')}",${t.date},${t.type},${inQty},${outQty},${balance},"${escapeCsv(t.ref || '')}"\n`;
+            }
+        }
+        const blob = new Blob([csv], {type:'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'stock_ledger.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+    function escapeCsv(s) { return `"${(s || '').replace(/"/g, '""')}"`; }
+    function escapeHtml(s) { return (s || '').replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    loadData();
+</script>
+</body>
+</html>
