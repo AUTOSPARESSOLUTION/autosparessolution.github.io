@@ -39,7 +39,7 @@
 
 <script>
     function refreshReport() {
-        let products = getProducts() || [];
+        let products = getProducts();
         const brand = document.getElementById('brandFilter').value;
         const make = document.getElementById('makeFilter').value;
         const group = document.getElementById('groupFilter').value;
@@ -49,15 +49,15 @@
         if (make) filtered = filtered.filter(p => p.make === make);
         if (group) filtered = filtered.filter(p => p.group === group);
         if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
-        filtered.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
+        filtered.sort((a,b) => a.name.localeCompare(b.name));
 
-        // Always display the table, even if empty
-        let html = '<table><thead>
+        // Always show the table, even if empty
+        let html = '<tr><thead>
             <th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price</th><th>Status</th>
-        </table></thead><tbody>';
+        </td></thead><tbody>';
 
         if (filtered.length === 0) {
-            html += '<tr><td colspan="9" style="text-align:center;">No products found</td></tr>';
+            html += '<tr><td colspan="9" style="text-align:center;">No products found.</td></tr>';
         } else {
             filtered.forEach(p => {
                 const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
@@ -74,12 +74,12 @@
                 </tr>`;
             });
         }
-        html += '</tbody></table>';
+        html += '</tbody><table>';
         document.getElementById('stockTable').innerHTML = html;
     }
 
     function populateFilters() {
-        const products = getProducts() || [];
+        const products = getProducts();
         const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
         const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
         const groups = [...new Set(products.map(p => p.group).filter(g => g))].sort();
@@ -98,7 +98,7 @@
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
             const cols = row.querySelectorAll('td');
-            if (cols.length && cols[0].innerText !== 'No products found') {
+            if (cols.length && cols[0].innerText !== 'No products found.') {
                 csv += `"${escapeCsv(cols[0].innerText)}","${escapeCsv(cols[1].innerText)}","${escapeCsv(cols[2].innerText)}","${escapeCsv(cols[3].innerText)}","${escapeCsv(cols[4].innerText)}","${escapeCsv(cols[5].innerText)}",${cols[6].innerText},${cols[7].innerText},"${escapeCsv(cols[8].innerText)}"\n`;
             }
         });
@@ -109,10 +109,8 @@
         const blob = new Blob([csv], {type:'text/csv'});
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
     }
-
     function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     function escapeCsv(s) { return `"${s.replace(/"/g, '""')}"`; }
-
     populateFilters();
     refreshReport();
 </script>
