@@ -31,10 +31,13 @@
         <div class="filter-group"><label>Make</label><select id="makeFilter"><option value="">All</option></select></div>
         <div class="filter-group"><label>Group</label><select id="groupFilter"><option value="">All</option></select></div>
         <div class="filter-group"><label>Line Code</label><input type="text" id="lineCodeFilter" placeholder="e.g., 1001"></div>
-        <div class="filter-group"><button onclick="refreshReport()">Refresh</button><button onclick="exportToCSV()" class="export-btn">Export CSV</button></div>
+        <div class="filter-group">
+            <button onclick="refreshReport()">Refresh</button>
+            <button onclick="exportToCSV()" class="export-btn">Export CSV</button>
+        </div>
     </div>
     <div id="stockTable"></div>
-    <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back</button>
+    <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
 </div>
 
 <script>
@@ -80,14 +83,14 @@
             const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
             html += `
             <tr class="${low ? 'low-stock' : ''}">
-                <td>${escapeHtml(p.sku)}</td>
-                <td>${escapeHtml(p.name)}</td>
+                <td>${escapeHtml(p.sku)}</strong></td>
+                <td><strong>${escapeHtml(p.name)}</strong></td>
                 <td>${escapeHtml(p.brand || '-')}</td>
                 <td>${escapeHtml(p.make || '-')}</td>
                 <td>${escapeHtml(p.group || '-')}</td>
                 <td>${p.lineCode || '-'}</td>
                 <td>${p.currentStock || 0}</td>
-                <td>₹${(p.price || 0).toFixed(2)}</td>
+                <td>₹${(p.price || 0).toFixed(2)}</strong></td>
                 <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
             </tr>`;
         });
@@ -113,19 +116,16 @@
     }
 
     function exportToCSV() {
-        const table = document.querySelector('#stockTable table');
+        const table = document.getElementById('stockTable');
         if (!table) return;
-
         let csv = "SKU,Name,Brand,Make,Group,Line Code,Stock,Price,Status\n";
         const rows = table.querySelectorAll('tbody tr');
-
         rows.forEach(row => {
             const cols = row.querySelectorAll('td');
             if (cols.length) {
                 csv += `"${escapeCsv(cols[0].innerText)}","${escapeCsv(cols[1].innerText)}","${escapeCsv(cols[2].innerText)}","${escapeCsv(cols[3].innerText)}","${escapeCsv(cols[4].innerText)}","${escapeCsv(cols[5].innerText)}",${cols[6].innerText},${cols[7].innerText},"${escapeCsv(cols[8].innerText)}"\n`;
             }
         });
-
         const blob = new Blob([csv], {type:'text/csv'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
