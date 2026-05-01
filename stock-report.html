@@ -44,37 +44,55 @@
         const make = document.getElementById('makeFilter').value;
         const group = document.getElementById('groupFilter').value;
         const lineCode = document.getElementById('lineCodeFilter').value.trim();
+
         let filtered = products;
         if (brand) filtered = filtered.filter(p => p.brand === brand);
         if (make) filtered = filtered.filter(p => p.make === make);
         if (group) filtered = filtered.filter(p => p.group === group);
         if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
-        filtered.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
 
-        // Always show the table, even if empty
-        let html = '<table><thead>
-            <th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price</th><th>Status</th>
-        </tr></thead><tbody>';
+        filtered.sort((a,b) => a.name.localeCompare(b.name));
 
         if (filtered.length === 0) {
-            html += '<tr><td colspan="9" style="text-align:center;">No products found.</td></tr>';
-        } else {
-            filtered.forEach(p => {
-                const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
-                html += `<tr class="${low ? 'low-stock' : ''}">
-                    <td>${escapeHtml(p.sku)}</strong></td>
-                    <td><strong>${escapeHtml(p.name)}</strong></td>
-                    <td>${escapeHtml(p.brand || '-')}</td>
-                    <td>${escapeHtml(p.make || '-')}</td>
-                    <td>${escapeHtml(p.group || '-')}</td>
-                    <td>${p.lineCode || '-'}</td>
-                    <td>${p.currentStock || 0}</td>
-                    <td>₹${(p.price || 0).toFixed(2)}</strong></td>
-                    <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
-                </tr>`;
-            });
+            document.getElementById('stockTable').innerHTML = '<p>No products match.</p>';
+            return;
         }
-        html += '</tbody></table>';
+
+        let html = `
+        <table>
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Name</th>
+                    <th>Brand</th>
+                    <th>Make</th>
+                    <th>Group</th>
+                    <th>Line Code</th>
+                    <th>Stock</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
+
+        filtered.forEach(p => {
+            const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
+            html += `
+            <tr class="${low ? 'low-stock' : ''}">
+                <td>${escapeHtml(p.sku)}</td>
+                <td>${escapeHtml(p.name)}</td>
+                <td>${escapeHtml(p.brand || '-')}</td>
+                <td>${escapeHtml(p.make || '-')}</td>
+                <td>${escapeHtml(p.group || '-')}</td>
+                <td>${p.lineCode || '-'}</td>
+                <td>${p.currentStock || 0}</td>
+                <td>₹${(p.price || 0).toFixed(2)}</td>
+                <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>`;
         document.getElementById('stockTable').innerHTML = html;
     }
 
@@ -83,34 +101,42 @@
         const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
         const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
         const groups = [...new Set(products.map(p => p.group).filter(g => g))].sort();
+
         const brandSelect = document.getElementById('brandFilter');
         brandSelect.innerHTML = '<option value="">All</option>' + brands.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+
         const makeSelect = document.getElementById('makeFilter');
         makeSelect.innerHTML = '<option value="">All</option>' + makes.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+
         const groupSelect = document.getElementById('groupFilter');
         groupSelect.innerHTML = '<option value="">All</option>' + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
     }
 
     function exportToCSV() {
-        const table = document.getElementById('stockTable');
+        const table = document.querySelector('#stockTable table');
         if (!table) return;
+
         let csv = "SKU,Name,Brand,Make,Group,Line Code,Stock,Price,Status\n";
         const rows = table.querySelectorAll('tbody tr');
+
         rows.forEach(row => {
             const cols = row.querySelectorAll('td');
-            if (cols.length && cols[0].innerText !== 'No products found.') {
+            if (cols.length) {
                 csv += `"${escapeCsv(cols[0].innerText)}","${escapeCsv(cols[1].innerText)}","${escapeCsv(cols[2].innerText)}","${escapeCsv(cols[3].innerText)}","${escapeCsv(cols[4].innerText)}","${escapeCsv(cols[5].innerText)}",${cols[6].innerText},${cols[7].innerText},"${escapeCsv(cols[8].innerText)}"\n`;
             }
         });
-        if (csv === "SKU,Name,Brand,Make,Group,Line Code,Stock,Price,Status\n") {
-            alert('No data to export');
-            return;
-        }
+
         const blob = new Blob([csv], {type:'text/csv'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'stock_report.csv';
+        a.click();
+        URL.revokeObjectURL(blob);
     }
-    function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-    function escapeCsv(s) { return `"${s.replace(/"/g, '""')}"`; }
+
+    function escapeHtml(s) { return s ? s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;') : ''; }
+    function escapeCsv(s) { return s.replace(/"/g, '""'); }
+
     populateFilters();
     refreshReport();
 </script>
