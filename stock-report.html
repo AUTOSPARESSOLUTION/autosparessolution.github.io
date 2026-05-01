@@ -9,7 +9,7 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
         h1 { color: #0a7c71; }
         .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
         .filter-group { flex: 1; min-width: 180px; }
@@ -20,8 +20,8 @@
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         .low-stock { background-color: #fff3cd; }
-        .export-btn { background: #6c757d; }
         .import-btn { background: #28a745; }
+        .export-btn { background: #6c757d; }
     </style>
 </head>
 <body>
@@ -76,7 +76,6 @@
                         price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
                         currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
                         reorderLevel: 10,
-                        costPrice: 0,
                         createdAt: new Date().toISOString()
                     });
                     imported++;
@@ -88,10 +87,10 @@
                 refreshReport();
                 populateFilters();
             } else {
-                alert('No new products found.');
+                alert('All products already exist.');
             }
         } catch(e) {
-            alert('Error importing CSV: ' + e.message);
+            alert('Import error: ' + e.message);
         }
     }
 
@@ -111,7 +110,7 @@
             document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv.</p>';
             return;
         }
-        let html = '</td><thead>
+        let html = '<table><thead>
             <th>SKU</th><th>Product Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price (₹)</th><th>Status</th>
         </tr></thead><tbody>';
         filtered.forEach(p => {
@@ -120,7 +119,7 @@
                 <td>${escapeHtml(p.sku)}</strong></td>
                 <td><strong>${escapeHtml(p.name)}</strong></td>
                 <td>${escapeHtml(p.brand || '-')}</td>
-                <td>${escapeHtml(p.make || '-')}<tr>
+                <td>${escapeHtml(p.make || '-')}</td>
                 <td>${escapeHtml(p.group || '-')}</td>
                 <td>${p.lineCode || '-'}</td>
                 <td>${p.currentStock || 0}</td>
@@ -160,8 +159,8 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
     }
 
-    function escapeHtml(s) { return (s || '').replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-    function escapeCsv(s) { return `"${(s || '').replace(/"/g, '""')}"`; }
+    function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function escapeCsv(s) { return `"${s.replace(/"/g, '""')}"`; }
 
     populateFilters();
     refreshReport();
