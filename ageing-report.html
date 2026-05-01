@@ -5,29 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ageing Report – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="data-manager.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; }
-        .filter-box { margin-bottom: 20px; }
+        .filter-box { margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 12px; font-weight: 600; }
+        input, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; }
+        button { background: #0a7c71; color: white; border: none; cursor: pointer; }
+        button:hover { background: #09645a; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         .total-row { background: #f1f3f5; font-weight: bold; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-bottom: 10px; }
-        .export-btn { background: #6c757d; }
+        .export-btn { background: #6c757d; margin-left: 10px; }
+        @media (max-width: 768px) { .filter-box { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
 <body>
 <div class="container">
     <h1><i class="fas fa-chart-line"></i> Customer Ageing Report</h1>
     <div class="filter-box">
-        <label>Cut‑off Date:</label>
-        <input type="date" id="cutoffDate" style="width:200px;">
-        <button onclick="loadReport()">Refresh</button>
-        <button onclick="exportToCSV()" class="export-btn">Export CSV</button>
+        <div class="filter-group">
+            <label>Cut‑off Date</label>
+            <input type="date" id="cutoffDate">
+        </div>
+        <div class="filter-group">
+            <button onclick="loadReport()">Refresh</button>
+            <button onclick="exportToCSV()" class="export-btn">Export CSV</button>
+        </div>
     </div>
     <div id="reportTable"></div>
     <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
@@ -42,19 +50,29 @@
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const cutoff = new Date(document.getElementById('cutoffDate').value);
         if (isNaN(cutoff.getTime())) {
-            // default to today
             document.getElementById('cutoffDate').valueAsDate = new Date();
             return loadReport();
         }
-        // Get only credit invoices (pending payments) – assume status "Pending"
+        // Filter only credit invoices that are pending
         const pendingInvoices = allInvoices.filter(inv => inv.status === 'Pending' && inv.invoiceType === 'credit');
-        // Group by customer
-        const ageingMap = new Map(); // key: customer email
+        // Group by customer email
+        const ageingMap = new Map();
         pendingInvoices.forEach(inv => {
             const customerEmail = inv.customerEmail || inv.buyer?.email;
             if (!customerEmail) return;
-            const invDate = new Date(inv.date.split('/').reverse().join('-'));
-            const dueDate = inv.dueDate ? new Date(inv.dueDate.split('/').reverse().join('-')) : invDate;
+            // Parse invoice date (format DD/MM/YYYY)
+            let invDate;
+            if (inv.date.includes('/')) {
+                const parts = inv.date.split('/');
+                invDate = new Date(parts[2], parts[1]-1, parts[0]);
+            } else {
+                invDate = new Date(inv.date);
+            }
+            let dueDate = inv.dueDate ? new Date(inv.dueDate) : invDate;
+            if (dueDate.toString() === 'Invalid Date' && inv.dueDate) {
+                const parts = inv.dueDate.split('/');
+                if (parts.length === 3) dueDate = new Date(parts[2], parts[1]-1, parts[0]);
+            }
             const daysOverdue = Math.floor((cutoff - dueDate) / (1000*60*60*24));
             let bucket = '0-30';
             if (daysOverdue > 30 && daysOverdue <= 60) bucket = '31-60';
@@ -63,30 +81,29 @@
             else if (daysOverdue <= 0) bucket = 'Not Due';
             const amount = inv.grandTotal || inv.total || 0;
             if (!ageingMap.has(customerEmail)) {
-                ageingMap.set(customerEmail, { name: '', total: 0, buckets: { '0-30':0, '31-60':0, '61-90':0, '90+':0, 'Not Due':0 } });
+                ageingMap.set(customerEmail, { name: '', buckets: { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0 }, total: 0 });
             }
             const entry = ageingMap.get(customerEmail);
-            entry.buckets[bucket] = (entry.buckets[bucket] || 0) + amount;
+            entry.buckets[bucket] += amount;
             entry.total += amount;
-            // set name if not set
             if (!entry.name) {
                 const cust = customers.find(c => c.email === customerEmail);
                 entry.name = cust ? cust.name : customerEmail;
             }
         });
-        // Convert to array and sort
+        // Convert to array and sort by total descending
         const rows = Array.from(ageingMap.entries()).map(([email, data]) => ({ email, ...data }));
         rows.sort((a,b) => b.total - a.total);
-        let html = '</td><thead><tr><th>Customer</th><th>Not Due</th><th>0‑30 Days</th><th>31‑60 Days</th><th>61‑90 Days</th><th>90+ Days</th><th>Total Outstanding</th></tr></thead><tbody>';
+        let html = '</td><thead>运转<th>Customer</th><th>Not Due (₹)</th><th>0‑30 Days (₹)</th><th>31‑60 Days (₹)</th><th>61‑90 Days (₹)</th><th>90+ Days (₹)</th><th>Total Outstanding (₹)</th></tr></thead><tbody>';
         let totals = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0, total:0 };
         rows.forEach(r => {
             html += `<tr>
-                <td>${escapeHtml(r.name)}</td>
-                <td>₹${r.buckets['Not Due'].toFixed(2)}</td>
-                <td>₹${r.buckets['0-30'].toFixed(2)}</td>
-                <td>₹${r.buckets['31-60'].toFixed(2)}</td>
-                <td>₹${r.buckets['61-90'].toFixed(2)}</td>
-                <td>₹${r.buckets['90+'].toFixed(2)}</td>
+                <td>${escapeHtml(r.name)}</strong></td>
+                <td>₹${r.buckets['Not Due'].toFixed(2)}</strong></td>
+                <td>₹${r.buckets['0-30'].toFixed(2)}</strong></td>
+                <td>₹${r.buckets['31-60'].toFixed(2)}</strong></td>
+                <td>₹${r.buckets['61-90'].toFixed(2)}</strong></td>
+                <td>₹${r.buckets['90+'].toFixed(2)}</strong></td>
                 <td><strong>₹${r.total.toFixed(2)}</strong></td>
             </tr>`;
             totals['Not Due'] += r.buckets['Not Due'];
@@ -96,28 +113,47 @@
             totals['90+'] += r.buckets['90+'];
             totals.total += r.total;
         });
-        html += `<tr class="total-row"><td><strong>Total</strong></td><td>₹${totals['Not Due'].toFixed(2)}</td><td>₹${totals['0-30'].toFixed(2)}</td><td>₹${totals['31-60'].toFixed(2)}</td><td>₹${totals['61-90'].toFixed(2)}</td><td>₹${totals['90+'].toFixed(2)}</td><td>₹${totals.total.toFixed(2)}</td></tr>`;
-        html += '</tbody></table>';
+        html += `<tr class="total-row"><td><strong>Total</strong></td>
+                <td><strong>₹${totals['Not Due'].toFixed(2)}</strong></td>
+                <td><strong>₹${totals['0-30'].toFixed(2)}</strong></td>
+                <td><strong>₹${totals['31-60'].toFixed(2)}</strong></td>
+                <td><strong>₹${totals['61-90'].toFixed(2)}</strong></td>
+                <td><strong>₹${totals['90+'].toFixed(2)}</strong></td>
+                <td><strong>₹${totals.total.toFixed(2)}</strong></td>
+            </tr>`;
+        html += '</tbody><tr>';
         document.getElementById('reportTable').innerHTML = html;
     }
 
     function exportToCSV() {
         const table = document.getElementById('reportTable');
         if (!table) return;
-        let csv = "Customer,Not Due,0-30 Days,31-60 Days,61-90 Days,90+ Days,Total Outstanding\n";
+        let csv = "Customer,Not Due (₹),0-30 Days (₹),31-60 Days (₹),61-90 Days (₹),90+ Days (₹),Total Outstanding (₹)\n";
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
-            const cols = row.querySelectorAll('td');
-            if (cols.length) {
-                csv += `"${escapeCsv(cols[0].innerText)}",${cols[1].innerText.replace('₹','')},${cols[2].innerText.replace('₹','')},${cols[3].innerText.replace('₹','')},${cols[4].innerText.replace('₹','')},${cols[5].innerText.replace('₹','')},${cols[6].innerText.replace('₹','')}\n`;
+            const cells = row.querySelectorAll('td');
+            if (cells.length) {
+                csv += `"${escapeCsv(cells[0].innerText)}",${cells[1].innerText.replace('₹','')},${cells[2].innerText.replace('₹','')},${cells[3].innerText.replace('₹','')},${cells[4].innerText.replace('₹','')},${cells[5].innerText.replace('₹','')},${cells[6].innerText.replace('₹','')}\n`;
             }
         });
         const blob = new Blob([csv], {type:'text/csv'});
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'customer_ageing.csv'; a.click(); URL.revokeObjectURL(url);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'customer_ageing.csv';
+        a.click();
+        URL.revokeObjectURL(url);
     }
-    function escapeCsv(s) { return `"${(s || '').replace(/"/g, '""')}"`; }
-    function escapeHtml(s) { return (s || '').replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
+    }
+    function escapeCsv(str) {
+        return `"${(str || '').replace(/"/g, '""')}"`;
+    }
+
+    // Set default cutoff to today
     document.getElementById('cutoffDate').valueAsDate = new Date();
     loadReport();
 </script>
