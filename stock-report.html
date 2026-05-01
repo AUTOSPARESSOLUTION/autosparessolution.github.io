@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Report – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="data-manager.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
@@ -19,7 +18,7 @@
         button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
         .import-btn { background: #28a745; }
         .export-btn { background: #6c757d; }
-        .debug { background: #e9ecef; padding: 5px; margin-bottom: 10px; font-family: monospace; display: none; }
+        .debug { background: #e9ecef; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 12px; display: none; }
         @media (max-width: 768px) { table { font-size: 12px; } }
     </style>
 </head>
@@ -40,6 +39,21 @@
 </div>
 
 <script>
+    // Helper: read products directly from localStorage (no data-manager.js dependency)
+    function getLocalProducts() {
+        const stored = localStorage.getItem('products');
+        if (stored) {
+            try {
+                return JSON.parse(stored);
+            } catch(e) { return []; }
+        }
+        return [];
+    }
+
+    function saveLocalProducts(products) {
+        localStorage.setItem('products', JSON.stringify(products));
+    }
+
     async function importFromCSV() {
         try {
             const res = await fetch('prices.csv');
@@ -52,7 +66,7 @@
             const makeIdx = headers.indexOf('make');
             const priceIdx = headers.indexOf('price');
             const stockIdx = headers.indexOf('stock');
-            let products = getProducts();
+            let products = getLocalProducts();
             let imported = 0;
             for (let i = 1; i < lines.length; i++) {
                 const cols = lines[i].split(',');
@@ -74,7 +88,7 @@
                 }
             }
             if (imported > 0) {
-                saveProducts(products);
+                saveLocalProducts(products);
                 alert(`${imported} products imported.`);
                 loadReport();
             } else {
@@ -86,7 +100,7 @@
     }
 
     function loadReport() {
-        const products = getProducts();
+        const products = getLocalProducts();
         displayProducts(products, document.getElementById('searchInput').value);
     }
 
@@ -95,19 +109,19 @@
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             filtered = products.filter(p =>
-                p.sku?.toLowerCase().includes(term) ||
-                p.name?.toLowerCase().includes(term) ||
-                p.brand?.toLowerCase().includes(term) ||
-                p.make?.toLowerCase().includes(term)
+                (p.sku && p.sku.toLowerCase().includes(term)) ||
+                (p.name && p.name.toLowerCase().includes(term)) ||
+                (p.brand && p.brand.toLowerCase().includes(term)) ||
+                (p.make && p.make.toLowerCase().includes(term))
             );
         }
         if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv, or add products in Product Master.</p>';
+            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv.</p>';
             return;
         }
         let html = '<table><thead>
             <th>SKU</th><th>Product Name</th><th>Brand</th><th>Make</th><th>Stock</th><th>Price (₹)</th><th>Status</th>
-        </tr></thead><tbody>';
+        </table></thead><tbody>';
         filtered.forEach(p => {
             const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
             html += `<tr class="${low ? 'low-stock' : ''}">
@@ -118,20 +132,20 @@
                 <td>${p.currentStock || 0}</td>
                 <td>₹${(p.price || 0).toFixed(2)}</strong></td>
                 <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low Stock' : 'OK'}</td>
-            <tr>`;
+            </tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('stockTable').innerHTML = html;
     }
 
     function searchProducts() {
-        const products = getProducts();
+        const products = getLocalProducts();
         const term = document.getElementById('searchInput').value;
         displayProducts(products, term);
     }
 
     function exportToCSV() {
-        const products = getProducts();
+        const products = getLocalProducts();
         if (!products.length) { alert('No data to export'); return; }
         let csv = "SKU,Product Name,Brand,Make,Stock,Price (₹),Status\n";
         products.forEach(p => {
@@ -145,9 +159,10 @@
     function toggleDebug() {
         const panel = document.getElementById('debugPanel');
         if (panel.style.display === 'none' || panel.style.display === '') {
-            const products = getProducts();
-            panel.innerHTML = `<strong>Products in localStorage:</strong> ${products.length}<br>` +
-                              (products.length > 0 ? `First product: ${JSON.stringify(products[0], null, 2)}` : 'No products.');
+            const products = getLocalProducts();
+            panel.innerHTML = `<strong>Products in localStorage (key "products"):</strong> ${products.length}<br>
+                               ${products.length > 0 ? `First product: ${JSON.stringify(products[0], null, 2)}` : 'No products.'}<br>
+                               Use "Import CSV" to load.`;
             panel.style.display = 'block';
         } else {
             panel.style.display = 'none';
