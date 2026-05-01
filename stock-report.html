@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Report – Auto Spares (Large Data)</title>
+    <title>Stock Report – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="data-manager.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
@@ -20,278 +21,100 @@
         th { background: #0a7c71; color: white; }
         .low-stock { background-color: #fff3cd; }
         .export-btn { background: #6c757d; margin-top: 10px; }
-        .import-btn { background: #28a745; }
-        .pagination { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
-        .page-btn { background: #e9ecef; color: #333; border: 1px solid #ccc; }
-        .page-btn.active { background: #0a7c71; color: white; }
-        .status { margin: 10px 0; font-size: 14px; }
-        .import-progress { display: none; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1><i class="fas fa-chart-line"></i> Stock Report (Large Data Ready)</h1>
+    <h1>Stock Report</h1>
     <div class="filter-box">
         <div class="filter-group"><label>Brand</label><select id="brandFilter"><option value="">All</option></select></div>
         <div class="filter-group"><label>Make</label><select id="makeFilter"><option value="">All</option></select></div>
         <div class="filter-group"><label>Group</label><select id="groupFilter"><option value="">All</option></select></div>
         <div class="filter-group"><label>Line Code</label><input type="text" id="lineCodeFilter" placeholder="e.g., 1001"></div>
-        <div class="filter-group">
-            <button onclick="importCSVtoIndexedDB()" class="import-btn"><i class="fas fa-file-csv"></i> Import CSV</button>
-            <button onclick="refreshReport()">Refresh</button>
-            <button onclick="exportToCSV()" class="export-btn">Export CSV</button>
-        </div>
+        <div class="filter-group"><button onclick="refreshReport()">Refresh</button><button onclick="exportToCSV()" class="export-btn">Export CSV</button></div>
     </div>
-    <div id="statusMsg" class="status"></div>
     <div id="stockTable"></div>
-    <div id="pagination" class="pagination"></div>
     <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back</button>
 </div>
 
 <script>
-    let db = null;
-    let currentPage = 1;
-    let rowsPerPage = 100;
-    let totalRows = 0;
-    let currentFilters = { brand: '', make: '', group: '', lineCode: '' };
-    let allFilteredSkus = []; // store SKUs of filtered results for pagination
+    function refreshReport() {
+        let products = getProducts() || [];
+        const brand = document.getElementById('brandFilter').value;
+        const make = document.getElementById('makeFilter').value;
+        const group = document.getElementById('groupFilter').value;
+        const lineCode = document.getElementById('lineCodeFilter').value.trim();
+        let filtered = products;
+        if (brand) filtered = filtered.filter(p => p.brand === brand);
+        if (make) filtered = filtered.filter(p => p.make === make);
+        if (group) filtered = filtered.filter(p => p.group === group);
+        if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
+        filtered.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
 
-    // Open IndexedDB
-    function openDB() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open('AutoSparesDB', 1);
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => {
-                db = request.result;
-                resolve(db);
-            };
-            request.onupgradeneeded = (e) => {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains('products')) {
-                    const store = db.createObjectStore('products', { keyPath: 'sku' });
-                    store.createIndex('brand', 'brand', { unique: false });
-                    store.createIndex('make', 'make', { unique: false });
-                    store.createIndex('group', 'group', { unique: false });
-                    store.createIndex('lineCode', 'lineCode', { unique: false });
-                }
-            };
-        });
-    }
-
-    // Import CSV into IndexedDB (handles lakhs of rows)
-    async function importCSVtoIndexedDB() {
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.csv';
-        fileInput.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const statusDiv = document.getElementById('statusMsg');
-            statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing... This may take a few minutes.';
-            try {
-                const db = await openDB();
-                const transaction = db.transaction(['products'], 'readwrite');
-                const store = transaction.objectStore('products');
-                store.clear(); // remove old data
-
-                const reader = new FileReader();
-                reader.onload = async (event) => {
-                    const csvText = event.target.result;
-                    const lines = csvText.split('\n');
-                    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-                    const partIdx = headers.indexOf('part');
-                    const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
-                    const brandIdx = headers.indexOf('brand');
-                    const makeIdx = headers.indexOf('make');
-                    const groupIdx = headers.indexOf('group');
-                    const lineCodeIdx = headers.indexOf('linecode');
-                    const priceIdx = headers.indexOf('price');
-                    const stockIdx = headers.indexOf('stock');
-
-                    let imported = 0;
-                    for (let i = 1; i < lines.length; i++) {
-                        const cols = lines[i].split(',');
-                        const sku = cols[partIdx]?.trim();
-                        if (!sku) continue;
-                        const product = {
-                            sku: sku,
-                            name: descIdx !== -1 ? (cols[descIdx]?.trim() || sku) : sku,
-                            brand: brandIdx !== -1 ? cols[brandIdx]?.trim() : '',
-                            make: makeIdx !== -1 ? cols[makeIdx]?.trim() : '',
-                            group: groupIdx !== -1 ? cols[groupIdx]?.trim() : '',
-                            lineCode: lineCodeIdx !== -1 ? (cols[lineCodeIdx]?.trim() || null) : null,
-                            price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
-                            currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
-                            reorderLevel: 10
-                        };
-                        store.put(product);
-                        imported++;
-                        if (i % 1000 === 0) {
-                            statusDiv.innerHTML = `Imported ${imported} products...`;
-                            await new Promise(r => setTimeout(r, 10)); // let UI breathe
-                        }
-                    }
-                    await new Promise((resolve, reject) => {
-                        transaction.oncomplete = resolve;
-                        transaction.onerror = reject;
-                    });
-                    statusDiv.innerHTML = `✅ Import complete: ${imported} products.`;
-                    populateFilters();
-                    refreshReport();
-                };
-                reader.readAsText(file);
-            } catch (err) {
-                statusDiv.innerHTML = 'Error: ' + err.message;
-            }
-        };
-        fileInput.click();
-    }
-
-    // Get filtered SKUs (for pagination)
-    async function getFilteredSkus() {
-        const filters = {
-            brand: document.getElementById('brandFilter').value,
-            make: document.getElementById('makeFilter').value,
-            group: document.getElementById('groupFilter').value,
-            lineCode: document.getElementById('lineCodeFilter').value.trim()
-        };
-        currentFilters = filters;
-        if (!db) await openDB();
-        const transaction = db.transaction(['products'], 'readonly');
-        const store = transaction.objectStore('products');
-        const indexBrand = store.index('brand');
-        const indexMake = store.index('make');
-        const indexGroup = store.index('group');
-        const indexLineCode = store.index('lineCode');
-
-        let allSkus = [];
-        return new Promise((resolve) => {
-            const request = store.openCursor();
-            request.onsuccess = (e) => {
-                const cursor = e.target.result;
-                if (cursor) {
-                    const p = cursor.value;
-                    let match = true;
-                    if (filters.brand && p.brand !== filters.brand) match = false;
-                    if (filters.make && p.make !== filters.make) match = false;
-                    if (filters.group && p.group !== filters.group) match = false;
-                    if (filters.lineCode && p.lineCode != filters.lineCode) match = false;
-                    if (match) allSkus.push(p.sku);
-                    cursor.continue();
-                } else {
-                    resolve(allSkus);
-                }
-            };
-        });
-    }
-
-    async function refreshReport(page = 1) {
-        if (!db) await openDB();
-        const filteredSkus = await getFilteredSkus();
-        totalRows = filteredSkus.length;
-        currentPage = page;
-        const start = (page - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
-        const pageSkus = filteredSkus.slice(start, end);
-
-        if (totalRows === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load data.</p>';
-            document.getElementById('pagination').innerHTML = '';
-            return;
-        }
-
-        // Fetch actual products for these SKUs
-        const transaction = db.transaction(['products'], 'readonly');
-        const store = transaction.objectStore('products');
-        const products = [];
-        for (let sku of pageSkus) {
-            const request = store.get(sku);
-            await new Promise((resolve) => {
-                request.onsuccess = () => {
-                    if (request.result) products.push(request.result);
-                    resolve();
-                };
-            });
-        }
-
+        // Always display the table, even if empty
         let html = '<table><thead>
             <th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price</th><th>Status</th>
-        </tr></thead><tbody>';
-        products.forEach(p => {
-            const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
-            html += `<tr class="${low ? 'low-stock' : ''}">
-                <td>${escapeHtml(p.sku)}</strong></td>
-                <td><strong>${escapeHtml(p.name)}</strong></td>
-                <td>${escapeHtml(p.brand || '-')}</td>
-                <td>${escapeHtml(p.make || '-')}</td>
-                <td>${escapeHtml(p.group || '-')}</td>
-                <td>${p.lineCode || '-'}</td>
-                <td>${p.currentStock || 0}</td>
-                <td>₹${(p.price || 0).toFixed(2)}</strong></td>
-                <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
-            </tr>`;
-        });
-        html += '</tbody><table>';
-        document.getElementById('stockTable').innerHTML = html;
+        </table></thead><tbody>';
 
-        // Pagination controls
-        let totalPages = Math.ceil(totalRows / rowsPerPage);
-        let pagHtml = '';
-        for (let i = 1; i <= totalPages; i++) {
-            pagHtml += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="refreshReport(${i})">${i}</button>`;
+        if (filtered.length === 0) {
+            html += '<tr><td colspan="9" style="text-align:center;">No products found</td></tr>';
+        } else {
+            filtered.forEach(p => {
+                const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
+                html += `<tr class="${low ? 'low-stock' : ''}">
+                    <td>${escapeHtml(p.sku)}</strong></td>
+                    <td><strong>${escapeHtml(p.name)}</strong></td>
+                    <td>${escapeHtml(p.brand || '-')}</td>
+                    <td>${escapeHtml(p.make || '-')}</td>
+                    <td>${escapeHtml(p.group || '-')}</td>
+                    <td>${p.lineCode || '-'}</td>
+                    <td>${p.currentStock || 0}</td>
+                    <td>₹${(p.price || 0).toFixed(2)}</strong></td>
+                    <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
+                </tr>`;
+            });
         }
-        document.getElementById('pagination').innerHTML = pagHtml;
-        document.getElementById('statusMsg').innerHTML = `Showing ${products.length} of ${totalRows} products.`;
+        html += '</tbody></table>';
+        document.getElementById('stockTable').innerHTML = html;
     }
 
-    async function populateFilters() {
-        if (!db) await openDB();
-        const transaction = db.transaction(['products'], 'readonly');
-        const store = transaction.objectStore('products');
-        const brands = new Set();
-        const makes = new Set();
-        const groups = new Set();
-        const request = store.openCursor();
-        request.onsuccess = (e) => {
-            const cursor = e.target.result;
-            if (cursor) {
-                const p = cursor.value;
-                if (p.brand) brands.add(p.brand);
-                if (p.make) makes.add(p.make);
-                if (p.group) groups.add(p.group);
-                cursor.continue();
-            } else {
-                const brandSelect = document.getElementById('brandFilter');
-                brandSelect.innerHTML = '<option value="">All</option>' + [...brands].sort().map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
-                const makeSelect = document.getElementById('makeFilter');
-                makeSelect.innerHTML = '<option value="">All</option>' + [...makes].sort().map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
-                const groupSelect = document.getElementById('groupFilter');
-                groupSelect.innerHTML = '<option value="">All</option>' + [...groups].sort().map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
-                refreshReport();
-            }
-        };
+    function populateFilters() {
+        const products = getProducts() || [];
+        const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
+        const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
+        const groups = [...new Set(products.map(p => p.group).filter(g => g))].sort();
+        const brandSelect = document.getElementById('brandFilter');
+        brandSelect.innerHTML = '<option value="">All</option>' + brands.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+        const makeSelect = document.getElementById('makeFilter');
+        makeSelect.innerHTML = '<option value="">All</option>' + makes.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+        const groupSelect = document.getElementById('groupFilter');
+        groupSelect.innerHTML = '<option value="">All</option>' + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
     }
 
     function exportToCSV() {
-        alert('CSV export for lakhs of rows will be heavy. Use the "Import CSV" to re‑export from source.');
-        // You could implement streaming export, but for simplicity just alert.
+        const table = document.getElementById('stockTable');
+        if (!table) return;
+        let csv = "SKU,Name,Brand,Make,Group,Line Code,Stock,Price,Status\n";
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td');
+            if (cols.length && cols[0].innerText !== 'No products found') {
+                csv += `"${escapeCsv(cols[0].innerText)}","${escapeCsv(cols[1].innerText)}","${escapeCsv(cols[2].innerText)}","${escapeCsv(cols[3].innerText)}","${escapeCsv(cols[4].innerText)}","${escapeCsv(cols[5].innerText)}",${cols[6].innerText},${cols[7].innerText},"${escapeCsv(cols[8].innerText)}"\n`;
+            }
+        });
+        if (csv === "SKU,Name,Brand,Make,Group,Line Code,Stock,Price,Status\n") {
+            alert('No data to export');
+            return;
+        }
+        const blob = new Blob([csv], {type:'text/csv'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
     }
 
     function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function escapeCsv(s) { return `"${s.replace(/"/g, '""')}"`; }
 
-    openDB().then(() => {
-        // Check if any data exists
-        const transaction = db.transaction(['products'], 'readonly');
-        const store = transaction.objectStore('products');
-        const countRequest = store.count();
-        countRequest.onsuccess = () => {
-            if (countRequest.result === 0) {
-                document.getElementById('stockTable').innerHTML = '<p>No products. Click "Import CSV" to load your price list.</p>';
-            } else {
-                populateFilters();
-            }
-        };
-    }).catch(err => console.error(err));
+    populateFilters();
+    refreshReport();
 </script>
 </body>
 </html>
