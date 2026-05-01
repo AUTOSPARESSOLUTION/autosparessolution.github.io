@@ -9,7 +9,7 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
         h1, h2 { color: #0a7c71; }
         .form-section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
         .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
@@ -19,9 +19,7 @@
         button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
         button:hover { background: #09645a; }
         .btn-warning { background: #ffc107; color: #333; }
-        .btn-warning:hover { background: #e0a800; }
         .btn-danger { background: #dc3545; }
-        .btn-danger:hover { background: #c82333; }
         .search-box { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
@@ -41,17 +39,16 @@
         </div>
     </div>
 
-    <!-- Add/Edit Product Form -->
     <div class="form-section">
         <h2 id="formTitle">Add New Product</h2>
         <div class="form-row">
             <div class="form-group"><label>Product Name *</label><input type="text" id="prodName"></div>
-            <div class="form-group"><label>SKU / Part No *</label><input type="text" id="prodSku"></div>
+            <div class="form-group"><label>SKU *</label><input type="text" id="prodSku"></div>
             <div class="form-group"><label>Brand</label><input type="text" id="prodBrand"></div>
         </div>
         <div class="form-row">
             <div class="form-group"><label>Make</label><input type="text" id="prodMake"></div>
-            <div class="form-group"><label>Line Code</label><input type="number" id="prodLineCode"></div>
+            <div class="form-group"><label>Line Code</label><input type="text" id="prodLineCode" placeholder="e.g., 1001"></div>
             <div class="form-group"><label>Group</label><input type="text" id="prodGroup"></div>
         </div>
         <div class="form-row">
@@ -62,7 +59,6 @@
         <div class="form-row">
             <div class="form-group"><label>Current Stock</label><input type="number" id="prodStock" step="1" value="0"></div>
             <div class="form-group"><label>Reorder Level</label><input type="number" id="prodReorder" step="1" value="10"></div>
-            <div class="form-group"><label>Cost Price (optional)</label><input type="number" id="prodCost" step="0.01" value="0"></div>
         </div>
         <div class="form-row">
             <button onclick="saveProduct()">💾 Save</button>
@@ -71,9 +67,8 @@
         </div>
     </div>
 
-    <!-- Search & Table -->
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by name, SKU, brand, make, group...">
+        <input type="text" id="searchInput" placeholder="Search by name, SKU, brand, make...">
         <button onclick="searchProducts()">🔍 Search</button>
         <button onclick="loadProducts()">🔄 Refresh</button>
         <button onclick="exportToCSV()">📄 Export CSV</button>
@@ -96,20 +91,20 @@
         let filtered = products;
         if (term) {
             filtered = products.filter(p =>
-                (p.name && p.name.toLowerCase().includes(term)) ||
-                (p.sku && p.sku.toLowerCase().includes(term)) ||
-                (p.brand && p.brand.toLowerCase().includes(term)) ||
-                (p.make && p.make.toLowerCase().includes(term)) ||
-                (p.group && p.group.toLowerCase().includes(term)) ||
-                (p.lineCode && p.lineCode.toString().includes(term))
+                p.name?.toLowerCase().includes(term) ||
+                p.sku?.toLowerCase().includes(term) ||
+                p.brand?.toLowerCase().includes(term) ||
+                p.make?.toLowerCase().includes(term) ||
+                p.group?.toLowerCase().includes(term) ||
+                p.lineCode?.toString().includes(term)
             );
         }
         if (filtered.length === 0) {
             document.getElementById('productsTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv.</p>';
             return;
         }
-        let html = '</td><thead>
-            <th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Line Code</th><th>Group</th><th>HSN</th><th>Unit</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th>
+        let html = '<table><thead>
+            <th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Line Code</th><th>Group</th><th>HSN</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th>
         </tr></thead><tbody>';
         filtered.forEach(p => {
             const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
@@ -121,17 +116,16 @@
                 <td>${p.lineCode || '-'}</td>
                 <td>${escapeHtml(p.group || '-')}</td>
                 <td>${escapeHtml(p.hsn || '-')}</td>
-                <td>${escapeHtml(p.unit || 'pc')}</td>
                 <td>₹${(p.price || 0).toLocaleString()}</td>
                 <td>${(p.currentStock || 0).toLocaleString()}</td>
                 <td>${low ? '⚠️ Low' : 'OK'}</td>
                 <td class="action-buttons">
                     <button onclick="editProduct('${p.id}')" style="background:#17a2b8;">✏️ Edit</button>
                     <button onclick="deleteProduct('${p.id}')" class="btn-danger">🗑️ Delete</button>
-                </strong></td>
-            <table>`;
+                 </strong></td>
+            </tr>`;
         });
-        html += '</tbody><table>';
+        html += '</tbody></table>';
         document.getElementById('productsTable').innerHTML = html;
     }
 
@@ -145,14 +139,13 @@
             sku: sku,
             brand: document.getElementById('prodBrand').value.trim(),
             make: document.getElementById('prodMake').value.trim(),
-            lineCode: document.getElementById('prodLineCode').value ? parseInt(document.getElementById('prodLineCode').value) : null,
+            lineCode: document.getElementById('prodLineCode').value.trim() || null,
             group: document.getElementById('prodGroup').value.trim(),
             hsn: document.getElementById('prodHsn').value.trim(),
             unit: document.getElementById('prodUnit').value,
             price: parseFloat(document.getElementById('prodPrice').value) || 0,
             currentStock: parseInt(document.getElementById('prodStock').value) || 0,
-            reorderLevel: parseInt(document.getElementById('prodReorder').value) || 0,
-            costPrice: parseFloat(document.getElementById('prodCost').value) || 0,
+            reorderLevel: parseInt(document.getElementById('prodReorder').value) || 10,
             updatedAt: new Date().toISOString()
         };
         if (editId === null) {
@@ -184,13 +177,12 @@
         document.getElementById('prodUnit').value = p.unit || 'pc';
         document.getElementById('prodPrice').value = p.price || 0;
         document.getElementById('prodStock').value = p.currentStock || 0;
-        document.getElementById('prodReorder').value = p.reorderLevel || 0;
-        document.getElementById('prodCost').value = p.costPrice || 0;
+        document.getElementById('prodReorder').value = p.reorderLevel || 10;
         document.getElementById('cancelEditBtn').style.display = 'inline-block';
     }
 
     function deleteProduct(id) {
-        if (!confirm('Delete this product? It may affect invoices.')) return;
+        if (!confirm('Delete this product?')) return;
         products = products.filter(p => p.id != id);
         saveProducts(products);
         loadProducts();
@@ -210,7 +202,6 @@
         document.getElementById('prodPrice').value = '0';
         document.getElementById('prodStock').value = '0';
         document.getElementById('prodReorder').value = '10';
-        document.getElementById('prodCost').value = '0';
         document.getElementById('cancelEditBtn').style.display = 'none';
     }
     function cancelEdit() { clearForm(); }
@@ -249,7 +240,6 @@
                         price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
                         currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
                         reorderLevel: 10,
-                        costPrice: 0,
                         createdAt: new Date().toISOString()
                     });
                     imported++;
@@ -260,24 +250,24 @@
                 alert(`${imported} products imported.`);
                 loadProducts();
             } else {
-                alert('No new products found. They may already exist.');
+                alert('All products already exist.');
             }
         } catch(e) {
-            alert('Error importing CSV: ' + e.message);
+            alert('Import error: ' + e.message);
         }
     }
 
     function exportToCSV() {
-        let csv = "SKU,Name,Brand,Make,Line Code,Group,HSN,Unit,Price,Stock,Reorder Level\n";
+        let csv = "SKU,Name,Brand,Make,Line Code,Group,HSN,Price,Stock,Reorder Level\n";
         products.forEach(p => {
-            csv += `"${p.sku}","${p.name}","${p.brand || ''}","${p.make || ''}","${p.lineCode || ''}","${p.group || ''}","${p.hsn || ''}","${p.unit || 'pc'}",${p.price || 0},${p.currentStock || 0},${p.reorderLevel || 0}\n`;
+            csv += `"${p.sku}","${p.name}","${p.brand || ''}","${p.make || ''}","${p.lineCode || ''}","${p.group || ''}","${p.hsn || ''}",${p.price || 0},${p.currentStock || 0},${p.reorderLevel || 0}\n`;
         });
         const blob = new Blob([csv], {type:'text/csv'});
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'products.csv'; a.click(); URL.revokeObjectURL(blob);
     }
 
-    function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     loadProducts();
 </script>
 </body>
-    </html>
+                                                                    </html>
