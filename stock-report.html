@@ -20,7 +20,9 @@
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
         th { background: #0a7c71; color: white; }
         .low-stock { background-color: #fff3cd; }
-        .export-btn { background: #6c757d; margin-top: 10px; }
+        .export-btn { background: #6c757d; }
+        .import-btn { background: #28a745; }
+        @media (max-width: 768px) { .filter-box { flex-direction: column; } }
     </style>
 </head>
 <body>
@@ -31,13 +33,69 @@
         <div class="filter-group"><label>Make</label><select id="makeFilter"><option value="">All</option></select></div>
         <div class="filter-group"><label>Group</label><select id="groupFilter"><option value="">All</option></select></div>
         <div class="filter-group"><label>Line Code</label><input type="text" id="lineCodeFilter" placeholder="e.g., 1001"></div>
-        <div class="filter-group"><button onclick="refreshReport()">Refresh</button><button onclick="exportToCSV()" class="export-btn">Export CSV</button></div>
+        <div class="filter-group">
+            <button onclick="refreshReport()">Refresh</button>
+            <button onclick="importFromCSV()" class="import-btn"><i class="fas fa-file-csv"></i> Import CSV</button>
+            <button onclick="exportToCSV()" class="export-btn">Export CSV</button>
+        </div>
     </div>
     <div id="stockTable"></div>
     <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back</button>
 </div>
 
 <script>
+    async function importFromCSV() {
+        try {
+            const res = await fetch('prices.csv');
+            const csv = await res.text();
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const partIdx = headers.indexOf('part');
+            const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
+            const brandIdx = headers.indexOf('brand');
+            const makeIdx = headers.indexOf('make');
+            const groupIdx = headers.indexOf('group');
+            const lineCodeIdx = headers.indexOf('linecode');
+            const hsnIdx = headers.indexOf('hsn');
+            const priceIdx = headers.indexOf('price');
+            const stockIdx = headers.indexOf('stock');
+            let imported = 0;
+            let products = getProducts();
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                const part = cols[partIdx]?.trim();
+                if (!part) continue;
+                if (!products.find(p => p.sku === part)) {
+                    products.push({
+                        id: Date.now() + Math.random(),
+                        name: descIdx !== -1 ? cols[descIdx]?.trim() || part : part,
+                        sku: part,
+                        brand: brandIdx !== -1 ? cols[brandIdx]?.trim() : '',
+                        make: makeIdx !== -1 ? cols[makeIdx]?.trim() : '',
+                        group: groupIdx !== -1 ? cols[groupIdx]?.trim() : '',
+                        lineCode: lineCodeIdx !== -1 ? (cols[lineCodeIdx]?.trim() || null) : null,
+                        hsn: hsnIdx !== -1 ? cols[hsnIdx]?.trim() : '',
+                        price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
+                        currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
+                        reorderLevel: 10,
+                        createdAt: new Date().toISOString()
+                    });
+                    imported++;
+                }
+            }
+            if (imported) {
+                saveProducts(products);
+                alert(`${imported} products imported.`);
+                refreshReport();
+                populateFilters();
+            } else {
+                alert('No new products found. They may already exist.');
+            }
+        } catch(e) {
+            alert('Import error: ' + e.message);
+        }
+    }
+
     function refreshReport() {
         let products = getProducts();
         const brand = document.getElementById('brandFilter').value;
@@ -51,10 +109,12 @@
         if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
         filtered.sort((a,b) => a.name.localeCompare(b.name));
         if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products match.</p>';
+            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv, or add products in Product Master.</p>';
             return;
         }
-        let html = '<tr><thead>运转<th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price</th><th>Status</th></tr></thead><tbody>';
+        let html = '<table><thead>
+            <th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price</th><th>Status</th>
+        </td></thead><tbody>';
         filtered.forEach(p => {
             const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
             html += `<tr class="${low ? 'low-stock' : ''}">
@@ -75,6 +135,7 @@
 
     function populateFilters() {
         const products = getProducts();
+        if (products.length === 0) return;
         const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
         const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
         const groups = [...new Set(products.map(p => p.group).filter(g => g))].sort();
@@ -102,6 +163,8 @@
     }
     function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     function escapeCsv(s) { return `"${s.replace(/"/g, '""')}"`; }
+
+    // Try to populate filters and report; if products empty, show the import button's effect
     populateFilters();
     refreshReport();
 </script>
