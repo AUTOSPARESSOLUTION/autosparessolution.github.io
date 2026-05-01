@@ -44,6 +44,132 @@
 </div>
 
 <script>
+    // Helper: get products from localStorage (via data-manager.js)
+    function getProductsFromMaster() {
+        if (typeof getProducts === 'function') return getProducts();
+        const stored = localStorage.getItem('products');
+        return stored ? JSON.parse(stored) : [];
+    }
+
+    // Compute stock from purchase and sales invoices
+    function computeStockFromTransactions() {
+        const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        const allSales = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        const salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+        const combinedSales = [...allSales, ...salesInvoices];
+
+        const stockMap = new Map(); // key = sku/part
+
+        // Process purchases (IN)
+        purchaseInvoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                const sku = item.productId || item.part || item.sku;
+                if (!sku) return;
+                const qty = parseFloat(item.quantity || item.qty || 0);
+                const cost = parseFloat(item.cost || item.price || 0);
+                const desc = item.desc || item.productName || '';
+                if (!stockMap.has(sku)) {
+                    stockMap.set(sku, { sku, name: desc, stock: 0, price: cost, brand: '', make: '', group: '', lineCode: '' });
+                }
+                const entry = stockMap.get(sku);
+                entry.stock += qty;
+                if (entry.price === 0 && cost > 0) entry.price = cost;
+                if (!entry.name && desc) entry.name = desc;
+            });
+        });
+
+        // Process sales (OUT)
+        combinedSales.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                const sku = item.productId || item.part || item.sku;
+                if (!sku) return;
+                const qty = parseFloat(item.quantity || item.qty || 0);
+                const price = parseFloat(item.price || 0);
+                const desc = item.desc || '';
+                if (!stockMap.has(sku)) {
+                    stockMap.set(sku, { sku, name: desc, stock: 0, price: price, brand: '', make: '', group: '', lineCode: '' });
+                }
+                const entry = stockMap.get(sku);
+                entry.stock -= qty;
+                if (entry.price === 0 && price > 0) entry.price = price;
+                if (!entry.name && desc) entry.name = desc;
+            });
+        });
+
+        // Enrich with product master data (brand, make, group, lineCode, better name)
+        const masterProducts = getProductsFromMaster();
+        for (let [sku, entry] of stockMap.entries()) {
+            const master = masterProducts.find(p => p.sku === sku);
+            if (master) {
+                entry.name = master.name || entry.name;
+                entry.brand = master.brand || '';
+                entry.make = master.make || '';
+                entry.group = master.group || '';
+                entry.lineCode = master.lineCode || '';
+                if (entry.price === 0 && master.price) entry.price = master.price;
+            }
+        }
+        // Convert to array
+        let result = Array.from(stockMap.values());
+        result.sort((a,b) => a.sku.localeCompare(b.sku));
+        return result;
+    }
+
+    // Populate filter dropdowns from product master (if any)
+    function populateFiltersFromMaster() {
+        const products = getProductsFromMaster();
+        if (!products.length) return;
+        const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
+        const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
+        const groups = [...new Set(products.map(p => p.group).filter(g => g))].sort();
+        const brandSelect = document.getElementById('brandFilter');
+        brandSelect.innerHTML = '<option value="">All</option>' + brands.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+        const makeSelect = document.getElementById('makeFilter');
+        makeSelect.innerHTML = '<option value="">All</option>' + makes.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+        const groupSelect = document.getElementById('groupFilter');
+        groupSelect.innerHTML = '<option value="">All</option>' + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
+    }
+
+    function refreshReport() {
+        let stockData = computeStockFromTransactions();
+        if (stockData.length === 0) {
+            document.getElementById('stockTable').innerHTML = '<p>No stock data found (no purchase or sales transactions). Import CSV or create invoices.</p>';
+            return;
+        }
+        // Apply filters
+        const brand = document.getElementById('brandFilter').value;
+        const make = document.getElementById('makeFilter').value;
+        const group = document.getElementById('groupFilter').value;
+        const lineCodeRaw = document.getElementById('lineCodeFilter').value.trim();
+        let filtered = stockData;
+        if (brand) filtered = filtered.filter(p => p.brand === brand);
+        if (make) filtered = filtered.filter(p => p.make === make);
+        if (group) filtered = filtered.filter(p => p.group === group);
+        if (lineCodeRaw) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCodeRaw);
+        filtered.sort((a,b) => a.name.localeCompare(b.name));
+
+        let html = '<table><thead>
+            <th>SKU</th><th>Product Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price (₹)</th><th>Status</th>
+        </tr></thead><tbody>';
+        filtered.forEach(p => {
+            const low = (p.stock || 0) <= 10; // reorder level assumed 10, can be adjusted
+            html += `<tr class="${low ? 'low-stock' : ''}">
+                <td>${escapeHtml(p.sku)}</strong></td>
+                <td>${escapeHtml(p.name)}</strong></td>
+                <td>${escapeHtml(p.brand || '-')}</td>
+                <td>${escapeHtml(p.make || '-')}</td>
+                <td>${escapeHtml(p.group || '-')}</td>
+                <td>${p.lineCode || '-'}</td>
+                <td>${p.stock || 0}</td>
+                <td>₹${(p.price || 0).toFixed(2)}</strong></td>
+                <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
+            </tr>`;
+        });
+        html += '</tbody></tr>';
+        document.getElementById('stockTable').innerHTML = html;
+    }
+
+    // Import CSV (identical to Product Master)
     async function importFromCSV() {
         try {
             const res = await fetch('prices.csv');
@@ -56,11 +182,10 @@
             const makeIdx = headers.indexOf('make');
             const groupIdx = headers.indexOf('group');
             const lineCodeIdx = headers.indexOf('linecode');
-            const hsnIdx = headers.indexOf('hsn');
             const priceIdx = headers.indexOf('price');
             const stockIdx = headers.indexOf('stock');
             let imported = 0;
-            let products = getProducts();
+            let products = getProductsFromMaster();
             for (let i = 1; i < lines.length; i++) {
                 const cols = lines[i].split(',');
                 const part = cols[partIdx]?.trim();
@@ -74,7 +199,6 @@
                         make: makeIdx !== -1 ? cols[makeIdx]?.trim() : '',
                         group: groupIdx !== -1 ? cols[groupIdx]?.trim() : '',
                         lineCode: lineCodeIdx !== -1 ? (cols[lineCodeIdx]?.trim() || null) : null,
-                        hsn: hsnIdx !== -1 ? cols[hsnIdx]?.trim() : '',
                         price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
                         currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
                         reorderLevel: 10,
@@ -86,71 +210,20 @@
             if (imported) {
                 saveProducts(products);
                 alert(`${imported} products imported.`);
+                populateFiltersFromMaster();
                 refreshReport();
-                populateFilters();
             } else {
-                alert('No new products found. They may already exist.');
+                alert('No new products found.');
             }
         } catch(e) {
             alert('Import error: ' + e.message);
         }
     }
 
-    function refreshReport() {
-        let products = getProducts();
-        const brand = document.getElementById('brandFilter').value;
-        const make = document.getElementById('makeFilter').value;
-        const group = document.getElementById('groupFilter').value;
-        const lineCode = document.getElementById('lineCodeFilter').value.trim();
-        let filtered = products;
-        if (brand) filtered = filtered.filter(p => p.brand === brand);
-        if (make) filtered = filtered.filter(p => p.make === make);
-        if (group) filtered = filtered.filter(p => p.group === group);
-        if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
-        filtered.sort((a,b) => a.name.localeCompare(b.name));
-        if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv, or add products in Product Master.</p>';
-            return;
-        }
-        let html = '<table><thead>
-            <th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price</th><th>Status</th>
-        </td></thead><tbody>';
-        filtered.forEach(p => {
-            const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
-            html += `<tr class="${low ? 'low-stock' : ''}">
-                <td>${escapeHtml(p.sku)}</strong></td>
-                <td>${escapeHtml(p.name)}</strong></td>
-                <td>${escapeHtml(p.brand || '-')}</td>
-                <td>${escapeHtml(p.make || '-')}</td>
-                <td>${escapeHtml(p.group || '-')}</td>
-                <td>${p.lineCode || '-'}</td>
-                <td>${p.currentStock || 0}</td>
-                <td>₹${(p.price || 0).toFixed(2)}</strong></td>
-                <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
-            </tr>`;
-        });
-        html += '</tbody></table>';
-        document.getElementById('stockTable').innerHTML = html;
-    }
-
-    function populateFilters() {
-        const products = getProducts();
-        if (products.length === 0) return;
-        const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
-        const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
-        const groups = [...new Set(products.map(p => p.group).filter(g => g))].sort();
-        const brandSelect = document.getElementById('brandFilter');
-        brandSelect.innerHTML = '<option value="">All</option>' + brands.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
-        const makeSelect = document.getElementById('makeFilter');
-        makeSelect.innerHTML = '<option value="">All</option>' + makes.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
-        const groupSelect = document.getElementById('groupFilter');
-        groupSelect.innerHTML = '<option value="">All</option>' + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
-    }
-
     function exportToCSV() {
         const table = document.getElementById('stockTable');
         if (!table) return;
-        let csv = "SKU,Name,Brand,Make,Group,Line Code,Stock,Price,Status\n";
+        let csv = "SKU,Product Name,Brand,Make,Group,Line Code,Stock,Price (₹),Status\n";
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
             const cols = row.querySelectorAll('td');
@@ -161,11 +234,12 @@
         const blob = new Blob([csv], {type:'text/csv'});
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
     }
+
     function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     function escapeCsv(s) { return `"${s.replace(/"/g, '""')}"`; }
 
-    // Try to populate filters and report; if products empty, show the import button's effect
-    populateFilters();
+    // Initial load
+    populateFiltersFromMaster();
     refreshReport();
 </script>
 </body>
