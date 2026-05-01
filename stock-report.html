@@ -110,7 +110,7 @@
             document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv.</p>';
             return;
         }
-        let html = '<table><thead>
+        let html = '</table><thead>
             <th>SKU</th><th>Product Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price (₹)</th><th>Status</th>
         </tr></thead><tbody>';
         filtered.forEach(p => {
