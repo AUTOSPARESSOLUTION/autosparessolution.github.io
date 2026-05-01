@@ -9,7 +9,7 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; }
         .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
         .filter-group { flex: 1; min-width: 180px; }
@@ -20,18 +20,17 @@
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         .low-stock { background-color: #fff3cd; }
-        .import-btn { background: #28a745; }
         .export-btn { background: #6c757d; }
+        .import-btn { background: #28a745; }
+        @media (max-width: 768px) { .filter-box { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
 <body>
 <div class="container">
     <h1><i class="fas fa-chart-line"></i> Stock Report</h1>
     <div class="filter-box">
-        <div class="filter-group"><label>Brand</label><select id="brandFilter"><option value="">All</option></select></div>
-        <div class="filter-group"><label>Make</label><select id="makeFilter"><option value="">All</option></select></div>
-        <div class="filter-group"><label>Group</label><select id="groupFilter"><option value="">All</option></select></div>
-        <div class="filter-group"><label>Line Code</label><input type="text" id="lineCodeFilter" placeholder="e.g., 1001"></div>
+        <div class="filter-group"><label>Filter by Brand</label><select id="brandFilter"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Filter by Make</label><select id="makeFilter"><option value="">All</option></select></div>
         <div class="filter-group">
             <button onclick="refreshReport()"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button onclick="importFromCSV()" class="import-btn"><i class="fas fa-file-csv"></i> Import CSV</button>
@@ -43,6 +42,7 @@
 </div>
 
 <script>
+    // The import function (identical to Product Master's)
     async function importFromCSV() {
         try {
             const res = await fetch('prices.csv');
@@ -53,7 +53,6 @@
             const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
             const brandIdx = headers.indexOf('brand');
             const makeIdx = headers.indexOf('make');
-            const hsnIdx = headers.indexOf('hsn');
             const priceIdx = headers.indexOf('price');
             const stockIdx = headers.indexOf('stock');
             let imported = 0;
@@ -69,10 +68,6 @@
                         sku: part,
                         brand: brandIdx !== -1 ? cols[brandIdx]?.trim() : '',
                         make: makeIdx !== -1 ? cols[makeIdx]?.trim() : '',
-                        lineCode: null,
-                        group: '',
-                        hsn: hsnIdx !== -1 ? cols[hsnIdx]?.trim() : '',
-                        unit: 'pc',
                         price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
                         currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
                         reorderLevel: 10,
@@ -98,20 +93,16 @@
         let products = getProducts();
         const brand = document.getElementById('brandFilter').value;
         const make = document.getElementById('makeFilter').value;
-        const group = document.getElementById('groupFilter').value;
-        const lineCode = document.getElementById('lineCodeFilter').value.trim();
         let filtered = products;
         if (brand) filtered = filtered.filter(p => p.brand === brand);
         if (make) filtered = filtered.filter(p => p.make === make);
-        if (group) filtered = filtered.filter(p => p.group === group);
-        if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
         filtered.sort((a,b) => a.name.localeCompare(b.name));
         if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv.</p>';
+            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv (or add products in Product Master).</p>';
             return;
         }
-        let html = '</table><thead>
-            <th>SKU</th><th>Product Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price (₹)</th><th>Status</th>
+        let html = '<tr><thead>
+            <th>SKU</th><th>Product Name</th><th>Brand</th><th>Make</th><th>Stock</th><th>Price (₹)</th><th>Status</th>
         </tr></thead><tbody>';
         filtered.forEach(p => {
             const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
@@ -120,8 +111,6 @@
                 <td><strong>${escapeHtml(p.name)}</strong></td>
                 <td>${escapeHtml(p.brand || '-')}</td>
                 <td>${escapeHtml(p.make || '-')}</td>
-                <td>${escapeHtml(p.group || '-')}</td>
-                <td>${p.lineCode || '-'}</td>
                 <td>${p.currentStock || 0}</td>
                 <td>₹${(p.price || 0).toFixed(2)}</strong></td>
                 <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low Stock' : 'OK'}</td>
@@ -135,28 +124,26 @@
         const products = getProducts();
         const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
         const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
-        const groups = [...new Set(products.map(p => p.group).filter(g => g))].sort();
         const brandSelect = document.getElementById('brandFilter');
         brandSelect.innerHTML = '<option value="">All</option>' + brands.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
         const makeSelect = document.getElementById('makeFilter');
         makeSelect.innerHTML = '<option value="">All</option>' + makes.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
-        const groupSelect = document.getElementById('groupFilter');
-        groupSelect.innerHTML = '<option value="">All</option>' + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
     }
 
     function exportToCSV() {
-        const table = document.getElementById('stockTable');
-        if (!table.querySelector('tbody tr')) { alert('No data to export'); return; }
-        let csv = "SKU,Product Name,Brand,Make,Group,Line Code,Stock,Price (₹),Status\n";
-        const rows = table.querySelectorAll('tbody tr');
-        rows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length) {
-                csv += `"${escapeCsv(cells[0].innerText)}","${escapeCsv(cells[1].innerText)}","${escapeCsv(cells[2].innerText)}","${escapeCsv(cells[3].innerText)}","${escapeCsv(cells[4].innerText)}","${escapeCsv(cells[5].innerText)}","${cells[6].innerText}","${cells[7].innerText.replace('₹', '')}","${escapeCsv(cells[8].innerText)}"\n`;
-            }
+        const products = getProducts();
+        if (!products.length) { alert('No data to export'); return; }
+        let csv = "SKU,Product Name,Brand,Make,Stock,Price (₹),Status\n";
+        products.forEach(p => {
+            const status = (p.currentStock || 0) <= (p.reorderLevel || 0) ? 'Low Stock' : 'OK';
+            csv += `"${escapeCsv(p.sku)}","${escapeCsv(p.name)}","${escapeCsv(p.brand || '')}","${escapeCsv(p.make || '')}",${p.currentStock || 0},${p.price || 0},"${status}"\n`;
         });
         const blob = new Blob([csv], {type:'text/csv'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'stock_report.csv';
+        a.click();
+        URL.revokeObjectURL(blob);
     }
 
     function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
