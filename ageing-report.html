@@ -47,6 +47,7 @@
 <script>
     let allInvoices = [];
     let customers = [];
+    let allPayments = [];
 
     // Helper to parse date in multiple formats (DD/MM/YYYY or YYYY-MM-DD)
     function parseDate(dateStr) {
@@ -61,7 +62,9 @@
     function loadReport() {
         allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        allPayments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
         console.log('All invoices loaded:', allInvoices.length);
+        console.log('All payments loaded:', allPayments.length);
         
         const cutoffElem = document.getElementById('cutoffDate');
         let cutoff = new Date(cutoffElem.value);
@@ -70,57 +73,103 @@
             cutoffElem.valueAsDate = cutoff;
         }
         
-        // Filter only credit invoices that are pending (not paid)
-        const pendingInvoices = allInvoices.filter(inv => 
-            (inv.status === 'Pending' || inv.status === 'pending') && inv.invoiceType === 'credit'
-        );
-        console.log('Pending credit invoices:', pendingInvoices.length);
-        
-        if (pendingInvoices.length === 0) {
-            document.getElementById('reportTable').innerHTML = '<p>No pending credit invoices found.</p>';
-            return;
+        // Group payments by customer
+        const paymentsByCustomer = new Map();
+        allPayments.forEach(p => {
+            const customerEmail = p.customerEmail;
+            if (!customerEmail) return;
+            if (!paymentsByCustomer.has(customerEmail)) paymentsByCustomer.set(customerEmail, []);
+            paymentsByCustomer.get(customerEmail).push({
+                date: p.date,
+                amount: p.amount
+            });
+        });
+        // Sort payments by date for each customer
+        for (let [email, payments] of paymentsByCustomer.entries()) {
+            payments.sort((a,b) => new Date(a.date) - new Date(b.date));
         }
+
+        // Get all credit invoices (pending only? Actually we need all credit invoices to apply payments,
+        // but ageing should only show those with outstanding balance. We'll keep all credit invoices,
+        // then later filter out ones with zero outstanding after payments.
+        // But also we need to ignore invoices that are already fully paid or paid in advance? We'll compute outstanding.
+        let creditInvoices = allInvoices.filter(inv => inv.invoiceType === 'credit');
         
-        const ageingMap = new Map();
-        pendingInvoices.forEach(inv => {
+        // Group invoices by customer and sort by date (oldest first for FIFO)
+        const invoicesByCustomer = new Map();
+        creditInvoices.forEach(inv => {
             const customerEmail = inv.customerEmail || inv.buyer?.email;
-            if (!customerEmail) {
-                console.warn('Invoice without customer email:', inv);
-                return;
-            }
-            // Parse invoice date
+            if (!customerEmail) return;
+            // Parse dates
             let invDate = parseDate(inv.date);
-            if (!invDate || isNaN(invDate.getTime())) {
-                console.warn('Invalid invoice date:', inv.date);
-                return;
-            }
-            // Parse due date (if available, else use invoice date)
+            if (!invDate || isNaN(invDate.getTime())) return;
             let dueDate = inv.dueDate ? parseDate(inv.dueDate) : invDate;
             if (!dueDate || isNaN(dueDate.getTime())) dueDate = invDate;
-            
-            const daysOverdue = Math.floor((cutoff - dueDate) / (1000*60*60*24));
-            let bucket = '0-30';
-            if (daysOverdue > 30 && daysOverdue <= 60) bucket = '31-60';
-            else if (daysOverdue > 60 && daysOverdue <= 90) bucket = '61-90';
-            else if (daysOverdue > 90) bucket = '90+';
-            else if (daysOverdue <= 0) bucket = 'Not Due';
-            
             const amount = inv.grandTotal || inv.total || 0;
-            if (!ageingMap.has(customerEmail)) {
-                const cust = customers.find(c => c.email === customerEmail);
-                ageingMap.set(customerEmail, {
-                    name: cust ? cust.name : customerEmail,
-                    buckets: { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0 },
-                    total: 0
-                });
-            }
-            const entry = ageingMap.get(customerEmail);
-            entry.buckets[bucket] += amount;
-            entry.total += amount;
+            if (amount <= 0) return;
+            if (!invoicesByCustomer.has(customerEmail)) invoicesByCustomer.set(customerEmail, []);
+            invoicesByCustomer.get(customerEmail).push({
+                id: inv.id,
+                date: invDate,
+                dueDate: dueDate,
+                originalAmount: amount,
+                outstanding: amount,
+                paid: 0
+            });
         });
-        
+        // Sort invoices by date (oldest first) for FIFO payment application
+        for (let [email, invoices] of invoicesByCustomer.entries()) {
+            invoices.sort((a,b) => a.date - b.date);
+        }
+
+        // Apply payments to invoices (FIFO)
+        for (let [customerEmail, payments] of paymentsByCustomer.entries()) {
+            const invoices = invoicesByCustomer.get(customerEmail);
+            if (!invoices || invoices.length === 0) continue;
+            let paymentIndex = 0;
+            let remainingPayment = 0;
+            for (let inv of invoices) {
+                if (inv.outstanding <= 0) continue;
+                while (paymentIndex < payments.length) {
+                    const payment = payments[paymentIndex];
+                    if (remainingPayment === 0) {
+                        remainingPayment = payment.amount;
+                        paymentIndex++;
+                    }
+                    const applyToInv = Math.min(remainingPayment, inv.outstanding);
+                    inv.outstanding -= applyToInv;
+                    remainingPayment -= applyToInv;
+                    if (inv.outstanding === 0) break;
+                    if (remainingPayment === 0) continue;
+                }
+                if (remainingPayment === 0 && paymentIndex >= payments.length) break;
+            }
+        }
+
+        // Now build ageing map with invoices that still have outstanding > 0
+        const ageingMap = new Map(); // key: customerEmail
+        for (let [customerEmail, invoices] of invoicesByCustomer.entries()) {
+            let totalOutstanding = 0;
+            const buckets = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0 };
+            for (let inv of invoices) {
+                if (inv.outstanding <= 0) continue;
+                totalOutstanding += inv.outstanding;
+                const daysOverdue = Math.floor((cutoff - inv.dueDate) / (1000*60*60*24));
+                let bucket = '0-30';
+                if (daysOverdue > 30 && daysOverdue <= 60) bucket = '31-60';
+                else if (daysOverdue > 60 && daysOverdue <= 90) bucket = '61-90';
+                else if (daysOverdue > 90) bucket = '90+';
+                else if (daysOverdue <= 0) bucket = 'Not Due';
+                buckets[bucket] += inv.outstanding;
+            }
+            if (totalOutstanding === 0) continue;
+            const cust = customers.find(c => c.email === customerEmail);
+            const customerName = cust ? cust.name : customerEmail;
+            ageingMap.set(customerEmail, { name: customerName, buckets, total: totalOutstanding });
+        }
+
         if (ageingMap.size === 0) {
-            document.getElementById('reportTable').innerHTML = '<p>No ageing data to display (no invoices with due dates?).</p>';
+            document.getElementById('reportTable').innerHTML = '<p>No outstanding dues after applying payments.</p>';
             return;
         }
         
@@ -131,12 +180,12 @@
         let totals = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0, total:0 };
         rows.forEach(r => {
             html += `<tr>
-                <td>${escapeHtml(r.name)}</td>
-                <td>₹${r.buckets['Not Due'].toFixed(2)}</td>
-                <td>₹${r.buckets['0-30'].toFixed(2)}</td>
-                <td>₹${r.buckets['31-60'].toFixed(2)}</td>
-                <td>₹${r.buckets['61-90'].toFixed(2)}</td>
-                <td>₹${r.buckets['90+'].toFixed(2)}</td>
+                <td>${escapeHtml(r.name)}</strong></td>
+                <td>₹${r.buckets['Not Due'].toFixed(2)}</strong></td>
+                <td>₹${r.buckets['0-30'].toFixed(2)}</strong></td>
+                <td>₹${r.buckets['31-60'].toFixed(2)}</strong></td>
+                <td>₹${r.buckets['61-90'].toFixed(2)}</strong></td>
+                <td>₹${r.buckets['90+'].toFixed(2)}</strong></td>
                 <td><strong>₹${r.total.toFixed(2)}</strong></td>
             </tr>`;
             totals['Not Due'] += r.buckets['Not Due'];
@@ -155,7 +204,7 @@
             <td><strong>₹${totals['90+'].toFixed(2)}</strong></td>
             <td><strong>₹${totals.total.toFixed(2)}</strong></td>
         </tr>`;
-        html += '</tbody></td>';
+        html += '</tbody></table>';
         document.getElementById('reportTable').innerHTML = html;
     }
 
@@ -186,10 +235,10 @@
         const panel = document.getElementById('debugPanel');
         if (panel.style.display === 'none' || panel.style.display === '') {
             let inv = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-            const pending = inv.filter(i => i.status === 'Pending' && i.invoiceType === 'credit');
+            let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
             panel.innerHTML = `<strong>All invoices count:</strong> ${inv.length}<br>
-                               <strong>Pending credit invoices:</strong> ${pending.length}<br>
-                               <strong>First pending invoice (if any):</strong><br>${JSON.stringify(pending[0] || {}, null, 2)}`;
+                               <strong>Payments count:</strong> ${payments.length}<br>
+                               <strong>Sample payment:</strong><br>${JSON.stringify(payments[0] || {}, null, 2)}`;
             panel.style.display = 'block';
         } else {
             panel.style.display = 'none';
