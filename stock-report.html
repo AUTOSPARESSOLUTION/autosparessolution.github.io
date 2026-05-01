@@ -21,6 +21,8 @@
         th { background: #0a7c71; color: white; }
         .low-stock { background-color: #fff3cd; }
         .export-btn { background: #6c757d; }
+        .import-btn { background: #28a745; }
+        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 12px; display: none; }
         @media (max-width: 768px) { .filter-box { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
@@ -30,18 +32,73 @@
     <div class="filter-box">
         <div class="filter-group"><label>Brand</label><select id="brandFilter"><option value="">All</option></select></div>
         <div class="filter-group"><label>Make</label><select id="makeFilter"><option value="">All</option></select></div>
-        <div class="filter-group"><label>Group (Category)</label><select id="groupFilter"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Group</label><select id="groupFilter"><option value="">All</option></select></div>
         <div class="filter-group"><label>Line Code</label><input type="text" id="lineCodeFilter" placeholder="e.g., 1001"></div>
         <div class="filter-group">
             <button onclick="refreshReport()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button onclick="importFromCSV()" class="import-btn"><i class="fas fa-file-csv"></i> Import CSV</button>
             <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
+            <button onclick="toggleDebug()" style="background:#ffc107; color:#333;"><i class="fas fa-bug"></i> Debug</button>
         </div>
     </div>
+    <div id="debugPanel" class="debug"></div>
     <div id="stockTable"></div>
     <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
 </div>
 
 <script>
+    async function importFromCSV() {
+        try {
+            const res = await fetch('prices.csv');
+            const csv = await res.text();
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const partIdx = headers.indexOf('part');
+            const descIdx = headers.indexOf('desc') !== -1 ? headers.indexOf('desc') : headers.indexOf('description');
+            const brandIdx = headers.indexOf('brand');
+            const makeIdx = headers.indexOf('make');
+            const hsnIdx = headers.indexOf('hsn');
+            const priceIdx = headers.indexOf('price');
+            const stockIdx = headers.indexOf('stock');
+            let imported = 0;
+            let products = getProducts();
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                const part = cols[partIdx]?.trim();
+                if (!part) continue;
+                if (!products.find(p => p.sku === part)) {
+                    products.push({
+                        id: Date.now() + Math.random(),
+                        name: descIdx !== -1 ? cols[descIdx]?.trim() || part : part,
+                        sku: part,
+                        brand: brandIdx !== -1 ? cols[brandIdx]?.trim() : '',
+                        make: makeIdx !== -1 ? cols[makeIdx]?.trim() : '',
+                        lineCode: null,
+                        group: '',
+                        hsn: hsnIdx !== -1 ? cols[hsnIdx]?.trim() : '',
+                        unit: 'pc',
+                        price: priceIdx !== -1 ? parseFloat(cols[priceIdx]) || 0 : 0,
+                        currentStock: stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0,
+                        reorderLevel: 10,
+                        costPrice: 0,
+                        createdAt: new Date().toISOString()
+                    });
+                    imported++;
+                }
+            }
+            if (imported) {
+                saveProducts(products);
+                alert(`${imported} products imported.`);
+                refreshReport();
+                populateFilters();
+            } else {
+                alert('No new products found. They may already exist.');
+            }
+        } catch(e) {
+            alert('Error importing CSV: ' + e.message);
+        }
+    }
+
     function refreshReport() {
         let products = getProducts();
         const brand = document.getElementById('brandFilter').value;
@@ -55,23 +112,23 @@
         if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
         filtered.sort((a,b) => a.name.localeCompare(b.name));
         if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products match the filter.</p>';
+            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load products from prices.csv.</p>';
             return;
         }
-        let html = '</table><thead>
+        let html = '<table><thead>
             <th>SKU</th><th>Product Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price (₹)</th><th>Status</th>
         </tr></thead><tbody>';
         filtered.forEach(p => {
             const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
             html += `<tr class="${low ? 'low-stock' : ''}">
-                <td>${escapeHtml(p.sku)}</td>
+                <td>${escapeHtml(p.sku)}</strong></td>
                 <td><strong>${escapeHtml(p.name)}</strong></td>
                 <td>${escapeHtml(p.brand || '-')}</td>
                 <td>${escapeHtml(p.make || '-')}</td>
                 <td>${escapeHtml(p.group || '-')}</td>
                 <td>${p.lineCode || '-'}</td>
                 <td>${p.currentStock || 0}</td>
-                <td>₹${(p.price || 0).toFixed(2)}</td>
+                <td>₹${(p.price || 0).toFixed(2)}</strong></td>
                 <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low Stock' : 'OK'}</td>
             </tr>`;
         });
@@ -115,6 +172,17 @@
         URL.revokeObjectURL(url);
     }
 
+    function toggleDebug() {
+        const panel = document.getElementById('debugPanel');
+        if (panel.style.display === 'none' || panel.style.display === '') {
+            const products = getProducts();
+            panel.innerHTML = `<strong>Products in localStorage:</strong> ${products.length}<br><pre>${JSON.stringify(products.slice(0,3), null, 2)}</pre>`;
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
     function escapeHtml(str) {
         if (!str) return '';
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
@@ -123,6 +191,7 @@
         return `"${(str || '').replace(/"/g, '""')}"`;
     }
 
+    // Initial load
     populateFilters();
     refreshReport();
 </script>
