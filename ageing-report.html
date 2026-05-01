@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ageing Report – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="data-manager.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        .filter-box { margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
+        th { background: #0a7c71; color: white; }
+        .total-row { background: #f1f3f5; font-weight: bold; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-bottom: 10px; }
+        .export-btn { background: #6c757d; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-chart-line"></i> Customer Ageing Report</h1>
+    <div class="filter-box">
+        <label>Cut‑off Date:</label>
+        <input type="date" id="cutoffDate" style="width:200px;">
+        <button onclick="loadReport()">Refresh</button>
+        <button onclick="exportToCSV()" class="export-btn">Export CSV</button>
+    </div>
+    <div id="reportTable"></div>
+    <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
+</div>
+
+<script>
+    let allInvoices = [];
+    let customers = [];
+
+    function loadReport() {
+        allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const cutoff = new Date(document.getElementById('cutoffDate').value);
+        if (isNaN(cutoff.getTime())) {
+            // default to today
+            document.getElementById('cutoffDate').valueAsDate = new Date();
+            return loadReport();
+        }
+        // Get only credit invoices (pending payments) – assume status "Pending"
+        const pendingInvoices = allInvoices.filter(inv => inv.status === 'Pending' && inv.invoiceType === 'credit');
+        // Group by customer
+        const ageingMap = new Map(); // key: customer email
+        pendingInvoices.forEach(inv => {
+            const customerEmail = inv.customerEmail || inv.buyer?.email;
+            if (!customerEmail) return;
+            const invDate = new Date(inv.date.split('/').reverse().join('-'));
+            const dueDate = inv.dueDate ? new Date(inv.dueDate.split('/').reverse().join('-')) : invDate;
+            const daysOverdue = Math.floor((cutoff - dueDate) / (1000*60*60*24));
+            let bucket = '0-30';
+            if (daysOverdue > 30 && daysOverdue <= 60) bucket = '31-60';
+            else if (daysOverdue > 60 && daysOverdue <= 90) bucket = '61-90';
+            else if (daysOverdue > 90) bucket = '90+';
+            else if (daysOverdue <= 0) bucket = 'Not Due';
+            const amount = inv.grandTotal || inv.total || 0;
+            if (!ageingMap.has(customerEmail)) {
+                ageingMap.set(customerEmail, { name: '', total: 0, buckets: { '0-30':0, '31-60':0, '61-90':0, '90+':0, 'Not Due':0 } });
+            }
+            const entry = ageingMap.get(customerEmail);
+            entry.buckets[bucket] = (entry.buckets[bucket] || 0) + amount;
+            entry.total += amount;
+            // set name if not set
+            if (!entry.name) {
+                const cust = customers.find(c => c.email === customerEmail);
+                entry.name = cust ? cust.name : customerEmail;
+            }
+        });
+        // Convert to array and sort
+        const rows = Array.from(ageingMap.entries()).map(([email, data]) => ({ email, ...data }));
+        rows.sort((a,b) => b.total - a.total);
+        let html = '</td><thead><tr><th>Customer</th><th>Not Due</th><th>0‑30 Days</th><th>31‑60 Days</th><th>61‑90 Days</th><th>90+ Days</th><th>Total Outstanding</th></tr></thead><tbody>';
+        let totals = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0, total:0 };
+        rows.forEach(r => {
+            html += `<tr>
+                <td>${escapeHtml(r.name)}</td>
+                <td>₹${r.buckets['Not Due'].toFixed(2)}</td>
+                <td>₹${r.buckets['0-30'].toFixed(2)}</td>
+                <td>₹${r.buckets['31-60'].toFixed(2)}</td>
+                <td>₹${r.buckets['61-90'].toFixed(2)}</td>
+                <td>₹${r.buckets['90+'].toFixed(2)}</td>
+                <td><strong>₹${r.total.toFixed(2)}</strong></td>
+            </tr>`;
+            totals['Not Due'] += r.buckets['Not Due'];
+            totals['0-30'] += r.buckets['0-30'];
+            totals['31-60'] += r.buckets['31-60'];
+            totals['61-90'] += r.buckets['61-90'];
+            totals['90+'] += r.buckets['90+'];
+            totals.total += r.total;
+        });
+        html += `<tr class="total-row"><td><strong>Total</strong></td><td>₹${totals['Not Due'].toFixed(2)}</td><td>₹${totals['0-30'].toFixed(2)}</td><td>₹${totals['31-60'].toFixed(2)}</td><td>₹${totals['61-90'].toFixed(2)}</td><td>₹${totals['90+'].toFixed(2)}</td><td>₹${totals.total.toFixed(2)}</td></tr>`;
+        html += '</tbody></table>';
+        document.getElementById('reportTable').innerHTML = html;
+    }
+
+    function exportToCSV() {
+        const table = document.getElementById('reportTable');
+        if (!table) return;
+        let csv = "Customer,Not Due,0-30 Days,31-60 Days,61-90 Days,90+ Days,Total Outstanding\n";
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td');
+            if (cols.length) {
+                csv += `"${escapeCsv(cols[0].innerText)}",${cols[1].innerText.replace('₹','')},${cols[2].innerText.replace('₹','')},${cols[3].innerText.replace('₹','')},${cols[4].innerText.replace('₹','')},${cols[5].innerText.replace('₹','')},${cols[6].innerText.replace('₹','')}\n`;
+            }
+        });
+        const blob = new Blob([csv], {type:'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'customer_ageing.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+    function escapeCsv(s) { return `"${(s || '').replace(/"/g, '""')}"`; }
+    function escapeHtml(s) { return (s || '').replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    document.getElementById('cutoffDate').valueAsDate = new Date();
+    loadReport();
+</script>
+</body>
+</html>
