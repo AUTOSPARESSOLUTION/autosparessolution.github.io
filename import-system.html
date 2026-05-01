@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import System – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        h1 { color: #0a7c71; }
+        .import-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover { background: #09645a; }
+        .btn-primary { background: #28a745; }
+        .btn-primary:hover { background: #218838; }
+        .preview {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow: auto;
+            font-size: 12px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #dee2e6; padding: 6px; text-align: left; }
+        th { background: #e9ecef; }
+        .status { margin-top: 15px; padding: 10px; border-radius: 6px; display: none; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-upload"></i> Import System</h1>
+    <p>Import customers or products from CSV files. Existing records will be updated (by email for customers, by SKU for products) or added if new.</p>
+
+    <!-- Import Customers -->
+    <div class="import-section">
+        <h2><i class="fas fa-users"></i> Import Customers</h2>
+        <div class="form-group">
+            <label>CSV File</label>
+            <input type="file" id="customerFile" accept=".csv">
+            <small>Expected columns: email, name, phone, address, gstin, state, creditLimit, status (optional). First row header required.</small>
+        </div>
+        <button class="btn-primary" onclick="previewCustomers()">Preview Customers</button>
+        <button onclick="importCustomers()">Import Customers</button>
+        <div id="customerPreview" class="preview" style="display:none;"></div>
+        <div id="customerStatus" class="status"></div>
+    </div>
+
+    <!-- Import Products -->
+    <div class="import-section">
+        <h2><i class="fas fa-boxes"></i> Import Products</h2>
+        <div class="form-group">
+            <label>CSV File</label>
+            <input type="file" id="productFile" accept=".csv">
+            <small>Expected columns: sku, name, brand, make, group, lineCode, price, currentStock, reorderLevel, hsn, unit. First row header required. Only sku and name are mandatory.</small>
+        </div>
+        <button class="btn-primary" onclick="previewProducts()">Preview Products</button>
+        <button onclick="importProducts()">Import Products</button>
+        <div id="productPreview" class="preview" style="display:none;"></div>
+        <div id="productStatus" class="status"></div>
+    </div>
+
+    <button onclick="window.location.href='index.html'">Back to Dashboard</button>
+</div>
+
+<script>
+    // ========== CUSTOMER IMPORT ==========
+    let customerPreviewData = [];
+
+    function previewCustomers() {
+        const file = document.getElementById('customerFile').files[0];
+        if (!file) { alert('Select a CSV file'); return; }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const rows = parseCSV(text);
+            if (rows.length < 2) { alert('CSV has no data rows'); return; }
+            const headers = rows[0];
+            customerPreviewData = rows.slice(1).map(row => {
+                const obj = {};
+                headers.forEach((h, idx) => { obj[h.trim()] = row[idx] ? row[idx].trim() : ''; });
+                return obj;
+            }).filter(obj => obj.email && obj.name);
+            displayPreview('customerPreview', customerPreviewData, headers);
+        };
+        reader.readAsText(file);
+    }
+
+    function importCustomers() {
+        if (!customerPreviewData.length) { alert('Load a CSV preview first'); return; }
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        let added = 0, updated = 0;
+        for (let row of customerPreviewData) {
+            const email = row.email;
+            if (!email) continue;
+            const existingIdx = customers.findIndex(c => c.email === email);
+            const customer = {
+                id: existingIdx !== -1 ? customers[existingIdx].id : Date.now() + Math.random(),
+                name: row.name || '',
+                email: email,
+                phone: row.phone || '',
+                address: row.address || '',
+                gstin: row.gstin || '',
+                state: row.state || '',
+                creditLimit: parseFloat(row.creditLimit) || 50000,
+                outstanding: existingIdx !== -1 ? (customers[existingIdx].outstanding || 0) : 0,
+                totalPurchased: existingIdx !== -1 ? (customers[existingIdx].totalPurchased || 0) : 0,
+                status: row.status === 'inactive' ? 'inactive' : 'active',
+                customerCode: existingIdx !== -1 ? customers[existingIdx].customerCode : ('CUST' + (customers.length + 1).toString().padStart(4,'0')),
+                createdAt: existingIdx !== -1 ? customers[existingIdx].createdAt : new Date().toISOString()
+            };
+            if (existingIdx !== -1) {
+                customers[existingIdx] = customer;
+                updated++;
+            } else {
+                customers.push(customer);
+                added++;
+            }
+        }
+        localStorage.setItem('customers', JSON.stringify(customers));
+        const statusDiv = document.getElementById('customerStatus');
+        statusDiv.innerHTML = `<i class="fas fa-check-circle"></i> Imported: ${added} new, ${updated} updated.`;
+        statusDiv.className = 'status success';
+        statusDiv.style.display = 'block';
+        setTimeout(() => statusDiv.style.display = 'none', 5000);
+        customerPreviewData = [];
+        document.getElementById('customerPreview').style.display = 'none';
+        document.getElementById('customerFile').value = '';
+    }
+
+    // ========== PRODUCT IMPORT ==========
+    let productPreviewData = [];
+
+    function previewProducts() {
+        const file = document.getElementById('productFile').files[0];
+        if (!file) { alert('Select a CSV file'); return; }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const rows = parseCSV(text);
+            if (rows.length < 2) { alert('CSV has no data rows'); return; }
+            const headers = rows[0];
+            productPreviewData = rows.slice(1).map(row => {
+                const obj = {};
+                headers.forEach((h, idx) => { obj[h.trim()] = row[idx] ? row[idx].trim() : ''; });
+                return obj;
+            }).filter(obj => obj.sku && obj.name);
+            displayPreview('productPreview', productPreviewData, headers);
+        };
+        reader.readAsText(file);
+    }
+
+    function importProducts() {
+        if (!productPreviewData.length) { alert('Load a CSV preview first'); return; }
+        let products = JSON.parse(localStorage.getItem('products') || '[]');
+        let added = 0, updated = 0;
+        for (let row of productPreviewData) {
+            const sku = row.sku;
+            if (!sku) continue;
+            const existingIdx = products.findIndex(p => p.sku === sku);
+            const product = {
+                id: existingIdx !== -1 ? products[existingIdx].id : Date.now() + Math.random(),
+                name: row.name || sku,
+                sku: sku,
+                brand: row.brand || '',
+                make: row.make || '',
+                group: row.group || '',
+                lineCode: row.lineCode || null,
+                hsn: row.hsn || '',
+                unit: row.unit || 'pc',
+                price: parseFloat(row.price) || 0,
+                currentStock: parseFloat(row.currentStock) || 0,
+                reorderLevel: parseFloat(row.reorderLevel) || 10,
+                costPrice: parseFloat(row.costPrice) || 0,
+                createdAt: existingIdx !== -1 ? products[existingIdx].createdAt : new Date().toISOString()
+            };
+            if (existingIdx !== -1) {
+                products[existingIdx] = product;
+                updated++;
+            } else {
+                products.push(product);
+                added++;
+            }
+        }
+        localStorage.setItem('products', JSON.stringify(products));
+        const statusDiv = document.getElementById('productStatus');
+        statusDiv.innerHTML = `<i class="fas fa-check-circle"></i> Imported: ${added} new, ${updated} updated.`;
+        statusDiv.className = 'status success';
+        statusDiv.style.display = 'block';
+        setTimeout(() => statusDiv.style.display = 'none', 5000);
+        productPreviewData = [];
+        document.getElementById('productPreview').style.display = 'none';
+        document.getElementById('productFile').value = '';
+    }
+
+    // ========== UTILITIES ==========
+    function parseCSV(text) {
+        const lines = text.split(/\r?\n/);
+        return lines.filter(l => l.trim()).map(line => {
+            const regex = /(".*?"|[^,]*)(,|$)/g;
+            const values = [];
+            let match;
+            while ((match = regex.exec(line)) !== null) {
+                let val = match[1];
+                if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+                values.push(val);
+                if (match[2] === '') break;
+            }
+            return values;
+        });
+    }
+
+    function displayPreview(elementId, data, headers) {
+        const container = document.getElementById(elementId);
+        if (!data.length) {
+            container.innerHTML = '<p>No valid rows found.</p>';
+            container.style.display = 'block';
+            return;
+        }
+        let html = '<table><thead><tr>';
+        headers.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
+        html += '</tr></thead><tbody>';
+        data.slice(0, 10).forEach(row => {
+            html += '<tr>';
+            headers.forEach(h => html += `<td>${escapeHtml(row[h] || '')}</td>`);
+            html += '</tr>';
+        });
+        if (data.length > 10) html += `<tr><td colspan="${headers.length}">... and ${data.length-10} more rows</td></tr>`;
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        container.style.display = 'block';
+    }
+
+    function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+</script>
+</body>
+</html>
