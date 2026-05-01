@@ -22,8 +22,6 @@
         .low-stock { background-color: #fff3cd; }
         .export-btn { background: #6c757d; }
         .import-btn { background: #28a745; }
-        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 12px; display: none; }
-        @media (max-width: 768px) { .filter-box { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
 <body>
@@ -38,10 +36,8 @@
             <button onclick="refreshReport()"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button onclick="importFromCSV()" class="import-btn"><i class="fas fa-file-csv"></i> Import CSV</button>
             <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
-            <button onclick="toggleDebug()" style="background:#ffc107; color:#333;"><i class="fas fa-bug"></i> Debug</button>
         </div>
     </div>
-    <div id="debugPanel" class="debug"></div>
     <div id="stockTable"></div>
     <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
 </div>
@@ -92,7 +88,7 @@
                 refreshReport();
                 populateFilters();
             } else {
-                alert('No new products found. They may already exist.');
+                alert('No new products found.');
             }
         } catch(e) {
             alert('Error importing CSV: ' + e.message);
@@ -112,10 +108,10 @@
         if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
         filtered.sort((a,b) => a.name.localeCompare(b.name));
         if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load products from prices.csv.</p>';
+            document.getElementById('stockTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv.</p>';
             return;
         }
-        let html = '<table><thead>
+        let html = '</td><thead>
             <th>SKU</th><th>Product Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price (₹)</th><th>Status</th>
         </tr></thead><tbody>';
         filtered.forEach(p => {
@@ -124,7 +120,7 @@
                 <td>${escapeHtml(p.sku)}</strong></td>
                 <td><strong>${escapeHtml(p.name)}</strong></td>
                 <td>${escapeHtml(p.brand || '-')}</td>
-                <td>${escapeHtml(p.make || '-')}</td>
+                <td>${escapeHtml(p.make || '-')}<tr>
                 <td>${escapeHtml(p.group || '-')}</td>
                 <td>${p.lineCode || '-'}</td>
                 <td>${p.currentStock || 0}</td>
@@ -151,10 +147,7 @@
 
     function exportToCSV() {
         const table = document.getElementById('stockTable');
-        if (!table || !table.querySelector('tbody tr')) {
-            alert('No data to export');
-            return;
-        }
+        if (!table.querySelector('tbody tr')) { alert('No data to export'); return; }
         let csv = "SKU,Product Name,Brand,Make,Group,Line Code,Stock,Price (₹),Status\n";
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
@@ -164,34 +157,12 @@
             }
         });
         const blob = new Blob([csv], {type:'text/csv'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'stock_report.csv';
-        a.click();
-        URL.revokeObjectURL(url);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
     }
 
-    function toggleDebug() {
-        const panel = document.getElementById('debugPanel');
-        if (panel.style.display === 'none' || panel.style.display === '') {
-            const products = getProducts();
-            panel.innerHTML = `<strong>Products in localStorage:</strong> ${products.length}<br><pre>${JSON.stringify(products.slice(0,3), null, 2)}</pre>`;
-            panel.style.display = 'block';
-        } else {
-            panel.style.display = 'none';
-        }
-    }
+    function escapeHtml(s) { return (s || '').replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function escapeCsv(s) { return `"${(s || '').replace(/"/g, '""')}"`; }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
-    }
-    function escapeCsv(str) {
-        return `"${(str || '').replace(/"/g, '""')}"`;
-    }
-
-    // Initial load
     populateFilters();
     refreshReport();
 </script>
