@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,26 +49,31 @@
         if (make) filtered = filtered.filter(p => p.make === make);
         if (group) filtered = filtered.filter(p => p.group === group);
         if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
-        filtered.sort((a,b) => a.name.localeCompare(b.name));
+        filtered.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
+
+        // Always show the table, even if empty
+        let html = '<table><thead>
+            <th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price</th><th>Status</th>
+        </tr></thead><tbody>';
+
         if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No products match.</p>';
-            return;
+            html += '<tr><td colspan="9" style="text-align:center;">No products found.</td></tr>';
+        } else {
+            filtered.forEach(p => {
+                const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
+                html += `<tr class="${low ? 'low-stock' : ''}">
+                    <td>${escapeHtml(p.sku)}</strong></td>
+                    <td><strong>${escapeHtml(p.name)}</strong></td>
+                    <td>${escapeHtml(p.brand || '-')}</td>
+                    <td>${escapeHtml(p.make || '-')}</td>
+                    <td>${escapeHtml(p.group || '-')}</td>
+                    <td>${p.lineCode || '-'}</td>
+                    <td>${p.currentStock || 0}</td>
+                    <td>₹${(p.price || 0).toFixed(2)}</strong></td>
+                    <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
+                </tr>`;
+            });
         }
-        let html = '<tr><thead>运转<th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price</th><th>Status</th></tr></thead><tbody>';
-        filtered.forEach(p => {
-            const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
-            html += `<tr class="${low ? 'low-stock' : ''}">
-                <td>${escapeHtml(p.sku)}</strong></td>
-                <td>${escapeHtml(p.name)}</strong></td>
-                <td>${escapeHtml(p.brand || '-')}</td>
-                <td>${escapeHtml(p.make || '-')}</td>
-                <td>${escapeHtml(p.group || '-')}</td>
-                <td>${p.lineCode || '-'}</td>
-                <td>${p.currentStock || 0}</td>
-                <td>₹${(p.price || 0).toFixed(2)}</strong></td>
-                <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
-            </tr>`;
-        });
         html += '</tbody></table>';
         document.getElementById('stockTable').innerHTML = html;
     }
@@ -94,10 +98,14 @@
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
             const cols = row.querySelectorAll('td');
-            if (cols.length) {
+            if (cols.length && cols[0].innerText !== 'No products found.') {
                 csv += `"${escapeCsv(cols[0].innerText)}","${escapeCsv(cols[1].innerText)}","${escapeCsv(cols[2].innerText)}","${escapeCsv(cols[3].innerText)}","${escapeCsv(cols[4].innerText)}","${escapeCsv(cols[5].innerText)}",${cols[6].innerText},${cols[7].innerText},"${escapeCsv(cols[8].innerText)}"\n`;
             }
         });
+        if (csv === "SKU,Name,Brand,Make,Group,Line Code,Stock,Price,Status\n") {
+            alert('No data to export');
+            return;
+        }
         const blob = new Blob([csv], {type:'text/csv'});
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
     }
