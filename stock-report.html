@@ -5,191 +5,105 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Report – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="data-manager.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
         h1 { color: #0a7c71; }
-        .search-box { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
+        .filter-group { flex: 1; min-width: 180px; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        select, input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
         th { background: #0a7c71; color: white; }
-        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
-        .export-btn { background: #6c757d; }
-        .debug { background: #e9ecef; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 12px; display: none; }
-        @media (max-width: 768px) { table { font-size: 12px; } }
+        .low-stock { background-color: #fff3cd; }
+        .export-btn { background: #6c757d; margin-top: 10px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1><i class="fas fa-chart-line"></i> Stock Report (From Transactions)</h1>
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by Product SKU, Name..." style="flex:1; padding: 8px;">
-        <button onclick="searchStock()">🔍 Search</button>
-        <button onclick="loadReport()">🔄 Refresh</button>
-        <button onclick="exportToCSV()" class="export-btn">📄 Export CSV</button>
-        <button onclick="toggleDebug()" style="background:#ffc107; color:#333;">🐞 Debug</button>
+    <h1>Stock Report</h1>
+    <div class="filter-box">
+        <div class="filter-group"><label>Brand</label><select id="brandFilter"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Make</label><select id="makeFilter"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Group</label><select id="groupFilter"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Line Code</label><input type="text" id="lineCodeFilter" placeholder="e.g., 1001"></div>
+        <div class="filter-group"><button onclick="refreshReport()">Refresh</button><button onclick="exportToCSV()" class="export-btn">Export CSV</button></div>
     </div>
-    <div id="debugPanel" class="debug"></div>
     <div id="stockTable"></div>
-    <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
+    <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back</button>
 </div>
 
 <script>
-    let currentStockData = []; // store { sku, name, stock, price? }
-
-    // Get product name from product master if available, else use SKU/part
-    function getProductName(sku, purchaseInvName, salesInvName) {
-        // First try product master
-        const stored = localStorage.getItem('products');
-        if (stored) {
-            try {
-                const products = JSON.parse(stored);
-                const product = products.find(p => p.sku === sku);
-                if (product && product.name) return product.name;
-            } catch(e) {}
-        }
-        // Use name from first purchase or sales description
-        if (purchaseInvName) return purchaseInvName;
-        if (salesInvName) return salesInvName;
-        return sku;
-    }
-
-    function computeStock() {
-        // 1. Read purchase invoices (stock in)
-        const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-        // 2. Read sales invoices (stock out)
-        const salesInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        // Also try alternative key for sales (some pages use 'salesInvoices')
-        const altSales = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        const allSales = [...salesInvoices, ...altSales];
-
-        const stockMap = new Map(); // key: sku/part, value: { sku, name, stock, price }
-
-        // Process purchases
-        purchaseInvoices.forEach(inv => {
-            const items = inv.items || [];
-            items.forEach(item => {
-                const sku = item.productId || item.part || item.sku;
-                if (!sku) return;
-                const qty = item.quantity || item.qty || 0;
-                const unitCost = item.cost || item.price || 0;
-                const nameFromInv = item.desc || item.productName || '';
-                if (!stockMap.has(sku)) {
-                    stockMap.set(sku, { sku: sku, name: nameFromInv, stock: 0, price: unitCost });
-                }
-                const entry = stockMap.get(sku);
-                entry.stock += qty;
-                if (entry.price === 0 && unitCost > 0) entry.price = unitCost;
-                if (entry.name === '' && nameFromInv) entry.name = nameFromInv;
-            });
-        });
-
-        // Process sales (subtract)
-        allSales.forEach(inv => {
-            const items = inv.items || [];
-            items.forEach(item => {
-                const sku = item.productId || item.part || item.sku;
-                if (!sku) return;
-                const qty = item.quantity || item.qty || 0;
-                const price = item.price || 0;
-                const nameFromInv = item.desc || '';
-                if (!stockMap.has(sku)) {
-                    stockMap.set(sku, { sku: sku, name: nameFromInv, stock: 0, price: price });
-                }
-                const entry = stockMap.get(sku);
-                entry.stock -= qty;
-                if (entry.price === 0 && price > 0) entry.price = price;
-                if (entry.name === '' && nameFromInv) entry.name = nameFromInv;
-            });
-        });
-
-        // Convert map to array
-        const result = [];
-        for (let [sku, data] of stockMap.entries()) {
-            // Improve name via product master
-            data.name = getProductName(sku, data.name, data.name);
-            result.push(data);
-        }
-        // Sort by SKU
-        result.sort((a,b) => a.sku.localeCompare(b.sku));
-        return result;
-    }
-
-    function displayStock(filterTerm = '') {
-        const allStock = computeStock();
-        let filtered = allStock;
-        if (filterTerm) {
-            const term = filterTerm.toLowerCase();
-            filtered = allStock.filter(item =>
-                item.sku.toLowerCase().includes(term) ||
-                item.name.toLowerCase().includes(term)
-            );
-        }
+    function refreshReport() {
+        let products = getProducts();
+        const brand = document.getElementById('brandFilter').value;
+        const make = document.getElementById('makeFilter').value;
+        const group = document.getElementById('groupFilter').value;
+        const lineCode = document.getElementById('lineCodeFilter').value.trim();
+        let filtered = products;
+        if (brand) filtered = filtered.filter(p => p.brand === brand);
+        if (make) filtered = filtered.filter(p => p.make === make);
+        if (group) filtered = filtered.filter(p => p.group === group);
+        if (lineCode) filtered = filtered.filter(p => p.lineCode && p.lineCode.toString() === lineCode);
+        filtered.sort((a,b) => a.name.localeCompare(b.name));
         if (filtered.length === 0) {
-            document.getElementById('stockTable').innerHTML = '<p>No stock data found. No purchase or sale transactions recorded yet.</p>';
+            document.getElementById('stockTable').innerHTML = '<p>No products match.</p>';
             return;
         }
-        let html = '<td><thead>
-            <th>SKU / Part No</th><th>Product Name</th><th>Current Stock</th><th>Last Unit Price (₹)</th>
-        </tr></thead><tbody>';
-        filtered.forEach(item => {
-            html += `<tr>
-                <td>${escapeHtml(item.sku)}</strong></td>
-                <td><strong>${escapeHtml(item.name)}</strong></td>
-                <td>${item.stock}</td>
-                <td>${item.price ? '₹' + item.price.toFixed(2) : '-'}</td>
+        let html = '<tr><thead>运转<th>SKU</th><th>Name</th><th>Brand</th><th>Make</th><th>Group</th><th>Line Code</th><th>Stock</th><th>Price</th><th>Status</th></tr></thead><tbody>';
+        filtered.forEach(p => {
+            const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
+            html += `<tr class="${low ? 'low-stock' : ''}">
+                <td>${escapeHtml(p.sku)}</strong></td>
+                <td>${escapeHtml(p.name)}</strong></td>
+                <td>${escapeHtml(p.brand || '-')}</td>
+                <td>${escapeHtml(p.make || '-')}</td>
+                <td>${escapeHtml(p.group || '-')}</td>
+                <td>${p.lineCode || '-'}</td>
+                <td>${p.currentStock || 0}</td>
+                <td>₹${(p.price || 0).toFixed(2)}</strong></td>
+                <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
             </tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('stockTable').innerHTML = html;
-        currentStockData = filtered;
     }
 
-    function loadReport() {
-        displayStock(document.getElementById('searchInput').value);
-    }
-
-    function searchStock() {
-        const term = document.getElementById('searchInput').value;
-        displayStock(term);
+    function populateFilters() {
+        const products = getProducts();
+        const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
+        const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
+        const groups = [...new Set(products.map(p => p.group).filter(g => g))].sort();
+        const brandSelect = document.getElementById('brandFilter');
+        brandSelect.innerHTML = '<option value="">All</option>' + brands.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+        const makeSelect = document.getElementById('makeFilter');
+        makeSelect.innerHTML = '<option value="">All</option>' + makes.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+        const groupSelect = document.getElementById('groupFilter');
+        groupSelect.innerHTML = '<option value="">All</option>' + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
     }
 
     function exportToCSV() {
-        if (!currentStockData.length) {
-            alert('No data to export');
-            return;
-        }
-        let csv = "SKU,Product Name,Current Stock,Last Unit Price (₹)\n";
-        currentStockData.forEach(item => {
-            csv += `"${escapeCsv(item.sku)}","${escapeCsv(item.name)}",${item.stock},${item.price || 0}\n`;
+        const table = document.getElementById('stockTable');
+        if (!table) return;
+        let csv = "SKU,Name,Brand,Make,Group,Line Code,Stock,Price,Status\n";
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td');
+            if (cols.length) {
+                csv += `"${escapeCsv(cols[0].innerText)}","${escapeCsv(cols[1].innerText)}","${escapeCsv(cols[2].innerText)}","${escapeCsv(cols[3].innerText)}","${escapeCsv(cols[4].innerText)}","${escapeCsv(cols[5].innerText)}",${cols[6].innerText},${cols[7].innerText},"${escapeCsv(cols[8].innerText)}"\n`;
+            }
         });
         const blob = new Blob([csv], {type:'text/csv'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'stock_report.csv';
-        a.click();
-        URL.revokeObjectURL(blob);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stock_report.csv'; a.click(); URL.revokeObjectURL(blob);
     }
-
-    function toggleDebug() {
-        const panel = document.getElementById('debugPanel');
-        if (panel.style.display === 'none' || panel.style.display === '') {
-            const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-            const salesInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-            panel.innerHTML = `<strong>Purchase Invoices count:</strong> ${purchaseInvoices.length}<br>
-                               <strong>Sales Invoices count:</strong> ${salesInvoices.length}<br>
-                               Use the table above for computed stock.`;
-            panel.style.display = 'block';
-        } else {
-            panel.style.display = 'none';
-        }
-    }
-
     function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     function escapeCsv(s) { return `"${s.replace(/"/g, '""')}"`; }
-
-    loadReport();
+    populateFilters();
+    refreshReport();
 </script>
 </body>
 </html>
