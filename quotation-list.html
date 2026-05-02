@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quotations – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="data-manager.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
+        th { background: #0a7c71; color: white; }
+        button { background: #0a7c71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin: 2px; }
+        .btn-pdf { background: #e67e22; }
+        .btn-edit { background: #17a2b8; }
+        .btn-delete { background: #dc3545; }
+        .btn-convert { background: #28a745; }
+        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; display: none; font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1><i class="fas fa-file-alt"></i> Quotations</h1>
+        <a href="quotation.html" style="background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;"><i class="fas fa-plus"></i> New Quotation</a>
+    </div>
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by Quotation No, Customer..." style="flex:1; padding: 8px;">
+        <button onclick="filterQuotations()"><i class="fas fa-search"></i> Search</button>
+        <button onclick="loadQuotations()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        <button onclick="exportToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <button onclick="toggleDebug()"><i class="fas fa-bug"></i> Debug</button>
+    </div>
+
+    <div id="debugPanel" class="debug"></div>
+    <div id="quotationsTable"></div>
+    <button onclick="window.location.href='index.html'" style="margin-top: 20px;">Back to Dashboard</button>
+</div>
+
+<script>
+    let quotations = [];
+
+    function loadQuotations() {
+        // Read raw data
+        let raw = localStorage.getItem('quotations');
+        if (!raw) raw = '[]';
+        try {
+            quotations = JSON.parse(raw);
+        } catch(e) { quotations = []; }
+        
+        // Normalise each quotation (consistent structure)
+        quotations = quotations.map(q => {
+            let customer = q.customer || {};
+            if (!customer.name && q.customerName) customer.name = q.customerName;
+            if (!customer.email && q.customerEmail) customer.email = q.customerEmail;
+            if (!customer.phone && q.customerPhone) customer.phone = q.customerPhone;
+            if (!customer.address && q.customerAddress) customer.address = q.customerAddress;
+            if (!customer.gstin && q.customerGstin) customer.gstin = q.customerGstin;
+            if (!customer.state && q.customerState) customer.state = q.customerState;
+            
+            return {
+                id: q.id || q.quotationId || Date.now(),
+                quotationNo: q.quotationNo || q.invoiceNo || 'N/A',
+                date: q.date || (q.createdAt ? q.createdAt.slice(0,10) : 'N/A'),
+                validUntil: q.validUntil || q.validTill || '',
+                customer: customer,
+                items: q.items || [],
+                subtotal: q.subtotal || 0,
+                cgst: q.cgst || 0,
+                sgst: q.sgst || 0,
+                grandTotal: q.grandTotal || q.total || 0
+            };
+        });
+        
+        // Save back normalized version (optional)
+        localStorage.setItem('quotations', JSON.stringify(quotations));
+        displayQuotations();
+    }
+
+    function displayQuotations(filter = '') {
+        if (quotations.length === 0) {
+            document.getElementById('quotationsTable').innerHTML = '<p>No quotations found. Click "Debug" to see raw storage.</p>';
+            return;
+        }
+        
+        let filtered = quotations;
+        if (filter) {
+            const term = filter.toLowerCase();
+            filtered = quotations.filter(q => 
+                q.quotationNo.toLowerCase().includes(term) ||
+                (q.customer.name && q.customer.name.toLowerCase().includes(term)) ||
+                (q.customer.email && q.customer.email.toLowerCase().includes(term))
+            );
+        }
+        
+        if (filtered.length === 0) {
+            document.getElementById('quotationsTable').innerHTML = '<p>No matching quotations found.</p>';
+            return;
+        }
+        
+        filtered.sort((a,b) => b.quotationNo.localeCompare(a.quotationNo));
+        let html = '<table><thead>运转<th>#</th><th>Quotation No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Valid Until</th><th>Actions</th></tr></thead><tbody>';
+        filtered.forEach((q, idx) => {
+            html += `<tr>
+                <td>${idx+1}</td>
+                <td><strong>${escapeHtml(q.quotationNo)}</strong></td>
+                <td>${q.date}</td>
+                <td>${escapeHtml(q.customer.name || q.customer.email || '?')}</td>
+                <td>₹${q.grandTotal.toFixed(2)}</strong></td>
+                <td>${q.validUntil || '-'}</td>
+                <td><div style="display:flex; gap:5px; flex-wrap:wrap;">
+                    <button class="btn-pdf" onclick="generatePDF('${q.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
+                    <button class="btn-convert" onclick="convertToInvoice('${q.id}')"><i class="fas fa-exchange-alt"></i> Convert</button>
+                    <button class="btn-edit" onclick="editQuotation('${q.id}')"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn-delete" onclick="deleteQuotation('${q.id}')"><i class="fas fa-trash"></i> Delete</button>
+                </div></td>
+            </tr>`;
+        });
+        html += '</tbody></tr>';
+        document.getElementById('quotationsTable').innerHTML = html;
+    }
+
+    // PDF generation (recreate layout from saved data)
+    function generatePDF(id) {
+        const quotation = quotations.find(q => q.id == id);
+        if (!quotation) { alert('Quotation not found'); return; }
+        const container = document.createElement('div');
+        container.style.maxWidth = '1200px';
+        container.style.margin = '0 auto';
+        container.style.backgroundColor = 'white';
+        container.style.padding = '0 15px 15px 15px';
+        container.style.fontFamily = 'Roboto, sans-serif';
+        
+        // Build items table
+        let itemsHtml = '';
+        (quotation.items || []).forEach((item, idx) => {
+            const qty = item.qty || 1;
+            const price = item.price || 0;
+            const disc = item.discount || 0;
+            const taxable = qty * price * (1 - disc/100);
+            const cgst = taxable * 0.09;
+            const sgst = taxable * 0.09;
+            const total = taxable + cgst + sgst;
+            itemsHtml += `<tr>
+                <td style="border:1px solid #dee2e6; padding:4px;">${idx+1}</td>
+                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.part || '')}</td>
+                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.desc || '')}</td>
+                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.hsn || '')}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${qty}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${price.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${disc}%</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">18%</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</td>
+            </tr>`;
+        });
+        
+        container.innerHTML = `
+            <div style="background:#0a7c71; color:white; padding:15px 20px; display:flex; justify-content:space-between; margin:0 -15px 15px -15px;">
+                <div><div style="font-size:24px;">Auto Spares Solution</div><div>GSTIN: 19ANOPD3300R1ZO</div><div>101, 1st floor, Howrah, WB 711108</div></div>
+                <div style="text-align:right;"><div style="font-size:20px;">QUOTATION</div><div>${quotation.quotationNo}</div><div>${quotation.date}</div><div>Valid Till: ${quotation.validUntil}</div></div>
+            </div>
+            <div style="background:#f8f9fa; padding:10px; margin-bottom:15px;">
+                <strong>Customer:</strong> ${escapeHtml(quotation.customer.name)}<br>
+                ${escapeHtml(quotation.customer.address)}<br>
+                GSTIN: ${escapeHtml(quotation.customer.gstin)} | State: ${escapeHtml(quotation.customer.state)}<br>
+                Phone: ${escapeHtml(quotation.customer.phone)} | Email: ${escapeHtml(quotation.customer.email)}
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                <thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
+                <tbody>${itemsHtml}</tbody>
+            </table>
+            <div style="text-align:right; margin-top:10px;">
+                <table style="width:280px; margin-left:auto;">
+                    <tr><td style="text-align:right;">Subtotal: </td><td>₹${quotation.subtotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">CGST (9%): </td><td>₹${quotation.cgst.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">SGST (9%): </td><td>₹${quotation.sgst.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td>₹${quotation.grandTotal.toFixed(2)}</td></tr>
+                </table>
+            </div>
+            <div style="margin-top:20px; border-top:1px solid #aaa; padding-top:10px; text-align:center; font-size:10px;">
+                This is a quotation – valid for 15 days. Thank you for your business.
+            </div>
+        `;
+        html2pdf().set({ margin: 0.2, filename: `Quotation_${quotation.quotationNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4' } }).from(container).save();
+    }
+
+    function convertToInvoice(id) {
+        const quotation = quotations.find(q => q.id == id);
+        if (!quotation) { alert('Quotation not found'); return; }
+        if (!quotation.customer.email) { alert('Customer email missing. Cannot convert.'); return; }
+        const invoiceItems = (quotation.items || []).map(item => ({
+            productId: item.part,
+            quantity: item.qty,
+            price: item.price
+        }));
+        const invoice = {
+            id: Date.now(),
+            date: new Date().toISOString().slice(0,10),
+            customerEmail: quotation.customer.email,
+            items: invoiceItems,
+            total: quotation.grandTotal,
+            invoiceNo: 'INV-' + Date.now(),
+            status: 'pending'
+        };
+        try {
+            createSalesInvoice(invoice);
+            alert('Quotation converted to Sales Invoice!');
+            if (confirm('Delete this quotation after conversion?')) deleteQuotation(id, false);
+            loadQuotations();
+        } catch(err) { alert('Error: ' + err.message); }
+    }
+
+    function editQuotation(id) {
+        localStorage.setItem('editQuotationId', id);
+        window.open('edit-quotation.html', '_blank');
+    }
+
+    function deleteQuotation(id, ask = true) {
+        if (ask && !confirm('Delete this quotation?')) return;
+        quotations = quotations.filter(q => q.id != id);
+        localStorage.setItem('quotations', JSON.stringify(quotations));
+        loadQuotations();
+    }
+
+    function filterQuotations() {
+        displayQuotations(document.getElementById('searchInput').value.toLowerCase());
+    }
+
+    function exportToCSV() {
+        if (!quotations.length) return;
+        let csv = "Quotation No,Date,Customer,Amount,Valid Until\n";
+        quotations.forEach(q => {
+            csv += `"${q.quotationNo}",${q.date},"${q.customer.name || q.customer.email}",${q.grandTotal},${q.validUntil}\n`;
+        });
+        const blob = new Blob([csv], {type:'text/csv'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'quotations_list.csv';
+        a.click();
+        URL.revokeObjectURL(blob);
+    }
+
+    function toggleDebug() {
+        const panel = document.getElementById('debugPanel');
+        if (panel.style.display === 'none' || panel.style.display === '') {
+            let raw = localStorage.getItem('quotations');
+            panel.innerHTML = `<strong>Raw localStorage 'quotations':</strong><br>${raw || 'null'}`;
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+    loadQuotations();
+</script>
+</body>
+</html>
