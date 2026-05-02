@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
+        /* (your existing styles – unchanged) */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -238,7 +239,6 @@
         <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
                 <h3>Buyer (Bill to)</h3>
-                <!-- Admin Customer Quick Select (visible only to admin) -->
                 <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
                     <div class="info-label">Quick Select:</div>
                     <div class="info-value">
@@ -319,7 +319,6 @@
         </div>
     </div>
 
-    <!-- Signatures -->
     <div class="signature-row">
         <div class="signature-box">Customer's Stamp & Signature<br><span style="font-size: 10px;">(Receiver's acknowledgment)</span></div>
         <div class="signature-box">For Auto Spares Solution<br>(Authorised Signatory)<br><span style="font-size: 10px;">(Stamp & Signature)</span></div>
@@ -384,7 +383,6 @@
         }
     }
 
-    // Helper: check if customer GSTIN is local (starts with "19")
     function isLocalGst() {
         const gst = document.getElementById('buyerGstin').value.trim();
         return gst.startsWith('19');
@@ -405,7 +403,6 @@
     }
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
-    // --- Financial Year ---
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -414,7 +411,6 @@
         else return `${year-1}-${year.toString().slice(-2)}`;
     }
 
-    // --- Get next invoice number from existing invoices (max + 1) ---
     function getNextInvoiceNumber(type) {
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const finYear = getFinancialYear();
@@ -435,11 +431,9 @@
 
     function updateInvoiceNumberDisplay() {
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const invoiceNo = getNextInvoiceNumber(type);
-        document.getElementById('invoiceNo').innerText = invoiceNo;
+        document.getElementById('invoiceNo').innerText = getNextInvoiceNumber(type);
     }
 
-    // --- Due Date Logic ---
     function computeDueDate(invoiceDate, type, paymentTermsDays) {
         const date = new Date(invoiceDate);
         if (type === 'cash') return date;
@@ -467,14 +461,9 @@
     function setDates() {
         const invoiceDate = new Date();
         document.getElementById('invoiceDate').innerText = formatDate(invoiceDate);
-        const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        let paymentTermsDays = parseInt(document.getElementById('paymentTerms').value);
-        if (isNaN(paymentTermsDays)) paymentTermsDays = 30;
-        const dueDate = computeDueDate(invoiceDate, type, paymentTermsDays);
-        document.getElementById('dueDate').innerText = formatDate(dueDate);
+        updateDueDate();
     }
 
-    // --- Cart calculations (handles local/out-of-state GST) ---
     function calculateTotalsAndTaxGroups() {
         let sub = 0;
         let taxGroups = {};
@@ -503,9 +492,8 @@
             igstTotal += taxGroups[hsn].igst;
         }
         let grand = sub + (isLocal ? cgstTotal + sgstTotal : igstTotal);
-        let roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
-        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, roundOff, grand, taxGroups, isLocal };
+        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, grand, taxGroups, isLocal };
     }
 
     function renderItemsAndTaxSummary() {
@@ -535,7 +523,7 @@
                 <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</strong></td>
                 <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</strong></td>
                 <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
-            </td>`;
+            </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
 
@@ -583,12 +571,8 @@
     }
 
     // ========== OVERRIDE createSalesInvoice to allow zero/negative stock ==========
-    // Save the original function
     const originalCreateSalesInvoice = window.createSalesInvoice;
-
-    // Replace with a wrapper that bypasses stock validation
     window.createSalesInvoice = function(invoice) {
-        // Custom implementation that updates stock without checking availability
         let products = getProducts();
         let invTransactions = getInventoryTransactions();
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
@@ -596,7 +580,6 @@
         for (let item of invoice.items) {
             let product = products.find(p => p.id == item.productId);
             if (!product) {
-                // Auto-create product if still missing
                 product = {
                     id: item.productId,
                     name: `Product ${item.productId}`,
@@ -611,7 +594,6 @@
             }
             let oldStock = product.currentStock || 0;
             let newStock = oldStock - item.quantity;
-            // Allow negative stock (no check)
             product.currentStock = newStock;
             
             invTransactions.push({
@@ -631,12 +613,10 @@
         salesInvoices.push(invoice);
         localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
         
-        // Also store in allInvoices for compatibility
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         allInvoices.push(invoice);
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
         
-        // Update customer outstanding
         let customer = customers.find(c => c.email === invoice.customerEmail);
         if (customer) {
             customer.outstanding = (customer.outstanding || 0) + invoice.total;
@@ -658,7 +638,6 @@
         return true;
     };
 
-    // --- Save Invoice (uses overridden createSalesInvoice) ---
     function saveInvoice() {
         if (cart.length === 0) {
             alert('Cart empty. Please add items first.');
@@ -678,7 +657,6 @@
             state: document.getElementById('buyerState').value.trim()
         };
 
-        // Ensure customer exists
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         let existingCustomer = customers.find(c => c.email === buyer.email);
         if (!existingCustomer && buyer.email) {
@@ -707,7 +685,6 @@
             return;
         }
 
-        // Ensure all products exist in product master (auto-create missing)
         let products = getProducts();
         let modified = false;
         for (let item of cart) {
@@ -798,7 +775,6 @@
         }
     }
 
-    // --- Print and PDF functions ---
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -822,9 +798,7 @@
             replacements.push({ original: el, span: span, parent: parent });
         });
         window.print();
-        setTimeout(() => {
-            replacements.forEach(rep => rep.parent.replaceChild(rep.original, rep.span));
-        }, 100);
+        setTimeout(() => replacements.forEach(rep => rep.parent.replaceChild(rep.original, rep.span)), 100);
     }
 
     function generatePDF() {
@@ -862,7 +836,6 @@
         });
     }
 
-    // --- Event Listeners ---
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
             const creditDiv = document.getElementById('creditFields');
@@ -877,13 +850,11 @@
     const paymentTermsInput = document.getElementById('paymentTerms');
     if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
 
-    // Initialization
     setDates();
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
     updateGstDisplay();
 
-    // Restore original createSalesInvoice when page unloads (optional)
     window.addEventListener('beforeunload', function() {
         window.createSalesInvoice = originalCreateSalesInvoice;
     });
