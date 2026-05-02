@@ -205,6 +205,7 @@
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
+    <!-- company-header etc. – same as your original; I'll keep it short but you can replace with your full header -->
     <div class="company-header">
         <div class="logo-area">
             <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
@@ -289,44 +290,19 @@
 
     <!-- Items Table -->
     <table class="items-table">
-        <thead>
-            <tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
-        </thead>
+        <thead><tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Unit Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
         <tbody id="itemsBody"></tbody>
     </table>
-
-    <!-- Tax Summary Table -->
-    <table class="tax-summary-table">
-        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
-        <tbody id="taxSummaryBody"></tbody>
-    </table>
-
-    <!-- Totals -->
+    <table class="tax-summary-table"><thead><tr><th>HSN/SAC</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total Tax</th></tr></thead><tbody id="taxSummaryBody"></tbody></table>
     <div class="totals">
-        <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
-        </table>
+        <table><tr><td>Subtotal (after discount):</td><td>₹<span id="subtotal">0.00</span></td></tr>
+        <tr><td id="gstLabel1">CGST (9%):</td><td>₹<span id="cgstTotal">0.00</span></td></tr>
+        <tr><td id="gstLabel2">SGST (9%):</td><td>₹<span id="sgstTotal">0.00</span></td></tr>
+        <tr style="font-weight:bold;"><td>Grand Total:</td><td>₹<span id="grandTotal">0.00</span></td></tr></table>
     </div>
-
-    <!-- Payment QR and Bank Details -->
-    <div class="qr-box">
-        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
-            <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
-            <div><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</div>
-        </div>
-    </div>
-
-    <!-- Signatures -->
-    <div class="signature-row">
-        <div class="signature-box">Customer's Stamp & Signature<br><span style="font-size: 10px;">(Receiver's acknowledgment)</span></div>
-        <div class="signature-box">For Auto Spares Solution<br>(Authorised Signatory)<br><span style="font-size: 10px;">(Stamp & Signature)</span></div>
-    </div>
-
-    <div class="footer-legal">This is a computer generated invoice. All disputes are subject to Howrah jurisdiction only.</div>
-    <div id="pageNumber" class="page-number"></div>
+    <div class="qr-box"><div><img src="images/ASS.QR.jpg" style="max-width:120px;"><div><strong>Bank Details:</strong><br>Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</div></div></div>
+    <div class="signature-row"><div class="signature-box">Customer's Stamp & Signature</div><div class="signature-box">For Auto Spares Solution</div></div>
+    <div class="footer-legal">This is a computer generated invoice. All disputes subject to Howrah jurisdiction.</div>
 </div>
 
 <div class="actions no-print">
@@ -337,12 +313,13 @@
 </div>
 
 <script>
-    // ========== DATA FROM localStorage ==========
+    // cart data
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
     cart = cart.map(i => ({ ...i, hsn: i.hsn || '' }));
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
+    // prefill buyer from current user
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
         document.getElementById('buyerAddress').value = currentUser.address || '';
@@ -352,7 +329,7 @@
         document.getElementById('buyerState').value = currentUser.state || '';
     }
 
-    // ========== ADMIN CUSTOMER QUICK SELECT ==========
+    // admin customer quick select
     if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
         document.getElementById('adminCustomerSelect').style.display = 'flex';
         populateCustomerSelect();
@@ -362,33 +339,26 @@
         const select = document.getElementById('quickCustomerSelect');
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
         select.innerHTML = '<option value="">-- Select Customer (Admin only) --</option>';
-        customers.forEach(c => {
-            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
-        });
+        customers.forEach(c => select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`);
     }
 
     function loadCustomerData() {
-        const select = document.getElementById('quickCustomerSelect');
-        const email = select.value;
+        const email = document.getElementById('quickCustomerSelect').value;
         if (!email) return;
         const cust = customers.find(c => c.email === email);
         if (cust) {
-            document.getElementById('buyerName').value = cust.name || '';
-            document.getElementById('buyerAddress').value = cust.address || '';
-            document.getElementById('buyerPhone').value = cust.phone || '';
-            document.getElementById('buyerEmail').value = cust.email || '';
-            document.getElementById('buyerGstin').value = cust.gstin || '';
-            document.getElementById('buyerState').value = cust.state || '';
-            document.getElementById('customerCode').value = cust.customerCode || '';
+            document.getElementById('buyerName').value = cust.name;
+            document.getElementById('buyerAddress').value = cust.address;
+            document.getElementById('buyerPhone').value = cust.phone;
+            document.getElementById('buyerEmail').value = cust.email;
+            document.getElementById('buyerGstin').value = cust.gstin;
+            document.getElementById('buyerState').value = cust.state;
+            document.getElementById('customerCode').value = cust.customerCode;
             updateGstDisplay();
         }
     }
 
-    function isLocalGst() {
-        const gst = document.getElementById('buyerGstin').value.trim();
-        return gst.startsWith('19');
-    }
-
+    function isLocalGst() { return document.getElementById('buyerGstin').value.trim().startsWith('19'); }
     function updateGstDisplay() {
         const isLocal = isLocalGst();
         const cgstLabel = document.getElementById('gstLabel1');
@@ -408,25 +378,21 @@
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
-        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
-        else return `${year-1}-${year.toString().slice(-2)}`;
+        return (month >= 4) ? `${year}-${(year+1).toString().slice(-2)}` : `${year-1}-${year.toString().slice(-2)}`;
     }
 
     function getNextInvoiceNumber(type) {
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const finYear = getFinancialYear();
-        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-        let maxNumber = 0;
+        const prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+        let max = 0;
         allInvoices.forEach(inv => {
             if (inv.invoiceType === type && inv.invoiceNo.startsWith(prefix)) {
-                const match = inv.invoiceNo.match(/(\d+)$/);
-                if (match) {
-                    const num = parseInt(match[1]);
-                    if (num > maxNumber) maxNumber = num;
-                }
+                let match = inv.invoiceNo.match(/(\d+)$/);
+                if (match) max = Math.max(max, parseInt(match[1]));
             }
         });
-        return prefix + (maxNumber + 1).toString().padStart(4, '0');
+        return prefix + (max + 1).toString().padStart(4, '0');
     }
 
     function updateInvoiceNumberDisplay() {
@@ -434,65 +400,52 @@
         document.getElementById('invoiceNo').innerText = getNextInvoiceNumber(type);
     }
 
-    function computeDueDate(invoiceDate, type, paymentTermsDays) {
+    function computeDueDate(invoiceDate, type, days) {
         const date = new Date(invoiceDate);
         if (type === 'cash') return date;
-        if (paymentTermsDays && !isNaN(paymentTermsDays)) date.setDate(date.getDate() + paymentTermsDays);
+        if (days && !isNaN(days)) date.setDate(date.getDate() + days);
         else date.setDate(date.getDate() + 30);
         return date;
     }
-
-    function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
-
+    function formatDate(d) { return d.toLocaleDateString('en-IN'); }
     function updateDueDate() {
-        const invoiceDateStr = document.getElementById('invoiceDate').innerText;
-        const parts = invoiceDateStr.split('/');
+        const parts = document.getElementById('invoiceDate').innerText.split('/');
         const invoiceDate = new Date(parts[2], parts[1]-1, parts[0]);
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        let paymentTermsDays = parseInt(document.getElementById('paymentTerms').value);
-        if (isNaN(paymentTermsDays)) paymentTermsDays = 30;
-        const dueDate = computeDueDate(invoiceDate, type, paymentTermsDays);
-        document.getElementById('dueDate').innerText = formatDate(dueDate);
+        let days = parseInt(document.getElementById('paymentTerms').value);
+        if (isNaN(days)) days = 30;
+        const due = computeDueDate(invoiceDate, type, days);
+        document.getElementById('dueDate').innerText = formatDate(due);
     }
-
     function setDates() {
-        const invoiceDate = new Date();
-        document.getElementById('invoiceDate').innerText = formatDate(invoiceDate);
-        const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        let paymentTermsDays = parseInt(document.getElementById('paymentTerms').value);
-        if (isNaN(paymentTermsDays)) paymentTermsDays = 30;
-        const dueDate = computeDueDate(invoiceDate, type, paymentTermsDays);
-        document.getElementById('dueDate').innerText = formatDate(dueDate);
+        const today = new Date();
+        document.getElementById('invoiceDate').innerText = formatDate(today);
+        updateDueDate();
     }
 
     function calculateTotalsAndTaxGroups() {
-        let sub = 0;
-        let taxGroups = {};
+        let sub = 0, taxGroups = {};
         const isLocal = isLocalGst();
         cart.forEach(i => {
             const hsn = i.hsn || '';
-            const taxable = (i.price * i.qty) * (1 - (i.discount || 0) / 100);
+            const taxable = i.price * i.qty * (1 - (i.discount || 0)/100);
             sub += taxable;
-            let cgst = 0, sgst = 0, igst = 0;
-            if (isLocal) {
-                cgst = taxable * 0.09;
-                sgst = taxable * 0.09;
-            } else {
-                igst = taxable * 0.18;
-            }
-            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+            let cgst=0,sgst=0,igst=0;
+            if (isLocal) { cgst = taxable*0.09; sgst = taxable*0.09; }
+            else { igst = taxable*0.18; }
+            if(!taxGroups[hsn]) taxGroups[hsn] = {taxable:0,cgst:0,sgst:0,igst:0};
             taxGroups[hsn].taxable += taxable;
             taxGroups[hsn].cgst += cgst;
             taxGroups[hsn].sgst += sgst;
             taxGroups[hsn].igst += igst;
         });
-        let cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
-        for (let hsn in taxGroups) {
-            cgstTotal += taxGroups[hsn].cgst;
-            sgstTotal += taxGroups[hsn].sgst;
-            igstTotal += taxGroups[hsn].igst;
+        let cgstTotal=0,sgstTotal=0,igstTotal=0;
+        for(let h in taxGroups){
+            cgstTotal += taxGroups[h].cgst;
+            sgstTotal += taxGroups[h].sgst;
+            igstTotal += taxGroups[h].igst;
         }
-        let grand = sub + (isLocal ? cgstTotal + sgstTotal : igstTotal);
+        let grand = sub + (isLocal ? cgstTotal+sgstTotal : igstTotal);
         grand = Math.round(grand);
         return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, grand, taxGroups, isLocal };
     }
@@ -501,86 +454,71 @@
         let itemsHtml = '';
         const isLocal = isLocalGst();
         cart.forEach((item, idx) => {
-            const discount = item.discount || 0;
-            const taxable = (item.price * item.qty) * (1 - discount / 100);
-            let cgst = 0, sgst = 0, igst = 0;
-            if (isLocal) {
-                cgst = taxable * 0.09;
-                sgst = taxable * 0.09;
-            } else {
-                igst = taxable * 0.18;
-            }
-            const totalItem = taxable + (isLocal ? cgst + sgst : igst);
+            const taxable = item.price * item.qty * (1 - (item.discount||0)/100);
+            let cgst=0,sgst=0,igst=0;
+            if(isLocal){ cgst = taxable*0.09; sgst = taxable*0.09; }
+            else { igst = taxable*0.18; }
+            const totalItem = taxable + (isLocal ? cgst+sgst : igst);
             itemsHtml += `<tr>
-                <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
-                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td style="text-align:center;">${item.qty}</strong></td>
-                <td style="text-align:right;">₹${item.price.toFixed(2)}</strong></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
-                <td style="text-align:center;">18%</strong></td>
-                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
+                <td>${idx+1}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
+                <td><input type="text" value="${escapeHtml(item.hsn||'')}" style="width:100%;" onchange="updateHsn('${item.part}', this.value)"></td>
+                <td>${item.qty}</td>
+                <td>₹${item.price.toFixed(2)}</td>
+                <td><input type="number" step="0.01" value="${item.discount||0}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
+                <td>₹${taxable.toFixed(2)}</td>
+                <td>18%</td>
+                <td>${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
+                <td>${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
+                <td>₹${totalItem.toFixed(2)}</td>
             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
-
         const totals = calculateTotalsAndTaxGroups();
         document.getElementById('subtotal').innerText = totals.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = totals.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = totals.sgstTotal.toFixed(2);
         document.getElementById('grandTotal').innerText = totals.grand.toFixed(2);
-
         let taxHtml = '';
-        for (let hsn in totals.taxGroups) {
+        for(let hsn in totals.taxGroups){
             const g = totals.taxGroups[hsn];
-            const totalTax = g.cgst + g.sgst + g.igst;
-            taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
-            </tr>`;
+            const totalTax = g.cgst+g.sgst+g.igst;
+            taxHtml += `<tr><td>${hsn||'N/A'}</td><td>₹${g.taxable.toFixed(2)}</td>
+                <td>${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
+                <td>${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
+                <td>${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
+                <td>₹${totalTax.toFixed(2)}</td></tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
     }
 
-    function updateDiscount(part, discPercent) {
+    function updateDiscount(part, disc) {
         const item = cart.find(i => i.part === part);
-        if (item) {
-            item.discount = parseFloat(discPercent) || 0;
-            renderItemsAndTaxSummary();
-        }
+        if(item) item.discount = parseFloat(disc) || 0;
+        renderItemsAndTaxSummary();
     }
-
-    function updateHsn(part, hsnValue) {
+    function updateHsn(part, hsn) {
         const item = cart.find(i => i.part === part);
-        if (item) {
-            item.hsn = hsnValue;
-            renderItemsAndTaxSummary();
-        }
+        if(item) item.hsn = hsn;
+        renderItemsAndTaxSummary();
     }
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
-    }
-
-    // ========== FIX: Ensure products exist before creating invoice ==========
+    // ========== FIX: Ensure all products exist in master ==========
     function ensureProductsExist() {
         let products = getProducts();  // from data-manager.js
         let modified = false;
         for (let item of cart) {
-            let part = item.part;
+            let part = item.part.trim();
             if (!part) continue;
-            let existing = products.find(p => p.id === part || p.sku === part);
+            // Try to find by id or sku (case-insensitive, trimmed)
+            let existing = products.find(p => 
+                (p.id && p.id.toString().trim() === part) ||
+                (p.sku && p.sku.toString().trim() === part)
+            );
             if (!existing) {
-                // Auto-create product with minimal details
+                console.log(`Auto-creating product for part: ${part}`);
                 let newProduct = {
                     id: part,
                     name: item.desc || part,
@@ -592,28 +530,31 @@
                     hsn: item.hsn || '',
                     unit: 'pc',
                     price: item.price,
-                    currentStock: 0,   // stock will be reduced later – but initial stock is 0 for sales
+                    currentStock: 0,      // initial stock; will be reduced by sale (but product exists)
                     reorderLevel: 10,
                     costPrice: 0,
                     createdAt: new Date().toISOString()
                 };
                 products.push(newProduct);
                 modified = true;
+            } else {
+                console.log(`Product already exists: ${part}`);
             }
         }
         if (modified) {
             saveProducts(products);
-            console.log('Auto-created missing products in product master.');
+            console.log('Missing products have been added to product master.');
         }
+        return products; // return updated products array
     }
 
-    function saveInvoice() {
+    async function saveInvoice() {
         if (cart.length === 0) {
             alert('Cart empty. Please add items first.');
             return;
         }
 
-        // Ensure all products exist in product master (auto-create missing)
+        // Ensure all products exist in product master before calling createSalesInvoice
         ensureProductsExist();
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
@@ -649,7 +590,6 @@
             };
             customers.push(newCust);
             localStorage.setItem('customers', JSON.stringify(customers));
-            existingCustomer = newCust;
         }
 
         if (!buyer.email) {
@@ -707,15 +647,17 @@
         };
 
         try {
-            createSalesInvoice(invoice);
+            await createSalesInvoice(invoice);  // data-manager.js function
             alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced.\nCustomer outstanding updated.\nLedger entry created.`);
             localStorage.setItem('invoiceCart', '[]');
             window.close();
         } catch (err) {
+            console.error('Error in saveInvoice:', err);
             alert('Error saving invoice: ' + err.message);
         }
     }
 
+    // print and PDF functions (unchanged)
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -739,9 +681,7 @@
             replacements.push({ original: el, span: span, parent: parent });
         });
         window.print();
-        setTimeout(() => {
-            replacements.forEach(rep => rep.parent.replaceChild(rep.original, rep.span));
-        }, 100);
+        setTimeout(() => replacements.forEach(rep => rep.parent.replaceChild(rep.original, rep.span)), 100);
     }
 
     function generatePDF() {
@@ -779,17 +719,15 @@
         });
     }
 
+    // event listeners
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            const creditDiv = document.getElementById('creditFields');
-            if (this.value === 'credit') creditDiv.style.display = 'flex';
-            else creditDiv.style.display = 'none';
+            document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
             updateInvoiceNumberDisplay();
             updateDueDate();
             updateGstDisplay();
         });
     });
-
     const paymentTermsInput = document.getElementById('paymentTerms');
     if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
 
@@ -799,4 +737,4 @@
     updateGstDisplay();
 </script>
 </body>
-    </html>
+                                                                                                           </html>
