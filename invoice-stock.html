@@ -238,6 +238,15 @@
         <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
                 <h3>Buyer (Bill to)</h3>
+                <!-- Admin Customer Quick Select (visible only to admin) -->
+                <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
+                    <div class="info-label">Quick Select:</div>
+                    <div class="info-value">
+                        <select id="quickCustomerSelect" onchange="loadCustomerData()">
+                            <option value="">-- Select Customer (Admin only) --</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
                 <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
                 <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN"></div></div>
@@ -296,12 +305,13 @@
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <td><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
-        ｜｜DSML｜｜
+        </table>
     </div>
 
+    <!-- Payment QR and Bank Details -->
     <div class="qr-box">
         <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
             <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
@@ -309,6 +319,7 @@
         </div>
     </div>
 
+    <!-- Signatures -->
     <div class="signature-row">
         <div class="signature-box">Customer's Stamp & Signature<br><span style="font-size: 10px;">(Receiver's acknowledgment)</span></div>
         <div class="signature-box">For Auto Spares Solution<br>(Authorised Signatory)<br><span style="font-size: 10px;">(Stamp & Signature)</span></div>
@@ -339,6 +350,38 @@
         document.getElementById('buyerEmail').value = currentUser.email || '';
         document.getElementById('buyerGstin').value = currentUser.gstin || '';
         document.getElementById('buyerState').value = currentUser.state || '';
+    }
+
+    // ========== ADMIN CUSTOMER QUICK SELECT ==========
+    if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
+        document.getElementById('adminCustomerSelect').style.display = 'flex';
+        populateCustomerSelect();
+    }
+
+    function populateCustomerSelect() {
+        const select = document.getElementById('quickCustomerSelect');
+        customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        select.innerHTML = '<option value="">-- Select Customer (Admin only) --</option>';
+        customers.forEach(c => {
+            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+        });
+    }
+
+    function loadCustomerData() {
+        const select = document.getElementById('quickCustomerSelect');
+        const email = select.value;
+        if (!email) return;
+        const cust = customers.find(c => c.email === email);
+        if (cust) {
+            document.getElementById('buyerName').value = cust.name || '';
+            document.getElementById('buyerAddress').value = cust.address || '';
+            document.getElementById('buyerPhone').value = cust.phone || '';
+            document.getElementById('buyerEmail').value = cust.email || '';
+            document.getElementById('buyerGstin').value = cust.gstin || '';
+            document.getElementById('buyerState').value = cust.state || '';
+            document.getElementById('customerCode').value = cust.customerCode || '';
+            updateGstDisplay();
+        }
     }
 
     // Helper: check if customer GSTIN is local (starts with "19")
@@ -492,7 +535,7 @@
                 <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</strong></td>
                 <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</strong></td>
                 <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
-            </tr>`;
+            </td>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
 
@@ -513,7 +556,7 @@
                 <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
                 <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
                 <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
-            </table>`;
+            </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
     }
@@ -545,19 +588,6 @@
 
     // Replace with a wrapper that bypasses stock validation
     window.createSalesInvoice = function(invoice) {
-        // Before calling the original, we will ensure each product's currentStock is set to at least sold quantity
-        // This avoids "Insufficient stock" error. We'll temporarily increase stock, then revert? Actually the original will subtract.
-        // We can simply set stock to a high value but that would be wrong. Better to remove the stock check from original.
-        // Since we cannot modify original directly, we'll copy the original logic but skip the stock check.
-        // However, to keep things simple and avoid code duplication, we'll temporarily adjust product.stock before calling original.
-        // The original will subtract the quantity, leading to proper reduction (possibly negative if original stock was lower).
-        // If original stock was 0 and we set it to sold quantity, after subtraction it becomes 0, not negative. That's not ideal.
-        // Instead, we should set stock to sold quantity + original stock? Let's just skip the stock check by overriding the function.
-        // We'll implement a custom version that does NOT check stock.
-        
-        // For simplicity, we'll use the original function but comment out the stock validation.
-        // But the original function is in data-manager.js, we cannot edit it. So we'll write our own version here.
-        
         // Custom implementation that updates stock without checking availability
         let products = getProducts();
         let invTransactions = getInventoryTransactions();
@@ -566,7 +596,7 @@
         for (let item of invoice.items) {
             let product = products.find(p => p.id == item.productId);
             if (!product) {
-                // Auto-create product if still missing (should not happen because we already ensured)
+                // Auto-create product if still missing
                 product = {
                     id: item.productId,
                     name: `Product ${item.productId}`,
@@ -768,7 +798,7 @@
         }
     }
 
-    // --- Print and PDF functions (identical to working version) ---
+    // --- Print and PDF functions ---
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -853,11 +883,10 @@
     updateInvoiceNumberDisplay();
     updateGstDisplay();
 
-    // Restore original createSalesInvoice after page load? Not necessary because we are overriding globally.
-    // To avoid side effects, we could restore, but it's fine within this page.
+    // Restore original createSalesInvoice when page unloads (optional)
     window.addEventListener('beforeunload', function() {
         window.createSalesInvoice = originalCreateSalesInvoice;
     });
 </script>
 </body>
-                                                                                                               </html>
+    </html>
