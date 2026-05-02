@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
+        /* (Your existing CSS – unchanged) */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -238,7 +239,6 @@
         <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
                 <h3>Buyer (Bill to)</h3>
-                <!-- Customer Quick Select (visible only to admin) -->
                 <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
                     <div class="info-label">Quick Select:</div>
                     <div class="info-value">
@@ -304,10 +304,10 @@
     <!-- Totals -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
@@ -343,7 +343,6 @@
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
-    // Pre‑fill buyer fields from logged‑in user
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
         document.getElementById('buyerAddress').value = currentUser.address || '';
@@ -354,7 +353,6 @@
     }
 
     // ========== ADMIN CUSTOMER QUICK SELECT ==========
-    // Check if current user is admin
     if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
         document.getElementById('adminCustomerSelect').style.display = 'flex';
         populateCustomerSelect();
@@ -382,12 +380,10 @@
             document.getElementById('buyerGstin').value = cust.gstin || '';
             document.getElementById('buyerState').value = cust.state || '';
             document.getElementById('customerCode').value = cust.customerCode || '';
-            // Also update GST display
             updateGstDisplay();
         }
     }
 
-    // Helper: check if customer GSTIN is local (starts with "19")
     function isLocalGst() {
         const gst = document.getElementById('buyerGstin').value.trim();
         return gst.startsWith('19');
@@ -408,7 +404,6 @@
     }
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
-    // --- Financial Year ---
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -417,7 +412,6 @@
         else return `${year-1}-${year.toString().slice(-2)}`;
     }
 
-    // --- Get next invoice number from existing invoices (max + 1) ---
     function getNextInvoiceNumber(type) {
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const finYear = getFinancialYear();
@@ -432,25 +426,19 @@
                 }
             }
         });
-        const nextNumber = maxNumber + 1;
-        return prefix + nextNumber.toString().padStart(4, '0');
+        return prefix + (maxNumber + 1).toString().padStart(4, '0');
     }
 
     function updateInvoiceNumberDisplay() {
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const invoiceNo = getNextInvoiceNumber(type);
-        document.getElementById('invoiceNo').innerText = invoiceNo;
+        document.getElementById('invoiceNo').innerText = getNextInvoiceNumber(type);
     }
 
-    // --- Due Date Logic ---
     function computeDueDate(invoiceDate, type, paymentTermsDays) {
         const date = new Date(invoiceDate);
         if (type === 'cash') return date;
-        if (paymentTermsDays && !isNaN(paymentTermsDays)) {
-            date.setDate(date.getDate() + paymentTermsDays);
-        } else {
-            date.setDate(date.getDate() + 30);
-        }
+        if (paymentTermsDays && !isNaN(paymentTermsDays)) date.setDate(date.getDate() + paymentTermsDays);
+        else date.setDate(date.getDate() + 30);
         return date;
     }
 
@@ -477,7 +465,6 @@
         document.getElementById('dueDate').innerText = formatDate(dueDate);
     }
 
-    // --- Cart calculations ---
     function calculateTotalsAndTaxGroups() {
         let sub = 0;
         let taxGroups = {};
@@ -506,9 +493,8 @@
             igstTotal += taxGroups[hsn].igst;
         }
         let grand = sub + (isLocal ? cgstTotal + sgstTotal : igstTotal);
-        let roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
-        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, roundOff, grand, taxGroups, isLocal };
+        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, grand, taxGroups, isLocal };
     }
 
     function renderItemsAndTaxSummary() {
@@ -527,17 +513,17 @@
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             itemsHtml += `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
                 <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td style="text-align:center;">${item.qty}</td>
-                <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="text-align:center;">18%</td>
-                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
+                <td style="text-align:center;">${item.qty}</strong></td>
+                <td style="text-align:right;">₹${item.price.toFixed(2)}</strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="text-align:center;">18%</strong></td>
+                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
@@ -553,12 +539,12 @@
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -585,12 +571,50 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    // --- Save Invoice (Integrated) ---
+    // ========== FIX: Ensure products exist before creating invoice ==========
+    function ensureProductsExist() {
+        let products = getProducts();  // from data-manager.js
+        let modified = false;
+        for (let item of cart) {
+            let part = item.part;
+            if (!part) continue;
+            let existing = products.find(p => p.id === part || p.sku === part);
+            if (!existing) {
+                // Auto-create product with minimal details
+                let newProduct = {
+                    id: part,
+                    name: item.desc || part,
+                    sku: part,
+                    brand: '',
+                    make: '',
+                    group: '',
+                    lineCode: null,
+                    hsn: item.hsn || '',
+                    unit: 'pc',
+                    price: item.price,
+                    currentStock: 0,   // stock will be reduced later – but initial stock is 0 for sales
+                    reorderLevel: 10,
+                    costPrice: 0,
+                    createdAt: new Date().toISOString()
+                };
+                products.push(newProduct);
+                modified = true;
+            }
+        }
+        if (modified) {
+            saveProducts(products);
+            console.log('Auto-created missing products in product master.');
+        }
+    }
+
     function saveInvoice() {
         if (cart.length === 0) {
             alert('Cart empty. Please add items first.');
             return;
         }
+
+        // Ensure all products exist in product master (auto-create missing)
+        ensureProductsExist();
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const totals = calculateTotalsAndTaxGroups();
@@ -605,7 +629,6 @@
             state: document.getElementById('buyerState').value.trim()
         };
 
-        // Ensure customer exists
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         let existingCustomer = customers.find(c => c.email === buyer.email);
         if (!existingCustomer && buyer.email) {
@@ -693,7 +716,6 @@
         }
     }
 
-    // --- Print and PDF functions ---
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -757,7 +779,6 @@
         });
     }
 
-    // --- Event Listeners ---
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
             const creditDiv = document.getElementById('creditFields');
@@ -772,11 +793,10 @@
     const paymentTermsInput = document.getElementById('paymentTerms');
     if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
 
-    // Initialization
     setDates();
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
     updateGstDisplay();
 </script>
 </body>
-                </html>
+    </html>
