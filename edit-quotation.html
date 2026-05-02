@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Quotation – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="data-manager.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
+        .form-group { flex: 1; min-width: 180px; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
+        .item-row {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .item-row input { flex: 1; min-width: 100px; }
+        .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; cursor: pointer; }
+        .totals { text-align: right; margin-top: 20px; }
+        .totals p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-edit"></i> Edit Quotation</h1>
+    <div id="warningMsg" style="background:#fff3cd; padding:10px; display:none;"></div>
+
+    <div class="form-row">
+        <div class="form-group"><label>Quotation No (read‑only)</label><input type="text" id="quotationNo" readonly></div>
+        <div class="form-group"><label>Date</label><input type="date" id="quotationDate"></div>
+        <div class="form-group"><label>Valid Until</label><input type="date" id="validUntil"></div>
+    </div>
+    <div class="form-row">
+        <div class="form-group"><label>Customer Name</label><input type="text" id="customerName"></div>
+        <div class="form-group"><label>Customer Email</label><input type="email" id="customerEmail"></div>
+        <div class="form-group"><label>Customer Phone</label><input type="text" id="customerPhone"></div>
+    </div>
+    <div class="form-row">
+        <div class="form-group"><label>Customer Address</label><textarea id="customerAddress" rows="2"></textarea></div>
+        <div class="form-group"><label>GSTIN</label><input type="text" id="customerGstin"></div>
+        <div class="form-group"><label>State</label><input type="text" id="customerState"></div>
+    </div>
+
+    <h3>Items</h3>
+    <div id="itemsContainer"></div>
+    <button class="add-item" onclick="addItem()">+ Add Item</button>
+
+    <div class="totals">
+        <p><strong>Subtotal:</strong> ₹<span id="subtotal">0.00</span></p>
+        <p><strong>CGST (9%):</strong> ₹<span id="cgstTotal">0.00</span></p>
+        <p><strong>SGST (9%):</strong> ₹<span id="sgstTotal">0.00</span></p>
+        <p><strong>Grand Total:</strong> ₹<span id="grandTotal">0.00</span></p>
+    </div>
+
+    <button onclick="saveChanges()">Save Changes</button>
+    <button onclick="window.close()">Cancel</button>
+</div>
+
+<script>
+    let originalQuotation = null;
+    let items = [];
+
+    function loadQuotation() {
+        const id = localStorage.getItem('editQuotationId');
+        if (!id) { alert('No quotation selected'); window.close(); return; }
+        const all = JSON.parse(localStorage.getItem('quotations') || '[]');
+        originalQuotation = all.find(q => q.id == id);
+        if (!originalQuotation) { alert('Quotation not found'); window.close(); return; }
+
+        // Fill form fields
+        document.getElementById('quotationNo').value = originalQuotation.quotationNo;
+        document.getElementById('quotationDate').value = originalQuotation.date;
+        document.getElementById('validUntil').value = originalQuotation.validUntil || '';
+        document.getElementById('customerName').value = originalQuotation.customer?.name || '';
+        document.getElementById('customerEmail').value = originalQuotation.customer?.email || '';
+        document.getElementById('customerPhone').value = originalQuotation.customer?.phone || '';
+        document.getElementById('customerAddress').value = originalQuotation.customer?.address || '';
+        document.getElementById('customerGstin').value = originalQuotation.customer?.gstin || '';
+        document.getElementById('customerState').value = originalQuotation.customer?.state || '';
+
+        // Load items
+        items = (originalQuotation.items || []).map(item => ({
+            part: item.part || '',
+            desc: item.desc || '',
+            hsn: item.hsn || '',
+            qty: item.qty || 1,
+            price: item.price || 0,
+            discount: item.discount || 0
+        }));
+        if (items.length === 0) addItem();
+        renderItems();
+        recalcTotals();
+    }
+
+    function addItem() {
+        items.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0 });
+        renderItems();
+        recalcTotals();
+    }
+
+    function removeItem(idx) {
+        items.splice(idx, 1);
+        renderItems();
+        recalcTotals();
+    }
+
+    function updateItem(idx, field, val) {
+        items[idx][field] = val;
+        recalcTotals();
+    }
+
+    function renderItems() {
+        const container = document.getElementById('itemsContainer');
+        container.innerHTML = '';
+        items.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'item-row';
+            div.innerHTML = `
+                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:2;">
+                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="flex:3;">
+                <input type="text" placeholder="HSN" value="${escapeHtml(item.hsn)}" onchange="updateItem(${idx}, 'hsn', this.value)" style="flex:1;">
+                <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Unit Price" value="${item.price}" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))" style="flex:1;">
+                <input type="number" placeholder="Disc %" value="${item.discount}" step="0.01" onchange="updateItem(${idx}, 'discount', parseFloat(this.value))" style="flex:1;">
+                <button class="remove-item" onclick="removeItem(${idx})">X</button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function recalcTotals() {
+        let subtotal = 0;
+        items.forEach(i => {
+            const qty = i.qty || 0;
+            const price = i.price || 0;
+            const disc = i.discount || 0;
+            const taxable = qty * price * (1 - disc/100);
+            subtotal += taxable;
+        });
+        const cgst = subtotal * 0.09;
+        const sgst = subtotal * 0.09;
+        const grand = subtotal + cgst + sgst;
+        document.getElementById('subtotal').innerText = subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = cgst.toFixed(2);
+        document.getElementById('sgstTotal').innerText = sgst.toFixed(2);
+        document.getElementById('grandTotal').innerText = grand.toFixed(2);
+        return { subtotal, cgst, sgst, grand };
+    }
+
+    function saveChanges() {
+        const newDate = document.getElementById('quotationDate').value;
+        const newValidUntil = document.getElementById('validUntil').value;
+        const totals = recalcTotals();
+        const customer = {
+            name: document.getElementById('customerName').value,
+            email: document.getElementById('customerEmail').value,
+            phone: document.getElementById('customerPhone').value,
+            address: document.getElementById('customerAddress').value,
+            gstin: document.getElementById('customerGstin').value,
+            state: document.getElementById('customerState').value
+        };
+        // Ensure customer email exists (for later conversion)
+        if (!customer.email) alert('Customer email is optional but recommended for invoice conversion.');
+
+        const updatedQuotation = {
+            ...originalQuotation,
+            date: newDate,
+            validUntil: newValidUntil,
+            customer: customer,
+            items: items.map(i => ({ ...i })),
+            subtotal: totals.subtotal,
+            cgst: totals.cgst,
+            sgst: totals.sgst,
+            grandTotal: totals.grand,
+            updatedAt: new Date().toISOString()
+        };
+
+        let all = JSON.parse(localStorage.getItem('quotations') || '[]');
+        const index = all.findIndex(q => q.id == originalQuotation.id);
+        if (index !== -1) all[index] = updatedQuotation;
+        localStorage.setItem('quotations', JSON.stringify(all));
+        alert('Quotation updated successfully');
+        window.close();
+    }
+
+    function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+    loadQuotation();
+</script>
+</body>
+</html>
