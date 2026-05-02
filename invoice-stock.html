@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
-        /* (Your existing CSS – unchanged) */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -205,7 +204,6 @@
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
-    <!-- company-header etc. – same as your original; I'll keep it short but you can replace with your full header -->
     <div class="company-header">
         <div class="logo-area">
             <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
@@ -240,14 +238,6 @@
         <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
                 <h3>Buyer (Bill to)</h3>
-                <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
-                    <div class="info-label">Quick Select:</div>
-                    <div class="info-value">
-                        <select id="quickCustomerSelect" onchange="loadCustomerData()">
-                            <option value="">-- Select Customer (Admin only) --</option>
-                        </select>
-                    </div>
-                </div>
                 <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
                 <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
                 <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN"></div></div>
@@ -290,19 +280,42 @@
 
     <!-- Items Table -->
     <table class="items-table">
-        <thead><tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Unit Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
+        <thead>
+            <tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
+        </thead>
         <tbody id="itemsBody"></tbody>
     </table>
-    <table class="tax-summary-table"><thead><tr><th>HSN/SAC</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total Tax</th></tr></thead><tbody id="taxSummaryBody"></tbody></table>
+
+    <!-- Tax Summary Table -->
+    <table class="tax-summary-table">
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
+        <tbody id="taxSummaryBody"></tbody>
+    </table>
+
+    <!-- Totals -->
     <div class="totals">
-        <table><tr><td>Subtotal (after discount):</td><td>₹<span id="subtotal">0.00</span></td></tr>
-        <tr><td id="gstLabel1">CGST (9%):</td><td>₹<span id="cgstTotal">0.00</span></td></tr>
-        <tr><td id="gstLabel2">SGST (9%):</td><td>₹<span id="sgstTotal">0.00</span></td></tr>
-        <tr style="font-weight:bold;"><td>Grand Total:</td><td>₹<span id="grandTotal">0.00</span></td></tr></table>
+        <table>
+            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+        ｜｜DSML｜｜
     </div>
-    <div class="qr-box"><div><img src="images/ASS.QR.jpg" style="max-width:120px;"><div><strong>Bank Details:</strong><br>Union Bank of India, A/c: 021111100007383, IFSC: UBINO802115, UPI: ass08@uboi</div></div></div>
-    <div class="signature-row"><div class="signature-box">Customer's Stamp & Signature</div><div class="signature-box">For Auto Spares Solution</div></div>
-    <div class="footer-legal">This is a computer generated invoice. All disputes subject to Howrah jurisdiction.</div>
+
+    <div class="qr-box">
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+            <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
+            <div><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</div>
+        </div>
+    </div>
+
+    <div class="signature-row">
+        <div class="signature-box">Customer's Stamp & Signature<br><span style="font-size: 10px;">(Receiver's acknowledgment)</span></div>
+        <div class="signature-box">For Auto Spares Solution<br>(Authorised Signatory)<br><span style="font-size: 10px;">(Stamp & Signature)</span></div>
+    </div>
+
+    <div class="footer-legal">This is a computer generated invoice. All disputes are subject to Howrah jurisdiction only.</div>
+    <div id="pageNumber" class="page-number"></div>
 </div>
 
 <div class="actions no-print">
@@ -313,13 +326,12 @@
 </div>
 
 <script>
-    // cart data
+    // ========== DATA FROM localStorage ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
     cart = cart.map(i => ({ ...i, hsn: i.hsn || '' }));
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
-    // prefill buyer from current user
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
         document.getElementById('buyerAddress').value = currentUser.address || '';
@@ -329,36 +341,12 @@
         document.getElementById('buyerState').value = currentUser.state || '';
     }
 
-    // admin customer quick select
-    if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
-        document.getElementById('adminCustomerSelect').style.display = 'flex';
-        populateCustomerSelect();
+    // Helper: check if customer GSTIN is local (starts with "19")
+    function isLocalGst() {
+        const gst = document.getElementById('buyerGstin').value.trim();
+        return gst.startsWith('19');
     }
 
-    function populateCustomerSelect() {
-        const select = document.getElementById('quickCustomerSelect');
-        customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        select.innerHTML = '<option value="">-- Select Customer (Admin only) --</option>';
-        customers.forEach(c => select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`);
-    }
-
-    function loadCustomerData() {
-        const email = document.getElementById('quickCustomerSelect').value;
-        if (!email) return;
-        const cust = customers.find(c => c.email === email);
-        if (cust) {
-            document.getElementById('buyerName').value = cust.name;
-            document.getElementById('buyerAddress').value = cust.address;
-            document.getElementById('buyerPhone').value = cust.phone;
-            document.getElementById('buyerEmail').value = cust.email;
-            document.getElementById('buyerGstin').value = cust.gstin;
-            document.getElementById('buyerState').value = cust.state;
-            document.getElementById('customerCode').value = cust.customerCode;
-            updateGstDisplay();
-        }
-    }
-
-    function isLocalGst() { return document.getElementById('buyerGstin').value.trim().startsWith('19'); }
     function updateGstDisplay() {
         const isLocal = isLocalGst();
         const cgstLabel = document.getElementById('gstLabel1');
@@ -374,188 +362,278 @@
     }
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
+    // --- Financial Year ---
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
-        return (month >= 4) ? `${year}-${(year+1).toString().slice(-2)}` : `${year-1}-${year.toString().slice(-2)}`;
+        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
+        else return `${year-1}-${year.toString().slice(-2)}`;
     }
 
+    // --- Get next invoice number from existing invoices (max + 1) ---
     function getNextInvoiceNumber(type) {
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const finYear = getFinancialYear();
-        const prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-        let max = 0;
+        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+        let maxNumber = 0;
         allInvoices.forEach(inv => {
             if (inv.invoiceType === type && inv.invoiceNo.startsWith(prefix)) {
-                let match = inv.invoiceNo.match(/(\d+)$/);
-                if (match) max = Math.max(max, parseInt(match[1]));
+                const match = inv.invoiceNo.match(/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > maxNumber) maxNumber = num;
+                }
             }
         });
-        return prefix + (max + 1).toString().padStart(4, '0');
+        const nextNumber = maxNumber + 1;
+        return prefix + nextNumber.toString().padStart(4, '0');
     }
 
     function updateInvoiceNumberDisplay() {
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        document.getElementById('invoiceNo').innerText = getNextInvoiceNumber(type);
+        const invoiceNo = getNextInvoiceNumber(type);
+        document.getElementById('invoiceNo').innerText = invoiceNo;
     }
 
-    function computeDueDate(invoiceDate, type, days) {
+    // --- Due Date Logic ---
+    function computeDueDate(invoiceDate, type, paymentTermsDays) {
         const date = new Date(invoiceDate);
         if (type === 'cash') return date;
-        if (days && !isNaN(days)) date.setDate(date.getDate() + days);
-        else date.setDate(date.getDate() + 30);
+        if (paymentTermsDays && !isNaN(paymentTermsDays)) {
+            date.setDate(date.getDate() + paymentTermsDays);
+        } else {
+            date.setDate(date.getDate() + 30);
+        }
         return date;
     }
-    function formatDate(d) { return d.toLocaleDateString('en-IN'); }
+
+    function formatDate(d) { return new Date(d).toLocaleDateString('en-IN'); }
+
     function updateDueDate() {
-        const parts = document.getElementById('invoiceDate').innerText.split('/');
+        const invoiceDateStr = document.getElementById('invoiceDate').innerText;
+        const parts = invoiceDateStr.split('/');
         const invoiceDate = new Date(parts[2], parts[1]-1, parts[0]);
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        let days = parseInt(document.getElementById('paymentTerms').value);
-        if (isNaN(days)) days = 30;
-        const due = computeDueDate(invoiceDate, type, days);
-        document.getElementById('dueDate').innerText = formatDate(due);
-    }
-    function setDates() {
-        const today = new Date();
-        document.getElementById('invoiceDate').innerText = formatDate(today);
-        updateDueDate();
+        let paymentTermsDays = parseInt(document.getElementById('paymentTerms').value);
+        if (isNaN(paymentTermsDays)) paymentTermsDays = 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTermsDays);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
     }
 
+    function setDates() {
+        const invoiceDate = new Date();
+        document.getElementById('invoiceDate').innerText = formatDate(invoiceDate);
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        let paymentTermsDays = parseInt(document.getElementById('paymentTerms').value);
+        if (isNaN(paymentTermsDays)) paymentTermsDays = 30;
+        const dueDate = computeDueDate(invoiceDate, type, paymentTermsDays);
+        document.getElementById('dueDate').innerText = formatDate(dueDate);
+    }
+
+    // --- Cart calculations (handles local/out-of-state GST) ---
     function calculateTotalsAndTaxGroups() {
-        let sub = 0, taxGroups = {};
+        let sub = 0;
+        let taxGroups = {};
         const isLocal = isLocalGst();
         cart.forEach(i => {
             const hsn = i.hsn || '';
-            const taxable = i.price * i.qty * (1 - (i.discount || 0)/100);
+            const taxable = (i.price * i.qty) * (1 - (i.discount || 0) / 100);
             sub += taxable;
-            let cgst=0,sgst=0,igst=0;
-            if (isLocal) { cgst = taxable*0.09; sgst = taxable*0.09; }
-            else { igst = taxable*0.18; }
-            if(!taxGroups[hsn]) taxGroups[hsn] = {taxable:0,cgst:0,sgst:0,igst:0};
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
             taxGroups[hsn].taxable += taxable;
             taxGroups[hsn].cgst += cgst;
             taxGroups[hsn].sgst += sgst;
             taxGroups[hsn].igst += igst;
         });
-        let cgstTotal=0,sgstTotal=0,igstTotal=0;
-        for(let h in taxGroups){
-            cgstTotal += taxGroups[h].cgst;
-            sgstTotal += taxGroups[h].sgst;
-            igstTotal += taxGroups[h].igst;
+        let cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
+        for (let hsn in taxGroups) {
+            cgstTotal += taxGroups[hsn].cgst;
+            sgstTotal += taxGroups[hsn].sgst;
+            igstTotal += taxGroups[hsn].igst;
         }
-        let grand = sub + (isLocal ? cgstTotal+sgstTotal : igstTotal);
+        let grand = sub + (isLocal ? cgstTotal + sgstTotal : igstTotal);
+        let roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
-        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, grand, taxGroups, isLocal };
+        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, roundOff, grand, taxGroups, isLocal };
     }
 
     function renderItemsAndTaxSummary() {
         let itemsHtml = '';
         const isLocal = isLocalGst();
         cart.forEach((item, idx) => {
-            const taxable = item.price * item.qty * (1 - (item.discount||0)/100);
-            let cgst=0,sgst=0,igst=0;
-            if(isLocal){ cgst = taxable*0.09; sgst = taxable*0.09; }
-            else { igst = taxable*0.18; }
-            const totalItem = taxable + (isLocal ? cgst+sgst : igst);
+            const discount = item.discount || 0;
+            const taxable = (item.price * item.qty) * (1 - discount / 100);
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             itemsHtml += `<tr>
-                <td>${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
-                <td><input type="text" value="${escapeHtml(item.hsn||'')}" style="width:100%;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td>${item.qty}</td>
-                <td>₹${item.price.toFixed(2)}</td>
-                <td><input type="number" step="0.01" value="${item.discount||0}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
-                <td>₹${taxable.toFixed(2)}</td>
-                <td>18%</td>
-                <td>${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
-                <td>${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
-                <td>₹${totalItem.toFixed(2)}</td>
+                <td style="text-align:center;">${idx+1}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
+                <td style="text-align:center;">${item.qty}</strong></td>
+                <td style="text-align:right;">₹${item.price.toFixed(2)}</strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="text-align:center;">18%</strong></td>
+                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
+
         const totals = calculateTotalsAndTaxGroups();
         document.getElementById('subtotal').innerText = totals.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = totals.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = totals.sgstTotal.toFixed(2);
         document.getElementById('grandTotal').innerText = totals.grand.toFixed(2);
+
         let taxHtml = '';
-        for(let hsn in totals.taxGroups){
+        for (let hsn in totals.taxGroups) {
             const g = totals.taxGroups[hsn];
-            const totalTax = g.cgst+g.sgst+g.igst;
-            taxHtml += `<tr><td>${hsn||'N/A'}</td><td>₹${g.taxable.toFixed(2)}</td>
-                <td>${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
-                <td>${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
-                <td>${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
-                <td>₹${totalTax.toFixed(2)}</td></tr>`;
+            const totalTax = g.cgst + g.sgst + g.igst;
+            taxHtml += `<tr>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
+            </table>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
     }
 
-    function updateDiscount(part, disc) {
+    function updateDiscount(part, discPercent) {
         const item = cart.find(i => i.part === part);
-        if(item) item.discount = parseFloat(disc) || 0;
-        renderItemsAndTaxSummary();
+        if (item) {
+            item.discount = parseFloat(discPercent) || 0;
+            renderItemsAndTaxSummary();
+        }
     }
-    function updateHsn(part, hsn) {
-        const item = cart.find(i => i.part === part);
-        if(item) item.hsn = hsn;
-        renderItemsAndTaxSummary();
-    }
-    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
-    // ========== FIX: Ensure all products exist in master ==========
-    function ensureProductsExist() {
-        let products = getProducts();  // from data-manager.js
-        let modified = false;
-        for (let item of cart) {
-            let part = item.part.trim();
-            if (!part) continue;
-            // Try to find by id or sku (case-insensitive, trimmed)
-            let existing = products.find(p => 
-                (p.id && p.id.toString().trim() === part) ||
-                (p.sku && p.sku.toString().trim() === part)
-            );
-            if (!existing) {
-                console.log(`Auto-creating product for part: ${part}`);
-                let newProduct = {
-                    id: part,
-                    name: item.desc || part,
-                    sku: part,
-                    brand: '',
-                    make: '',
-                    group: '',
-                    lineCode: null,
-                    hsn: item.hsn || '',
+    function updateHsn(part, hsnValue) {
+        const item = cart.find(i => i.part === part);
+        if (item) {
+            item.hsn = hsnValue;
+            renderItemsAndTaxSummary();
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
+    }
+
+    // ========== OVERRIDE createSalesInvoice to allow zero/negative stock ==========
+    // Save the original function
+    const originalCreateSalesInvoice = window.createSalesInvoice;
+
+    // Replace with a wrapper that bypasses stock validation
+    window.createSalesInvoice = function(invoice) {
+        // Before calling the original, we will ensure each product's currentStock is set to at least sold quantity
+        // This avoids "Insufficient stock" error. We'll temporarily increase stock, then revert? Actually the original will subtract.
+        // We can simply set stock to a high value but that would be wrong. Better to remove the stock check from original.
+        // Since we cannot modify original directly, we'll copy the original logic but skip the stock check.
+        // However, to keep things simple and avoid code duplication, we'll temporarily adjust product.stock before calling original.
+        // The original will subtract the quantity, leading to proper reduction (possibly negative if original stock was lower).
+        // If original stock was 0 and we set it to sold quantity, after subtraction it becomes 0, not negative. That's not ideal.
+        // Instead, we should set stock to sold quantity + original stock? Let's just skip the stock check by overriding the function.
+        // We'll implement a custom version that does NOT check stock.
+        
+        // For simplicity, we'll use the original function but comment out the stock validation.
+        // But the original function is in data-manager.js, we cannot edit it. So we'll write our own version here.
+        
+        // Custom implementation that updates stock without checking availability
+        let products = getProducts();
+        let invTransactions = getInventoryTransactions();
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        
+        for (let item of invoice.items) {
+            let product = products.find(p => p.id == item.productId);
+            if (!product) {
+                // Auto-create product if still missing (should not happen because we already ensured)
+                product = {
+                    id: item.productId,
+                    name: `Product ${item.productId}`,
+                    sku: item.productId,
+                    currentStock: 0,
                     unit: 'pc',
                     price: item.price,
-                    currentStock: 0,      // initial stock; will be reduced by sale (but product exists)
                     reorderLevel: 10,
-                    costPrice: 0,
                     createdAt: new Date().toISOString()
                 };
-                products.push(newProduct);
-                modified = true;
-            } else {
-                console.log(`Product already exists: ${part}`);
+                products.push(product);
             }
+            let oldStock = product.currentStock || 0;
+            let newStock = oldStock - item.quantity;
+            // Allow negative stock (no check)
+            product.currentStock = newStock;
+            
+            invTransactions.push({
+                id: Date.now() + Math.random(),
+                productId: item.productId,
+                type: 'sales',
+                quantity: -item.quantity,
+                date: invoice.date,
+                ref: invoice.invoiceNo || `INV-${invoice.id}`,
+                balanceAfter: newStock
+            });
         }
-        if (modified) {
-            saveProducts(products);
-            console.log('Missing products have been added to product master.');
+        saveProducts(products);
+        saveInventoryTransactions(invTransactions);
+        
+        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+        salesInvoices.push(invoice);
+        localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
+        
+        // Also store in allInvoices for compatibility
+        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        allInvoices.push(invoice);
+        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+        
+        // Update customer outstanding
+        let customer = customers.find(c => c.email === invoice.customerEmail);
+        if (customer) {
+            customer.outstanding = (customer.outstanding || 0) + invoice.total;
+            localStorage.setItem('customers', JSON.stringify(customers));
+            
+            let customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
+            customerLedger.push({
+                id: Date.now(),
+                customerEmail: invoice.customerEmail,
+                date: invoice.date,
+                type: 'invoice',
+                ref: invoice.invoiceNo || `INV-${invoice.id}`,
+                debit: invoice.total,
+                credit: 0,
+                balance: customer.outstanding
+            });
+            localStorage.setItem('customerLedger', JSON.stringify(customerLedger));
         }
-        return products; // return updated products array
-    }
+        return true;
+    };
 
-    async function saveInvoice() {
+    // --- Save Invoice (uses overridden createSalesInvoice) ---
+    function saveInvoice() {
         if (cart.length === 0) {
             alert('Cart empty. Please add items first.');
             return;
         }
-
-        // Ensure all products exist in product master before calling createSalesInvoice
-        ensureProductsExist();
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const totals = calculateTotalsAndTaxGroups();
@@ -570,6 +648,7 @@
             state: document.getElementById('buyerState').value.trim()
         };
 
+        // Ensure customer exists
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         let existingCustomer = customers.find(c => c.email === buyer.email);
         if (!existingCustomer && buyer.email) {
@@ -590,11 +669,44 @@
             };
             customers.push(newCust);
             localStorage.setItem('customers', JSON.stringify(customers));
+            existingCustomer = newCust;
         }
 
         if (!buyer.email) {
             alert('Customer email is required to link invoice.');
             return;
+        }
+
+        // Ensure all products exist in product master (auto-create missing)
+        let products = getProducts();
+        let modified = false;
+        for (let item of cart) {
+            let part = item.part ? item.part.trim() : '';
+            if (!part) continue;
+            let existing = products.find(p => p.id === part || p.sku === part);
+            if (!existing) {
+                let newProduct = {
+                    id: part,
+                    name: item.desc || part,
+                    sku: part,
+                    brand: '',
+                    make: '',
+                    group: '',
+                    lineCode: null,
+                    hsn: item.hsn || '',
+                    unit: 'pc',
+                    price: item.price,
+                    currentStock: 0,
+                    reorderLevel: 10,
+                    costPrice: 0,
+                    createdAt: new Date().toISOString()
+                };
+                products.push(newProduct);
+                modified = true;
+            }
+        }
+        if (modified) {
+            saveProducts(products);
         }
 
         const items = cart.map(item => ({
@@ -647,17 +759,16 @@
         };
 
         try {
-            await createSalesInvoice(invoice);  // data-manager.js function
-            alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced.\nCustomer outstanding updated.\nLedger entry created.`);
+            createSalesInvoice(invoice);
+            alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced (negative allowed).\nCustomer outstanding updated.\nLedger entry created.`);
             localStorage.setItem('invoiceCart', '[]');
             window.close();
         } catch (err) {
-            console.error('Error in saveInvoice:', err);
             alert('Error saving invoice: ' + err.message);
         }
     }
 
-    // print and PDF functions (unchanged)
+    // --- Print and PDF functions (identical to working version) ---
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -681,7 +792,9 @@
             replacements.push({ original: el, span: span, parent: parent });
         });
         window.print();
-        setTimeout(() => replacements.forEach(rep => rep.parent.replaceChild(rep.original, rep.span)), 100);
+        setTimeout(() => {
+            replacements.forEach(rep => rep.parent.replaceChild(rep.original, rep.span));
+        }, 100);
     }
 
     function generatePDF() {
@@ -719,22 +832,32 @@
         });
     }
 
-    // event listeners
+    // --- Event Listeners ---
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            document.getElementById('creditFields').style.display = this.value === 'credit' ? 'flex' : 'none';
+            const creditDiv = document.getElementById('creditFields');
+            if (this.value === 'credit') creditDiv.style.display = 'flex';
+            else creditDiv.style.display = 'none';
             updateInvoiceNumberDisplay();
             updateDueDate();
             updateGstDisplay();
         });
     });
+
     const paymentTermsInput = document.getElementById('paymentTerms');
     if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
 
+    // Initialization
     setDates();
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
     updateGstDisplay();
+
+    // Restore original createSalesInvoice after page load? Not necessary because we are overriding globally.
+    // To avoid side effects, we could restore, but it's fine within this page.
+    window.addEventListener('beforeunload', function() {
+        window.createSalesInvoice = originalCreateSalesInvoice;
+    });
 </script>
 </body>
-                                                                                                           </html>
+                                                                                                               </html>
