@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Purchase Entry – Supplier Bill / Credit Note (Stock Integrated)</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
         body {
@@ -79,12 +78,6 @@
     <div class="form-row">
         <div class="form-group">
             <label>Supplier *</label>
-            <!-- Admin quick-select (visible only to admin) -->
-            <div id="adminSupplierSelect" style="display:none;">
-                <select id="quickSupplierSelect" onchange="loadSupplierData()" style="margin-bottom:5px;">
-                    <option value="">-- Quick Select (Admin only) --</option>
-                </select>
-            </div>
             <select id="supplierSelect">
                 <option value="">-- Select existing or type new --</option>
             </select>
@@ -99,13 +92,13 @@
 
     <!-- Bill Details -->
     <div class="form-row">
-        <div class="form-group"><label>Purchase Invoice No *</label><input type="text" id="purchaseInvoiceNo" placeholder="Leave blank for auto‑generated"></div>
+        <div class="form-group"><label>Purchase Invoice No *</label><input type="text" id="purchaseInvoiceNo" placeholder="Leave blank for auto-generated"></div>
         <div class="form-group"><label>Invoice Date</label><input type="date" id="purchaseDate"></div>
         <div class="form-group"><label>Due Date</label><input type="date" id="purchaseDueDate"></div>
         <div class="form-group"><label>Payment Terms (days)</label><input type="number" id="paymentTerms" value="30"></div>
     </div>
 
-    <!-- Items Table (fully manual entry) -->
+    <!-- Items Table (fully manual entry, part number is the product ID) -->
     <h3>Items Purchased</h3>
     <div id="itemsContainer"></div>
     <button class="add-item" onclick="addItemRow()"><i class="fas fa-plus"></i> Add Item</button>
@@ -139,37 +132,9 @@
 </div>
 
 <script>
-    let items = [];              // each item: { part, desc, hsn, qty, cost, discount }
+    let items = [];           // each item: { part, desc, hsn, qty, cost, discount }
     let suppliers = [];
     let purchaseInvoices = [];
-
-    // ---------- Financial Year & Auto‑Numbering ----------
-    function getFinancialYear() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
-        else return `${year-1}-${year.toString().slice(-2)}`;
-    }
-
-    function getNextPurchaseInvoiceNumber() {
-        const finYear = getFinancialYear();
-        const all = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-        let maxNum = 0;
-        const prefix = `PUR/${finYear}/`;
-        all.forEach(inv => {
-            const invNo = inv.invoiceNo || inv.poNo || '';
-            if (invNo.startsWith(prefix)) {
-                const match = invNo.match(/\/(\d+)$/);
-                if (match) {
-                    const num = parseInt(match[1]);
-                    if (!isNaN(num) && num > maxNum) maxNum = num;
-                }
-            }
-        });
-        const nextNum = maxNum + 1;
-        return prefix + nextNum.toString().padStart(4, '0');
-    }
 
     // ---------- Load cart from localStorage (set by index.html) ----------
     function loadCartItems() {
@@ -215,20 +180,23 @@
             populateInvoiceDropdown();
         });
 
-        // Admin quick-select
+        // Admin quick-select (optional)
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-        if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
-            document.getElementById('adminSupplierSelect').style.display = 'block';
+        const adminDiv = document.getElementById('adminSupplierSelect');
+        if (adminDiv && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
+            adminDiv.style.display = 'flex';
             const quickSelect = document.getElementById('quickSupplierSelect');
-            quickSelect.innerHTML = '<option value="">-- Quick Select (Admin only) --</option>';
-            suppliers.forEach(sup => {
-                quickSelect.innerHTML += `<option value="${sup.email}" data-name="${sup.name}" data-gstin="${sup.gstin || ''}" data-phone="${sup.phone || ''}" data-address="${sup.address || ''}">${sup.name} (${sup.email})</option>`;
-            });
+            if (quickSelect) {
+                quickSelect.innerHTML = '<option value="">-- Quick Select (Admin only) --</option>';
+                suppliers.forEach(sup => {
+                    quickSelect.innerHTML += `<option value="${sup.email}" data-name="${sup.name}" data-gstin="${sup.gstin || ''}" data-phone="${sup.phone || ''}" data-address="${sup.address || ''}">${sup.name} (${sup.email})</option>`;
+                });
+            }
         }
     }
 
     function loadSupplierDataFromQuick() {
-        const email = document.getElementById('quickSupplierSelect').value;
+        const email = document.getElementById('quickSupplierSelect')?.value;
         if (!email) return;
         const sup = suppliers.find(s => s.email === email);
         if (sup) {
@@ -236,9 +204,8 @@
             document.getElementById('supplierGstin').value = sup.gstin || '';
             document.getElementById('supplierPhone').value = sup.phone || '';
             document.getElementById('supplierAddress').value = sup.address || '';
-            // Also set the main select
             const mainSelect = document.getElementById('supplierSelect');
-            mainSelect.value = email;
+            if (mainSelect) mainSelect.value = email;
         }
     }
 
@@ -307,7 +274,19 @@
         }
         let invoiceNo = document.getElementById('purchaseInvoiceNo').value.trim();
         if (!invoiceNo) {
-            invoiceNo = getNextPurchaseInvoiceNumber();
+            // Auto-generate purchase invoice number
+            const finYear = getFinancialYear();
+            const existing = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+            let maxNum = 0;
+            const prefix = `PUR/${finYear}/`;
+            existing.forEach(inv => {
+                if (inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
+                    let num = parseInt(inv.invoiceNo.split('/').pop());
+                    if (!isNaN(num) && num > maxNum) maxNum = num;
+                }
+            });
+            const nextNum = maxNum + 1;
+            invoiceNo = prefix + nextNum.toString().padStart(4, '0');
             document.getElementById('purchaseInvoiceNo').value = invoiceNo;
         }
         if (items.length === 0 || items.every(i => !i.part)) {
@@ -325,7 +304,7 @@
                 phone: document.getElementById('supplierPhone').value,
                 gstin: document.getElementById('supplierGstin').value,
                 address: document.getElementById('supplierAddress').value,
-                state: '',  // optional
+                state: '',
                 creditLimit: 50000,
                 openingBalance: 0,
                 outstanding: 0,
@@ -337,12 +316,12 @@
             localStorage.setItem('suppliers', JSON.stringify(suppliers));
         }
 
-        // Build purchase items (productId will be part number)
+        // Build purchase items – use the part string as productId (no numeric ID)
         const purchaseItems = [];
         for (let item of items) {
             if (!item.part) continue;
             purchaseItems.push({
-                productId: item.part,
+                productId: item.part,       // exact part number as productId
                 quantity: item.qty,
                 cost: item.cost,
                 discount: item.discount,
@@ -369,12 +348,19 @@
         try {
             createPurchaseInvoice(purchase); // defined in data-manager.js
             alert(`Purchase invoice ${invoiceNo} saved! Stock increased, supplier outstanding updated.`);
-            // Clear cart from localStorage and close
             localStorage.setItem('invoiceCart', '[]');
             window.close();
         } catch (err) {
             alert('Error saving purchase invoice: ' + err.message);
         }
+    }
+
+    function getFinancialYear() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
+        else return `${year-1}-${year.toString().slice(-2)}`;
     }
 
     // ---------- Credit Note ----------
@@ -429,7 +415,7 @@
     document.getElementById('creditDate').valueAsDate = new Date();
 
     loadSupplierData();
-    loadCartItems();   // loads items from invoiceCart (set by index.html)
+    loadCartItems();
     purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
 </script>
 </body>
