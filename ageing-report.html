@@ -3,266 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ageing Report – Auto Spares</title>
+    <title>Customer Outstanding – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
         h1 { color: #0a7c71; }
-        .filter-box { margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
-        .filter-group { display: flex; flex-direction: column; gap: 5px; }
-        label { font-size: 12px; font-weight: 600; }
-        input, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; }
-        button { background: #0a7c71; color: white; border: none; cursor: pointer; }
-        button:hover { background: #09645a; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
         th { background: #0a7c71; color: white; }
         .total-row { background: #f1f3f5; font-weight: bold; }
-        .export-btn { background: #6c757d; margin-left: 10px; }
-        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 12px; display: none; }
-        @media (max-width: 768px) { .filter-box { flex-direction: column; align-items: stretch; } }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin: 5px; }
+        .export-btn { background: #6c757d; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1><i class="fas fa-chart-line"></i> Customer Ageing Report</h1>
-    <div class="filter-box">
-        <div class="filter-group">
-            <label>Cut‑off Date</label>
-            <input type="date" id="cutoffDate">
-        </div>
-        <div class="filter-group">
-            <button onclick="loadReport()"><i class="fas fa-sync-alt"></i> Refresh</button>
-            <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
-            <button onclick="toggleDebug()" class="export-btn" style="background:#ffc107; color:#333;"><i class="fas fa-bug"></i> Debug</button>
-        </div>
+    <h1><i class="fas fa-chart-line"></i> Customer Outstanding (Ageing Ready)</h1>
+    <div style="margin-bottom: 20px;">
+        <button onclick="loadReport()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
     </div>
-    <div id="debugPanel" class="debug"></div>
     <div id="reportTable"></div>
     <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back to Dashboard</button>
 </div>
 
 <script>
-    let allInvoices = [];
-    let customers = [];
-    let allPayments = [];
-
-    function parseDate(dateStr) {
-        if (!dateStr) return null;
-        if (typeof dateStr !== 'string') dateStr = dateStr.toString();
-        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            const d = new Date(dateStr);
-            if (!isNaN(d.getTime())) return d;
-        }
-        const parts = dateStr.split('/');
-        if (parts.length === 3) {
-            const day = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            const year = parseInt(parts[2], 10);
-            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                const d = new Date(year, month, day);
-                if (!isNaN(d.getTime())) return d;
-            }
-        }
-        const d = new Date(dateStr);
-        return isNaN(d.getTime()) ? null : d;
-    }
-
     function loadReport() {
-        allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        allPayments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const customersWithOutstanding = customers.filter(c => (c.outstanding || 0) > 0);
         
-        const cutoffElem = document.getElementById('cutoffDate');
-        let cutoff = new Date(cutoffElem.value);
-        if (isNaN(cutoff.getTime())) {
-            cutoff = new Date();
-            cutoffElem.valueAsDate = cutoff;
-        }
-        
-        // ===== METHOD 1: Invoice‑wise FIFO (if data exists) =====
-        let creditInvoices = allInvoices.filter(inv => inv.invoiceType === 'credit');
-        let ageingMap = new Map();
-        let usedInvoiceMethod = false;
-        
-        if (creditInvoices.length > 0) {
-            usedInvoiceMethod = true;
-            // Group payments by customer
-            const paymentsByCust = new Map();
-            allPayments.forEach(p => {
-                const email = p.customerEmail;
-                if (!email) return;
-                const payDate = parseDate(p.date);
-                if (!payDate) return;
-                if (!paymentsByCust.has(email)) paymentsByCust.set(email, []);
-                paymentsByCust.get(email).push({
-                    date: payDate,
-                    amount: parseFloat(p.amount) || 0
-                });
-            });
-            for (let arr of paymentsByCust.values()) arr.sort((a,b) => a.date - b.date);
-            
-            // Group invoices by customer, sort by date
-            const invoicesByCust = new Map();
-            creditInvoices.forEach(inv => {
-                const email = inv.customerEmail || inv.buyer?.email;
-                if (!email) return;
-                const invDate = parseDate(inv.date);
-                if (!invDate) return;
-                let dueDate = inv.dueDate ? parseDate(inv.dueDate) : invDate;
-                if (!dueDate) dueDate = invDate;
-                const amount = inv.grandTotal || inv.total || 0;
-                if (amount <= 0) return;
-                if (!invoicesByCust.has(email)) invoicesByCust.set(email, []);
-                invoicesByCust.get(email).push({
-                    date: invDate,
-                    dueDate: dueDate,
-                    amount: amount,
-                    outstanding: amount
-                });
-            });
-            for (let arr of invoicesByCust.values()) arr.sort((a,b) => a.date - b.date);
-            
-            // Apply payments FIFO
-            for (let [email, invoices] of invoicesByCust.entries()) {
-                const payments = paymentsByCust.get(email) || [];
-                let payIdx = 0, remaining = 0;
-                for (let inv of invoices) {
-                    if (inv.outstanding <= 0) continue;
-                    while (payIdx < payments.length) {
-                        if (remaining === 0) {
-                            remaining = payments[payIdx].amount;
-                            payIdx++;
-                        }
-                        const apply = Math.min(remaining, inv.outstanding);
-                        inv.outstanding -= apply;
-                        remaining -= apply;
-                        if (inv.outstanding === 0) break;
-                    }
-                    if (remaining === 0 && payIdx >= payments.length) break;
-                }
-                let totalOut = 0;
-                const buckets = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0 };
-                for (let inv of invoices) {
-                    if (inv.outstanding <= 0) continue;
-                    totalOut += inv.outstanding;
-                    const daysOverdue = Math.floor((cutoff - inv.dueDate) / (1000*60*60*24));
-                    let bucket = '0-30';
-                    if (daysOverdue > 30 && daysOverdue <= 60) bucket = '31-60';
-                    else if (daysOverdue > 60 && daysOverdue <= 90) bucket = '61-90';
-                    else if (daysOverdue > 90) bucket = '90+';
-                    else if (daysOverdue <= 0) bucket = 'Not Due';
-                    buckets[bucket] += inv.outstanding;
-                }
-                if (totalOut > 0) {
-                    const cust = customers.find(c => c.email === email);
-                    const name = cust ? cust.name : email;
-                    ageingMap.set(email, { name, buckets, total: totalOut });
-                }
-            }
-        }
-        
-        // ===== METHOD 2 (Fallback): Use `customers` outstanding directly =====
-        if (ageingMap.size === 0) {
-            // Fallback: use the `outstanding` field from customers array
-            customers.forEach(cust => {
-                if (cust.outstanding && cust.outstanding > 0) {
-                    // Put entire outstanding into "Not Due" bucket (since we don't have invoice‑wise due dates)
-                    const buckets = { 'Not Due': cust.outstanding, '0-30':0, '31-60':0, '61-90':0, '90+':0 };
-                    ageingMap.set(cust.email, { name: cust.name, buckets, total: cust.outstanding });
-                }
-            });
-            if (ageingMap.size > 0) {
-                console.log("Using fallback (customer outstanding) because invoice‑wise calculation gave zero.");
-            }
-        }
-        
-        // Display the table
-        if (ageingMap.size === 0) {
-            document.getElementById('reportTable').innerHTML = '<p>No outstanding dues found.</p>';
+        if (customersWithOutstanding.length === 0) {
+            document.getElementById('reportTable').innerHTML = '<p>No customers with outstanding balance found.</p>';
             return;
         }
         
-        const rows = Array.from(ageingMap.values());
-        rows.sort((a,b) => b.total - a.total);
+        // Sort by outstanding descending
+        customersWithOutstanding.sort((a,b) => (b.outstanding || 0) - (a.outstanding || 0));
         
         let html = '<table><thead>
-            <th>Customer</th><th>Not Due (₹)</th><th>0‑30 Days (₹)</th><th>31‑60 Days (₹)</th><th>61‑90 Days (₹)</th><th>90+ Days (₹)</th><th>Total (₹)</th>
+            <th>Customer Name</th><th>Email</th><th>Phone</th><th>Outstanding (₹)</th>
         </tr></thead><tbody>';
-        let totals = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0, total:0 };
-        rows.forEach(r => {
+        let totalOutstanding = 0;
+        customersWithOutstanding.forEach(c => {
+            totalOutstanding += (c.outstanding || 0);
             html += `<tr>
-                <td>${escapeHtml(r.name)}</strong></td>
-                <td>₹${r.buckets['Not Due'].toFixed(2)}</strong></td>
-                <td>₹${r.buckets['0-30'].toFixed(2)}</strong></td>
-                <td>₹${r.buckets['31-60'].toFixed(2)}</strong></td>
-                <td>₹${r.buckets['61-90'].toFixed(2)}</strong></td>
-                <td>₹${r.buckets['90+'].toFixed(2)}</strong></td>
-                <td><strong>₹${r.total.toFixed(2)}</strong></td>
+                <td>${escapeHtml(c.name)}</strong></td>
+                <td>${escapeHtml(c.email)}</strong></td>
+                <td>${escapeHtml(c.phone)}</strong></td>
+                <td><strong>₹${(c.outstanding || 0).toFixed(2)}</strong></td>
             </tr>`;
-            totals['Not Due'] += r.buckets['Not Due'];
-            totals['0-30'] += r.buckets['0-30'];
-            totals['31-60'] += r.buckets['31-60'];
-            totals['61-90'] += r.buckets['61-90'];
-            totals['90+'] += r.buckets['90+'];
-            totals.total += r.total;
         });
         html += `<tr class="total-row">
-            <td><strong>Total</strong></td>
-            <td><strong>₹${totals['Not Due'].toFixed(2)}</strong></td>
-            <td><strong>₹${totals['0-30'].toFixed(2)}</strong></td>
-            <td><strong>₹${totals['31-60'].toFixed(2)}</strong></td>
-            <td><strong>₹${totals['61-90'].toFixed(2)}</strong></td>
-            <td><strong>₹${totals['90+'].toFixed(2)}</strong></td>
-            <td><strong>₹${totals.total.toFixed(2)}</strong></td>
-        </table>`;
+            <td><td colspan="3"><strong>Total Outstanding</strong></td>
+            <td><strong>₹${totalOutstanding.toFixed(2)}</strong></td>
+        </tr>`;
         html += '</tbody></table>';
         document.getElementById('reportTable').innerHTML = html;
-        
-        // Debug output (optional)
-        console.log("Ageing report generated. Used invoice method:", usedInvoiceMethod, "Rows:", rows.length);
     }
     
     function exportToCSV() {
-        const table = document.getElementById('reportTable');
-        if (!table || !table.querySelector('tbody tr')) {
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const customersWithOutstanding = customers.filter(c => (c.outstanding || 0) > 0);
+        if (customersWithOutstanding.length === 0) {
             alert('No data to export');
             return;
         }
-        let csv = "Customer,Not Due (₹),0-30 Days (₹),31-60 Days (₹),61-90 Days (₹),90+ Days (₹),Total Outstanding (₹)\n";
-        const rows = table.querySelectorAll('tbody tr');
-        rows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length) {
-                csv += `"${escapeCsv(cells[0].innerText)}",${cells[1].innerText.replace('₹','')},${cells[2].innerText.replace('₹','')},${cells[3].innerText.replace('₹','')},${cells[4].innerText.replace('₹','')},${cells[5].innerText.replace('₹','')},${cells[6].innerText.replace('₹','')}\n`;
-            }
+        let csv = "Customer Name,Email,Phone,Outstanding (₹)\n";
+        customersWithOutstanding.forEach(c => {
+            csv += `"${escapeCsv(c.name)}","${escapeCsv(c.email)}","${escapeCsv(c.phone)}",${c.outstanding || 0}\n`;
         });
         const blob = new Blob([csv], {type:'text/csv'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'customer_ageing.csv';
+        a.download = 'customer_outstanding.csv';
         a.click();
         URL.revokeObjectURL(blob);
-    }
-    
-    function toggleDebug() {
-        const panel = document.getElementById('debugPanel');
-        if (panel.style.display === 'none' || panel.style.display === '') {
-            panel.innerHTML = `<strong>Customers with outstanding (from master):</strong><br>${customers.filter(c => c.outstanding > 0).map(c => `${c.name}: ₹${c.outstanding}`).join('<br>') || 'None'}<br><br>
-                               <strong>Credit invoices count:</strong> ${allInvoices.filter(i => i.invoiceType === 'credit').length}<br>
-                               <strong>Payments count:</strong> ${allPayments.length}`;
-            panel.style.display = 'block';
-        } else {
-            panel.style.display = 'none';
-        }
     }
     
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     function escapeCsv(str) { return `"${(str || '').replace(/"/g, '""')}"`; }
     
-    document.getElementById('cutoffDate').valueAsDate = new Date();
     loadReport();
 </script>
 </body>
