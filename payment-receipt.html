@@ -8,33 +8,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; }
         h1 { color: #0a7c71; }
         .form-group { margin-bottom: 15px; }
         label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 13px; }
         input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
+        button { background: #0a7c71; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
         button:hover { background: #09645a; }
         .flex-row { display: flex; gap: 15px; flex-wrap: wrap; }
         .flex-row > div { flex: 1; }
@@ -210,7 +190,7 @@
         paymentToPrint = { payment, customer };
         generateReceiptPDF();
         
-        // Clear form fields (optional)
+        // Clear form fields
         document.getElementById('amount').value = '';
         document.getElementById('reference').value = '';
         document.getElementById('remarks').value = '';
