@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ageing Report – Auto Spares (Debug Version)</title>
+    <title>Ageing Report – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
@@ -21,13 +21,13 @@
         th { background: #0a7c71; color: white; }
         .total-row { background: #f1f3f5; font-weight: bold; }
         .export-btn { background: #6c757d; margin-left: 10px; }
-        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 400px; overflow: auto; display: none; }
+        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 12px; display: none; }
         @media (max-width: 768px) { .filter-box { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1><i class="fas fa-chart-line"></i> Customer Ageing Report (Debug)</h1>
+    <h1><i class="fas fa-chart-line"></i> Customer Ageing Report</h1>
     <div class="filter-box">
         <div class="filter-group">
             <label>Cut‑off Date</label>
@@ -71,21 +71,9 @@
     }
 
     function loadReport() {
-        console.log("=== Ageing Report Started ===");
         allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
         allPayments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
-        
-        console.log(`Total invoices: ${allInvoices.length}`);
-        console.log(`Total customers: ${customers.length}`);
-        console.log(`Total payments: ${allPayments.length}`);
-        
-        // Log first invoice to see structure
-        if (allInvoices.length > 0) {
-            console.log("First invoice example:", allInvoices[0]);
-            console.log("invoiceType:", allInvoices[0].invoiceType);
-            console.log("grandTotal:", allInvoices[0].grandTotal);
-        }
         
         const cutoffElem = document.getElementById('cutoffDate');
         let cutoff = new Date(cutoffElem.value);
@@ -93,106 +81,107 @@
             cutoff = new Date();
             cutoffElem.valueAsDate = cutoff;
         }
-        console.log(`Cutoff date: ${cutoff.toISOString()}`);
         
-        // 1. Filter credit invoices
+        // ===== METHOD 1: Invoice‑wise FIFO (if data exists) =====
         let creditInvoices = allInvoices.filter(inv => inv.invoiceType === 'credit');
-        console.log(`Credit invoices count: ${creditInvoices.length}`);
-        if (creditInvoices.length === 0) {
-            document.getElementById('reportTable').innerHTML = '<p>No credit invoices found.</p>';
-            return;
-        }
+        let ageingMap = new Map();
+        let usedInvoiceMethod = false;
         
-        // 2. Group payments by customer
-        const paymentsByCust = new Map();
-        allPayments.forEach(p => {
-            const email = p.customerEmail;
-            if (!email) return;
-            const payDate = parseDate(p.date);
-            if (!payDate) return;
-            if (!paymentsByCust.has(email)) paymentsByCust.set(email, []);
-            paymentsByCust.get(email).push({
-                date: payDate,
-                amount: parseFloat(p.amount) || 0
+        if (creditInvoices.length > 0) {
+            usedInvoiceMethod = true;
+            // Group payments by customer
+            const paymentsByCust = new Map();
+            allPayments.forEach(p => {
+                const email = p.customerEmail;
+                if (!email) return;
+                const payDate = parseDate(p.date);
+                if (!payDate) return;
+                if (!paymentsByCust.has(email)) paymentsByCust.set(email, []);
+                paymentsByCust.get(email).push({
+                    date: payDate,
+                    amount: parseFloat(p.amount) || 0
+                });
             });
-        });
-        for (let arr of paymentsByCust.values()) arr.sort((a,b) => a.date - b.date);
-        
-        // 3. Group credit invoices by customer
-        const invoicesByCust = new Map();
-        creditInvoices.forEach(inv => {
-            const email = inv.customerEmail || inv.buyer?.email;
-            if (!email) return;
-            const invDate = parseDate(inv.date);
-            if (!invDate) return;
-            let dueDate = inv.dueDate ? parseDate(inv.dueDate) : invDate;
-            if (!dueDate) dueDate = invDate;
-            const amount = inv.grandTotal || inv.total || 0;
-            if (amount <= 0) return;
-            if (!invoicesByCust.has(email)) invoicesByCust.set(email, []);
-            invoicesByCust.get(email).push({
-                id: inv.id,
-                date: invDate,
-                dueDate: dueDate,
-                amount: amount,
-                outstanding: amount
+            for (let arr of paymentsByCust.values()) arr.sort((a,b) => a.date - b.date);
+            
+            // Group invoices by customer, sort by date
+            const invoicesByCust = new Map();
+            creditInvoices.forEach(inv => {
+                const email = inv.customerEmail || inv.buyer?.email;
+                if (!email) return;
+                const invDate = parseDate(inv.date);
+                if (!invDate) return;
+                let dueDate = inv.dueDate ? parseDate(inv.dueDate) : invDate;
+                if (!dueDate) dueDate = invDate;
+                const amount = inv.grandTotal || inv.total || 0;
+                if (amount <= 0) return;
+                if (!invoicesByCust.has(email)) invoicesByCust.set(email, []);
+                invoicesByCust.get(email).push({
+                    date: invDate,
+                    dueDate: dueDate,
+                    amount: amount,
+                    outstanding: amount
+                });
             });
-        });
-        for (let arr of invoicesByCust.values()) arr.sort((a,b) => a.date - b.date);
-        
-        console.log(`Customers with credit invoices: ${invoicesByCust.size}`);
-        
-        // 4. Apply payments FIFO
-        for (let [email, invoices] of invoicesByCust.entries()) {
-            const payments = paymentsByCust.get(email) || [];
-            console.log(`Applying ${payments.length} payments to customer ${email} with ${invoices.length} invoices`);
-            let payIdx = 0;
-            let remaining = 0;
-            for (let inv of invoices) {
-                if (inv.outstanding <= 0) continue;
-                while (payIdx < payments.length) {
-                    if (remaining === 0) {
-                        remaining = payments[payIdx].amount;
-                        payIdx++;
+            for (let arr of invoicesByCust.values()) arr.sort((a,b) => a.date - b.date);
+            
+            // Apply payments FIFO
+            for (let [email, invoices] of invoicesByCust.entries()) {
+                const payments = paymentsByCust.get(email) || [];
+                let payIdx = 0, remaining = 0;
+                for (let inv of invoices) {
+                    if (inv.outstanding <= 0) continue;
+                    while (payIdx < payments.length) {
+                        if (remaining === 0) {
+                            remaining = payments[payIdx].amount;
+                            payIdx++;
+                        }
+                        const apply = Math.min(remaining, inv.outstanding);
+                        inv.outstanding -= apply;
+                        remaining -= apply;
+                        if (inv.outstanding === 0) break;
                     }
-                    const apply = Math.min(remaining, inv.outstanding);
-                    inv.outstanding -= apply;
-                    remaining -= apply;
-                    if (inv.outstanding === 0) break;
+                    if (remaining === 0 && payIdx >= payments.length) break;
                 }
-                if (remaining === 0 && payIdx >= payments.length) break;
+                let totalOut = 0;
+                const buckets = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0 };
+                for (let inv of invoices) {
+                    if (inv.outstanding <= 0) continue;
+                    totalOut += inv.outstanding;
+                    const daysOverdue = Math.floor((cutoff - inv.dueDate) / (1000*60*60*24));
+                    let bucket = '0-30';
+                    if (daysOverdue > 30 && daysOverdue <= 60) bucket = '31-60';
+                    else if (daysOverdue > 60 && daysOverdue <= 90) bucket = '61-90';
+                    else if (daysOverdue > 90) bucket = '90+';
+                    else if (daysOverdue <= 0) bucket = 'Not Due';
+                    buckets[bucket] += inv.outstanding;
+                }
+                if (totalOut > 0) {
+                    const cust = customers.find(c => c.email === email);
+                    const name = cust ? cust.name : email;
+                    ageingMap.set(email, { name, buckets, total: totalOut });
+                }
             }
-            // Log final outstanding for this customer
-            const totalOut = invoices.reduce((sum, inv) => sum + inv.outstanding, 0);
-            console.log(`Customer ${email} total outstanding after payments: ${totalOut}`);
         }
         
-        // 5. Build ageing map
-        const ageingMap = new Map();
-        for (let [email, invoices] of invoicesByCust.entries()) {
-            let totalOut = 0;
-            const buckets = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0 };
-            for (let inv of invoices) {
-                if (inv.outstanding <= 0) continue;
-                totalOut += inv.outstanding;
-                const daysOverdue = Math.floor((cutoff - inv.dueDate) / (1000*60*60*24));
-                let bucket = '0-30';
-                if (daysOverdue > 30 && daysOverdue <= 60) bucket = '31-60';
-                else if (daysOverdue > 60 && daysOverdue <= 90) bucket = '61-90';
-                else if (daysOverdue > 90) bucket = '90+';
-                else if (daysOverdue <= 0) bucket = 'Not Due';
-                buckets[bucket] += inv.outstanding;
-            }
-            if (totalOut === 0) continue;
-            const cust = customers.find(c => c.email === email);
-            const name = cust ? cust.name : email;
-            ageingMap.set(email, { name, buckets, total: totalOut });
-        }
-        
-        console.log(`Customers with positive outstanding: ${ageingMap.size}`);
-        
+        // ===== METHOD 2 (Fallback): Use `customers` outstanding directly =====
         if (ageingMap.size === 0) {
-            document.getElementById('reportTable').innerHTML = '<p>No outstanding dues after applying payments.</p>';
+            // Fallback: use the `outstanding` field from customers array
+            customers.forEach(cust => {
+                if (cust.outstanding && cust.outstanding > 0) {
+                    // Put entire outstanding into "Not Due" bucket (since we don't have invoice‑wise due dates)
+                    const buckets = { 'Not Due': cust.outstanding, '0-30':0, '31-60':0, '61-90':0, '90+':0 };
+                    ageingMap.set(cust.email, { name: cust.name, buckets, total: cust.outstanding });
+                }
+            });
+            if (ageingMap.size > 0) {
+                console.log("Using fallback (customer outstanding) because invoice‑wise calculation gave zero.");
+            }
+        }
+        
+        // Display the table
+        if (ageingMap.size === 0) {
+            document.getElementById('reportTable').innerHTML = '<p>No outstanding dues found.</p>';
             return;
         }
         
@@ -228,10 +217,12 @@
             <td><strong>₹${totals['61-90'].toFixed(2)}</strong></td>
             <td><strong>₹${totals['90+'].toFixed(2)}</strong></td>
             <td><strong>₹${totals.total.toFixed(2)}</strong></td>
-        </tr>`;
+        </table>`;
         html += '</tbody></table>';
         document.getElementById('reportTable').innerHTML = html;
-        console.log("Table displayed.");
+        
+        // Debug output (optional)
+        console.log("Ageing report generated. Used invoice method:", usedInvoiceMethod, "Rows:", rows.length);
     }
     
     function exportToCSV() {
@@ -259,39 +250,9 @@
     function toggleDebug() {
         const panel = document.getElementById('debugPanel');
         if (panel.style.display === 'none' || panel.style.display === '') {
-            let output = "<strong>Credit Invoices & Payments (FIFO Application):</strong><br>";
-            const creditInvoices = allInvoices.filter(inv => inv.invoiceType === 'credit');
-            const custMap = new Map();
-            creditInvoices.forEach(inv => {
-                const email = inv.customerEmail || inv.buyer?.email;
-                if (!email) return;
-                if (!custMap.has(email)) custMap.set(email, []);
-                custMap.get(email).push(inv);
-            });
-            for (let [email, invs] of custMap.entries()) {
-                const cust = customers.find(c => c.email === email);
-                const name = cust ? cust.name : email;
-                output += `<br><strong>${name} (${email})</strong><br>Invoices (oldest first):<br>`;
-                invs.sort((a,b) => parseDate(a.date) - parseDate(b.date));
-                let totalInv = 0;
-                invs.forEach(inv => {
-                    const amount = inv.grandTotal || inv.total || 0;
-                    totalInv += amount;
-                    output += ` - ${inv.invoiceNo} | Date: ${inv.date} | Due: ${inv.dueDate || inv.date} | Amount: ₹${amount}<br>`;
-                });
-                const payments = allPayments.filter(p => p.customerEmail === email);
-                payments.sort((a,b) => parseDate(a.date) - parseDate(b.date));
-                let totalPay = 0;
-                if (payments.length) {
-                    output += `Payments (oldest first):<br>`;
-                    payments.forEach(p => {
-                        totalPay += p.amount;
-                        output += ` - Receipt ${p.receiptNo} | Date: ${p.date} | Amount: ₹${p.amount}<br>`;
-                    });
-                }
-                output += `<strong>Total Invoices: ₹${totalInv}, Total Payments: ₹${totalPay}, Outstanding: ₹${totalInv - totalPay}</strong><br>`;
-            }
-            panel.innerHTML = output;
+            panel.innerHTML = `<strong>Customers with outstanding (from master):</strong><br>${customers.filter(c => c.outstanding > 0).map(c => `${c.name}: ₹${c.outstanding}`).join('<br>') || 'None'}<br><br>
+                               <strong>Credit invoices count:</strong> ${allInvoices.filter(i => i.invoiceType === 'credit').length}<br>
+                               <strong>Payments count:</strong> ${allPayments.length}`;
             panel.style.display = 'block';
         } else {
             panel.style.display = 'none';
