@@ -21,7 +21,8 @@
         th { background: #0a7c71; color: white; }
         .total-row { background: #f1f3f5; font-weight: bold; }
         .export-btn { background: #6c757d; margin-left: 10px; }
-        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 12px; display: none; }
+        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 400px; overflow: auto; display: none; }
+        .detail-toggle { background: #e9ecef; color: #333; margin-left: 10px; }
         @media (max-width: 768px) { .filter-box { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
@@ -49,14 +50,28 @@
     let customers = [];
     let allPayments = [];
 
-    // Unified date parser (handles DD/MM/YYYY and YYYY-MM-DD)
+    // Robust date parser
     function parseDate(dateStr) {
         if (!dateStr) return null;
-        if (typeof dateStr === 'string' && dateStr.includes('/')) {
-            const parts = dateStr.split('/');
-            if (parts.length === 3) return new Date(parts[2], parts[1]-1, parts[0]);
+        if (typeof dateStr !== 'string') dateStr = dateStr.toString();
+        // YYYY-MM-DD
+        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) return d;
         }
-        return new Date(dateStr);
+        // DD/MM/YYYY or D/M/YYYY
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const year = parseInt(parts[2], 10);
+            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                const d = new Date(year, month, day);
+                if (!isNaN(d.getTime())) return d;
+            }
+        }
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? null : d;
     }
 
     function loadReport() {
@@ -71,74 +86,74 @@
             cutoffElem.valueAsDate = cutoff;
         }
         
-        // Group payments by customer (only credit invoices matter)
-        const paymentsByCustomer = new Map();
+        // 1. Filter only credit invoices (type === 'credit')
+        let creditInvoices = allInvoices.filter(inv => inv.invoiceType === 'credit');
+        if (creditInvoices.length === 0) {
+            document.getElementById('reportTable').innerHTML = '<p>No credit invoices found.</p>';
+            return;
+        }
+        
+        // 2. Group payments by customer and sort by date (oldest first)
+        const paymentsByCust = new Map();
         allPayments.forEach(p => {
             const email = p.customerEmail;
             if (!email) return;
-            if (!paymentsByCustomer.has(email)) paymentsByCustomer.set(email, []);
-            paymentsByCustomer.get(email).push({
-                date: parseDate(p.date),
-                amount: p.amount
+            const payDate = parseDate(p.date);
+            if (!payDate) return;
+            if (!paymentsByCust.has(email)) paymentsByCust.set(email, []);
+            paymentsByCust.get(email).push({
+                date: payDate,
+                amount: parseFloat(p.amount) || 0
             });
         });
-        // Sort payments by date
-        for (let payments of paymentsByCustomer.values()) {
-            payments.sort((a,b) => a.date - b.date);
-        }
+        for (let arr of paymentsByCust.values()) arr.sort((a,b) => a.date - b.date);
         
-        // Get all credit invoices
-        let creditInvoices = allInvoices.filter(inv => inv.invoiceType === 'credit');
-        
-        // Group invoices by customer, sort by date (oldest first)
-        const invoicesByCustomer = new Map();
+        // 3. Group credit invoices by customer, sort by date (oldest first)
+        const invoicesByCust = new Map();
         creditInvoices.forEach(inv => {
             const email = inv.customerEmail || inv.buyer?.email;
             if (!email) return;
-            let invDate = parseDate(inv.date);
-            if (!invDate || isNaN(invDate.getTime())) return;
+            const invDate = parseDate(inv.date);
+            if (!invDate) return;
             let dueDate = inv.dueDate ? parseDate(inv.dueDate) : invDate;
-            if (!dueDate || isNaN(dueDate.getTime())) dueDate = invDate;
+            if (!dueDate) dueDate = invDate;
             const amount = inv.grandTotal || inv.total || 0;
             if (amount <= 0) return;
-            if (!invoicesByCustomer.has(email)) invoicesByCustomer.set(email, []);
-            invoicesByCustomer.get(email).push({
+            if (!invoicesByCust.has(email)) invoicesByCust.set(email, []);
+            invoicesByCust.get(email).push({
                 id: inv.id,
                 date: invDate,
                 dueDate: dueDate,
-                originalAmount: amount,
+                amount: amount,
                 outstanding: amount
             });
         });
-        // Sort invoices by date (oldest first)
-        for (let invoices of invoicesByCustomer.values()) {
-            invoices.sort((a,b) => a.date - b.date);
-        }
+        for (let arr of invoicesByCust.values()) arr.sort((a,b) => a.date - b.date);
         
-        // Apply payments (FIFO)
-        for (let [email, invoices] of invoicesByCustomer.entries()) {
-            const payments = paymentsByCustomer.get(email) || [];
-            let paymentIdx = 0;
-            let remainingPayment = 0;
+        // 4. Apply payments (FIFO) – reduce outstanding of oldest invoices first
+        for (let [email, invoices] of invoicesByCust.entries()) {
+            const payments = paymentsByCust.get(email) || [];
+            let payIdx = 0;
+            let remaining = 0;
             for (let inv of invoices) {
                 if (inv.outstanding <= 0) continue;
-                while (paymentIdx < payments.length) {
-                    if (remainingPayment === 0) {
-                        remainingPayment = payments[paymentIdx].amount;
-                        paymentIdx++;
+                while (payIdx < payments.length) {
+                    if (remaining === 0) {
+                        remaining = payments[payIdx].amount;
+                        payIdx++;
                     }
-                    const apply = Math.min(remainingPayment, inv.outstanding);
+                    const apply = Math.min(remaining, inv.outstanding);
                     inv.outstanding -= apply;
-                    remainingPayment -= apply;
+                    remaining -= apply;
                     if (inv.outstanding === 0) break;
                 }
-                if (remainingPayment === 0 && paymentIdx >= payments.length) break;
+                if (remaining === 0 && payIdx >= payments.length) break;
             }
         }
         
-        // Build ageing report from invoices with remaining outstanding
-        const ageingMap = new Map();
-        for (let [email, invoices] of invoicesByCustomer.entries()) {
+        // 5. Build ageing map (only customers with positive outstanding after payments)
+        const ageingMap = new Map(); // email -> { name, buckets, total }
+        for (let [email, invoices] of invoicesByCust.entries()) {
             let totalOut = 0;
             const buckets = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0 };
             for (let inv of invoices) {
@@ -163,10 +178,11 @@
             return;
         }
         
+        // Sort by total outstanding descending
         const rows = Array.from(ageingMap.values());
         rows.sort((a,b) => b.total - a.total);
         
-        let html = '<tr><thead>运转<th>Customer</th><th>Not Due (₹)</th><th>0‑30 Days (₹)</th><th>31‑60 Days (₹)</th><th>61‑90 Days (₹)</th><th>90+ Days (₹)</th><th>Total (₹)</th></tr></thead><tbody>';
+        let html = '<table><thead>运转<th>Customer</th><th>Not Due (₹)</th><th>0‑30 Days (₹)</th><th>31‑60 Days (₹)</th><th>61‑90 Days (₹)</th><th>90+ Days (₹)</th><th>Total (₹)</th></tr></thead><tbody>';
         let totals = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0, total:0 };
         rows.forEach(r => {
             html += `<tr>
@@ -223,9 +239,32 @@
     function toggleDebug() {
         const panel = document.getElementById('debugPanel');
         if (panel.style.display === 'none' || panel.style.display === '') {
-            panel.innerHTML = `<strong>All invoices count:</strong> ${allInvoices.length}<br>
-                               <strong>Payments count:</strong> ${allPayments.length}<br>
-                               <strong>Sample payment (first):</strong><br>${JSON.stringify(allPayments[0] || {}, null, 2)}`;
+            // Build debug info: for each customer, list invoices and payments
+            let output = "<strong>Invoices (credit) per customer:</strong><br>";
+            const creditInvoices = allInvoices.filter(inv => inv.invoiceType === 'credit');
+            const custMap = new Map();
+            creditInvoices.forEach(inv => {
+                const email = inv.customerEmail || inv.buyer?.email;
+                if (!email) return;
+                if (!custMap.has(email)) custMap.set(email, []);
+                custMap.get(email).push(inv);
+            });
+            for (let [email, invs] of custMap.entries()) {
+                const cust = customers.find(c => c.email === email);
+                const name = cust ? cust.name : email;
+                output += `<br><strong>${name} (${email})</strong><br>Invoices:<br>`;
+                invs.forEach(inv => {
+                    output += ` - ${inv.invoiceNo} | Date: ${inv.date} | Amount: ₹${(inv.grandTotal || inv.total || 0)}<br>`;
+                });
+                const payments = allPayments.filter(p => p.customerEmail === email);
+                if (payments.length) {
+                    output += `Payments:<br>`;
+                    payments.forEach(p => {
+                        output += ` - Receipt ${p.receiptNo} | Date: ${p.date} | Amount: ₹${p.amount}<br>`;
+                    });
+                }
+            }
+            panel.innerHTML = output;
             panel.style.display = 'block';
         } else {
             panel.style.display = 'none';
