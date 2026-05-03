@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ageing Report – Auto Spares</title>
+    <title>Ageing Report – Auto Spares (Debug Version)</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
@@ -27,7 +27,7 @@
 </head>
 <body>
 <div class="container">
-    <h1><i class="fas fa-chart-line"></i> Customer Ageing Report</h1>
+    <h1><i class="fas fa-chart-line"></i> Customer Ageing Report (Debug)</h1>
     <div class="filter-box">
         <div class="filter-group">
             <label>Cut‑off Date</label>
@@ -49,7 +49,6 @@
     let customers = [];
     let allPayments = [];
 
-    // Robust date parser
     function parseDate(dateStr) {
         if (!dateStr) return null;
         if (typeof dateStr !== 'string') dateStr = dateStr.toString();
@@ -71,16 +70,22 @@
         return isNaN(d.getTime()) ? null : d;
     }
 
-    // Format date to YYYY-MM-DD for consistent comparison
-    function formatDate(date) {
-        if (!date) return null;
-        return date.toISOString().slice(0,10);
-    }
-
     function loadReport() {
+        console.log("=== Ageing Report Started ===");
         allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
         allPayments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
+        
+        console.log(`Total invoices: ${allInvoices.length}`);
+        console.log(`Total customers: ${customers.length}`);
+        console.log(`Total payments: ${allPayments.length}`);
+        
+        // Log first invoice to see structure
+        if (allInvoices.length > 0) {
+            console.log("First invoice example:", allInvoices[0]);
+            console.log("invoiceType:", allInvoices[0].invoiceType);
+            console.log("grandTotal:", allInvoices[0].grandTotal);
+        }
         
         const cutoffElem = document.getElementById('cutoffDate');
         let cutoff = new Date(cutoffElem.value);
@@ -88,15 +93,17 @@
             cutoff = new Date();
             cutoffElem.valueAsDate = cutoff;
         }
+        console.log(`Cutoff date: ${cutoff.toISOString()}`);
         
-        // 1. Filter only credit invoices
+        // 1. Filter credit invoices
         let creditInvoices = allInvoices.filter(inv => inv.invoiceType === 'credit');
+        console.log(`Credit invoices count: ${creditInvoices.length}`);
         if (creditInvoices.length === 0) {
             document.getElementById('reportTable').innerHTML = '<p>No credit invoices found.</p>';
             return;
         }
         
-        // 2. Group payments by customer, sort by date (oldest first)
+        // 2. Group payments by customer
         const paymentsByCust = new Map();
         allPayments.forEach(p => {
             const email = p.customerEmail;
@@ -111,14 +118,13 @@
         });
         for (let arr of paymentsByCust.values()) arr.sort((a,b) => a.date - b.date);
         
-        // 3. Group invoices by customer, sort by date (oldest first)
+        // 3. Group credit invoices by customer
         const invoicesByCust = new Map();
         creditInvoices.forEach(inv => {
             const email = inv.customerEmail || inv.buyer?.email;
             if (!email) return;
             const invDate = parseDate(inv.date);
             if (!invDate) return;
-            // Use due date if available, otherwise invoice date
             let dueDate = inv.dueDate ? parseDate(inv.dueDate) : invDate;
             if (!dueDate) dueDate = invDate;
             const amount = inv.grandTotal || inv.total || 0;
@@ -134,9 +140,12 @@
         });
         for (let arr of invoicesByCust.values()) arr.sort((a,b) => a.date - b.date);
         
-        // 4. Apply payments (FIFO) – reduce outstanding of oldest invoices first
+        console.log(`Customers with credit invoices: ${invoicesByCust.size}`);
+        
+        // 4. Apply payments FIFO
         for (let [email, invoices] of invoicesByCust.entries()) {
             const payments = paymentsByCust.get(email) || [];
+            console.log(`Applying ${payments.length} payments to customer ${email} with ${invoices.length} invoices`);
             let payIdx = 0;
             let remaining = 0;
             for (let inv of invoices) {
@@ -153,10 +162,13 @@
                 }
                 if (remaining === 0 && payIdx >= payments.length) break;
             }
+            // Log final outstanding for this customer
+            const totalOut = invoices.reduce((sum, inv) => sum + inv.outstanding, 0);
+            console.log(`Customer ${email} total outstanding after payments: ${totalOut}`);
         }
         
-        // 5. Build ageing map – only customers with outstanding > 0
-        const ageingMap = new Map(); // key: email
+        // 5. Build ageing map
+        const ageingMap = new Map();
         for (let [email, invoices] of invoicesByCust.entries()) {
             let totalOut = 0;
             const buckets = { 'Not Due':0, '0-30':0, '31-60':0, '61-90':0, '90+':0 };
@@ -177,12 +189,13 @@
             ageingMap.set(email, { name, buckets, total: totalOut });
         }
         
+        console.log(`Customers with positive outstanding: ${ageingMap.size}`);
+        
         if (ageingMap.size === 0) {
             document.getElementById('reportTable').innerHTML = '<p>No outstanding dues after applying payments.</p>';
             return;
         }
         
-        // Convert to array and sort by total outstanding descending
         const rows = Array.from(ageingMap.values());
         rows.sort((a,b) => b.total - a.total);
         
@@ -215,9 +228,10 @@
             <td><strong>₹${totals['61-90'].toFixed(2)}</strong></td>
             <td><strong>₹${totals['90+'].toFixed(2)}</strong></td>
             <td><strong>₹${totals.total.toFixed(2)}</strong></td>
-        </table>`;
+        </tr>`;
         html += '</tbody></table>';
         document.getElementById('reportTable').innerHTML = html;
+        console.log("Table displayed.");
     }
     
     function exportToCSV() {
