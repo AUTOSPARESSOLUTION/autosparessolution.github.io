@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Payment Receipt – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
+        .warning { background: #fff3cd; padding: 10px; margin-bottom: 15px; border-left: 4px solid #ffc107; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-edit"></i> Edit Payment Receipt</h1>
+    <div id="warningMsg" class="warning" style="display:none;"></div>
+    <div class="form-group"><label>Receipt No (read-only)</label><input type="text" id="receiptNo" readonly></div>
+    <div class="form-group"><label>Customer Email (read-only)</label><input type="email" id="customerEmail" readonly></div>
+    <div class="form-group"><label>Payment Date</label><input type="date" id="paymentDate"></div>
+    <div class="form-group"><label>Amount (₹)</label><input type="number" id="amount" step="0.01"></div>
+    <div class="form-group"><label>Payment Mode</label><select id="mode"><option>Cash</option><option>Bank Transfer</option><option>Cheque</option><option>UPI</option></select></div>
+    <div class="form-group"><label>Reference</label><input type="text" id="reference"></div>
+    <div class="form-group"><label>Remarks</label><textarea id="remarks" rows="2"></textarea></div>
+    <div><button onclick="saveEdit()"><i class="fas fa-save"></i> Save Changes</button><button onclick="window.close()">Cancel</button></div>
+</div>
+
+<script>
+    let originalPayment = null;
+    let paymentId = localStorage.getItem('editPaymentReceiptId');
+    let payments = [];
+    let customers = [];
+
+    function loadPayment() {
+        payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
+        customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        originalPayment = payments.find(p => p.id == paymentId);
+        if (!originalPayment) {
+            alert('Payment receipt not found');
+            window.close();
+            return;
+        }
+        document.getElementById('receiptNo').value = originalPayment.receiptNo;
+        document.getElementById('customerEmail').value = originalPayment.customerEmail;
+        document.getElementById('paymentDate').value = originalPayment.date;
+        document.getElementById('amount').value = originalPayment.amount;
+        document.getElementById('mode').value = originalPayment.mode || 'Cash';
+        document.getElementById('reference').value = originalPayment.reference || '';
+        document.getElementById('remarks').value = originalPayment.remarks || '';
+    }
+
+    function saveEdit() {
+        const newAmount = parseFloat(document.getElementById('amount').value);
+        if (isNaN(newAmount) || newAmount <= 0) { alert('Enter valid amount'); return; }
+        const newDate = document.getElementById('paymentDate').value;
+        const newMode = document.getElementById('mode').value;
+        const newRef = document.getElementById('reference').value.trim() || 'N/A';
+        const newRemarks = document.getElementById('remarks').value;
+
+        const oldAmount = originalPayment.amount;
+        const amountDiff = oldAmount - newAmount; // positive = decrease in payment
+
+        // Update customer outstanding
+        if (oldAmount !== newAmount) {
+            const customer = customers.find(c => c.email === originalPayment.customerEmail);
+            if (customer) {
+                customer.outstanding = (customer.outstanding || 0) + amountDiff;
+                if (customer.outstanding < 0) customer.outstanding = 0;
+                localStorage.setItem('customers', JSON.stringify(customers));
+                // Update ledger entry for this payment
+                let ledger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
+                const ledgerEntry = ledger.find(l => l.ref === originalPayment.receiptNo && l.type === 'payment');
+                if (ledgerEntry) {
+                    ledgerEntry.credit = newAmount;
+                    ledgerEntry.balance = customer.outstanding;
+                    ledgerEntry.narration = newRemarks || 'Payment edited';
+                    localStorage.setItem('customerLedger', JSON.stringify(ledger));
+                }
+                showWarning(`Amount changed from ₹${oldAmount.toFixed(2)} to ₹${newAmount.toFixed(2)}. Customer outstanding adjusted.`);
+            }
+        }
+
+        // Update payment object
+        originalPayment.date = newDate;
+        originalPayment.amount = newAmount;
+        originalPayment.mode = newMode;
+        originalPayment.reference = newRef;
+        originalPayment.remarks = newRemarks;
+
+        // Save back
+        const index = payments.findIndex(p => p.id == paymentId);
+        if (index !== -1) payments[index] = originalPayment;
+        localStorage.setItem('customerPayments', JSON.stringify(payments));
+
+        alert('Payment receipt updated successfully');
+        generateUpdatedReceiptPDF(originalPayment);
+        setTimeout(() => window.close(), 1500);
+    }
+
+    function generateUpdatedReceiptPDF(payment) {
+        const customer = customers.find(c => c.email === payment.customerEmail);
+        if (!customer) return;
+        const receiptDiv = document.createElement('div');
+        receiptDiv.style.maxWidth = '800px';
+        receiptDiv.style.margin = '0 auto';
+        receiptDiv.style.backgroundColor = 'white';
+        receiptDiv.style.padding = '20px';
+        receiptDiv.style.fontFamily = 'Roboto, sans-serif';
+        receiptDiv.innerHTML = `
+            <div style="text-align:center;"><div style="font-size:24px;">Auto Spares Solution</div><div>GSTIN: 19ANOPD3300R1ZO</div><div>101, 1st floor, Howrah, WB 711108</div></div>
+            <h2 style="text-align:center;">PAYMENT RECEIPT</h2>
+            <p><strong>Receipt No:</strong> ${payment.receiptNo}</p>
+            <p><strong>Customer:</strong> ${escapeHtml(customer.name)} (${escapeHtml(customer.email)})</p>
+            <p><strong>Date:</strong> ${payment.date}</p>
+            <p><strong>Amount:</strong> ₹${payment.amount.toFixed(2)}</p>
+            <p><strong>Mode:</strong> ${payment.mode}</p>
+            <p><strong>Reference:</strong> ${escapeHtml(payment.reference)}</p>
+            <p><strong>Remarks:</strong> ${escapeHtml(payment.remarks)}</p>
+            <div style="margin-top:30px; text-align:center;">This is an updated receipt.</div>
+        `;
+        html2pdf().set({ margin: 0.2, filename: `Payment_Receipt_${payment.receiptNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } }).from(receiptDiv).save();
+    }
+
+    function showWarning(msg) {
+        const warnDiv = document.getElementById('warningMsg');
+        warnDiv.innerHTML = msg;
+        warnDiv.style.display = 'block';
+        setTimeout(() => warnDiv.style.display = 'none', 5000);
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    loadPayment();
+</script>
+</body>
+</html>
