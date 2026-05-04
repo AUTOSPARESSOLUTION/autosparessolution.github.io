@@ -1,197 +1,185 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Payment Receipt System</title>
-    <style>
-        body { font-family: Arial; background:#eef2f3; padding:20px;}
-        .box { background:white; padding:20px; border-radius:10px; max-width:1000px; margin:auto;}
-        h2 { color:#0a7c71; }
+<meta charset="UTF-8">
+<title>Payment Receipt & Outstanding</title>
 
-        input, button {
-            padding:8px;
-            margin:5px;
-            border-radius:5px;
-            border:1px solid #ccc;
-        }
+<style>
+body { font-family: Arial; background:#f4f6f8; padding:20px; }
+.container { background:#fff; padding:20px; border-radius:10px; max-width:1100px; margin:auto; }
+h2 { color:#0a7c71; }
 
-        button {
-            background:#0a7c71;
-            color:white;
-            cursor:pointer;
-        }
+input, button {
+    padding:8px;
+    margin:5px;
+}
 
-        button:hover { background:#08665d; }
+button {
+    background:#0a7c71;
+    color:#fff;
+    border:none;
+    cursor:pointer;
+}
 
-        .delete { background:#dc3545; }
+table {
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+}
 
-        table {
-            width:100%;
-            border-collapse:collapse;
-            margin-top:20px;
-        }
+th, td {
+    border:1px solid #ccc;
+    padding:8px;
+}
 
-        th,td {
-            border:1px solid #ddd;
-            padding:8px;
-            text-align:left;
-        }
-
-        th { background:#0a7c71; color:white; }
-
-        .paid { color:green; font-weight:bold; }
-        .partial { color:orange; font-weight:bold; }
-        .unpaid { color:red; font-weight:bold; }
-    </style>
+th {
+    background:#0a7c71;
+    color:#fff;
+}
+</style>
 </head>
 
 <body>
 
-<div class="box">
-    <h2>💰 Payment Entry & Receipt List</h2>
+<div class="container">
+<h2>Payment Entry</h2>
 
-    <input id="invNo" placeholder="Invoice No">
-    <input id="amount" type="number" placeholder="Amount">
-    <input id="date" type="date">
-    <button onclick="addPayment()">Add Payment</button>
+<input type="text" id="customer" placeholder="Customer Name">
+<input type="number" id="amount" placeholder="Amount">
+<input type="date" id="date">
 
-    <h3>📄 Receipt List</h3>
-    <div id="list"></div>
+<button onclick="savePayment()">Save Payment</button>
+
+<h2>Outstanding + Ageing (After Payment)</h2>
+<div id="report"></div>
+
 </div>
 
 <script>
 
-// Load data
-let payments = JSON.parse(localStorage.getItem('payments') || '[]');
+// ================= DATA =================
 let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+let payments = JSON.parse(localStorage.getItem('paymentReceipts') || '[]');
 
-// ✅ Normalize invoice no
-function clean(str){
-    return (str || '').toString().trim().toUpperCase();
-}
+// ================= SAVE PAYMENT =================
+function savePayment(){
+    let customer = document.getElementById('customer').value;
+    let amount = parseFloat(document.getElementById('amount').value);
+    let date = document.getElementById('date').value;
 
-// ✅ Add Payment
-function addPayment(){
-
-    let inv = clean(document.getElementById('invNo').value);
-    let amt = parseFloat(document.getElementById('amount').value);
-    let dt = document.getElementById('date').value;
-
-    if(!inv || !amt){
-        alert("Enter Invoice & Amount");
+    if(!customer || !amount || !date){
+        alert("Fill all fields");
         return;
     }
 
     payments.push({
-        id: Date.now(),
-        invoiceNo: inv,
-        amount: amt,
-        date: dt
+        customer,
+        amount,
+        date
     });
 
-    localStorage.setItem('payments', JSON.stringify(payments));
+    localStorage.setItem('paymentReceipts', JSON.stringify(payments));
 
-    updateInvoiceStatus(inv);
+    alert("Payment Saved");
 
-    load();
-
-    document.getElementById('invNo').value='';
-    document.getElementById('amount').value='';
+    generateReport();
 }
 
-// ✅ Update Invoice Status (VERY IMPORTANT)
-function updateInvoiceStatus(invNo){
+// ================= MAIN LOGIC =================
+function generateReport(){
 
-    invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+    let map = {};
 
-    let inv = invoices.find(i => clean(i.invoiceNo) === invNo);
-    if(!inv) return;
+    // STEP 1: LOAD CREDIT INVOICES
+    invoices
+    .filter(inv => inv.invoiceType === 'credit')
+    .forEach(inv => {
 
-    let paid = payments
-        .filter(p => clean(p.invoiceNo) === invNo)
-        .reduce((sum,p)=>sum + Number(p.amount || 0), 0);
+        let cust = inv.buyer?.name || 'Unknown';
 
-    let total = Number(inv.grandTotal || 0);
+        if(!map[cust]) map[cust] = [];
 
-    if(paid >= total){
-        inv.status = "Paid";
-    } else if(paid > 0){
-        inv.status = "Partial";
-    } else {
-        inv.status = "Unpaid";
-    }
+        map[cust].push({
+            invoiceNo: inv.invoiceNo,
+            date: inv.date,
+            original: inv.grandTotal,
+            balance: inv.grandTotal
+        });
+    });
 
-    localStorage.setItem('allInvoices', JSON.stringify(invoices));
-}
+    // STEP 2: APPLY PAYMENTS (FIFO)
+    payments.forEach(pay => {
 
-// ✅ Delete Payment
-function deletePayment(id){
+        let cust = pay.customer;
 
-    if(!confirm("Delete this payment?")) return;
+        if(!map[cust]) return;
 
-    let p = payments.find(x => x.id === id);
-    if(!p) return;
+        let remaining = pay.amount;
 
-    payments = payments.filter(x => x.id !== id);
-    localStorage.setItem('payments', JSON.stringify(payments));
+        // sort oldest invoice first
+        map[cust].sort((a,b)=> new Date(a.date) - new Date(b.date));
 
-    updateInvoiceStatus(clean(p.invoiceNo));
+        map[cust].forEach(inv => {
 
-    load();
-}
+            if(remaining <= 0) return;
 
-// ✅ Load Table
-function load(){
+            let used = Math.min(inv.balance, remaining);
 
-    payments = JSON.parse(localStorage.getItem('payments') || '[]');
-    invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+            inv.balance -= used;
+            remaining -= used;
+        });
 
-    let html = `
-    <table>
-        <tr>
-            <th>Invoice</th>
-            <th>Date</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Action</th>
-        </tr>`;
+    });
 
-    payments.forEach(p => {
+    // STEP 3: BUILD TABLE
+    let html = `<table>
+    <tr>
+        <th>Customer</th>
+        <th>Invoice</th>
+        <th>Date</th>
+        <th>Original</th>
+        <th>Balance</th>
+        <th>Age (Days)</th>
+        <th>Bucket</th>
+    </tr>`;
 
-        let inv = invoices.find(i => clean(i.invoiceNo) === clean(p.invoiceNo));
+    let today = new Date();
 
-        let statusClass = "unpaid";
-        let statusText = "Unpaid";
+    Object.keys(map).forEach(cust => {
 
-        if(inv){
-            if(inv.status === "Paid"){
-                statusClass = "paid";
-                statusText = "Paid";
-            }
-            else if(inv.status === "Partial"){
-                statusClass = "partial";
-                statusText = "Partial";
-            }
-        }
+        map[cust].forEach(inv => {
 
-        html += `
-        <tr>
-            <td>${p.invoiceNo}</td>
-            <td>${p.date}</td>
-            <td>₹${Number(p.amount).toFixed(2)}</td>
-            <td class="${statusClass}">${statusText}</td>
-            <td>
-                <button class="delete" onclick="deletePayment(${p.id})">Delete</button>
-            </td>
-        </tr>`;
+            if(inv.balance <= 0) return;
+
+            let invDate = new Date(inv.date);
+            let age = Math.floor((today - invDate)/(1000*60*60*24));
+
+            let bucket = "";
+            if(age <=30) bucket="0-30";
+            else if(age<=60) bucket="31-60";
+            else if(age<=90) bucket="61-90";
+            else bucket="90+";
+
+            html += `<tr>
+                <td>${cust}</td>
+                <td>${inv.invoiceNo}</td>
+                <td>${inv.date}</td>
+                <td>${inv.original.toFixed(2)}</td>
+                <td>${inv.balance.toFixed(2)}</td>
+                <td>${age}</td>
+                <td>${bucket}</td>
+            </tr>`;
+        });
+
     });
 
     html += "</table>";
 
-    document.getElementById('list').innerHTML = html;
+    document.getElementById("report").innerHTML = html;
 }
 
-// Initial load
-load();
+// INIT
+generateReport();
 
 </script>
 
