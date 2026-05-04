@@ -1,57 +1,118 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Payment Receipt</title>
+    <title>Payment Receipt System</title>
     <style>
-        body { font-family: Arial; background:#f5f5f5; padding:20px;}
-        .box { background:#fff; padding:20px; border-radius:10px; max-width:900px; margin:auto;}
-        input, button { padding:8px; margin:5px; }
-        table { width:100%; border-collapse:collapse; margin-top:20px;}
-        th,td { border:1px solid #ddd; padding:8px; }
-        th { background:#0a7c71; color:white;}
+        body { font-family: Arial; background:#eef2f3; padding:20px;}
+        .box { background:white; padding:20px; border-radius:10px; max-width:1000px; margin:auto;}
+        h2 { color:#0a7c71; }
+
+        input, button {
+            padding:8px;
+            margin:5px;
+            border-radius:5px;
+            border:1px solid #ccc;
+        }
+
+        button {
+            background:#0a7c71;
+            color:white;
+            cursor:pointer;
+        }
+
+        button:hover { background:#08665d; }
+
+        .delete { background:#dc3545; }
+
+        table {
+            width:100%;
+            border-collapse:collapse;
+            margin-top:20px;
+        }
+
+        th,td {
+            border:1px solid #ddd;
+            padding:8px;
+            text-align:left;
+        }
+
+        th { background:#0a7c71; color:white; }
+
+        .paid { color:green; font-weight:bold; }
+        .partial { color:orange; font-weight:bold; }
+        .unpaid { color:red; font-weight:bold; }
     </style>
 </head>
 
 <body>
+
 <div class="box">
-    <h2>Payment Entry</h2>
+    <h2>💰 Payment Entry & Receipt List</h2>
 
     <input id="invNo" placeholder="Invoice No">
     <input id="amount" type="number" placeholder="Amount">
     <input id="date" type="date">
     <button onclick="addPayment()">Add Payment</button>
 
-    <h3>Receipt List</h3>
+    <h3>📄 Receipt List</h3>
     <div id="list"></div>
 </div>
 
 <script>
+
+// Load data
 let payments = JSON.parse(localStorage.getItem('payments') || '[]');
 let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
 
+// ✅ Normalize invoice no
+function clean(str){
+    return (str || '').toString().trim().toUpperCase();
+}
+
+// ✅ Add Payment
 function addPayment(){
-    let inv = document.getElementById('invNo').value;
+
+    let inv = clean(document.getElementById('invNo').value);
     let amt = parseFloat(document.getElementById('amount').value);
     let dt = document.getElementById('date').value;
 
-    if(!inv || !amt){ alert("Enter details"); return; }
+    if(!inv || !amt){
+        alert("Enter Invoice & Amount");
+        return;
+    }
 
-    payments.push({invoiceNo:inv, amount:amt, date:dt});
+    payments.push({
+        id: Date.now(),
+        invoiceNo: inv,
+        amount: amt,
+        date: dt
+    });
+
     localStorage.setItem('payments', JSON.stringify(payments));
 
     updateInvoiceStatus(inv);
+
     load();
+
+    document.getElementById('invNo').value='';
+    document.getElementById('amount').value='';
 }
 
+// ✅ Update Invoice Status (VERY IMPORTANT)
 function updateInvoiceStatus(invNo){
-    let inv = invoices.find(i=>i.invoiceNo===invNo);
+
+    invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+
+    let inv = invoices.find(i => clean(i.invoiceNo) === invNo);
     if(!inv) return;
 
     let paid = payments
-        .filter(p=>p.invoiceNo===invNo)
-        .reduce((a,b)=>a+b.amount,0);
+        .filter(p => clean(p.invoiceNo) === invNo)
+        .reduce((sum,p)=>sum + Number(p.amount || 0), 0);
 
-    if(paid >= inv.grandTotal){
+    let total = Number(inv.grandTotal || 0);
+
+    if(paid >= total){
         inv.status = "Paid";
     } else if(paid > 0){
         inv.status = "Partial";
@@ -62,20 +123,77 @@ function updateInvoiceStatus(invNo){
     localStorage.setItem('allInvoices', JSON.stringify(invoices));
 }
 
+// ✅ Delete Payment
+function deletePayment(id){
+
+    if(!confirm("Delete this payment?")) return;
+
+    let p = payments.find(x => x.id === id);
+    if(!p) return;
+
+    payments = payments.filter(x => x.id !== id);
+    localStorage.setItem('payments', JSON.stringify(payments));
+
+    updateInvoiceStatus(clean(p.invoiceNo));
+
+    load();
+}
+
+// ✅ Load Table
 function load(){
-    let html = "<table><tr><th>Invoice</th><th>Date</th><th>Amount</th></tr>";
-    payments.forEach(p=>{
-        html += `<tr>
+
+    payments = JSON.parse(localStorage.getItem('payments') || '[]');
+    invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+
+    let html = `
+    <table>
+        <tr>
+            <th>Invoice</th>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>`;
+
+    payments.forEach(p => {
+
+        let inv = invoices.find(i => clean(i.invoiceNo) === clean(p.invoiceNo));
+
+        let statusClass = "unpaid";
+        let statusText = "Unpaid";
+
+        if(inv){
+            if(inv.status === "Paid"){
+                statusClass = "paid";
+                statusText = "Paid";
+            }
+            else if(inv.status === "Partial"){
+                statusClass = "partial";
+                statusText = "Partial";
+            }
+        }
+
+        html += `
+        <tr>
             <td>${p.invoiceNo}</td>
             <td>${p.date}</td>
-            <td>₹${p.amount}</td>
+            <td>₹${Number(p.amount).toFixed(2)}</td>
+            <td class="${statusClass}">${statusText}</td>
+            <td>
+                <button class="delete" onclick="deletePayment(${p.id})">Delete</button>
+            </td>
         </tr>`;
     });
+
     html += "</table>";
+
     document.getElementById('list').innerHTML = html;
 }
 
+// Initial load
 load();
+
 </script>
+
 </body>
 </html>
