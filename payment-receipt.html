@@ -1,54 +1,81 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Payment Entry</title>
-<style>
-body{font-family:Arial;padding:20px;}
-input,button{padding:8px;margin:5px;}
-</style>
+    <title>Payment Receipt</title>
+    <style>
+        body { font-family: Arial; background:#f5f5f5; padding:20px;}
+        .box { background:#fff; padding:20px; border-radius:10px; max-width:900px; margin:auto;}
+        input, button { padding:8px; margin:5px; }
+        table { width:100%; border-collapse:collapse; margin-top:20px;}
+        th,td { border:1px solid #ddd; padding:8px; }
+        th { background:#0a7c71; color:white;}
+    </style>
 </head>
+
 <body>
+<div class="box">
+    <h2>Payment Entry</h2>
 
-<h2>Payment Entry</h2>
+    <input id="invNo" placeholder="Invoice No">
+    <input id="amount" type="number" placeholder="Amount">
+    <input id="date" type="date">
+    <button onclick="addPayment()">Add Payment</button>
 
-<input type="text" id="email" placeholder="Customer Email"><br>
-<input type="number" id="amount" placeholder="Amount"><br>
-
-<button onclick="savePayment()">Save Payment</button>
-<button onclick="goList()">Manage Payments</button>
+    <h3>Receipt List</h3>
+    <div id="list"></div>
+</div>
 
 <script>
-function savePayment(){
-    const email = document.getElementById('email').value;
-    const amount = parseFloat(document.getElementById('amount').value);
+let payments = JSON.parse(localStorage.getItem('payments') || '[]');
+let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
 
-    if(!email || !amount){
-        alert("Enter valid data");
-        return;
+function addPayment(){
+    let inv = document.getElementById('invNo').value;
+    let amt = parseFloat(document.getElementById('amount').value);
+    let dt = document.getElementById('date').value;
+
+    if(!inv || !amt){ alert("Enter details"); return; }
+
+    payments.push({invoiceNo:inv, amount:amt, date:dt});
+    localStorage.setItem('payments', JSON.stringify(payments));
+
+    updateInvoiceStatus(inv);
+    load();
+}
+
+function updateInvoiceStatus(invNo){
+    let inv = invoices.find(i=>i.invoiceNo===invNo);
+    if(!inv) return;
+
+    let paid = payments
+        .filter(p=>p.invoiceNo===invNo)
+        .reduce((a,b)=>a+b.amount,0);
+
+    if(paid >= inv.grandTotal){
+        inv.status = "Paid";
+    } else if(paid > 0){
+        inv.status = "Partial";
+    } else {
+        inv.status = "Unpaid";
     }
 
-    let payments = JSON.parse(localStorage.getItem('customerPayments')||'[]');
+    localStorage.setItem('allInvoices', JSON.stringify(invoices));
+}
 
-    payments.push({
-        id: Date.now(),
-        date: new Date().toISOString().slice(0,10),
-        customerEmail: email,
-        amount: amount
+function load(){
+    let html = "<table><tr><th>Invoice</th><th>Date</th><th>Amount</th></tr>";
+    payments.forEach(p=>{
+        html += `<tr>
+            <td>${p.invoiceNo}</td>
+            <td>${p.date}</td>
+            <td>₹${p.amount}</td>
+        </tr>`;
     });
-
-    localStorage.setItem('customerPayments', JSON.stringify(payments));
-
-    alert("Payment Saved ✔");
-
-    document.getElementById('email').value="";
-    document.getElementById('amount').value="";
+    html += "</table>";
+    document.getElementById('list').innerHTML = html;
 }
 
-function goList(){
-    window.location.href="payment-list.html";
-}
+load();
 </script>
-
 </body>
 </html>
