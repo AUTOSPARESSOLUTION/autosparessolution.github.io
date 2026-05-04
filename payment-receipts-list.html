@@ -47,7 +47,7 @@ button {
 .btn-delete { background: #dc3545; }
 .btn-pdf { background: #e67e22; }
 
-table { width: 100%; border-collapse: collapse; }
+table { width: 100%; border-collapse: collapse; margin-top:15px; }
 th, td { border: 1px solid #dee2e6; padding: 10px; }
 th { background: #0a7c71; color: white; }
 </style>
@@ -63,7 +63,7 @@ th { background: #0a7c71; color: white; }
 <div class="form-section">
 <div class="form-row">
 <div class="form-group">
-<label>Customer</label>
+<label>Customer *</label>
 <select id="customerSelect"></select>
 </div>
 
@@ -84,7 +84,8 @@ th { background: #0a7c71; color: white; }
 <select id="mode">
 <option>Cash</option>
 <option>UPI</option>
-<option>Bank</option>
+<option>Bank Transfer</option>
+<option>Cheque</option>
 </select>
 </div>
 
@@ -99,7 +100,7 @@ th { background: #0a7c71; color: white; }
 </div>
 </div>
 
-<button onclick="addPayment()">Save</button>
+<button onclick="addPayment()"><i class="fas fa-save"></i> Save Receipt</button>
 </div>
 
 <!-- TABLE -->
@@ -111,19 +112,21 @@ th { background: #0a7c71; color: white; }
 
 <script>
 
+/* ================= DATA ================= */
 let receipts = JSON.parse(localStorage.getItem('customerPayments') || '[]');
 let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
 /* ================= LOAD ================= */
 function loadCustomers(){
 let sel = document.getElementById('customerSelect');
-sel.innerHTML = '<option value="">Select</option>';
+sel.innerHTML = '<option value="">-- Select Customer --</option>';
 customers.forEach(c=>{
-sel.innerHTML += `<option value="${c.email}">${c.name}</option>`;
+sel.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
 });
 }
 
-function refresh(){
+/* ================= SAVE ================= */
+function saveData(){
 localStorage.setItem('customerPayments', JSON.stringify(receipts));
 display();
 }
@@ -131,36 +134,35 @@ display();
 /* ================= ADD ================= */
 function addPayment(){
 
-let email = customerSelect.value;
-let amount = parseFloat(amountInput());
+let email = document.getElementById('customerSelect').value;
+let amount = parseFloat(document.getElementById('amount').value);
 
-if(!email || !amount){
-alert("Fill data");
-return;
-}
+if(!email){ alert("Select customer"); return; }
+if(isNaN(amount) || amount<=0){ alert("Enter valid amount"); return; }
 
-let receiptNo = "PR-" + Date.now();
+let receiptNo = "PR/" + Date.now();
 
 let obj = {
 id: Date.now(),
 receiptNo,
-date: paymentDate.value,
+date: document.getElementById('paymentDate').value,
 customerEmail: email,
 amount,
-mode: mode.value,
-reference: reference.value,
-remarks: remarks.value
+mode: document.getElementById('mode').value,
+reference: document.getElementById('reference').value || "N/A",
+remarks: document.getElementById('remarks').value || ""
 };
 
 receipts.push(obj);
-refresh();
+saveData();
+clearForm();
 }
 
 /* ================= DISPLAY ================= */
 function display(){
 
 if(receipts.length===0){
-tableData.innerHTML = "No Data";
+tableData.innerHTML = "<p>No receipts</p>";
 return;
 }
 
@@ -171,11 +173,11 @@ let html = `<table>
 <th>Date</th>
 <th>Customer</th>
 <th>Amount</th>
+<th>Mode</th>
 <th>Action</th>
 </tr>`;
 
 receipts.forEach((r,i)=>{
-
 let cust = customers.find(c=>c.email===r.customerEmail);
 
 html += `<tr>
@@ -183,12 +185,13 @@ html += `<tr>
 <td>${r.receiptNo}</td>
 <td>${r.date}</td>
 <td>${cust?cust.name:r.customerEmail}</td>
-<td>₹${r.amount}</td>
+<td>₹${r.amount.toFixed(2)}</td>
+<td>${r.mode}</td>
 
 <td>
-<button class="btn-edit" onclick="edit(${r.id})">Edit</button>
-<button class="btn-delete" onclick="del(${r.id})">Delete</button>
-<button class="btn-pdf" onclick="pdf(${r.id})">PDF</button>
+<button class="btn-edit" onclick="edit(${r.id})"><i class="fas fa-edit"></i></button>
+<button class="btn-delete" onclick="removeReceipt(${r.id})"><i class="fas fa-trash"></i></button>
+<button class="btn-pdf" onclick="generatePDF(${r.id})"><i class="fas fa-file-pdf"></i></button>
 </td>
 </tr>`;
 });
@@ -198,10 +201,10 @@ tableData.innerHTML = html;
 }
 
 /* ================= DELETE ================= */
-function del(id){
-if(!confirm("Delete?")) return;
+function removeReceipt(id){
+if(!confirm("Delete receipt?")) return;
 receipts = receipts.filter(r=>r.id!==id);
-refresh();
+saveData();
 }
 
 /* ================= EDIT ================= */
@@ -209,18 +212,25 @@ function edit(id){
 
 let r = receipts.find(x=>x.id===id);
 
-paymentDate.value = r.date;
-amount.value = r.amount;
-reference.value = r.reference;
-remarks.value = r.remarks;
-mode.value = r.mode;
-customerSelect.value = r.customerEmail;
+document.getElementById('paymentDate').value = r.date;
+document.getElementById('amount').value = r.amount;
+document.getElementById('reference').value = r.reference;
+document.getElementById('remarks').value = r.remarks;
+document.getElementById('mode').value = r.mode;
+document.getElementById('customerSelect').value = r.customerEmail;
 
-del(id);
+removeReceipt(id);
 }
 
-/* ================= PDF (FIXED EXACT FORMAT) ================= */
-function pdf(id){
+/* ================= CLEAR ================= */
+function clearForm(){
+document.getElementById('amount').value="";
+document.getElementById('reference').value="";
+document.getElementById('remarks').value="";
+}
+
+/* ================= PDF WITH LOGO ================= */
+function generatePDF(id){
 
 let p = receipts.find(r=>r.id===id);
 let c = customers.find(x=>x.email===p.customerEmail);
@@ -228,41 +238,68 @@ let c = customers.find(x=>x.email===p.customerEmail);
 let div = document.createElement('div');
 
 div.innerHTML = `
-<div style="font-family:Arial;padding:20px">
+<div style="width:800px; padding:20px; font-family:Arial;">
 
-<h2 style="text-align:center">PAYMENT RECEIPT</h2>
+<table width="100%">
+<tr>
+<td align="center">
 
-<p><b>Receipt No:</b> ${p.receiptNo}</p>
+<img src="images/ASS.jpg" style="height:60px;" onerror="this.style.display='none'">
+
+<h2 style="margin:0;">AUTO SPARES SOLUTION</h2>
+GSTIN: 19ANOPD3300R1ZO<br>
+101, 1st Floor, Q Road, Howrah<br>
+
+<h3>PAYMENT RECEIPT</h3>
+</td>
+</tr>
+</table>
+
+<table width="100%" style="margin-top:20px;">
+<tr>
+<td><b>Receipt No:</b> ${p.receiptNo}</td>
+<td align="right"><b>Date:</b> ${p.date}</td>
+</tr>
+</table>
 
 <hr>
 
-<h3>Customer</h3>
-<p>Name: ${c?c.name:''}</p>
-<p>Email: ${p.customerEmail}</p>
+<table width="100%">
+<tr><td colspan="2"><b>Customer Details</b></td></tr>
+<tr><td width="150">Name</td><td>: ${c?c.name:''}</td></tr>
+<tr><td>Email</td><td>: ${p.customerEmail}</td></tr>
+<tr><td>Phone</td><td>: ${c?.phone || ''}</td></tr>
+</table>
 
 <hr>
 
-<h3>Payment</h3>
-<p>Date: ${p.date}</p>
-<p>Amount: ₹${p.amount}</p>
-<p>Mode: ${p.mode}</p>
-<p>Ref: ${p.reference}</p>
+<table width="100%">
+<tr><td colspan="2"><b>Payment Details</b></td></tr>
+<tr><td width="150">Amount</td><td>: ₹${p.amount.toFixed(2)}</td></tr>
+<tr><td>Mode</td><td>: ${p.mode}</td></tr>
+<tr><td>Reference</td><td>: ${p.reference}</td></tr>
+<tr><td>Remarks</td><td>: ${p.remarks}</td></tr>
+</table>
+
+<br><br>
+
+<table width="100%">
+<tr>
+<td align="center">_________________<br>Customer Signature</td>
+<td align="center">_________________<br>Authorized Sign</td>
+</tr>
+</table>
 
 </div>
 `;
 
-html2pdf().from(div).save("receipt.pdf");
+html2pdf().from(div).save(`Receipt_${p.receiptNo}.pdf`);
 }
 
-/* ================= HELPERS ================= */
-function amountInput(){
-return document.getElementById('amount').value;
-}
-
+/* ================= INIT ================= */
 document.getElementById('paymentDate').value =
 new Date().toISOString().slice(0,10);
 
-/* ================= INIT ================= */
 loadCustomers();
 display();
 
