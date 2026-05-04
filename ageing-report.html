@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Outstanding Report</title>
+    <title>Outstanding with FIFO Ageing</title>
     <style>
         body { font-family: Arial; background:#eef2f3; padding:20px;}
         .box { background:white; padding:20px; border-radius:10px;}
@@ -13,28 +13,29 @@
 
 <body>
 <div class="box">
-    <h2>Outstanding & Ageing (100% Accurate)</h2>
+    <h2>Outstanding with Correct Ageing (FIFO)</h2>
     <div id="report"></div>
 </div>
 
 <script>
+
 let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
 let payments = JSON.parse(localStorage.getItem('payments') || '[]');
 
-// ✅ Normalize function (VERY IMPORTANT)
+// Clean invoice no
 function clean(str){
     return (str || '').toString().trim().toUpperCase();
 }
 
-// ✅ Convert DD/MM/YYYY → Date
-function parseDate(dateStr){
-    if(!dateStr) return new Date();
-    let p = dateStr.split('/');
+// Convert DD/MM/YYYY
+function parseDate(d){
+    if(!d) return new Date();
+    let p = d.split('/');
     return new Date(p[2], p[1]-1, p[0]);
 }
 
-// ✅ Ageing calculation
-function getAgeing(days){
+// Age bucket
+function ageing(days){
     if(days <= 30) return "0-30 Days";
     if(days <= 60) return "31-60 Days";
     if(days <= 90) return "61-90 Days";
@@ -51,28 +52,42 @@ function load(){
         <th>Total</th>
         <th>Paid</th>
         <th>Outstanding</th>
-        <th>Ageing</th>
+        <th>Ageing (Correct)</th>
     </tr>`;
 
     invoices.forEach(inv => {
 
         let invNo = clean(inv.invoiceNo);
-
-        // ✅ Exact match payments
-        let paid = payments
-            .filter(p => clean(p.invoiceNo) === invNo)
-            .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-
         let total = Number(inv.grandTotal || 0);
-        let balance = total - paid;
 
-        // ignore fully paid
-        if(balance <= 0) return;
+        // Get payments sorted by date (FIFO)
+        let invPayments = payments
+            .filter(p => clean(p.invoiceNo) === invNo)
+            .sort((a,b)=> new Date(a.date) - new Date(b.date));
 
-        // ageing
+        let remaining = total;
+
+        // Apply payments FIFO
+        invPayments.forEach(p => {
+            if(remaining > 0){
+                let payAmt = Number(p.amount || 0);
+                if(payAmt >= remaining){
+                    remaining = 0;
+                } else {
+                    remaining -= payAmt;
+                }
+            }
+        });
+
+        // skip if fully paid
+        if(remaining <= 0) return;
+
+        let paid = total - remaining;
+
+        // ageing only on remaining
         let invDate = parseDate(inv.date);
         let today = new Date();
-        let days = Math.floor((today - invDate) / (1000*60*60*24));
+        let days = Math.floor((today - invDate)/(1000*60*60*24));
 
         html += `
         <tr>
@@ -80,8 +95,8 @@ function load(){
             <td>${inv.date}</td>
             <td>₹${total.toFixed(2)}</td>
             <td>₹${paid.toFixed(2)}</td>
-            <td><b style="color:red;">₹${balance.toFixed(2)}</b></td>
-            <td>${getAgeing(days)}</td>
+            <td style="color:red;"><b>₹${remaining.toFixed(2)}</b></td>
+            <td>${ageing(days)}</td>
         </tr>`;
     });
 
@@ -91,6 +106,7 @@ function load(){
 }
 
 load();
+
 </script>
 </body>
 </html>
