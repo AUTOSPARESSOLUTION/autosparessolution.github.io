@@ -2,197 +2,242 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Payment + Outstanding Final</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment Receipt – Auto Spares</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
-body { font-family: Arial; background:#f4f6f8; padding:20px; }
-.container { background:#fff; padding:20px; border-radius:10px; max-width:1200px; margin:auto; }
-h2 { color:#0a7c71; margin-top:30px; }
+body { font-family: Arial; background:#e9ecef; padding:20px; }
+.container { max-width:800px; margin:auto; background:#fff; padding:20px; border-radius:10px; }
+h1 { color:#0a7c71; }
 
-table { width:100%; border-collapse:collapse; margin-top:15px; }
-th, td { border:1px solid #ccc; padding:8px; }
-th { background:#0a7c71; color:white; }
+label { font-weight:600; font-size:13px; }
+input, select, textarea { width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:6px; }
+
+button {
+    background:#0a7c71;
+    color:#fff;
+    border:none;
+    padding:10px;
+    margin-top:10px;
+    cursor:pointer;
+    border-radius:6px;
+}
+
+.flex { display:flex; gap:10px; }
+.flex > div { flex:1; }
+
+.info { margin-top:10px; background:#f8f9fa; padding:8px; border-radius:6px; }
 </style>
 </head>
 
 <body>
 
 <div class="container">
+<h1><i class="fas fa-receipt"></i> Payment Receipt</h1>
 
-<h2>All Payments (from localStorage)</h2>
-<div id="paymentList"></div>
+<label>Customer</label>
+<select id="customerSelect"></select>
+<input type="email" id="customerEmail" placeholder="Or enter email manually">
 
-<h2>Outstanding After Payment Adjustment</h2>
-<div id="report"></div>
+<div class="flex">
+<div>
+<label>Date</label>
+<input type="date" id="date">
+</div>
+
+<div>
+<label>Amount</label>
+<input type="number" id="amount">
+</div>
+</div>
+
+<div class="flex">
+<div>
+<label>Mode</label>
+<select id="mode">
+<option>Cash</option>
+<option>Bank</option>
+<option>UPI</option>
+<option>Cheque</option>
+</select>
+</div>
+
+<div>
+<label>Reference</label>
+<input type="text" id="ref">
+</div>
+</div>
+
+<label>Remarks</label>
+<textarea id="remarks"></textarea>
+
+<button onclick="savePayment()">Save & Print</button>
+
+<div id="info" class="info" style="display:none;"></div>
 
 </div>
 
 <script>
 
-// ================= LOAD DATA =================
-let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-let payments = JSON.parse(localStorage.getItem('paymentReceipts') || '[]');
+// ===== CONSTANT =====
+const KEY = "customerPayments";
 
-// ================= HELPER =================
-function normalize(str){
-    return (str || '').toString().trim().toLowerCase();
+// ===== LOAD CUSTOMER =====
+function loadCustomers(){
+    let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+
+    let html = '<option value="">-- Select Customer --</option>';
+
+    customers.forEach(c=>{
+        html += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+    });
+
+    document.getElementById('customerSelect').innerHTML = html;
 }
 
-// 🔥 Detect correct payment key (IMPORTANT FIX)
-function getPaymentKey(pay){
-    let customer = normalize(pay.customer);
-    let email = normalize(pay.email);
-    let phone = normalize(pay.phone);
+// ===== RECEIPT NUMBER =====
+function getReceiptNo(date){
 
-    // If customer field contains email → use it
-    if(customer.includes("@")) return customer;
+    let list = JSON.parse(localStorage.getItem(KEY) || '[]');
 
-    return email || phone || customer;
+    let d = new Date(date);
+    let y = d.getFullYear();
+    let m = d.getMonth()+1;
+
+    let fy = (m>=4) ? `${y}-${(y+1).toString().slice(-2)}` : `${y-1}-${y.toString().slice(-2)}`;
+
+    let max = 0;
+
+    list.forEach(p=>{
+        if(p.receiptNo && p.receiptNo.startsWith(`PR/${fy}/`)){
+            let n = parseInt(p.receiptNo.split('/').pop());
+            if(n>max) max=n;
+        }
+    });
+
+    return `PR/${fy}/` + (max+1).toString().padStart(4,'0');
 }
 
-// 🔥 Invoice key
-function getInvoiceKey(inv){
-    let email = normalize(inv.buyer?.email);
-    let phone = normalize(inv.buyer?.phone);
-    let name  = normalize(inv.buyer?.name);
+// ===== CUSTOMER INFO =====
+function showInfo(){
 
-    return email || phone || name;
+    let email = document.getElementById('customerSelect').value ||
+                document.getElementById('customerEmail').value;
+
+    let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+    let c = customers.find(x=>x.email===email);
+
+    let box = document.getElementById('info');
+
+    if(c){
+        box.innerHTML = `<b>${c.name}</b> | Outstanding: ₹${(c.outstanding||0).toFixed(2)}`;
+        box.style.display="block";
+    }else{
+        box.style.display="none";
+    }
 }
 
-// ================= SHOW PAYMENT LIST =================
-function showPayments(){
+document.getElementById('customerSelect').addEventListener('change', showInfo);
+document.getElementById('customerEmail').addEventListener('input', showInfo);
 
-    if(payments.length === 0){
-        document.getElementById("paymentList").innerHTML = "No payments found";
+// ===== SAVE PAYMENT =====
+function savePayment(){
+
+    let email = document.getElementById('customerSelect').value ||
+                document.getElementById('customerEmail').value;
+
+    if(!email){
+        alert("Customer required");
         return;
     }
 
-    let html = `<table>
-    <tr>
-        <th>Date</th>
-        <th>Customer</th>
-        <th>Email</th>
-        <th>Phone</th>
-        <th>Amount</th>
-    </tr>`;
+    let amount = parseFloat(document.getElementById('amount').value);
 
-    payments.forEach(p => {
-        html += `<tr>
-            <td>${p.date}</td>
-            <td>${p.customer}</td>
-            <td>${p.email || ''}</td>
-            <td>${p.phone || ''}</td>
-            <td>₹${p.amount}</td>
-        </tr>`;
+    if(!amount || amount<=0){
+        alert("Enter valid amount");
+        return;
+    }
+
+    let date = document.getElementById('date').value || new Date().toISOString().slice(0,10);
+
+    let receiptNo = getReceiptNo(date);
+
+    let payment = {
+        id: Date.now(),
+        receiptNo: receiptNo,
+        date: date,
+        customerEmail: email,
+        amount: amount,
+        mode: document.getElementById('mode').value,
+        reference: document.getElementById('ref').value || 'N/A',
+        remarks: document.getElementById('remarks').value || ''
+    };
+
+    // ===== SAVE =====
+    let list = JSON.parse(localStorage.getItem(KEY) || '[]');
+    list.push(payment);
+    localStorage.setItem(KEY, JSON.stringify(list));
+
+    // ===== UPDATE CUSTOMER =====
+    let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+    let c = customers.find(x=>x.email===email);
+
+    if(c){
+        c.outstanding = (c.outstanding || 0) - amount;
+        if(c.outstanding < 0) c.outstanding = 0;
+    }
+
+    localStorage.setItem('customers', JSON.stringify(customers));
+
+    // ===== LEDGER =====
+    let ledger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
+
+    ledger.push({
+        id: Date.now(),
+        customerEmail: email,
+        date: date,
+        type: 'payment',
+        ref: receiptNo,
+        debit: 0,
+        credit: amount,
+        balance: c ? c.outstanding : 0
     });
 
-    html += "</table>";
+    localStorage.setItem('customerLedger', JSON.stringify(ledger));
 
-    document.getElementById("paymentList").innerHTML = html;
+    alert("Saved: " + receiptNo);
+
+    generatePDF(payment, c);
+
+    // reset
+    document.getElementById('amount').value='';
+    document.getElementById('ref').value='';
+    document.getElementById('remarks').value='';
 }
 
-// ================= MAIN LOGIC =================
-function generateReport(){
+// ===== PDF =====
+function generatePDF(p,c){
 
-    let map = {};
+    let div = document.createElement('div');
 
-    // STEP 1: LOAD CREDIT INVOICES
-    invoices
-    .filter(inv => inv.invoiceType === 'credit')
-    .forEach(inv => {
+    div.innerHTML = `
+    <h2 style="text-align:center;">PAYMENT RECEIPT</h2>
+    <p>Receipt: ${p.receiptNo}</p>
+    <p>Name: ${c?.name || ''}</p>
+    <p>Email: ${p.customerEmail}</p>
+    <p>Date: ${p.date}</p>
+    <p>Amount: ₹${p.amount}</p>
+    `;
 
-        let key = getInvoiceKey(inv);
-
-        if(!map[key]){
-            map[key] = {
-                name: inv.buyer?.name || '',
-                email: inv.buyer?.email || '',
-                phone: inv.buyer?.phone || '',
-                invoices: []
-            };
-        }
-
-        map[key].invoices.push({
-            invoiceNo: inv.invoiceNo,
-            date: inv.date,
-            original: inv.grandTotal,
-            balance: inv.grandTotal
-        });
-    });
-
-    // STEP 2: APPLY PAYMENTS (FIFO)
-    payments.forEach(pay => {
-
-        let key = getPaymentKey(pay);
-
-        if(!map[key]) return;
-
-        let remaining = pay.amount;
-
-        // sort oldest first
-        map[key].invoices.sort((a,b)=> new Date(a.date) - new Date(b.date));
-
-        map[key].invoices.forEach(inv => {
-
-            if(remaining <= 0) return;
-
-            let used = Math.min(inv.balance, remaining);
-
-            inv.balance -= used;
-            remaining -= used;
-        });
-    });
-
-    // STEP 3: DISPLAY REPORT
-    let html = `<table>
-    <tr>
-        <th>Customer</th>
-        <th>Email</th>
-        <th>Invoice</th>
-        <th>Date</th>
-        <th>Original</th>
-        <th>Balance</th>
-        <th>Age</th>
-        <th>Bucket</th>
-    </tr>`;
-
-    let today = new Date();
-
-    Object.values(map).forEach(cust => {
-
-        cust.invoices.forEach(inv => {
-
-            if(inv.balance <= 0) return;
-
-            let age = Math.floor((today - new Date(inv.date)) / (1000*60*60*24));
-
-            let bucket =
-                age <=30 ? "0-30" :
-                age <=60 ? "31-60" :
-                age <=90 ? "61-90" : "90+";
-
-            html += `<tr>
-                <td>${cust.name}</td>
-                <td>${cust.email}</td>
-                <td>${inv.invoiceNo}</td>
-                <td>${inv.date}</td>
-                <td>₹${inv.original.toFixed(2)}</td>
-                <td>₹${inv.balance.toFixed(2)}</td>
-                <td>${age}</td>
-                <td>${bucket}</td>
-            </tr>`;
-        });
-
-    });
-
-    html += "</table>";
-
-    document.getElementById("report").innerHTML = html;
+    html2pdf().from(div).save();
 }
 
-// ================= INIT =================
-showPayments();
-generateReport();
+// INIT
+document.getElementById('date').value = new Date().toISOString().slice(0,10);
+loadCustomers();
 
 </script>
 
