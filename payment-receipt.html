@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Payments + Outstanding Reconciliation</title>
+<title>Payment + Outstanding Final</title>
 
 <style>
 body { font-family: Arial; background:#f4f6f8; padding:20px; }
@@ -12,8 +12,6 @@ h2 { color:#0a7c71; margin-top:30px; }
 table { width:100%; border-collapse:collapse; margin-top:15px; }
 th, td { border:1px solid #ccc; padding:8px; }
 th { background:#0a7c71; color:white; }
-
-button { padding:6px 10px; margin:3px; cursor:pointer; }
 </style>
 </head>
 
@@ -31,16 +29,37 @@ button { padding:6px 10px; margin:3px; cursor:pointer; }
 
 <script>
 
-// ========= LOAD DATA =========
+// ================= LOAD DATA =================
 let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
 let payments = JSON.parse(localStorage.getItem('paymentReceipts') || '[]');
 
-// ========= HELPER =========
+// ================= HELPER =================
 function normalize(str){
     return (str || '').toString().trim().toLowerCase();
 }
 
-// ========= SHOW PAYMENTS =========
+// 🔥 Detect correct payment key (IMPORTANT FIX)
+function getPaymentKey(pay){
+    let customer = normalize(pay.customer);
+    let email = normalize(pay.email);
+    let phone = normalize(pay.phone);
+
+    // If customer field contains email → use it
+    if(customer.includes("@")) return customer;
+
+    return email || phone || customer;
+}
+
+// 🔥 Invoice key
+function getInvoiceKey(inv){
+    let email = normalize(inv.buyer?.email);
+    let phone = normalize(inv.buyer?.phone);
+    let name  = normalize(inv.buyer?.name);
+
+    return email || phone || name;
+}
+
+// ================= SHOW PAYMENT LIST =================
 function showPayments(){
 
     if(payments.length === 0){
@@ -72,27 +91,23 @@ function showPayments(){
     document.getElementById("paymentList").innerHTML = html;
 }
 
-// ========= MAIN RECONCILIATION =========
+// ================= MAIN LOGIC =================
 function generateReport(){
 
     let map = {};
 
-    // STEP 1: CREDIT INVOICES
+    // STEP 1: LOAD CREDIT INVOICES
     invoices
     .filter(inv => inv.invoiceType === 'credit')
     .forEach(inv => {
 
-        let name = inv.buyer?.name || '';
-        let email = inv.buyer?.email || '';
-        let phone = inv.buyer?.phone || '';
-
-        let key = normalize(email) || normalize(phone) || normalize(name);
+        let key = getInvoiceKey(inv);
 
         if(!map[key]){
             map[key] = {
-                name,
-                email,
-                phone,
+                name: inv.buyer?.name || '',
+                email: inv.buyer?.email || '',
+                phone: inv.buyer?.phone || '',
                 invoices: []
             };
         }
@@ -108,7 +123,7 @@ function generateReport(){
     // STEP 2: APPLY PAYMENTS (FIFO)
     payments.forEach(pay => {
 
-        let key = normalize(pay.email) || normalize(pay.phone) || normalize(pay.customer);
+        let key = getPaymentKey(pay);
 
         if(!map[key]) return;
 
@@ -128,7 +143,7 @@ function generateReport(){
         });
     });
 
-    // STEP 3: DISPLAY
+    // STEP 3: DISPLAY REPORT
     let html = `<table>
     <tr>
         <th>Customer</th>
@@ -175,7 +190,7 @@ function generateReport(){
     document.getElementById("report").innerHTML = html;
 }
 
-// ========= INIT =========
+// ================= INIT =================
 showPayments();
 generateReport();
 
