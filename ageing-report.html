@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Outstanding with FIFO Ageing</title>
+    <title>Final Outstanding with True Ageing</title>
     <style>
         body { font-family: Arial; background:#eef2f3; padding:20px;}
         .box { background:white; padding:20px; border-radius:10px;}
@@ -12,8 +12,9 @@
 </head>
 
 <body>
+
 <div class="box">
-    <h2>Outstanding with Correct Ageing (FIFO)</h2>
+    <h2>Outstanding & Ageing (Tally Correct)</h2>
     <div id="report"></div>
 </div>
 
@@ -22,12 +23,12 @@
 let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
 let payments = JSON.parse(localStorage.getItem('payments') || '[]');
 
-// Clean invoice no
+// Clean
 function clean(str){
     return (str || '').toString().trim().toUpperCase();
 }
 
-// Convert DD/MM/YYYY
+// Parse DD/MM/YYYY
 function parseDate(d){
     if(!d) return new Date();
     let p = d.split('/');
@@ -44,58 +45,64 @@ function ageing(days){
 
 function load(){
 
+    // STEP 1: Prepare invoice ledger
+    let ledger = invoices.map(inv => ({
+        invoiceNo: inv.invoiceNo,
+        date: parseDate(inv.date),
+        total: Number(inv.grandTotal || 0),
+        balance: Number(inv.grandTotal || 0)
+    }));
+
+    // Sort invoices by date (FIFO)
+    ledger.sort((a,b)=> a.date - b.date);
+
+    // STEP 2: Apply ALL payments FIFO across invoices
+    payments.forEach(p => {
+
+        let payAmt = Number(p.amount || 0);
+
+        for(let i=0; i<ledger.length; i++){
+
+            if(payAmt <= 0) break;
+
+            if(ledger[i].balance > 0){
+
+                if(payAmt >= ledger[i].balance){
+                    payAmt -= ledger[i].balance;
+                    ledger[i].balance = 0;
+                } else {
+                    ledger[i].balance -= payAmt;
+                    payAmt = 0;
+                }
+            }
+        }
+    });
+
+    // STEP 3: Build report
     let html = `
     <table>
     <tr>
         <th>Invoice</th>
         <th>Date</th>
         <th>Total</th>
-        <th>Paid</th>
         <th>Outstanding</th>
-        <th>Ageing (Correct)</th>
+        <th>Ageing</th>
     </tr>`;
 
-    invoices.forEach(inv => {
+    let today = new Date();
 
-        let invNo = clean(inv.invoiceNo);
-        let total = Number(inv.grandTotal || 0);
+    ledger.forEach(row => {
 
-        // Get payments sorted by date (FIFO)
-        let invPayments = payments
-            .filter(p => clean(p.invoiceNo) === invNo)
-            .sort((a,b)=> new Date(a.date) - new Date(b.date));
+        if(row.balance <= 0) return;
 
-        let remaining = total;
-
-        // Apply payments FIFO
-        invPayments.forEach(p => {
-            if(remaining > 0){
-                let payAmt = Number(p.amount || 0);
-                if(payAmt >= remaining){
-                    remaining = 0;
-                } else {
-                    remaining -= payAmt;
-                }
-            }
-        });
-
-        // skip if fully paid
-        if(remaining <= 0) return;
-
-        let paid = total - remaining;
-
-        // ageing only on remaining
-        let invDate = parseDate(inv.date);
-        let today = new Date();
-        let days = Math.floor((today - invDate)/(1000*60*60*24));
+        let days = Math.floor((today - row.date)/(1000*60*60*24));
 
         html += `
         <tr>
-            <td>${inv.invoiceNo}</td>
-            <td>${inv.date}</td>
-            <td>₹${total.toFixed(2)}</td>
-            <td>₹${paid.toFixed(2)}</td>
-            <td style="color:red;"><b>₹${remaining.toFixed(2)}</b></td>
+            <td>${row.invoiceNo}</td>
+            <td>${row.date.toLocaleDateString()}</td>
+            <td>₹${row.total.toFixed(2)}</td>
+            <td style="color:red;"><b>₹${row.balance.toFixed(2)}</b></td>
             <td>${ageing(days)}</td>
         </tr>`;
     });
@@ -108,5 +115,6 @@ function load(){
 load();
 
 </script>
+
 </body>
 </html>
