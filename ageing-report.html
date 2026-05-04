@@ -1,98 +1,140 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Outstanding Final Correct</title>
-    <style>
-        body { font-family: Arial; background:#eef2f3; padding:20px;}
-        .box { background:white; padding:20px; border-radius:10px;}
-        table { width:100%; border-collapse:collapse; margin-top:20px;}
-        th,td { border:1px solid #ccc; padding:8px;}
-        th { background:#0a7c71; color:white;}
-    </style>
+<title>Outstanding + Payment Adjusted (FINAL)</title>
+
+<style>
+body { font-family: Arial; background:#f4f6f8; padding:20px; }
+.container { background:#fff; padding:20px; border-radius:10px; max-width:1200px; margin:auto; }
+h2 { color:#0a7c71; }
+
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+th, td { border:1px solid #ccc; padding:8px; }
+th { background:#0a7c71; color:white; }
+</style>
 </head>
 
 <body>
 
-<div class="box">
-    <h2>Outstanding + Ageing (Invoice-wise Correct)</h2>
-    <div id="report"></div>
+<div class="container">
+<h2>Outstanding After Payment Adjustment (FIFO)</h2>
+<div id="report"></div>
 </div>
 
 <script>
 
-// Load data
+// ================= LOAD DATA =================
 let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-let payments = JSON.parse(localStorage.getItem('payments') || '[]');
+let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]'); // ✅ FIXED KEY
 
-// Clean function
-function clean(str){
-    return (str || '').toString().trim().toUpperCase();
-}
+// ================= MAIN FUNCTION =================
+function generateReport(){
 
-// Convert date DD/MM/YYYY
-function parseDate(d){
-    if(!d) return new Date();
-    let p = d.split('/');
-    return new Date(p[2], p[1]-1, p[0]);
-}
+    let map = {};
 
-// Age bucket
-function ageing(days){
-    if(days <= 30) return "0-30 Days";
-    if(days <= 60) return "31-60 Days";
-    if(days <= 90) return "61-90 Days";
-    return "90+ Days";
-}
+    // STEP 1: LOAD CREDIT INVOICES
+    invoices
+    .filter(inv => inv.invoiceType === 'credit')
+    .forEach(inv => {
 
-function load(){
+        let email = inv.buyer?.email || "unknown";
 
-    let html = `
-    <table>
+        if(!map[email]){
+            map[email] = {
+                name: inv.buyer?.name || "Unknown",
+                email: email,
+                list: []
+            };
+        }
+
+        map[email].list.push({
+            invoiceNo: inv.invoiceNo,
+            date: inv.date,
+            original: inv.grandTotal,
+            balance: inv.grandTotal
+        });
+    });
+
+    // STEP 2: APPLY PAYMENTS (CORRECT MATCHING)
+    payments.forEach(pay => {
+
+        let email = pay.customerEmail;
+
+        if(!map[email]) return;
+
+        let remaining = pay.amount;
+
+        // FIFO (oldest invoice first)
+        map[email].list.sort((a,b)=> new Date(a.date) - new Date(b.date));
+
+        map[email].list.forEach(inv => {
+
+            if(remaining <= 0) return;
+
+            let used = Math.min(inv.balance, remaining);
+
+            inv.balance -= used;
+            remaining -= used;
+
+        });
+
+    });
+
+    // STEP 3: DISPLAY
+    let html = `<table>
     <tr>
+        <th>Customer</th>
+        <th>Email</th>
         <th>Invoice</th>
         <th>Date</th>
-        <th>Total</th>
+        <th>Original</th>
         <th>Paid</th>
-        <th>Outstanding</th>
-        <th>Ageing</th>
+        <th>Balance</th>
+        <th>Age</th>
+        <th>Bucket</th>
     </tr>`;
 
-    invoices.forEach(inv => {
+    let today = new Date();
 
-        let invNo = clean(inv.invoiceNo);
-        let total = Number(inv.grandTotal || 0);
+    Object.keys(map).forEach(key => {
 
-        // ✅ MATCH PAYMENT ONLY FOR SAME INVOICE
-        let paid = payments
-            .filter(p => clean(p.invoiceNo) === invNo)
-            .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        map[key].list.forEach(inv => {
 
-        let balance = total - paid;
+            let paid = inv.original - inv.balance;
 
-        // Skip if fully paid
-        if(balance <= 0) return;
+            if(inv.balance <= 0) return; // skip fully paid
 
-        let invDate = parseDate(inv.date);
-        let today = new Date();
-        let days = Math.floor((today - invDate)/(1000*60*60*24));
+            let invDate = new Date(inv.date);
+            let age = Math.floor((today - invDate)/(1000*60*60*24));
 
-        html += `
-        <tr>
-            <td>${inv.invoiceNo}</td>
-            <td>${inv.date}</td>
-            <td>₹${total.toFixed(2)}</td>
-            <td>₹${paid.toFixed(2)}</td>
-            <td style="color:red;"><b>₹${balance.toFixed(2)}</b></td>
-            <td>${ageing(days)}</td>
-        </tr>`;
+            let bucket = "";
+            if(age <=30) bucket="0-30";
+            else if(age<=60) bucket="31-60";
+            else if(age<=90) bucket="61-90";
+            else bucket="90+";
+
+            html += `<tr>
+                <td>${map[key].name}</td>
+                <td>${map[key].email}</td>
+                <td>${inv.invoiceNo}</td>
+                <td>${inv.date}</td>
+                <td>₹${inv.original.toFixed(2)}</td>
+                <td style="color:green;">₹${paid.toFixed(2)}</td>
+                <td style="color:red;"><b>₹${inv.balance.toFixed(2)}</b></td>
+                <td>${age}</td>
+                <td>${bucket}</td>
+            </tr>`;
+        });
+
     });
 
     html += "</table>";
 
-    document.getElementById('report').innerHTML = html;
+    document.getElementById("report").innerHTML = html;
 }
 
-load();
+// INIT
+generateReport();
 
 </script>
 
