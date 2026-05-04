@@ -2,113 +2,87 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Payment Receipt & Outstanding</title>
+<title>Payments + Outstanding Reconciliation</title>
 
 <style>
 body { font-family: Arial; background:#f4f6f8; padding:20px; }
 .container { background:#fff; padding:20px; border-radius:10px; max-width:1200px; margin:auto; }
-h2 { color:#0a7c71; }
+h2 { color:#0a7c71; margin-top:30px; }
 
-input, button {
-    padding:8px;
-    margin:5px;
-}
+table { width:100%; border-collapse:collapse; margin-top:15px; }
+th, td { border:1px solid #ccc; padding:8px; }
+th { background:#0a7c71; color:white; }
 
-button {
-    background:#0a7c71;
-    color:#fff;
-    border:none;
-    cursor:pointer;
-}
-
-table {
-    width:100%;
-    border-collapse:collapse;
-    margin-top:20px;
-}
-
-th, td {
-    border:1px solid #ccc;
-    padding:8px;
-    text-align:left;
-}
-
-th {
-    background:#0a7c71;
-    color:#fff;
-}
+button { padding:6px 10px; margin:3px; cursor:pointer; }
 </style>
 </head>
 
 <body>
 
 <div class="container">
-<h2>Payment Entry</h2>
 
-<input type="text" id="customer" placeholder="Customer Name">
-<input type="text" id="email" placeholder="Email (IMPORTANT)">
-<input type="text" id="phone" placeholder="Phone">
-<input type="number" id="amount" placeholder="Amount">
-<input type="date" id="date">
+<h2>All Payments (from localStorage)</h2>
+<div id="paymentList"></div>
 
-<button onclick="savePayment()">Save Payment</button>
-
-<h2>Outstanding + Ageing (After Payment)</h2>
+<h2>Outstanding After Payment Adjustment</h2>
 <div id="report"></div>
 
 </div>
 
 <script>
 
-// ================= LOAD DATA =================
+// ========= LOAD DATA =========
 let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
 let payments = JSON.parse(localStorage.getItem('paymentReceipts') || '[]');
 
-// ================= HELPER =================
+// ========= HELPER =========
 function normalize(str){
     return (str || '').toString().trim().toLowerCase();
 }
 
-// ================= SAVE PAYMENT =================
-function savePayment(){
+// ========= SHOW PAYMENTS =========
+function showPayments(){
 
-    let customer = document.getElementById('customer').value;
-    let email = document.getElementById('email').value;
-    let phone = document.getElementById('phone').value;
-    let amount = parseFloat(document.getElementById('amount').value);
-    let date = document.getElementById('date').value;
-
-    if(!customer || !amount || !date){
-        alert("Fill required fields");
+    if(payments.length === 0){
+        document.getElementById("paymentList").innerHTML = "No payments found";
         return;
     }
 
-    payments.push({
-        customer,
-        email,
-        phone,
-        amount,
-        date
+    let html = `<table>
+    <tr>
+        <th>Date</th>
+        <th>Customer</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Amount</th>
+    </tr>`;
+
+    payments.forEach(p => {
+        html += `<tr>
+            <td>${p.date}</td>
+            <td>${p.customer}</td>
+            <td>${p.email || ''}</td>
+            <td>${p.phone || ''}</td>
+            <td>₹${p.amount}</td>
+        </tr>`;
     });
 
-    localStorage.setItem('paymentReceipts', JSON.stringify(payments));
+    html += "</table>";
 
-    alert("Payment Saved Successfully");
-
-    generateReport();
+    document.getElementById("paymentList").innerHTML = html;
 }
 
-// ================= MAIN LOGIC =================
+// ========= MAIN RECONCILIATION =========
 function generateReport(){
 
     let map = {};
 
-    // ================= STEP 1: LOAD CREDIT INVOICES =================
+    // STEP 1: CREDIT INVOICES
     invoices
     .filter(inv => inv.invoiceType === 'credit')
     .forEach(inv => {
 
-        let name = inv.buyer?.name || 'Unknown';
+        let name = inv.buyer?.name || '';
         let email = inv.buyer?.email || '';
         let phone = inv.buyer?.phone || '';
 
@@ -119,11 +93,11 @@ function generateReport(){
                 name,
                 email,
                 phone,
-                list: []
+                invoices: []
             };
         }
 
-        map[key].list.push({
+        map[key].invoices.push({
             invoiceNo: inv.invoiceNo,
             date: inv.date,
             original: inv.grandTotal,
@@ -131,19 +105,19 @@ function generateReport(){
         });
     });
 
-    // ================= STEP 2: APPLY PAYMENTS =================
+    // STEP 2: APPLY PAYMENTS (FIFO)
     payments.forEach(pay => {
 
-        let payKey = normalize(pay.email) || normalize(pay.phone) || normalize(pay.customer);
+        let key = normalize(pay.email) || normalize(pay.phone) || normalize(pay.customer);
 
-        if(!map[payKey]) return;
+        if(!map[key]) return;
 
         let remaining = pay.amount;
 
-        // FIFO oldest invoice first
-        map[payKey].list.sort((a,b)=> new Date(a.date) - new Date(b.date));
+        // sort oldest first
+        map[key].invoices.sort((a,b)=> new Date(a.date) - new Date(b.date));
 
-        map[payKey].list.forEach(inv => {
+        map[key].invoices.forEach(inv => {
 
             if(remaining <= 0) return;
 
@@ -154,12 +128,11 @@ function generateReport(){
         });
     });
 
-    // ================= STEP 3: DISPLAY =================
+    // STEP 3: DISPLAY
     let html = `<table>
     <tr>
         <th>Customer</th>
         <th>Email</th>
-        <th>Phone</th>
         <th>Invoice</th>
         <th>Date</th>
         <th>Original</th>
@@ -172,23 +145,20 @@ function generateReport(){
 
     Object.values(map).forEach(cust => {
 
-        cust.list.forEach(inv => {
+        cust.invoices.forEach(inv => {
 
             if(inv.balance <= 0) return;
 
-            let invDate = new Date(inv.date);
-            let age = Math.floor((today - invDate)/(1000*60*60*24));
+            let age = Math.floor((today - new Date(inv.date)) / (1000*60*60*24));
 
-            let bucket = "";
-            if(age <=30) bucket="0-30";
-            else if(age<=60) bucket="31-60";
-            else if(age<=90) bucket="61-90";
-            else bucket="90+";
+            let bucket =
+                age <=30 ? "0-30" :
+                age <=60 ? "31-60" :
+                age <=90 ? "61-90" : "90+";
 
             html += `<tr>
                 <td>${cust.name}</td>
                 <td>${cust.email}</td>
-                <td>${cust.phone}</td>
                 <td>${inv.invoiceNo}</td>
                 <td>${inv.date}</td>
                 <td>₹${inv.original.toFixed(2)}</td>
@@ -205,7 +175,8 @@ function generateReport(){
     document.getElementById("report").innerHTML = html;
 }
 
-// INIT
+// ========= INIT =========
+showPayments();
 generateReport();
 
 </script>
