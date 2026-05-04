@@ -2,79 +2,265 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Payment List</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment Receipts – Auto Spares</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 <style>
-body{font-family:Arial;padding:20px;}
-table{border-collapse:collapse;width:100%;}
-th,td{border:1px solid #ccc;padding:8px;text-align:left;}
-button{padding:5px;margin-right:5px;}
+*{box-sizing:border-box;}
+body{font-family:'Roboto';background:#e9ecef;padding:20px;}
+.container{max-width:1400px;margin:auto;background:#fff;padding:20px;border-radius:10px;}
+h1{color:#0a7c71;}
+.form-section,.table-section{background:#f8f9fa;padding:20px;margin-bottom:20px;border-radius:8px;}
+.form-row{display:flex;gap:10px;flex-wrap:wrap;}
+.form-group{flex:1;min-width:180px;}
+input,select{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;}
+button{background:#0a7c71;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;}
+.btn-edit{background:#17a2b8;}
+.btn-del{background:#dc3545;}
+.btn-pdf{background:#e67e22;}
+table{width:100%;border-collapse:collapse;margin-top:10px;}
+th,td{border:1px solid #ddd;padding:8px;}
+th{background:#0a7c71;color:#fff;}
+.modal{display:none;position:fixed;width:100%;height:100%;background:rgba(0,0,0,.5);}
+.modal-content{background:#fff;margin:10% auto;padding:20px;width:400px;border-radius:10px;}
 </style>
 </head>
+
 <body>
+<div class="container">
 
-<h2>All Payments</h2>
+<h1><i class="fas fa-receipt"></i> Payment Receipts</h1>
 
-<button onclick="goBack()">⬅ Back</button>
+<div class="form-section">
+<div class="form-row">
+<div class="form-group">
+<label>Customer</label>
+<select id="customerSelect"></select>
+</div>
+<div class="form-group">
+<label>Date</label>
+<input type="date" id="paymentDate">
+</div>
+<div class="form-group">
+<label>Amount</label>
+<input type="number" id="amount">
+</div>
+</div>
 
-<table id="paymentTable"></table>
+<div class="form-row">
+<div class="form-group">
+<label>Mode</label>
+<select id="mode">
+<option>Cash</option><option>UPI</option><option>Bank</option>
+</select>
+</div>
+<div class="form-group">
+<label>Reference</label>
+<input id="reference">
+</div>
+</div>
+
+<button onclick="addPayment()">Save</button>
+</div>
+
+<div class="table-section">
+<div id="table"></div>
+</div>
+
+</div>
+
+<!-- EDIT MODAL -->
+<div id="editModal" class="modal">
+<div class="modal-content">
+<h3>Edit Payment</h3>
+<input type="hidden" id="editId">
+<label>Amount</label>
+<input id="editAmount">
+<br><br>
+<button onclick="updatePayment()">Save</button>
+<button onclick="closeModal()">Cancel</button>
+</div>
+</div>
 
 <script>
-let payments = [];
 
-function loadPayments(){
-    payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
+let receipts=[];
+let customers=[];
 
-    let html = "<tr><th>Date</th><th>Customer</th><th>Amount</th><th>Action</th></tr>";
+/* ================= LOAD ================= */
+function load(){
+receipts=JSON.parse(localStorage.getItem('customerPayments')||'[]');
+customers=JSON.parse(localStorage.getItem('customers')||'[]');
 
-    payments.forEach((p,index)=>{
-        html += `<tr>
-            <td>${p.date}</td>
-            <td>${p.customerEmail}</td>
-            <td>₹${p.amount}</td>
-            <td>
-                <button onclick="editPayment(${index})">Edit</button>
-                <button onclick="deletePayment(${index})">Delete</button>
-            </td>
-        </tr>`;
-    });
-
-    document.getElementById('paymentTable').innerHTML = html;
+let sel=document.getElementById('customerSelect');
+sel.innerHTML='';
+customers.forEach(c=>{
+sel.innerHTML+=`<option value="${c.email}">${c.name}</option>`;
+});
 }
 
-// ===== EDIT =====
-function editPayment(index){
-    let p = payments[index];
+/* ================= DISPLAY ================= */
+function display(){
+let html='<table><tr><th>#</th><th>Receipt</th><th>Customer</th><th>Amount</th><th>Action</th></tr>';
 
-    let newAmount = prompt("Edit Amount", p.amount);
-    if(newAmount === null) return;
+receipts.forEach((r,i)=>{
+let cust=customers.find(c=>c.email==r.customerEmail);
 
-    let newDate = prompt("Edit Date (YYYY-MM-DD)", p.date);
+html+=`
+<tr>
+<td>${i+1}</td>
+<td>${r.receiptNo}</td>
+<td>${cust?cust.name:r.customerEmail}</td>
+<td>₹${r.amount}</td>
+<td>
+<button class="btn-edit" onclick="edit('${r.id}')">Edit</button>
+<button class="btn-del" onclick="del('${r.id}')">Delete</button>
+<button class="btn-pdf" onclick="pdf('${r.id}')">PDF</button>
+</td>
+</tr>`;
+});
 
-    payments[index].amount = parseFloat(newAmount);
-    payments[index].date = newDate || p.date;
-
-    localStorage.setItem('customerPayments', JSON.stringify(payments));
-
-    alert("Updated ✔");
-    loadPayments();
+html+='</table>';
+document.getElementById('table').innerHTML=html;
 }
 
-// ===== DELETE =====
-function deletePayment(index){
-    if(!confirm("Delete this payment?")) return;
-
-    payments.splice(index,1);
-    localStorage.setItem('customerPayments', JSON.stringify(payments));
-
-    alert("Deleted ✔");
-    loadPayments();
+/* ================= RECEIPT NO ================= */
+function receiptNo(){
+return 'PR/'+Date.now();
 }
 
-function goBack(){
-    window.location.href="payment-receipt.html";
+/* ================= LEDGER CALC ================= */
+function calcOutstanding(email){
+let ledger=JSON.parse(localStorage.getItem('customerLedger')||'[]');
+let bal=0;
+
+ledger.filter(l=>l.customerEmail==email)
+.forEach(l=>{
+bal+= (l.debit||0);
+bal-= (l.credit||0);
+});
+
+return bal<0?0:bal;
 }
 
-loadPayments();
+/* ================= ADD ================= */
+function addPayment(){
+
+let email=document.getElementById('customerSelect').value;
+let amt=parseFloat(document.getElementById('amount').value);
+
+if(!amt)return alert('Enter amount');
+
+let pay={
+id:Date.now(),
+receiptNo:receiptNo(),
+customerEmail:email,
+amount:amt,
+date:new Date().toISOString().slice(0,10)
+};
+
+receipts.push(pay);
+localStorage.setItem('customerPayments',JSON.stringify(receipts));
+
+/* ledger */
+let ledger=JSON.parse(localStorage.getItem('customerLedger')||'[]');
+ledger.push({customerEmail:email,credit:amt,debit:0});
+localStorage.setItem('customerLedger',JSON.stringify(ledger));
+
+/* outstanding */
+let cust=customers.find(c=>c.email==email);
+cust.outstanding=calcOutstanding(email);
+localStorage.setItem('customers',JSON.stringify(customers));
+
+display();
+}
+
+/* ================= EDIT ================= */
+function edit(id){
+let r=receipts.find(x=>x.id==id);
+document.getElementById('editId').value=id;
+document.getElementById('editAmount').value=r.amount;
+document.getElementById('editModal').style.display='block';
+}
+
+function updatePayment(){
+
+let id=document.getElementById('editId').value;
+let newAmt=parseFloat(document.getElementById('editAmount').value);
+
+let r=receipts.find(x=>x.id==id);
+let oldAmt=r.amount;
+
+r.amount=newAmt;
+
+localStorage.setItem('customerPayments',JSON.stringify(receipts));
+
+/* update ledger */
+let ledger=JSON.parse(localStorage.getItem('customerLedger')||'[]');
+let entry=ledger.find(l=>l.credit==oldAmt && l.customerEmail==r.customerEmail);
+
+if(entry) entry.credit=newAmt;
+
+localStorage.setItem('customerLedger',JSON.stringify(ledger));
+
+/* recalc */
+let cust=customers.find(c=>c.email==r.customerEmail);
+cust.outstanding=calcOutstanding(r.customerEmail);
+
+localStorage.setItem('customers',JSON.stringify(customers));
+
+closeModal();
+display();
+}
+
+/* ================= DELETE ================= */
+function del(id){
+
+if(!confirm('Delete?')) return;
+
+let r=receipts.find(x=>x.id==id);
+
+/* remove receipt */
+receipts=receipts.filter(x=>x.id!=id);
+localStorage.setItem('customerPayments',JSON.stringify(receipts));
+
+/* remove ledger */
+let ledger=JSON.parse(localStorage.getItem('customerLedger')||'[]');
+ledger=ledger.filter(l=>!(l.customerEmail==r.customerEmail && l.credit==r.amount));
+localStorage.setItem('customerLedger',JSON.stringify(ledger));
+
+/* recalc */
+let cust=customers.find(c=>c.email==r.customerEmail);
+cust.outstanding=calcOutstanding(r.customerEmail);
+
+localStorage.setItem('customers',JSON.stringify(customers));
+
+display();
+}
+
+/* ================= PDF ================= */
+function pdf(id){
+
+let r=receipts.find(x=>x.id==id);
+
+let div=document.createElement('div');
+div.innerHTML=`<h2>Receipt ${r.receiptNo}</h2><p>Amount ₹${r.amount}</p>`;
+
+html2pdf().from(div).save();
+}
+
+/* ================= MODAL ================= */
+function closeModal(){
+document.getElementById('editModal').style.display='none';
+}
+
+/* ================= INIT ================= */
+load();
+display();
+
 </script>
 
 </body>
