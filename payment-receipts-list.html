@@ -9,41 +9,69 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
-*{box-sizing:border-box;}
-body{font-family:'Roboto';background:#e9ecef;padding:20px;}
-.container{max-width:1400px;margin:auto;background:#fff;padding:20px;border-radius:10px;}
-h1{color:#0a7c71;}
-.form-section,.table-section{background:#f8f9fa;padding:20px;margin-bottom:20px;border-radius:8px;}
-.form-row{display:flex;gap:10px;flex-wrap:wrap;}
-.form-group{flex:1;min-width:180px;}
-input,select{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;}
-button{background:#0a7c71;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;}
-.btn-edit{background:#17a2b8;}
-.btn-del{background:#dc3545;}
-.btn-pdf{background:#e67e22;}
-table{width:100%;border-collapse:collapse;margin-top:10px;}
-th,td{border:1px solid #ddd;padding:8px;}
-th{background:#0a7c71;color:#fff;}
-.modal{display:none;position:fixed;width:100%;height:100%;background:rgba(0,0,0,.5);}
-.modal-content{background:#fff;margin:10% auto;padding:20px;width:400px;border-radius:10px;}
+* { box-sizing: border-box; }
+body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+.container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+h1 { color: #0a7c71; }
+
+.form-section, .table-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 1px solid #dee2e6;
+}
+
+.form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
+.form-group { flex: 1; min-width: 180px; }
+
+label { font-size: 12px; font-weight: 600; }
+
+input, select, textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+button {
+    background: #0a7c71;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.btn-edit { background: #17a2b8; }
+.btn-delete { background: #dc3545; }
+.btn-pdf { background: #e67e22; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #dee2e6; padding: 10px; }
+th { background: #0a7c71; color: white; }
 </style>
 </head>
 
 <body>
+
 <div class="container">
 
 <h1><i class="fas fa-receipt"></i> Payment Receipts</h1>
 
+<!-- FORM -->
 <div class="form-section">
 <div class="form-row">
 <div class="form-group">
 <label>Customer</label>
 <select id="customerSelect"></select>
 </div>
+
 <div class="form-group">
 <label>Date</label>
 <input type="date" id="paymentDate">
 </div>
+
 <div class="form-group">
 <label>Amount</label>
 <input type="number" id="amount">
@@ -54,211 +82,188 @@ th{background:#0a7c71;color:#fff;}
 <div class="form-group">
 <label>Mode</label>
 <select id="mode">
-<option>Cash</option><option>UPI</option><option>Bank</option>
+<option>Cash</option>
+<option>UPI</option>
+<option>Bank</option>
 </select>
 </div>
+
 <div class="form-group">
 <label>Reference</label>
-<input id="reference">
+<input type="text" id="reference">
+</div>
+
+<div class="form-group">
+<label>Remarks</label>
+<input type="text" id="remarks">
 </div>
 </div>
 
 <button onclick="addPayment()">Save</button>
 </div>
 
+<!-- TABLE -->
 <div class="table-section">
-<div id="table"></div>
+<div id="tableData"></div>
 </div>
 
-</div>
-
-<!-- EDIT MODAL -->
-<div id="editModal" class="modal">
-<div class="modal-content">
-<h3>Edit Payment</h3>
-<input type="hidden" id="editId">
-<label>Amount</label>
-<input id="editAmount">
-<br><br>
-<button onclick="updatePayment()">Save</button>
-<button onclick="closeModal()">Cancel</button>
-</div>
 </div>
 
 <script>
 
-let receipts=[];
-let customers=[];
+let receipts = JSON.parse(localStorage.getItem('customerPayments') || '[]');
+let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
 /* ================= LOAD ================= */
-function load(){
-receipts=JSON.parse(localStorage.getItem('customerPayments')||'[]');
-customers=JSON.parse(localStorage.getItem('customers')||'[]');
-
-let sel=document.getElementById('customerSelect');
-sel.innerHTML='';
+function loadCustomers(){
+let sel = document.getElementById('customerSelect');
+sel.innerHTML = '<option value="">Select</option>';
 customers.forEach(c=>{
-sel.innerHTML+=`<option value="${c.email}">${c.name}</option>`;
+sel.innerHTML += `<option value="${c.email}">${c.name}</option>`;
 });
 }
 
-/* ================= DISPLAY ================= */
-function display(){
-let html='<table><tr><th>#</th><th>Receipt</th><th>Customer</th><th>Amount</th><th>Action</th></tr>';
-
-receipts.forEach((r,i)=>{
-let cust=customers.find(c=>c.email==r.customerEmail);
-
-html+=`
-<tr>
-<td>${i+1}</td>
-<td>${r.receiptNo}</td>
-<td>${cust?cust.name:r.customerEmail}</td>
-<td>₹${r.amount}</td>
-<td>
-<button class="btn-edit" onclick="edit('${r.id}')">Edit</button>
-<button class="btn-del" onclick="del('${r.id}')">Delete</button>
-<button class="btn-pdf" onclick="pdf('${r.id}')">PDF</button>
-</td>
-</tr>`;
-});
-
-html+='</table>';
-document.getElementById('table').innerHTML=html;
-}
-
-/* ================= RECEIPT NO ================= */
-function receiptNo(){
-return 'PR/'+Date.now();
-}
-
-/* ================= LEDGER CALC ================= */
-function calcOutstanding(email){
-let ledger=JSON.parse(localStorage.getItem('customerLedger')||'[]');
-let bal=0;
-
-ledger.filter(l=>l.customerEmail==email)
-.forEach(l=>{
-bal+= (l.debit||0);
-bal-= (l.credit||0);
-});
-
-return bal<0?0:bal;
+function refresh(){
+localStorage.setItem('customerPayments', JSON.stringify(receipts));
+display();
 }
 
 /* ================= ADD ================= */
 function addPayment(){
 
-let email=document.getElementById('customerSelect').value;
-let amt=parseFloat(document.getElementById('amount').value);
+let email = customerSelect.value;
+let amount = parseFloat(amountInput());
 
-if(!amt)return alert('Enter amount');
+if(!email || !amount){
+alert("Fill data");
+return;
+}
 
-let pay={
-id:Date.now(),
-receiptNo:receiptNo(),
-customerEmail:email,
-amount:amt,
-date:new Date().toISOString().slice(0,10)
+let receiptNo = "PR-" + Date.now();
+
+let obj = {
+id: Date.now(),
+receiptNo,
+date: paymentDate.value,
+customerEmail: email,
+amount,
+mode: mode.value,
+reference: reference.value,
+remarks: remarks.value
 };
 
-receipts.push(pay);
-localStorage.setItem('customerPayments',JSON.stringify(receipts));
-
-/* ledger */
-let ledger=JSON.parse(localStorage.getItem('customerLedger')||'[]');
-ledger.push({customerEmail:email,credit:amt,debit:0});
-localStorage.setItem('customerLedger',JSON.stringify(ledger));
-
-/* outstanding */
-let cust=customers.find(c=>c.email==email);
-cust.outstanding=calcOutstanding(email);
-localStorage.setItem('customers',JSON.stringify(customers));
-
-display();
+receipts.push(obj);
+refresh();
 }
 
-/* ================= EDIT ================= */
-function edit(id){
-let r=receipts.find(x=>x.id==id);
-document.getElementById('editId').value=id;
-document.getElementById('editAmount').value=r.amount;
-document.getElementById('editModal').style.display='block';
+/* ================= DISPLAY ================= */
+function display(){
+
+if(receipts.length===0){
+tableData.innerHTML = "No Data";
+return;
 }
 
-function updatePayment(){
+let html = `<table>
+<tr>
+<th>#</th>
+<th>Receipt</th>
+<th>Date</th>
+<th>Customer</th>
+<th>Amount</th>
+<th>Action</th>
+</tr>`;
 
-let id=document.getElementById('editId').value;
-let newAmt=parseFloat(document.getElementById('editAmount').value);
+receipts.forEach((r,i)=>{
 
-let r=receipts.find(x=>x.id==id);
-let oldAmt=r.amount;
+let cust = customers.find(c=>c.email===r.customerEmail);
 
-r.amount=newAmt;
+html += `<tr>
+<td>${i+1}</td>
+<td>${r.receiptNo}</td>
+<td>${r.date}</td>
+<td>${cust?cust.name:r.customerEmail}</td>
+<td>₹${r.amount}</td>
 
-localStorage.setItem('customerPayments',JSON.stringify(receipts));
+<td>
+<button class="btn-edit" onclick="edit(${r.id})">Edit</button>
+<button class="btn-delete" onclick="del(${r.id})">Delete</button>
+<button class="btn-pdf" onclick="pdf(${r.id})">PDF</button>
+</td>
+</tr>`;
+});
 
-/* update ledger */
-let ledger=JSON.parse(localStorage.getItem('customerLedger')||'[]');
-let entry=ledger.find(l=>l.credit==oldAmt && l.customerEmail==r.customerEmail);
-
-if(entry) entry.credit=newAmt;
-
-localStorage.setItem('customerLedger',JSON.stringify(ledger));
-
-/* recalc */
-let cust=customers.find(c=>c.email==r.customerEmail);
-cust.outstanding=calcOutstanding(r.customerEmail);
-
-localStorage.setItem('customers',JSON.stringify(customers));
-
-closeModal();
-display();
+html += "</table>";
+tableData.innerHTML = html;
 }
 
 /* ================= DELETE ================= */
 function del(id){
-
-if(!confirm('Delete?')) return;
-
-let r=receipts.find(x=>x.id==id);
-
-/* remove receipt */
-receipts=receipts.filter(x=>x.id!=id);
-localStorage.setItem('customerPayments',JSON.stringify(receipts));
-
-/* remove ledger */
-let ledger=JSON.parse(localStorage.getItem('customerLedger')||'[]');
-ledger=ledger.filter(l=>!(l.customerEmail==r.customerEmail && l.credit==r.amount));
-localStorage.setItem('customerLedger',JSON.stringify(ledger));
-
-/* recalc */
-let cust=customers.find(c=>c.email==r.customerEmail);
-cust.outstanding=calcOutstanding(r.customerEmail);
-
-localStorage.setItem('customers',JSON.stringify(customers));
-
-display();
+if(!confirm("Delete?")) return;
+receipts = receipts.filter(r=>r.id!==id);
+refresh();
 }
 
-/* ================= PDF ================= */
+/* ================= EDIT ================= */
+function edit(id){
+
+let r = receipts.find(x=>x.id===id);
+
+paymentDate.value = r.date;
+amount.value = r.amount;
+reference.value = r.reference;
+remarks.value = r.remarks;
+mode.value = r.mode;
+customerSelect.value = r.customerEmail;
+
+del(id);
+}
+
+/* ================= PDF (FIXED EXACT FORMAT) ================= */
 function pdf(id){
 
-let r=receipts.find(x=>x.id==id);
+let p = receipts.find(r=>r.id===id);
+let c = customers.find(x=>x.email===p.customerEmail);
 
-let div=document.createElement('div');
-div.innerHTML=`<h2>Receipt ${r.receiptNo}</h2><p>Amount ₹${r.amount}</p>`;
+let div = document.createElement('div');
 
-html2pdf().from(div).save();
+div.innerHTML = `
+<div style="font-family:Arial;padding:20px">
+
+<h2 style="text-align:center">PAYMENT RECEIPT</h2>
+
+<p><b>Receipt No:</b> ${p.receiptNo}</p>
+
+<hr>
+
+<h3>Customer</h3>
+<p>Name: ${c?c.name:''}</p>
+<p>Email: ${p.customerEmail}</p>
+
+<hr>
+
+<h3>Payment</h3>
+<p>Date: ${p.date}</p>
+<p>Amount: ₹${p.amount}</p>
+<p>Mode: ${p.mode}</p>
+<p>Ref: ${p.reference}</p>
+
+</div>
+`;
+
+html2pdf().from(div).save("receipt.pdf");
 }
 
-/* ================= MODAL ================= */
-function closeModal(){
-document.getElementById('editModal').style.display='none';
+/* ================= HELPERS ================= */
+function amountInput(){
+return document.getElementById('amount').value;
 }
+
+document.getElementById('paymentDate').value =
+new Date().toISOString().slice(0,10);
 
 /* ================= INIT ================= */
-load();
+loadCustomers();
 display();
 
 </script>
