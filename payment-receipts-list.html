@@ -5,118 +5,246 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payment Receipts – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
         .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
         h1 { color: #0a7c71; }
-        .form-section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-        .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
+        .form-section, .table-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+        }
+        .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; align-items: flex-end; }
         .form-group { flex: 1; min-width: 180px; }
         label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
         input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
-        .btn-warning { background: #ffc107; color: #333; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
         .btn-pdf { background: #e67e22; }
         .btn-edit { background: #17a2b8; }
-        .btn-delete { background: #dc3545; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
-        .search-box { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        @media (max-width: 768px) { .form-row { flex-direction: column; } table { font-size: 12px; } }
+        .modal {
+            display: none;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            right: 15px;
+            top: 10px;
+            font-size: 24px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <h1><i class="fas fa-receipt"></i> Payment Receipts</h1>
 
-    <!-- Add New Receipt Form -->
+    <!-- Add New Payment Form -->
     <div class="form-section">
-        <h3>Record New Payment</h3>
+        <h3><i class="fas fa-plus-circle"></i> Record New Payment</h3>
         <div class="form-row">
             <div class="form-group">
                 <label>Customer *</label>
                 <select id="customerSelect">
                     <option value="">-- Select Customer --</option>
                 </select>
-                <input type="email" id="customerEmailDirect" placeholder="Or enter email" style="margin-top:5px;">
+                <button type="button" style="margin-top:5px; background:#28a745; padding:4px 8px;" onclick="showAddCustomerModal()"><i class="fas fa-user-plus"></i> New Customer</button>
             </div>
             <div class="form-group"><label>Date</label><input type="date" id="paymentDate"></div>
             <div class="form-group"><label>Amount (₹)</label><input type="number" id="amount" step="0.01"></div>
         </div>
         <div class="form-row">
             <div class="form-group"><label>Mode</label><select id="mode"><option>Cash</option><option>Bank Transfer</option><option>Cheque</option><option>UPI</option></select></div>
-            <div class="form-group"><label>Reference</label><input type="text" id="reference" placeholder="Optional"></div>
+            <div class="form-group"><label>Reference</label><input type="text" id="reference" placeholder="Cheque/UTR"></div>
             <div class="form-group"><label>Remarks</label><textarea id="remarks" rows="1"></textarea></div>
         </div>
-        <button onclick="addReceipt()">Save Receipt</button>
-        <button class="btn-warning" onclick="clearForm()">Clear</button>
+        <button onclick="addNewPayment()"><i class="fas fa-save"></i> Save Receipt</button>
+        <button onclick="clearForm()">Clear</button>
+        <button onclick="migrateAndLoadAll()" style="background:#6c757d;"><i class="fas fa-database"></i> Migrate Old Receipts</button>
     </div>
 
-    <!-- Receipts Table -->
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by Receipt No, Customer..." style="flex:1;">
-        <button onclick="filterReceipts()">Search</button>
-        <button onclick="loadReceipts()">Refresh</button>
-        <button onclick="exportToCSV()">Export CSV</button>
+    <!-- All Receipts Table -->
+    <div class="table-section">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Search by Receipt No, Customer..." style="flex:1;">
+            <button onclick="filterReceipts()"><i class="fas fa-search"></i> Search</button>
+            <button onclick="refreshDisplay()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button onclick="exportToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        </div>
+        <div id="receiptsTable"></div>
     </div>
-    <div id="receiptsTable"></div>
-    <button onclick="window.location.href='index.html'" style="margin-top:20px;">Back</button>
 </div>
 
+<!-- Add Customer Modal -->
+<div id="addCustomerModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="closeAddCustomerModal()">&times;</span><h3>Add Customer</h3><input type="text" id="newName" placeholder="Name*"><br><br><input type="email" id="newEmail" placeholder="Email*"><br><br><input type="text" id="newPhone" placeholder="Phone"><br><br><button onclick="saveNewCustomer()">Save</button><button onclick="closeAddCustomerModal()">Cancel</button></div></div>
+<!-- Edit Modal -->
+<div id="editModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="closeEditModal()">&times;</span><h3>Edit Receipt</h3><input type="hidden" id="editId"><label>Receipt No</label><input type="text" id="editReceiptNo" readonly><br><label>Customer Email</label><input type="email" id="editCustomerEmail" readonly><br><label>Date</label><input type="date" id="editDate"><br><label>Amount (₹)</label><input type="number" id="editAmount" step="0.01"><br><label>Mode</label><select id="editMode"><option>Cash</option><option>Bank Transfer</option><option>Cheque</option><option>UPI</option></select><br><label>Reference</label><input type="text" id="editReference"><br><label>Remarks</label><textarea id="editRemarks" rows="2"></textarea><br><button onclick="saveEdit()">Save Changes</button><button onclick="closeEditModal()">Cancel</button></div></div>
+
 <script>
-    let receipts = [];
+    let receipts = [];      // unified array of all receipts (standard format)
     let customers = [];
 
-    function loadReceipts() {
-        receipts = JSON.parse(localStorage.getItem('customerPayments') || '[]');
+    // ========== Helper: Get Financial Year ==========
+    function getFinancialYear(dateStr) {
+        if (!dateStr) dateStr = new Date().toISOString();
+        let d = new Date(dateStr);
+        let year = d.getFullYear();
+        let month = d.getMonth() + 1;
+        return (month >= 4) ? `${year}-${(year+1).toString().slice(-2)}` : `${year-1}-${year.toString().slice(-2)}`;
+    }
+
+    // ========== Generate sequential receipt number based on date ==========
+    function getNextReceiptNumberForDate(dateStr) {
+        const finYear = getFinancialYear(dateStr);
+        let max = 0;
+        receipts.forEach(r => {
+            if (r.receiptNo && r.receiptNo.startsWith(`PR/${finYear}/`)) {
+                let num = parseInt(r.receiptNo.split('/').pop());
+                if (!isNaN(num) && num > max) max = num;
+            }
+        });
+        return `PR/${finYear}/` + (max + 1).toString().padStart(4, '0');
+    }
+
+    // ========== Load from ALL possible localStorage keys and unify ==========
+    function loadAllReceipts() {
+        const possibleKeys = ['customerPayments', 'payments', 'allPayments', 'paymentReceipts', 'receipts'];
+        let merged = [];
+        for (let key of possibleKeys) {
+            let data = localStorage.getItem(key);
+            if (data) {
+                try {
+                    let arr = JSON.parse(data);
+                    if (Array.isArray(arr)) merged.push(...arr);
+                } catch(e) {}
+            }
+        }
+        // Remove duplicates by id (or receiptNo if id missing)
+        let unique = [];
+        let seenIds = new Set();
+        for (let r of merged) {
+            let id = r.id || r.receiptId || (r.receiptNo ? r.receiptNo : null);
+            if (id && !seenIds.has(id)) {
+                seenIds.add(id);
+                // Normalize fields
+                let normalized = {
+                    id: id,
+                    receiptNo: r.receiptNo || r.receipt_number || null,
+                    date: r.date || r.paymentDate || new Date().toISOString().slice(0,10),
+                    customerEmail: r.customerEmail || r.email || r.customer_email,
+                    amount: parseFloat(r.amount) || 0,
+                    mode: r.mode || r.paymentMode || 'Cash',
+                    reference: r.reference || r.ref || 'N/A',
+                    remarks: r.remarks || r.narration || ''
+                };
+                if (!normalized.customerEmail) continue;
+                unique.push(normalized);
+            }
+        }
+        // Sort by date (oldest first) to assign sequential numbers
+        unique.sort((a,b) => new Date(a.date) - new Date(b.date));
+        receipts = unique;
+        // Ensure every receipt has a proper sequential receiptNo
+        for (let r of receipts) {
+            if (!r.receiptNo || r.receiptNo === '') {
+                r.receiptNo = getNextReceiptNumberForDate(r.date);
+            }
+        }
+        // Re-sort by receiptNo descending for display
+        receipts.sort((a,b) => b.receiptNo.localeCompare(a.receiptNo));
+        // Save back to main key for future
+        localStorage.setItem('customerPayments', JSON.stringify(receipts));
+    }
+
+    // ========== Load customers ==========
+    function loadCustomers() {
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        // Ensure each customer has a customerCode (for dropdown)
+        customers.forEach(c => {
+            if (!c.customerCode) c.customerCode = 'CUST' + (Math.floor(Math.random()*10000)).toString().padStart(4,'0');
+        });
+        localStorage.setItem('customers', JSON.stringify(customers));
         populateCustomerDropdown();
-        displayReceipts();
     }
 
     function populateCustomerDropdown() {
-        const select = document.getElementById('customerSelect');
+        let select = document.getElementById('customerSelect');
         select.innerHTML = '<option value="">-- Select Customer --</option>';
         customers.forEach(c => {
             select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
         });
     }
 
-    function getFinancialYear() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-        return (month >= 4) ? `${year}-${(year+1).toString().slice(-2)}` : `${year-1}-${year.toString().slice(-2)}`;
-    }
-
-    function getNextReceiptNumber() {
-        const finYear = getFinancialYear();
-        let maxNum = 0;
-        const prefix = `PR/${finYear}/`;
-        receipts.forEach(r => {
-            if (r.receiptNo && r.receiptNo.startsWith(prefix)) {
-                const num = parseInt(r.receiptNo.split('/').pop());
-                if (!isNaN(num) && num > maxNum) maxNum = num;
-            }
-        });
-        return prefix + (maxNum + 1).toString().padStart(4, '0');
-    }
-
-    function addReceipt() {
-        let email = document.getElementById('customerSelect').value;
-        if (!email) email = document.getElementById('customerEmailDirect').value.trim();
-        if (!email) { alert('Select or enter customer email'); return; }
-        const amount = parseFloat(document.getElementById('amount').value);
-        if (isNaN(amount) || amount <= 0) { alert('Valid amount required'); return; }
-        let customer = customers.find(c => c.email === email);
-        if (!customer) {
-            alert('Customer not found. Please add in Customer Master first.');
+    // ========== Display table with serial numbers ==========
+    function displayReceipts(filter = '') {
+        let filtered = receipts;
+        if (filter) {
+            const term = filter.toLowerCase();
+            filtered = receipts.filter(r => {
+                let cust = customers.find(c => c.email === r.customerEmail);
+                return r.receiptNo.toLowerCase().includes(term) ||
+                       (cust && cust.name.toLowerCase().includes(term)) ||
+                       (r.reference && r.reference.toLowerCase().includes(term));
+            });
+        }
+        if (filtered.length === 0) {
+            document.getElementById('receiptsTable').innerHTML = '<p>No receipts found. Click "Migrate Old Receipts" to scan existing data.</p>';
             return;
         }
-        const receiptNo = getNextReceiptNumber();
-        const payment = {
+        let html = '<table><thead>运转<th>#</th><th>Receipt No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Mode</th><th>Reference</th><th>Actions</th></tr></thead><tbody>';
+        filtered.forEach((r, idx) => {
+            let cust = customers.find(c => c.email === r.customerEmail);
+            let customerName = cust ? cust.name : r.customerEmail;
+            html += `<tr>
+                <td>${idx+1}</td>
+                <td><strong>${escapeHtml(r.receiptNo)}</strong></td>
+                <td>${r.date}</td>
+                <td>${escapeHtml(customerName)}</strong></td>
+                <td>₹${r.amount.toFixed(2)}</td>
+                <td>${r.mode}</td>
+                <td>${escapeHtml(r.reference)}</strong></td>
+                <td>
+                    <button class="btn-edit" onclick="openEditModal('${r.id}')"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn-pdf" onclick="generateReceiptPDF('${r.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></tr>';
+        document.getElementById('receiptsTable').innerHTML = html;
+    }
+
+    // ========== Add new payment (with sequential receipt number) ==========
+    function addNewPayment() {
+        let email = document.getElementById('customerSelect').value;
+        if (!email) { alert('Select a customer'); return; }
+        let amount = parseFloat(document.getElementById('amount').value);
+        if (isNaN(amount) || amount <= 0) { alert('Valid amount required'); return; }
+        let cust = customers.find(c => c.email === email);
+        if (!cust) { alert('Customer not found'); return; }
+        let receiptNo = getNextReceiptNumberForDate(document.getElementById('paymentDate').value || new Date().toISOString());
+        let payment = {
             id: Date.now(),
             receiptNo: receiptNo,
             date: document.getElementById('paymentDate').value || new Date().toISOString().slice(0,10),
@@ -127,133 +255,182 @@
             remarks: document.getElementById('remarks').value
         };
         // Update customer outstanding
-        customer.outstanding = (customer.outstanding || 0) - amount;
-        if (customer.outstanding < 0) customer.outstanding = 0;
+        cust.outstanding = (cust.outstanding || 0) - amount;
+        if (cust.outstanding < 0) cust.outstanding = 0;
         localStorage.setItem('customers', JSON.stringify(customers));
         receipts.push(payment);
         localStorage.setItem('customerPayments', JSON.stringify(receipts));
-        // Add to ledger
+        // Update ledger
         let ledger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
-        ledger.push({
-            id: Date.now(),
-            customerEmail: email,
-            date: payment.date,
-            type: 'payment',
-            ref: receiptNo,
-            debit: 0,
-            credit: amount,
-            balance: customer.outstanding,
-            narration: payment.remarks || 'Payment received'
-        });
+        ledger.push({ id: Date.now(), customerEmail: email, date: payment.date, type: 'payment', ref: receiptNo, debit: 0, credit: amount, balance: cust.outstanding, narration: payment.remarks });
         localStorage.setItem('customerLedger', JSON.stringify(ledger));
-        alert(`Receipt ${receiptNo} saved!`);
+        alert(`Receipt ${receiptNo} saved`);
         clearForm();
-        loadReceipts();
+        refreshDisplay();
     }
 
     function clearForm() {
         document.getElementById('customerSelect').value = '';
-        document.getElementById('customerEmailDirect').value = '';
         document.getElementById('amount').value = '';
         document.getElementById('reference').value = '';
         document.getElementById('remarks').value = '';
         document.getElementById('paymentDate').value = new Date().toISOString().slice(0,10);
     }
 
-    function displayReceipts(filter = '') {
-        let filtered = receipts;
-        if (filter) {
-            const term = filter.toLowerCase();
-            filtered = receipts.filter(r => {
-                const cust = customers.find(c => c.email === r.customerEmail);
-                return r.receiptNo.toLowerCase().includes(term) ||
-                       (cust && (cust.name.toLowerCase().includes(term))) ||
-                       (r.reference && r.reference.toLowerCase().includes(term));
-            });
-        }
-        if (filtered.length === 0) {
-            document.getElementById('receiptsTable').innerHTML = '<p>No receipts found. Add one above.</p>';
-            return;
-        }
-        filtered.sort((a,b) => b.receiptNo.localeCompare(a.receiptNo));
-        let html = '<table><thead>
-            <th>#</th><th>Receipt No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Mode</th><th>Reference</th><th>Actions</th>
-        </tr></thead><tbody>';
-        filtered.forEach((r, idx) => {
-            const cust = customers.find(c => c.email === r.customerEmail);
-            const customerName = cust ? cust.name : r.customerEmail;
-            html += `<tr>
-                <td>${idx+1}</td>
-                <td><strong>${escapeHtml(r.receiptNo)}</strong></td>
-                <td>${r.date}</td>
-                <td>${escapeHtml(customerName)}</strong></td>
-                <td>₹${r.amount.toFixed(2)}</strong></td>
-                <td>${r.mode || 'Cash'}</td>
-                <td>${escapeHtml(r.reference || '-')}</td>
-                <td>
-                    <button class="btn-pdf" onclick="generatePDF('${r.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
-                    <button class="btn-edit" onclick="editReceipt('${r.id}')"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn-delete" onclick="deleteReceipt('${r.id}')"><i class="fas fa-trash"></i> Delete</button>
-                 </strong></td>
-            </tr>`;
-        });
-        html += '</tbody></td>';
-        document.getElementById('receiptsTable').innerHTML = html;
+    function refreshDisplay() {
+        loadAllReceipts();
+        loadCustomers();
+        displayReceipts();
     }
 
-    function generatePDF(paymentId) {
-        const payment = receipts.find(p => p.id == paymentId);
-        if (!payment) return;
-        const customer = customers.find(c => c.email === payment.customerEmail);
-        if (!customer) return;
-        const div = document.createElement('div');
-        div.style.padding = '20px';
-        div.style.fontFamily = 'Roboto, sans-serif';
-        div.innerHTML = `
-            <div style="text-align:center;"><h2>Auto Spares Solution</h2><p>GSTIN: 19ANOPD3300R1ZO</p></div>
-            <h3>Payment Receipt</h3>
-            <p>Receipt No: ${payment.receiptNo}<br>Date: ${payment.date}<br>Customer: ${customer.name}<br>Amount: ₹${payment.amount.toFixed(2)}<br>Mode: ${payment.mode}<br>Ref: ${payment.reference}<br>Remarks: ${payment.remarks}</p>
-        `;
-        html2pdf().set({ margin: 0.2, filename: `Receipt_${payment.receiptNo}.pdf` }).from(div).save();
+    function migrateAndLoadAll() {
+        refreshDisplay();
+        alert("Migration complete. All old receipts loaded and given sequential numbers.");
     }
 
-    function editReceipt(id) {
-        localStorage.setItem('editPaymentId', id);
-        window.open('edit-payment-receipt.html', '_blank');
+    // ========== Edit functions ==========
+    function openEditModal(id) {
+        let r = receipts.find(r => r.id == id);
+        if (!r) return;
+        document.getElementById('editId').value = r.id;
+        document.getElementById('editReceiptNo').value = r.receiptNo;
+        document.getElementById('editCustomerEmail').value = r.customerEmail;
+        document.getElementById('editDate').value = r.date;
+        document.getElementById('editAmount').value = r.amount;
+        document.getElementById('editMode').value = r.mode;
+        document.getElementById('editReference').value = r.reference;
+        document.getElementById('editRemarks').value = r.remarks;
+        document.getElementById('editModal').style.display = 'block';
     }
-
-    function deleteReceipt(id) {
-        if (!confirm('Delete this receipt? Outstanding will be restored.')) return;
-        const payment = receipts.find(p => p.id == id);
-        if (!payment) return;
-        let customer = customers.find(c => c.email === payment.customerEmail);
-        if (customer) {
-            customer.outstanding = (customer.outstanding || 0) + payment.amount;
-            localStorage.setItem('customers', JSON.stringify(customers));
+    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+    function saveEdit() {
+        let id = document.getElementById('editId').value;
+        let idx = receipts.findIndex(r => r.id == id);
+        if (idx === -1) return;
+        let old = receipts[idx];
+        let newAmount = parseFloat(document.getElementById('editAmount').value);
+        if (isNaN(newAmount) || newAmount <= 0) { alert('Invalid amount'); return; }
+        let newDate = document.getElementById('editDate').value;
+        let newMode = document.getElementById('editMode').value;
+        let newRef = document.getElementById('editReference').value.trim() || 'N/A';
+        let newRemarks = document.getElementById('editRemarks').value;
+        let amountDiff = old.amount - newAmount;
+        if (amountDiff !== 0) {
+            let cust = customers.find(c => c.email === old.customerEmail);
+            if (cust) {
+                cust.outstanding += amountDiff;
+                if (cust.outstanding < 0) cust.outstanding = 0;
+                localStorage.setItem('customers', JSON.stringify(customers));
+            }
         }
-        receipts = receipts.filter(p => p.id != id);
+        old.date = newDate;
+        old.amount = newAmount;
+        old.mode = newMode;
+        old.reference = newRef;
+        old.remarks = newRemarks;
         localStorage.setItem('customerPayments', JSON.stringify(receipts));
-        // Remove from ledger
+        // Update ledger
         let ledger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
-        ledger = ledger.filter(l => l.ref !== payment.receiptNo || l.type !== 'payment');
-        localStorage.setItem('customerLedger', JSON.stringify(ledger));
-        alert('Receipt deleted');
-        loadReceipts();
+        let ledgerEntry = ledger.find(l => l.ref === old.receiptNo && l.type === 'payment');
+        if (ledgerEntry) {
+            ledgerEntry.credit = newAmount;
+            let cust = customers.find(c => c.email === old.customerEmail);
+            ledgerEntry.balance = cust ? cust.outstanding : 0;
+            ledgerEntry.narration = newRemarks || 'Payment edited';
+            localStorage.setItem('customerLedger', JSON.stringify(ledger));
+        }
+        alert('Receipt updated');
+        closeEditModal();
+        refreshDisplay();
     }
 
+    // ========== PDF generation – EXACT format as your provided code ==========
+    function generateReceiptPDF(paymentId) {
+        const payment = receipts.find(p => p.id == paymentId);
+        if (!payment) { alert('Payment not found'); return; }
+        const customer = customers.find(c => c.email === payment.customerEmail);
+        if (!customer) { alert('Customer not found'); return; }
+
+        const receiptDiv = document.createElement('div');
+        receiptDiv.style.maxWidth = '800px';
+        receiptDiv.style.margin = '0 auto';
+        receiptDiv.style.backgroundColor = 'white';
+        receiptDiv.style.padding = '20px';
+        receiptDiv.style.fontFamily = 'Roboto, sans-serif';
+        receiptDiv.style.border = '1px solid #ccc';
+        receiptDiv.innerHTML = `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
+                    <img src="images/ASS.jpg" alt="Logo" style="height: 60px;" onerror="this.style.display='none'">
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold; color: #0a7c71;">Auto Spares Solution</div>
+                        <div>GSTIN: 19ANOPD3300R1ZO</div>
+                        <div>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</div>
+                    </div>
+                </div>
+                <h2 style="margin-top: 15px;">PAYMENT RECEIPT</h2>
+                <p>Receipt No: ${payment.receiptNo}</p>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h3>Customer Details</h3>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Name:</div><div>${escapeHtml(customer.name)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Email:</div><div>${escapeHtml(customer.email)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Phone:</div><div>${escapeHtml(customer.phone)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Address:</div><div>${escapeHtml(customer.address || '')}</div></div>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h3>Payment Details</h3>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Date:</div><div>${payment.date}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Amount:</div><div>₹${payment.amount.toFixed(2)}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Mode:</div><div>${payment.mode || 'Cash'}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Reference:</div><div>${escapeHtml(payment.reference || '-')}</div></div>
+                <div style="display: flex; margin-bottom: 5px;"><div style="width: 120px; font-weight: bold;">Remarks:</div><div>${escapeHtml(payment.remarks || '-')}</div></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                <div style="text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px;">Customer Signature</div>
+                <div style="text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px;">For Auto Spares Solution</div>
+            </div>
+            <div style="font-size: 10px; text-align: center; margin-top: 20px; color: #777;">
+                This is a computer generated receipt. Valid with stamp & signature.<br>Thank you for your business!
+            </div>
+        `;
+        const opt = {
+            margin: [0.2, 0.2, 0.2, 0.2],
+            filename: `Payment_Receipt_${payment.receiptNo}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(receiptDiv).save();
+    }
+
+    // ========== Search, export, helpers ==========
     function filterReceipts() { displayReceipts(document.getElementById('searchInput').value.toLowerCase()); }
     function exportToCSV() {
+        if (!receipts.length) return;
         let csv = "Receipt No,Date,Customer Email,Amount,Mode,Reference,Remarks\n";
-        receipts.forEach(r => {
-            csv += `"${r.receiptNo}",${r.date},"${r.customerEmail}",${r.amount},"${r.mode}","${r.reference}","${r.remarks}"\n`;
-        });
-        const blob = new Blob([csv], {type:'text/csv'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'receipts.csv'; a.click();
+        receipts.forEach(r => csv += `"${r.receiptNo}",${r.date},"${r.customerEmail}",${r.amount},"${r.mode}","${r.reference}","${r.remarks}"\n`);
+        let blob = new Blob([csv], {type:'text/csv'});
+        let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'payment_receipts.csv'; a.click(); URL.revokeObjectURL(blob);
     }
-    function escapeHtml(s) { return s.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function showAddCustomerModal() { document.getElementById('addCustomerModal').style.display = 'block'; }
+    function closeAddCustomerModal() { document.getElementById('addCustomerModal').style.display = 'none'; }
+    function saveNewCustomer() {
+        let name = document.getElementById('newName').value.trim(), email = document.getElementById('newEmail').value.trim();
+        if (!name || !email) { alert('Name and Email required'); return; }
+        if (customers.find(c => c.email === email)) { alert('Email exists'); return; }
+        let newCust = { id: Date.now(), name, email, phone: document.getElementById('newPhone').value, address: '', gstin: '', state: '', creditLimit: 50000, outstanding: 0, totalPurchased: 0, status: 'active', customerCode: 'CUST' + (customers.length+1).toString().padStart(4,'0'), createdAt: new Date().toISOString() };
+        customers.push(newCust);
+        localStorage.setItem('customers', JSON.stringify(customers));
+        populateCustomerDropdown();
+        closeAddCustomerModal();
+        alert('Customer added');
+    }
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
+    // Initialization
     document.getElementById('paymentDate').value = new Date().toISOString().slice(0,10);
-    loadReceipts();
+    refreshDisplay();
 </script>
 </body>
-</html>
+    </html>
