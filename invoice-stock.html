@@ -336,6 +336,46 @@
 </div>
 
 <script>
+    // ========== LOAD FROM QUOTATION CONVERSION ==========
+(function loadQuotationData() {
+    const pending = localStorage.getItem('pendingQuotationConversion');
+    if (pending) {
+        try {
+            const data = JSON.parse(pending);
+            if (data.source === 'quotation') {
+                // Set invoice type radio
+                if (data.invoiceType === 'credit') {
+                    document.querySelector('input[name="invoiceType"][value="credit"]').checked = true;
+                    document.getElementById('creditFields').style.display = 'flex';
+                } else {
+                    document.querySelector('input[name="invoiceType"][value="cash"]').checked = true;
+                    document.getElementById('creditFields').style.display = 'none';
+                }
+                // Fill customer details
+                document.getElementById('buyerName').value = data.customer.name || '';
+                document.getElementById('buyerEmail').value = data.customer.email || '';
+                document.getElementById('buyerPhone').value = data.customer.phone || '';
+                document.getElementById('buyerAddress').value = data.customer.address || '';
+                document.getElementById('buyerGstin').value = data.customer.gstin || '';
+                document.getElementById('buyerState').value = data.customer.state || '';
+                // Fill cart items (invoiceCart)
+                const cartItems = data.items.map(item => ({
+                    part: item.part,
+                    desc: item.desc,
+                    hsn: item.hsn,
+                    qty: item.qty,
+                    price: item.price,
+                    discount: item.discount
+                }));
+                localStorage.setItem('invoiceCart', JSON.stringify(cartItems));
+                // Show a message and reload to render
+                alert(`Quotation ${data.quotationNo} loaded. Please review and click "Save Invoice".`);
+                localStorage.removeItem('pendingQuotationConversion');
+                window.location.reload();
+            }
+        } catch(e) { console.error('Error loading quotation:', e); }
+    }
+})();
     // ========== DATA FROM localStorage ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
     cart = cart.map(i => ({ ...i, hsn: i.hsn || '' }));
