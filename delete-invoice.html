@@ -12,11 +12,13 @@
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
         th { background: #0a7c71; color: white; }
-        .delete-btn { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .delete-btn { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
         .tab { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
         .tab button { background-color: #f1f1f1; float: left; border: none; outline: none; cursor: pointer; padding: 10px 16px; margin-right: 5px; }
         .tab button.active { background-color: #0a7c71; color: white; }
         .tabcontent { display: none; }
+        .success { color: green; margin: 10px 0; }
+        .error { color: red; margin: 10px 0; }
     </style>
     <script src="data-manager.js"></script>
 </head>
@@ -36,7 +38,31 @@
         <div id="purchaseTable"></div>
     </div>
 </div>
+
 <script>
+    // Helper functions to safely get/set localStorage data
+    function getSalesInvoices() { return JSON.parse(localStorage.getItem('salesInvoices') || '[]'); }
+    function saveSalesInvoices(invoices) { localStorage.setItem('salesInvoices', JSON.stringify(invoices)); }
+    function getAllInvoices() { return JSON.parse(localStorage.getItem('allInvoices') || '[]'); }
+    function saveAllInvoices(invoices) { localStorage.setItem('allInvoices', JSON.stringify(invoices)); }
+    function getCustomers() { return JSON.parse(localStorage.getItem('customers') || '[]'); }
+    function saveCustomers(customers) { localStorage.setItem('customers', JSON.stringify(customers)); }
+    function getCustomerLedger() { return JSON.parse(localStorage.getItem('customerLedger') || '[]'); }
+    function saveCustomerLedger(ledger) { localStorage.setItem('customerLedger', JSON.stringify(ledger)); }
+    function getInventoryTransactions() { return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]'); }
+    function saveInventoryTransactions(trans) { localStorage.setItem('inventoryTransactions', JSON.stringify(trans)); }
+
+    // Products functions (from data-manager.js, but define fallbacks)
+    function getProducts() {
+        if (typeof window.getProducts === 'function') return window.getProducts();
+        return JSON.parse(localStorage.getItem('products') || '[]');
+    }
+    function saveProducts(products) {
+        if (typeof window.saveProducts === 'function') window.saveProducts(products);
+        else localStorage.setItem('products', JSON.stringify(products));
+    }
+
+    // Tab switching
     function openTab(evt, tabName) {
         document.querySelectorAll('.tabcontent').forEach(div => div.style.display = 'none');
         document.querySelectorAll('.tablinks').forEach(btn => btn.classList.remove('active'));
@@ -45,70 +71,169 @@
         if (tabName === 'Sales') loadSalesInvoices();
         else loadPurchaseInvoices();
     }
+
+    // Load and display sales invoices
     function loadSalesInvoices() {
-        const invoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        if (invoices.length === 0) { document.getElementById('salesTable').innerHTML = '<p>No sales invoices.</p>'; return; }
-        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        const invoices = getSalesInvoices();
+        if (invoices.length === 0) {
+            document.getElementById('salesTable').innerHTML = '<p>No sales invoices found.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
         invoices.forEach(inv => {
             html += `<tr>
-                <td>${inv.invoiceNo}</td><td>${inv.date}</td><td>${inv.customerEmail}</td><td>₹${inv.total.toLocaleString()}</td>
+                <td>${escapeHtml(inv.invoiceNo)}</td>
+                <td>${inv.date}</td>
+                <td>${escapeHtml(inv.customerEmail)}</td>
+                <td>₹${inv.total.toLocaleString()}</td>
                 <td><button class="delete-btn" onclick="deleteSalesInvoice('${inv.id}')">Delete & Reverse</button></td>
             </tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('salesTable').innerHTML = html;
     }
+
+    // Delete sales invoice and reverse all effects
+    window.deleteSalesInvoice = async function(invoiceId) {
+        if (!confirm('Delete this sales invoice? Stock will be added back, customer outstanding reduced.')) return;
+
+        try {
+            let invoices = getSalesInvoices();
+            const invoice = invoices.find(inv => inv.id == invoiceId);
+            if (!invoice) {
+                alert('Invoice not found.');
+                return;
+            }
+
+            // 1. Reverse stock: add back quantities to products
+            let products = getProducts();
+            for (let item of invoice.items) {
+                let prod = products.find(p => p.id == item.productId || p.sku == item.productId);
+                if (prod) {
+                    prod.currentStock = (prod.currentStock || 0) + item.quantity;
+                } else {
+                    console.warn(`Product ${item.productId} not found for stock reversal`);
+                }
+            }
+            saveProducts(products);
+
+            // 2. Remove inventory transactions linked to this invoice
+            let invTransactions = getInventoryTransactions();
+            invTransactions = invTransactions.filter(t => t.ref !== invoice.invoiceNo && t.ref !== `INV-${invoice.id}`);
+            saveInventoryTransactions(invTransactions);
+
+            // 3. Update customer outstanding: subtract invoice total
+            let customers = getCustomers();
+            const customer = customers.find(c => c.email === invoice.customerEmail);
+            if (customer) {
+                customer.outstanding = (customer.outstanding || 0) - invoice.total;
+                if (customer.outstanding < 0) customer.outstanding = 0;
+                saveCustomers(customers);
+
+                // 4. Update customer ledger: add a reversal entry (credit)
+                let ledger = getCustomerLedger();
+                ledger.push({
+                    id: Date.now(),
+                    customerEmail: invoice.customerEmail,
+                    date: new Date().toISOString().slice(0,10),
+                    type: 'reversal',
+                    ref: `DEL-${invoice.invoiceNo}`,
+                    debit: 0,
+                    credit: invoice.total,
+                    balance: customer.outstanding,
+                    note: `Reversal of invoice ${invoice.invoiceNo}`
+                });
+                saveCustomerLedger(ledger);
+            }
+
+            // 5. Remove invoice from salesInvoices
+            const remainingInvoices = invoices.filter(inv => inv.id != invoiceId);
+            saveSalesInvoices(remainingInvoices);
+
+            // 6. Also remove from allInvoices if present
+            let allInv = getAllInvoices();
+            allInv = allInv.filter(inv => inv.id != invoiceId && inv.invoiceNo !== invoice.invoiceNo);
+            saveAllInvoices(allInv);
+
+            alert('Sales invoice deleted and all effects reversed successfully.');
+            loadSalesInvoices(); // refresh table
+        } catch (err) {
+            console.error(err);
+            alert('Error during deletion: ' + err.message);
+        }
+    };
+
+    // Purchase invoice deletion (reverse stock & supplier outstanding)
     function loadPurchaseInvoices() {
         const invoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-        if (invoices.length === 0) { document.getElementById('purchaseTable').innerHTML = '<p>No purchase invoices.</p>'; return; }
-        let html = '<td><thead><tr><th>PO No</th><th>Date</th><th>Supplier</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        if (invoices.length === 0) {
+            document.getElementById('purchaseTable').innerHTML = '<p>No purchase invoices found.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>PO No</th><th>Date</th><th>Supplier Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
         invoices.forEach(inv => {
             html += `<tr>
-                <td>${inv.poNo}</td><td>${inv.date}</td><td>${inv.supplierEmail}</td><td>₹${inv.total.toLocaleString()}</td>
+                <td>${escapeHtml(inv.poNo)}</td>
+                <td>${inv.date}</td>
+                <td>${escapeHtml(inv.supplierEmail)}</td>
+                <td>₹${inv.total.toLocaleString()}</td>
                 <td><button class="delete-btn" onclick="deletePurchaseInvoice('${inv.id}')">Delete & Reverse</button></td>
             </tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('purchaseTable').innerHTML = html;
     }
-    function deleteSalesInvoice(id) {
-        if (!confirm('Delete this sales invoice? Stock will be added back, customer outstanding reduced.')) return;
-        try {
-            const result = deleteSalesInvoice(id); // from data-manager.js
-            if (result) alert('Invoice deleted and reversed.');
-            else alert('Failed to delete invoice.');
-            loadSalesInvoices();
-        } catch(e) { alert('Error: ' + e.message); }
-    }
-    function deletePurchaseInvoice(id) {
+
+    window.deletePurchaseInvoice = function(invoiceId) {
         if (!confirm('Delete this purchase invoice? Stock will be reduced, supplier outstanding reduced.')) return;
+
         try {
-            const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-            const invoice = purchaseInvoices.find(i => i.id == id);
-            if (!invoice) { alert('Invoice not found'); return; }
-            // Reverse stock
+            let purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+            const invoice = purchaseInvoices.find(inv => inv.id == invoiceId);
+            if (!invoice) {
+                alert('Invoice not found');
+                return;
+            }
+
+            // Reverse stock: Subtract quantities (because purchase originally added stock)
             let products = getProducts();
             for (let item of invoice.items) {
-                let product = products.find(p => p.id == item.productId);
-                if (product) product.currentStock -= item.quantity;
+                let prod = products.find(p => p.id == item.productId || p.sku == item.productId);
+                if (prod) {
+                    prod.currentStock = (prod.currentStock || 0) - item.quantity;
+                    if (prod.currentStock < 0) prod.currentStock = 0;
+                } else {
+                    console.warn(`Product ${item.productId} not found for stock reversal`);
+                }
             }
             saveProducts(products);
-            // Remove invoice
-            const remaining = purchaseInvoices.filter(i => i.id != id);
-            localStorage.setItem('purchaseInvoices', JSON.stringify(remaining));
-            // Reverse supplier outstanding (using paySupplier? simpler: directly update)
+
+            // Update supplier outstanding: subtract invoice total
             let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
             let supplier = suppliers.find(s => s.email === invoice.supplierEmail);
             if (supplier) {
-                supplier.outstanding -= invoice.total;
+                supplier.outstanding = (supplier.outstanding || 0) - invoice.total;
                 if (supplier.outstanding < 0) supplier.outstanding = 0;
                 localStorage.setItem('suppliers', JSON.stringify(suppliers));
             }
+
+            // Remove the purchase invoice
+            const remaining = purchaseInvoices.filter(inv => inv.id != invoiceId);
+            localStorage.setItem('purchaseInvoices', JSON.stringify(remaining));
+
             alert('Purchase invoice deleted and stock reverted.');
             loadPurchaseInvoices();
-        } catch(e) { alert('Error: ' + e.message); }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
     }
-    // Load initial view
+
+    // Initial load
     loadSalesInvoices();
 </script>
 </body>
