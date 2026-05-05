@@ -305,7 +305,7 @@
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <td><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
@@ -336,47 +336,77 @@
 </div>
 
 <script>
-    // ========== LOAD FROM QUOTATION CONVERSION ==========
-(function loadQuotationData() {
-    const pending = localStorage.getItem('pendingQuotationConversion');
-    if (pending) {
+    // ========== SINGLE QUOTATION LOADER - RUNS FIRST, NO PAGE RELOAD ==========
+    (function() {
+        const pending = localStorage.getItem('pendingQuotationConversion');
+        if (!pending) return;
+        
         try {
             const data = JSON.parse(pending);
-            if (data.source === 'quotation') {
-                // Set invoice type radio
+            if (data.source !== 'quotation') return;
+
+            // Wait for DOM to be ready
+            function applyQuotationData() {
+                // 1. Set invoice type radio
+                const cashRadio = document.querySelector('input[name="invoiceType"][value="cash"]');
+                const creditRadio = document.querySelector('input[name="invoiceType"][value="credit"]');
+                const creditDiv = document.getElementById('creditFields');
                 if (data.invoiceType === 'credit') {
-                    document.querySelector('input[name="invoiceType"][value="credit"]').checked = true;
-                    document.getElementById('creditFields').style.display = 'flex';
+                    if (creditRadio) creditRadio.checked = true;
+                    if (creditDiv) creditDiv.style.display = 'flex';
                 } else {
-                    document.querySelector('input[name="invoiceType"][value="cash"]').checked = true;
-                    document.getElementById('creditFields').style.display = 'none';
+                    if (cashRadio) cashRadio.checked = true;
+                    if (creditDiv) creditDiv.style.display = 'none';
                 }
-                // Fill customer details
-                document.getElementById('buyerName').value = data.customer.name || '';
-                document.getElementById('buyerEmail').value = data.customer.email || '';
-                document.getElementById('buyerPhone').value = data.customer.phone || '';
-                document.getElementById('buyerAddress').value = data.customer.address || '';
-                document.getElementById('buyerGstin').value = data.customer.gstin || '';
-                document.getElementById('buyerState').value = data.customer.state || '';
-                // Fill cart items (invoiceCart)
+
+                // 2. Fill customer fields
+                const customerMap = {
+                    buyerName: data.customer.name,
+                    buyerEmail: data.customer.email,
+                    buyerPhone: data.customer.phone,
+                    buyerAddress: data.customer.address,
+                    buyerGstin: data.customer.gstin,
+                    buyerState: data.customer.state
+                };
+                for (const [id, val] of Object.entries(customerMap)) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = val || '';
+                }
+
+                // 3. Convert items to cart format and store in localStorage
                 const cartItems = data.items.map(item => ({
                     part: item.part,
                     desc: item.desc,
-                    hsn: item.hsn,
+                    hsn: item.hsn || '',
                     qty: item.qty,
                     price: item.price,
-                    discount: item.discount
+                    discount: item.discount || 0
                 }));
                 localStorage.setItem('invoiceCart', JSON.stringify(cartItems));
-                // Show a message and reload to render
-                alert(`Quotation ${data.quotationNo} loaded. Please review and click "Save Invoice".`);
+
+                // 4. Remove the pending data so it doesn't load again
                 localStorage.removeItem('pendingQuotationConversion');
-                window.location.reload();
+
+                // 5. Show a success message (optional)
+                alert(`Quotation ${data.quotationNo} loaded. Please review and click "Save Invoice".`);
+
+                // 6. Reload the page? No! Instead, let the normal script run.
+                //    The page will now read the updated invoiceCart and render correctly.
+                //    We do NOT reload to avoid infinite loops.
             }
-        } catch(e) { console.error('Error loading quotation:', e); }
-    }
-})();
-    // ========== DATA FROM localStorage ==========
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', applyQuotationData);
+            } else {
+                applyQuotationData();
+            }
+        } catch(e) {
+            console.error('Quotation loader error:', e);
+            localStorage.removeItem('pendingQuotationConversion');
+        }
+    })();
+
+    // ========== NORMAL INVOICE SCRIPT ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
     cart = cart.map(i => ({ ...i, hsn: i.hsn || '' }));
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
@@ -552,17 +582,17 @@
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             itemsHtml += `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
                 <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td style="text-align:center;">${item.qty}</strong></td>
-                <td style="text-align:right;">₹${item.price.toFixed(2)}</strong></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
-                <td style="text-align:center;">18%</strong></td>
-                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
+                <td style="text-align:center;">${item.qty}</td>
+                <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="text-align:center;">18%</td>
+                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
@@ -578,12 +608,12 @@
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -899,90 +929,5 @@
         window.createSalesInvoice = originalCreateSalesInvoice;
     });
 </script>
-    <script>
-(function() {
-    const pending = localStorage.getItem('pendingQuotationConversion');
-    if (!pending) return;
-    
-    try {
-        const data = JSON.parse(pending);
-        if (data.source !== 'quotation') return;
-
-        // Wait for the DOM to be fully loaded
-        function fillData() {
-            // Set invoice type
-            const cashRadio = document.querySelector('input[name="invoiceType"][value="cash"]');
-            const creditRadio = document.querySelector('input[name="invoiceType"][value="credit"]');
-            const creditFields = document.getElementById('creditFields');
-            if (data.invoiceType === 'credit') {
-                if (creditRadio) creditRadio.checked = true;
-                if (creditFields) creditFields.style.display = 'flex';
-            } else {
-                if (cashRadio) cashRadio.checked = true;
-                if (creditFields) creditFields.style.display = 'none';
-            }
-
-            // Fill customer details
-            const buyerFields = {
-                buyerName: data.customer.name,
-                buyerEmail: data.customer.email,
-                buyerPhone: data.customer.phone,
-                buyerAddress: data.customer.address,
-                buyerGstin: data.customer.gstin,
-                buyerState: data.customer.state
-            };
-            for (const [id, value] of Object.entries(buyerFields)) {
-                const el = document.getElementById(id);
-                if (el) el.value = value || '';
-            }
-
-            // Save items to invoiceCart and trigger render
-            const cartItems = data.items.map(item => ({
-                part: item.part,
-                desc: item.desc,
-                hsn: item.hsn || '',
-                qty: item.qty,
-                price: item.price,
-                discount: item.discount || 0
-            }));
-            localStorage.setItem('invoiceCart', JSON.stringify(cartItems));
-
-            // Re‑initialize the cart in the page's existing variable (if accessible)
-            if (typeof cart !== 'undefined') {
-                window.cart = cartItems;
-            }
-
-            // Force re‑render of items and totals if functions exist
-            if (typeof renderItemsAndTaxSummary === 'function') {
-                renderItemsAndTaxSummary();
-            }
-            if (typeof updateGstDisplay === 'function') {
-                updateGstDisplay();
-            }
-            if (typeof updateInvoiceNumberDisplay === 'function') {
-                updateInvoiceNumberDisplay();
-            }
-            if (typeof updateDueDate === 'function') {
-                updateDueDate();
-            }
-
-            // Show a confirmation (optional)
-            alert(`Quotation ${data.quotationNo} loaded. Please review and click "Save Invoice".`);
-            
-            // Clear the pending data so it doesn't load again on refresh
-            localStorage.removeItem('pendingQuotationConversion');
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', fillData);
-        } else {
-            fillData();
-        }
-    } catch(e) {
-        console.error('Failed to load quotation:', e);
-        localStorage.removeItem('pendingQuotationConversion');
-    }
-})();
-    </script>
 </body>
     </html>
