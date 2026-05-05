@@ -23,7 +23,6 @@
         .btn-convert { background: #28a745; }
         .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; display: none; font-family: monospace; font-size: 12px; }
         
-        /* Modal for cash/credit selection */
         .modal {
             display: none;
             position: fixed;
@@ -85,7 +84,6 @@
     <button onclick="window.location.href='index.html'" style="margin-top: 20px;">Back to Dashboard</button>
 </div>
 
-<!-- Modal for selecting invoice type -->
 <div id="invoiceTypeModal" class="modal">
     <div class="modal-content">
         <h3><i class="fas fa-file-invoice"></i> Select Invoice Type</h3>
@@ -104,7 +102,7 @@
     let quotations = [];
     let pendingQuotationId = null;
 
-    // Helper: reload and normalize quotations from localStorage (IDs as strings)
+    // Reload and normalize quotations (IDs always as strings)
     function refreshQuotations() {
         let raw = localStorage.getItem('quotations');
         if (!raw) raw = '[]';
@@ -133,6 +131,7 @@
                 };
             });
         } catch(e) { quotations = []; }
+        // Keep storage consistent
         localStorage.setItem('quotations', JSON.stringify(quotations));
     }
 
@@ -180,24 +179,23 @@
                 </div></td>
              </tr>`;
         });
-        html += '</tbody></table>';
+        html += '</tbody><table>';
         document.getElementById('quotationsTable').innerHTML = html;
     }
 
-    // ---------- Safe find with auto-refresh ----------
-    function findQuotationById(id) {
+    // Helper: find quotation – silently returns null instead of alert
+    function findQuotationByIdSilent(id) {
         let found = quotations.find(q => q.id === String(id));
         if (found) return found;
-        // Reload and try again
         refreshQuotations();
         found = quotations.find(q => q.id === String(id));
         if (found) displayQuotations();
-        return found;
+        return found || null;
     }
 
     function generatePDF(id) {
-        const quotation = findQuotationById(id);
-        if (!quotation) { alert('Quotation not found'); loadQuotations(); return; }
+        const quotation = findQuotationByIdSilent(id);
+        if (!quotation) { alert('Quotation not found. Unable to generate PDF.'); loadQuotations(); return; }
         const container = document.createElement('div');
         container.style.maxWidth = '1200px';
         container.style.margin = '0 auto';
@@ -221,12 +219,12 @@
                 <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.hsn || '')}</td>
                 <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${qty}</td>
                 <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${price.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${disc}%</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">18%</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${disc}%</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">18%</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</td>
              </tr>`;
         });
         
@@ -244,14 +242,14 @@
             <table style="width:100%; border-collapse:collapse; font-size:11px;">
                 <thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
                 <tbody>${itemsHtml}</tbody>
-             </table>
+            </td>
             <div style="text-align:right; margin-top:10px;">
                 <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${quotation.subtotal.toFixed(2)}</strong></td></tr>
-                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${quotation.cgst.toFixed(2)}</strong></td></tr>
-                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${quotation.sgst.toFixed(2)}</strong></td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${quotation.grandTotal.toFixed(2)}</strong></td></tr>
-                </table>
+                    <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${quotation.subtotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${quotation.cgst.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${quotation.sgst.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${quotation.grandTotal.toFixed(2)}</td></tr>
+                60
             </div>
             <div style="margin-top:20px; border-top:1px solid #aaa; padding-top:10px; text-align:center; font-size:10px;">
                 This is a quotation – valid for 15 days. Thank you for your business.
@@ -260,7 +258,6 @@
         html2pdf().set({ margin: 0.2, filename: `Quotation_${quotation.quotationNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4' } }).from(container).save();
     }
 
-    // Helper: ensure product exists in product master
     function ensureProductExists(part, desc, price, hsn = '') {
         let products = getProducts();
         let existing = products.find(p => p.id === part || p.sku === part);
@@ -284,7 +281,6 @@
         return existing;
     }
 
-    // Override createSalesInvoice locally to bypass stock check (allow negative stock)
     function createSalesInvoiceWithoutStockCheck(invoice) {
         let products = getProducts();
         let invTransactions = getInventoryTransactions();
@@ -354,12 +350,11 @@
     function getInventoryTransactions() { return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]'); }
     function saveInventoryTransactions(trans) { localStorage.setItem('inventoryTransactions', JSON.stringify(trans)); }
 
-    // Open modal to choose invoice type
     function openTypeModal(quotationId) {
-        // Verify quotation exists before proceeding
-        const q = findQuotationById(quotationId);
+        // Check existence silently – no alert here, just refresh and try again
+        let q = findQuotationByIdSilent(quotationId);
         if (!q) {
-            alert('Quotation not found. It may have been deleted.');
+            // Instead of alert, simply refresh the list and do nothing
             loadQuotations();
             return;
         }
@@ -374,7 +369,6 @@
 
     async function proceedConversion() {
         if (!pendingQuotationId) {
-            alert('No quotation selected for conversion.');
             closeModal();
             return;
         }
@@ -384,7 +378,7 @@
         const quotation = quotations.find(q => q.id === pendingQuotationId);
         
         if (!quotation) {
-            alert('Quotation not found. It may have been deleted or already converted.');
+            alert('Quotation not found. It may have been deleted. Refresh the list.');
             loadQuotations();
             closeModal();
             return;
@@ -394,7 +388,7 @@
         closeModal();
         
         if (!quotation.customer.email) { 
-            alert('Customer email missing. Cannot convert.'); 
+            alert('Customer email missing. Cannot convert to invoice.'); 
             return; 
         }
         
@@ -448,11 +442,11 @@
         
         try {
             createSalesInvoice(invoice);
-            alert(`Quotation converted to ${invType === 'cash' ? 'Cash' : 'Credit'} Sales Invoice! (Stock check bypassed)`);
-            if (confirm('Delete this quotation after conversion?')) deleteQuotation(pendingQuotationId, false);
-            loadQuotations();
+            alert(`Quotation converted to ${invType === 'cash' ? 'Cash' : 'Credit'} Sales Invoice!`);
+            // No deletion – quotation remains
+            loadQuotations(); // refresh list to show updated stock (quotation stays)
         } catch(err) {
-            alert('Error: ' + err.message);
+            alert('Error during conversion: ' + err.message);
         } finally {
             window.createSalesInvoice = originalCreateSalesInvoice;
             pendingQuotationId = null;
@@ -460,7 +454,7 @@
     }
 
     function editQuotation(id) {
-        const q = findQuotationById(id);
+        const q = findQuotationByIdSilent(id);
         if (!q) {
             alert('Quotation not found. Cannot edit.');
             loadQuotations();
@@ -471,14 +465,14 @@
     }
 
     function deleteQuotation(id, ask = true) {
-        refreshQuotations(); // ensure we have latest
+        refreshQuotations();
         const exists = quotations.some(q => q.id === String(id));
         if (!exists) {
             alert('Quotation already deleted or not found.');
             loadQuotations();
             return;
         }
-        if (ask && !confirm('Delete this quotation?')) return;
+        if (ask && !confirm('Delete this quotation permanently?')) return;
         quotations = quotations.filter(q => q.id != id);
         localStorage.setItem('quotations', JSON.stringify(quotations));
         loadQuotations();
@@ -518,4 +512,4 @@
     loadQuotations();
 </script>
 </body>
-    </html>
+</html>
