@@ -104,37 +104,40 @@
     let quotations = [];
     let pendingQuotationId = null;
 
-    function loadQuotations() {
+    // Helper: reload and normalize quotations from localStorage (IDs as strings)
+    function refreshQuotations() {
         let raw = localStorage.getItem('quotations');
         if (!raw) raw = '[]';
         try {
-            quotations = JSON.parse(raw);
+            let parsed = JSON.parse(raw);
+            quotations = parsed.map(q => {
+                let customer = q.customer || {};
+                if (!customer.name && q.customerName) customer.name = q.customerName;
+                if (!customer.email && q.customerEmail) customer.email = q.customerEmail;
+                if (!customer.phone && q.customerPhone) customer.phone = q.customerPhone;
+                if (!customer.address && q.customerAddress) customer.address = q.customerAddress;
+                if (!customer.gstin && q.customerGstin) customer.gstin = q.customerGstin;
+                if (!customer.state && q.customerState) customer.state = q.customerState;
+                
+                return {
+                    id: String(q.id || q.quotationId || Date.now()),
+                    quotationNo: q.quotationNo || q.invoiceNo || 'N/A',
+                    date: q.date || (q.createdAt ? q.createdAt.slice(0,10) : 'N/A'),
+                    validUntil: q.validUntil || q.validTill || '',
+                    customer: customer,
+                    items: q.items || [],
+                    subtotal: q.subtotal || 0,
+                    cgst: q.cgst || 0,
+                    sgst: q.sgst || 0,
+                    grandTotal: q.grandTotal || q.total || 0
+                };
+            });
         } catch(e) { quotations = []; }
-        
-        quotations = quotations.map(q => {
-            let customer = q.customer || {};
-            if (!customer.name && q.customerName) customer.name = q.customerName;
-            if (!customer.email && q.customerEmail) customer.email = q.customerEmail;
-            if (!customer.phone && q.customerPhone) customer.phone = q.customerPhone;
-            if (!customer.address && q.customerAddress) customer.address = q.customerAddress;
-            if (!customer.gstin && q.customerGstin) customer.gstin = q.customerGstin;
-            if (!customer.state && q.customerState) customer.state = q.customerState;
-            
-            return {
-                id: q.id || q.quotationId || Date.now(),
-                quotationNo: q.quotationNo || q.invoiceNo || 'N/A',
-                date: q.date || (q.createdAt ? q.createdAt.slice(0,10) : 'N/A'),
-                validUntil: q.validUntil || q.validTill || '',
-                customer: customer,
-                items: q.items || [],
-                subtotal: q.subtotal || 0,
-                cgst: q.cgst || 0,
-                sgst: q.sgst || 0,
-                grandTotal: q.grandTotal || q.total || 0
-            };
-        });
-        
         localStorage.setItem('quotations', JSON.stringify(quotations));
+    }
+
+    function loadQuotations() {
+        refreshQuotations();
         displayQuotations();
     }
 
@@ -160,7 +163,7 @@
         }
         
         filtered.sort((a,b) => b.quotationNo.localeCompare(a.quotationNo));
-        let html = '<table><thead>运转<th>#</th><th>Quotation No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Valid Until</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>#</th><th>Quotation No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Valid Until</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach((q, idx) => {
             html += `<tr>
                 <td>${idx+1}</td>
@@ -175,15 +178,26 @@
                     <button class="btn-edit" onclick="editQuotation('${q.id}')"><i class="fas fa-edit"></i> Edit</button>
                     <button class="btn-delete" onclick="deleteQuotation('${q.id}')"><i class="fas fa-trash"></i> Delete</button>
                 </div></td>
-            </tr>`;
+             </tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('quotationsTable').innerHTML = html;
     }
 
+    // ---------- Safe find with auto-refresh ----------
+    function findQuotationById(id) {
+        let found = quotations.find(q => q.id === String(id));
+        if (found) return found;
+        // Reload and try again
+        refreshQuotations();
+        found = quotations.find(q => q.id === String(id));
+        if (found) displayQuotations();
+        return found;
+    }
+
     function generatePDF(id) {
-        const quotation = quotations.find(q => q.id == id);
-        if (!quotation) { alert('Quotation not found'); return; }
+        const quotation = findQuotationById(id);
+        if (!quotation) { alert('Quotation not found'); loadQuotations(); return; }
         const container = document.createElement('div');
         container.style.maxWidth = '1200px';
         container.style.margin = '0 auto';
@@ -213,7 +227,7 @@
                 <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</strong></td>
                 <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</strong></td>
                 <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</strong></td>
-            </tr>`;
+             </tr>`;
         });
         
         container.innerHTML = `
@@ -228,9 +242,9 @@
                 Phone: ${escapeHtml(quotation.customer.phone)} | Email: ${escapeHtml(quotation.customer.email)}
             </div>
             <table style="width:100%; border-collapse:collapse; font-size:11px;">
-                <thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></td></thead>
+                <thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
                 <tbody>${itemsHtml}</tbody>
-            </table>
+             </table>
             <div style="text-align:right; margin-top:10px;">
                 <table style="width:280px; margin-left:auto;">
                     <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${quotation.subtotal.toFixed(2)}</strong></td></tr>
@@ -342,7 +356,14 @@
 
     // Open modal to choose invoice type
     function openTypeModal(quotationId) {
-        pendingQuotationId = quotationId;
+        // Verify quotation exists before proceeding
+        const q = findQuotationById(quotationId);
+        if (!q) {
+            alert('Quotation not found. It may have been deleted.');
+            loadQuotations();
+            return;
+        }
+        pendingQuotationId = String(quotationId);
         document.getElementById('invoiceTypeModal').style.display = 'flex';
     }
 
@@ -352,13 +373,30 @@
     }
 
     async function proceedConversion() {
-        if (!pendingQuotationId) return;
+        if (!pendingQuotationId) {
+            alert('No quotation selected for conversion.');
+            closeModal();
+            return;
+        }
+        
+        // Always fetch fresh data to avoid stale references
+        refreshQuotations();
+        const quotation = quotations.find(q => q.id === pendingQuotationId);
+        
+        if (!quotation) {
+            alert('Quotation not found. It may have been deleted or already converted.');
+            loadQuotations();
+            closeModal();
+            return;
+        }
+        
         const invType = document.querySelector('input[name="invType"]:checked').value;
         closeModal();
         
-        const quotation = quotations.find(q => q.id == pendingQuotationId);
-        if (!quotation) { alert('Quotation not found'); return; }
-        if (!quotation.customer.email) { alert('Customer email missing. Cannot convert.'); return; }
+        if (!quotation.customer.email) { 
+            alert('Customer email missing. Cannot convert.'); 
+            return; 
+        }
         
         // Ensure customer exists
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
@@ -422,11 +460,24 @@
     }
 
     function editQuotation(id) {
+        const q = findQuotationById(id);
+        if (!q) {
+            alert('Quotation not found. Cannot edit.');
+            loadQuotations();
+            return;
+        }
         localStorage.setItem('editQuotationId', id);
         window.open('edit-quotation.html', '_blank');
     }
 
     function deleteQuotation(id, ask = true) {
+        refreshQuotations(); // ensure we have latest
+        const exists = quotations.some(q => q.id === String(id));
+        if (!exists) {
+            alert('Quotation already deleted or not found.');
+            loadQuotations();
+            return;
+        }
         if (ask && !confirm('Delete this quotation?')) return;
         quotations = quotations.filter(q => q.id != id);
         localStorage.setItem('quotations', JSON.stringify(quotations));
@@ -434,7 +485,7 @@
     }
 
     function filterQuotations() {
-        displayQuotations(document.getElementById('searchInput').value.toLowerCase());
+        displayQuotations(document.getElementById('searchInput').value);
     }
 
     function exportToCSV() {
@@ -467,4 +518,4 @@
     loadQuotations();
 </script>
 </body>
-</html>
+    </html>
