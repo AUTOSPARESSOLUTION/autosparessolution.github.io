@@ -899,5 +899,90 @@
         window.createSalesInvoice = originalCreateSalesInvoice;
     });
 </script>
+    <script>
+(function() {
+    const pending = localStorage.getItem('pendingQuotationConversion');
+    if (!pending) return;
+    
+    try {
+        const data = JSON.parse(pending);
+        if (data.source !== 'quotation') return;
+
+        // Wait for the DOM to be fully loaded
+        function fillData() {
+            // Set invoice type
+            const cashRadio = document.querySelector('input[name="invoiceType"][value="cash"]');
+            const creditRadio = document.querySelector('input[name="invoiceType"][value="credit"]');
+            const creditFields = document.getElementById('creditFields');
+            if (data.invoiceType === 'credit') {
+                if (creditRadio) creditRadio.checked = true;
+                if (creditFields) creditFields.style.display = 'flex';
+            } else {
+                if (cashRadio) cashRadio.checked = true;
+                if (creditFields) creditFields.style.display = 'none';
+            }
+
+            // Fill customer details
+            const buyerFields = {
+                buyerName: data.customer.name,
+                buyerEmail: data.customer.email,
+                buyerPhone: data.customer.phone,
+                buyerAddress: data.customer.address,
+                buyerGstin: data.customer.gstin,
+                buyerState: data.customer.state
+            };
+            for (const [id, value] of Object.entries(buyerFields)) {
+                const el = document.getElementById(id);
+                if (el) el.value = value || '';
+            }
+
+            // Save items to invoiceCart and trigger render
+            const cartItems = data.items.map(item => ({
+                part: item.part,
+                desc: item.desc,
+                hsn: item.hsn || '',
+                qty: item.qty,
+                price: item.price,
+                discount: item.discount || 0
+            }));
+            localStorage.setItem('invoiceCart', JSON.stringify(cartItems));
+
+            // Re‑initialize the cart in the page's existing variable (if accessible)
+            if (typeof cart !== 'undefined') {
+                window.cart = cartItems;
+            }
+
+            // Force re‑render of items and totals if functions exist
+            if (typeof renderItemsAndTaxSummary === 'function') {
+                renderItemsAndTaxSummary();
+            }
+            if (typeof updateGstDisplay === 'function') {
+                updateGstDisplay();
+            }
+            if (typeof updateInvoiceNumberDisplay === 'function') {
+                updateInvoiceNumberDisplay();
+            }
+            if (typeof updateDueDate === 'function') {
+                updateDueDate();
+            }
+
+            // Show a confirmation (optional)
+            alert(`Quotation ${data.quotationNo} loaded. Please review and click "Save Invoice".`);
+            
+            // Clear the pending data so it doesn't load again on refresh
+            localStorage.removeItem('pendingQuotationConversion');
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', fillData);
+        } else {
+            fillData();
+        }
+    } catch(e) {
+        console.error('Failed to load quotation:', e);
+        localStorage.removeItem('pendingQuotationConversion');
+    }
+})();
+    </script>
 </body>
     </html>
