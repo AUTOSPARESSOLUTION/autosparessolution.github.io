@@ -48,14 +48,12 @@
     let quotations = [];
 
     function loadQuotations() {
-        // Read raw data
         let raw = localStorage.getItem('quotations');
         if (!raw) raw = '[]';
         try {
             quotations = JSON.parse(raw);
         } catch(e) { quotations = []; }
         
-        // Normalise each quotation (consistent structure)
         quotations = quotations.map(q => {
             let customer = q.customer || {};
             if (!customer.name && q.customerName) customer.name = q.customerName;
@@ -79,7 +77,6 @@
             };
         });
         
-        // Save back normalized version (optional)
         localStorage.setItem('quotations', JSON.stringify(quotations));
         displayQuotations();
     }
@@ -123,11 +120,10 @@
                 </div></td>
             </tr>`;
         });
-        html += '</tbody></tr>';
+        html += '</tbody></table>';
         document.getElementById('quotationsTable').innerHTML = html;
     }
 
-    // PDF generation (recreate layout from saved data)
     function generatePDF(id) {
         const quotation = quotations.find(q => q.id == id);
         if (!quotation) { alert('Quotation not found'); return; }
@@ -138,7 +134,6 @@
         container.style.padding = '0 15px 15px 15px';
         container.style.fontFamily = 'Roboto, sans-serif';
         
-        // Build items table
         let itemsHtml = '';
         (quotation.items || []).forEach((item, idx) => {
             const qty = item.qty || 1;
@@ -181,10 +176,10 @@
             </table>
             <div style="text-align:right; margin-top:10px;">
                 <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal: </td><td>₹${quotation.subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">CGST (9%): </td><td>₹${quotation.cgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">SGST (9%): </td><td>₹${quotation.sgst.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td>₹${quotation.grandTotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${quotation.subtotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${quotation.cgst.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${quotation.sgst.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${quotation.grandTotal.toFixed(2)}</td></tr>
                 </table>
             </div>
             <div style="margin-top:20px; border-top:1px solid #aaa; padding-top:10px; text-align:center; font-size:10px;">
@@ -194,15 +189,69 @@
         html2pdf().set({ margin: 0.2, filename: `Quotation_${quotation.quotationNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4' } }).from(container).save();
     }
 
+    // Helper: ensure product exists in product master
+    function ensureProductExists(part, desc, price, hsn = '') {
+        let products = getProducts();
+        let existing = products.find(p => p.id === part || p.sku === part);
+        if (!existing) {
+            const newProduct = {
+                id: part,
+                sku: part,
+                name: desc || part,
+                hsn: hsn,
+                unit: 'pc',
+                price: price,
+                currentStock: 0,
+                reorderLevel: 10,
+                costPrice: 0,
+                createdAt: new Date().toISOString()
+            };
+            products.push(newProduct);
+            saveProducts(products);
+            return newProduct;
+        }
+        return existing;
+    }
+
     function convertToInvoice(id) {
         const quotation = quotations.find(q => q.id == id);
         if (!quotation) { alert('Quotation not found'); return; }
         if (!quotation.customer.email) { alert('Customer email missing. Cannot convert.'); return; }
+        
+        // Ensure customer exists
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        let customer = customers.find(c => c.email === quotation.customer.email);
+        if (!customer) {
+            customer = {
+                id: Date.now(),
+                name: quotation.customer.name,
+                email: quotation.customer.email,
+                phone: quotation.customer.phone || '',
+                address: quotation.customer.address || '',
+                gstin: quotation.customer.gstin || '',
+                state: quotation.customer.state || '',
+                creditLimit: 50000,
+                outstanding: 0,
+                totalPurchased: 0,
+                status: 'active',
+                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
+                createdAt: new Date().toISOString()
+            };
+            customers.push(customer);
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+        
+        // Ensure all products exist
+        for (let item of (quotation.items || [])) {
+            ensureProductExists(item.part, item.desc, item.price, item.hsn);
+        }
+        
         const invoiceItems = (quotation.items || []).map(item => ({
             productId: item.part,
             quantity: item.qty,
             price: item.price
         }));
+        
         const invoice = {
             id: Date.now(),
             date: new Date().toISOString().slice(0,10),
