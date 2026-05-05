@@ -102,7 +102,6 @@
     let quotations = [];
     let pendingQuotationId = null;
 
-    // Reload and normalize quotations (IDs always as strings)
     function refreshQuotations() {
         let raw = localStorage.getItem('quotations');
         if (!raw) raw = '[]';
@@ -116,7 +115,6 @@
                 if (!customer.address && q.customerAddress) customer.address = q.customerAddress;
                 if (!customer.gstin && q.customerGstin) customer.gstin = q.customerGstin;
                 if (!customer.state && q.customerState) customer.state = q.customerState;
-                
                 return {
                     id: String(q.id || q.quotationId || Date.now()),
                     quotationNo: q.quotationNo || q.invoiceNo || 'N/A',
@@ -131,7 +129,6 @@
                 };
             });
         } catch(e) { quotations = []; }
-        // Keep storage consistent
         localStorage.setItem('quotations', JSON.stringify(quotations));
     }
 
@@ -145,7 +142,6 @@
             document.getElementById('quotationsTable').innerHTML = '<p>No quotations found. Click "Debug" to see raw storage.</p>';
             return;
         }
-        
         let filtered = quotations;
         if (filter) {
             const term = filter.toLowerCase();
@@ -155,12 +151,10 @@
                 (q.customer.email && q.customer.email.toLowerCase().includes(term))
             );
         }
-        
         if (filtered.length === 0) {
             document.getElementById('quotationsTable').innerHTML = '<p>No matching quotations found.</p>';
             return;
         }
-        
         filtered.sort((a,b) => b.quotationNo.localeCompare(a.quotationNo));
         let html = '<table><thead><tr><th>#</th><th>Quotation No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Valid Until</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach((q, idx) => {
@@ -177,13 +171,12 @@
                     <button class="btn-edit" onclick="editQuotation('${q.id}')"><i class="fas fa-edit"></i> Edit</button>
                     <button class="btn-delete" onclick="deleteQuotation('${q.id}')"><i class="fas fa-trash"></i> Delete</button>
                 </div></td>
-             </tr>`;
+            </tr>`;
         });
-        html += '</tbody><table>';
+        html += '</tbody></table>';
         document.getElementById('quotationsTable').innerHTML = html;
     }
 
-    // Helper: find quotation – silently returns null instead of alert
     function findQuotationByIdSilent(id) {
         let found = quotations.find(q => q.id === String(id));
         if (found) return found;
@@ -202,7 +195,6 @@
         container.style.backgroundColor = 'white';
         container.style.padding = '0 15px 15px 15px';
         container.style.fontFamily = 'Roboto, sans-serif';
-        
         let itemsHtml = '';
         (quotation.items || []).forEach((item, idx) => {
             const qty = item.qty || 1;
@@ -219,15 +211,14 @@
                 <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.hsn || '')}</td>
                 <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${qty}</td>
                 <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${price.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${disc}%</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">18%</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</td>
-             </tr>`;
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${disc}%</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">18%</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</strong></td>
+            </tr>`;
         });
-        
         container.innerHTML = `
             <div style="background:#0a7c71; color:white; padding:15px 20px; display:flex; justify-content:space-between; margin:0 -15px 15px -15px;">
                 <div><div style="font-size:24px;">Auto Spares Solution</div><div>GSTIN: 19ANOPD3300R1ZO</div><div>101, 1st floor, Howrah, WB 711108</div></div>
@@ -242,13 +233,13 @@
             <table style="width:100%; border-collapse:collapse; font-size:11px;">
                 <thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
                 <tbody>${itemsHtml}</tbody>
-            </td>
+            60
             <div style="text-align:right; margin-top:10px;">
                 <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${quotation.subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${quotation.cgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${quotation.sgst.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${quotation.grandTotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${quotation.subtotal.toFixed(2)}</strong></td></tr>
+                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${quotation.cgst.toFixed(2)}</strong></td></tr>
+                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${quotation.sgst.toFixed(2)}</strong></td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${quotation.grandTotal.toFixed(2)}</strong></td></tr>
                 60
             </div>
             <div style="margin-top:20px; border-top:1px solid #aaa; padding-top:10px; text-align:center; font-size:10px;">
@@ -258,103 +249,9 @@
         html2pdf().set({ margin: 0.2, filename: `Quotation_${quotation.quotationNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4' } }).from(container).save();
     }
 
-    function ensureProductExists(part, desc, price, hsn = '') {
-        let products = getProducts();
-        let existing = products.find(p => p.id === part || p.sku === part);
-        if (!existing) {
-            const newProduct = {
-                id: part,
-                sku: part,
-                name: desc || part,
-                hsn: hsn,
-                unit: 'pc',
-                price: price,
-                currentStock: 0,
-                reorderLevel: 10,
-                costPrice: 0,
-                createdAt: new Date().toISOString()
-            };
-            products.push(newProduct);
-            saveProducts(products);
-            return newProduct;
-        }
-        return existing;
-    }
-
-    function createSalesInvoiceWithoutStockCheck(invoice) {
-        let products = getProducts();
-        let invTransactions = getInventoryTransactions();
-        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        
-        for (let item of invoice.items) {
-            let product = products.find(p => p.id == item.productId || p.sku == item.productId);
-            if (!product) {
-                product = {
-                    id: item.productId,
-                    name: `Product ${item.productId}`,
-                    sku: item.productId,
-                    currentStock: 0,
-                    unit: 'pc',
-                    price: item.price,
-                    reorderLevel: 10,
-                    createdAt: new Date().toISOString()
-                };
-                products.push(product);
-            }
-            let oldStock = product.currentStock || 0;
-            let newStock = oldStock - item.quantity;
-            product.currentStock = newStock;
-            
-            invTransactions.push({
-                id: Date.now() + Math.random(),
-                productId: item.productId,
-                type: 'sales',
-                quantity: -item.quantity,
-                date: invoice.date,
-                ref: invoice.invoiceNo || `INV-${invoice.id}`,
-                balanceAfter: newStock
-            });
-        }
-        saveProducts(products);
-        saveInventoryTransactions(invTransactions);
-        
-        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        salesInvoices.push(invoice);
-        localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
-        
-        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        allInvoices.push(invoice);
-        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-        
-        let customer = customers.find(c => c.email === invoice.customerEmail);
-        if (customer) {
-            customer.outstanding = (customer.outstanding || 0) + invoice.total;
-            localStorage.setItem('customers', JSON.stringify(customers));
-            
-            let customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
-            customerLedger.push({
-                id: Date.now(),
-                customerEmail: invoice.customerEmail,
-                date: invoice.date,
-                type: 'invoice',
-                ref: invoice.invoiceNo || `INV-${invoice.id}`,
-                debit: invoice.total,
-                credit: 0,
-                balance: customer.outstanding
-            });
-            localStorage.setItem('customerLedger', JSON.stringify(customerLedger));
-        }
-        return true;
-    }
-
-    function getInventoryTransactions() { return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]'); }
-    function saveInventoryTransactions(trans) { localStorage.setItem('inventoryTransactions', JSON.stringify(trans)); }
-
     function openTypeModal(quotationId) {
-        // Check existence silently – no alert here, just refresh and try again
         let q = findQuotationByIdSilent(quotationId);
         if (!q) {
-            // Instead of alert, simply refresh the list and do nothing
             loadQuotations();
             return;
         }
@@ -367,90 +264,58 @@
         pendingQuotationId = null;
     }
 
+    // ========== MODIFIED: Convert by redirecting to invoice page ==========
     async function proceedConversion() {
         if (!pendingQuotationId) {
             closeModal();
             return;
         }
-        
-        // Always fetch fresh data to avoid stale references
         refreshQuotations();
         const quotation = quotations.find(q => q.id === pendingQuotationId);
-        
         if (!quotation) {
-            alert('Quotation not found. It may have been deleted. Refresh the list.');
+            alert('Quotation not found. It may have been deleted.');
             loadQuotations();
             closeModal();
             return;
         }
-        
+
         const invType = document.querySelector('input[name="invType"]:checked').value;
         closeModal();
-        
-        if (!quotation.customer.email) { 
-            alert('Customer email missing. Cannot convert to invoice.'); 
-            return; 
+
+        if (!quotation.customer.email) {
+            alert('Customer email missing. Cannot convert to invoice.');
+            return;
         }
-        
-        // Ensure customer exists
-        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        let customer = customers.find(c => c.email === quotation.customer.email);
-        if (!customer) {
-            customer = {
-                id: Date.now(),
-                name: quotation.customer.name,
-                email: quotation.customer.email,
+
+        // Prepare data to pass to the professional invoice page
+        const conversionData = {
+            source: 'quotation',
+            quotationId: quotation.id,
+            quotationNo: quotation.quotationNo,
+            invoiceType: invType,
+            customer: {
+                name: quotation.customer.name || '',
+                email: quotation.customer.email || '',
                 phone: quotation.customer.phone || '',
                 address: quotation.customer.address || '',
                 gstin: quotation.customer.gstin || '',
-                state: quotation.customer.state || '',
-                creditLimit: 50000,
-                outstanding: 0,
-                totalPurchased: 0,
-                status: 'active',
-                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
-                createdAt: new Date().toISOString()
-            };
-            customers.push(customer);
-            localStorage.setItem('customers', JSON.stringify(customers));
-        }
-        
-        // Ensure all products exist
-        for (let item of (quotation.items || [])) {
-            ensureProductExists(item.part, item.desc, item.price, item.hsn);
-        }
-        
-        const invoiceItems = (quotation.items || []).map(item => ({
-            productId: item.part,
-            quantity: item.qty,
-            price: item.price
-        }));
-        
-        const invoice = {
-            id: Date.now(),
-            date: new Date().toISOString().slice(0,10),
-            customerEmail: quotation.customer.email,
-            items: invoiceItems,
-            total: quotation.grandTotal,
-            invoiceNo: 'INV-' + Date.now(),
-            status: invType === 'cash' ? 'Paid' : 'Pending',
-            invoiceType: invType
+                state: quotation.customer.state || ''
+            },
+            items: quotation.items.map(item => ({
+                part: item.part,
+                desc: item.desc,
+                hsn: item.hsn || '',
+                qty: item.qty,
+                price: item.price,
+                discount: item.discount || 0
+            })),
+            grandTotal: quotation.grandTotal
         };
-        
-        const originalCreateSalesInvoice = window.createSalesInvoice;
-        window.createSalesInvoice = createSalesInvoiceWithoutStockCheck;
-        
-        try {
-            createSalesInvoice(invoice);
-            alert(`Quotation converted to ${invType === 'cash' ? 'Cash' : 'Credit'} Sales Invoice!`);
-            // No deletion – quotation remains
-            loadQuotations(); // refresh list to show updated stock (quotation stays)
-        } catch(err) {
-            alert('Error during conversion: ' + err.message);
-        } finally {
-            window.createSalesInvoice = originalCreateSalesInvoice;
-            pendingQuotationId = null;
-        }
+
+        // Store in localStorage and redirect to invoice creation page
+        localStorage.setItem('pendingQuotationConversion', JSON.stringify(conversionData));
+        // Redirect to your professional invoice page (adjust filename if needed)
+        window.location.href = 'invoice.html';
     }
 
     function editQuotation(id) {
