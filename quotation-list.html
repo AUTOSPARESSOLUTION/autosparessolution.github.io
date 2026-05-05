@@ -22,6 +22,47 @@
         .btn-delete { background: #dc3545; }
         .btn-convert { background: #28a745; }
         .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; display: none; font-family: monospace; font-size: 12px; }
+        
+        /* Modal for cash/credit selection */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .modal-content h3 {
+            margin-top: 0;
+            color: #0a7c71;
+        }
+        .modal-options {
+            margin: 20px 0;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        .modal-options label {
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .modal-buttons button {
+            margin: 0 10px;
+            padding: 8px 20px;
+        }
     </style>
 </head>
 <body>
@@ -44,8 +85,24 @@
     <button onclick="window.location.href='index.html'" style="margin-top: 20px;">Back to Dashboard</button>
 </div>
 
+<!-- Modal for selecting invoice type -->
+<div id="invoiceTypeModal" class="modal">
+    <div class="modal-content">
+        <h3><i class="fas fa-file-invoice"></i> Select Invoice Type</h3>
+        <div class="modal-options">
+            <label><input type="radio" name="invType" value="cash" checked> Cash Bill</label>
+            <label><input type="radio" name="invType" value="credit"> Credit Bill</label>
+        </div>
+        <div class="modal-buttons">
+            <button onclick="proceedConversion()">Convert</button>
+            <button onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script>
     let quotations = [];
+    let pendingQuotationId = null;
 
     function loadQuotations() {
         let raw = localStorage.getItem('quotations');
@@ -114,7 +171,7 @@
                 <td>${q.validUntil || '-'}</td>
                 <td><div style="display:flex; gap:5px; flex-wrap:wrap;">
                     <button class="btn-pdf" onclick="generatePDF('${q.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
-                    <button class="btn-convert" onclick="convertToInvoice('${q.id}')"><i class="fas fa-exchange-alt"></i> Convert</button>
+                    <button class="btn-convert" onclick="openTypeModal('${q.id}')"><i class="fas fa-exchange-alt"></i> Convert</button>
                     <button class="btn-edit" onclick="editQuotation('${q.id}')"><i class="fas fa-edit"></i> Edit</button>
                     <button class="btn-delete" onclick="deleteQuotation('${q.id}')"><i class="fas fa-trash"></i> Delete</button>
                 </div></td>
@@ -150,12 +207,12 @@
                 <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.hsn || '')}</td>
                 <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${qty}</td>
                 <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${price.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${disc}%</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">18%</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${disc}%</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">18%</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</strong></td>
             </tr>`;
         });
         
@@ -171,15 +228,15 @@
                 Phone: ${escapeHtml(quotation.customer.phone)} | Email: ${escapeHtml(quotation.customer.email)}
             </div>
             <table style="width:100%; border-collapse:collapse; font-size:11px;">
-                <thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
+                <thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></td></thead>
                 <tbody>${itemsHtml}</tbody>
             </table>
             <div style="text-align:right; margin-top:10px;">
                 <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${quotation.subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${quotation.cgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${quotation.sgst.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${quotation.grandTotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${quotation.subtotal.toFixed(2)}</strong></td></tr>
+                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${quotation.cgst.toFixed(2)}</strong></td></tr>
+                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${quotation.sgst.toFixed(2)}</strong></td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${quotation.grandTotal.toFixed(2)}</strong></td></tr>
                 </table>
             </div>
             <div style="margin-top:20px; border-top:1px solid #aaa; padding-top:10px; text-align:center; font-size:10px;">
@@ -213,8 +270,93 @@
         return existing;
     }
 
-    function convertToInvoice(id) {
-        const quotation = quotations.find(q => q.id == id);
+    // Override createSalesInvoice locally to bypass stock check (allow negative stock)
+    function createSalesInvoiceWithoutStockCheck(invoice) {
+        let products = getProducts();
+        let invTransactions = getInventoryTransactions();
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        
+        for (let item of invoice.items) {
+            let product = products.find(p => p.id == item.productId || p.sku == item.productId);
+            if (!product) {
+                product = {
+                    id: item.productId,
+                    name: `Product ${item.productId}`,
+                    sku: item.productId,
+                    currentStock: 0,
+                    unit: 'pc',
+                    price: item.price,
+                    reorderLevel: 10,
+                    createdAt: new Date().toISOString()
+                };
+                products.push(product);
+            }
+            let oldStock = product.currentStock || 0;
+            let newStock = oldStock - item.quantity;
+            product.currentStock = newStock;
+            
+            invTransactions.push({
+                id: Date.now() + Math.random(),
+                productId: item.productId,
+                type: 'sales',
+                quantity: -item.quantity,
+                date: invoice.date,
+                ref: invoice.invoiceNo || `INV-${invoice.id}`,
+                balanceAfter: newStock
+            });
+        }
+        saveProducts(products);
+        saveInventoryTransactions(invTransactions);
+        
+        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+        salesInvoices.push(invoice);
+        localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
+        
+        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        allInvoices.push(invoice);
+        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+        
+        let customer = customers.find(c => c.email === invoice.customerEmail);
+        if (customer) {
+            customer.outstanding = (customer.outstanding || 0) + invoice.total;
+            localStorage.setItem('customers', JSON.stringify(customers));
+            
+            let customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
+            customerLedger.push({
+                id: Date.now(),
+                customerEmail: invoice.customerEmail,
+                date: invoice.date,
+                type: 'invoice',
+                ref: invoice.invoiceNo || `INV-${invoice.id}`,
+                debit: invoice.total,
+                credit: 0,
+                balance: customer.outstanding
+            });
+            localStorage.setItem('customerLedger', JSON.stringify(customerLedger));
+        }
+        return true;
+    }
+
+    function getInventoryTransactions() { return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]'); }
+    function saveInventoryTransactions(trans) { localStorage.setItem('inventoryTransactions', JSON.stringify(trans)); }
+
+    // Open modal to choose invoice type
+    function openTypeModal(quotationId) {
+        pendingQuotationId = quotationId;
+        document.getElementById('invoiceTypeModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('invoiceTypeModal').style.display = 'none';
+        pendingQuotationId = null;
+    }
+
+    async function proceedConversion() {
+        if (!pendingQuotationId) return;
+        const invType = document.querySelector('input[name="invType"]:checked').value;
+        closeModal();
+        
+        const quotation = quotations.find(q => q.id == pendingQuotationId);
         if (!quotation) { alert('Quotation not found'); return; }
         if (!quotation.customer.email) { alert('Customer email missing. Cannot convert.'); return; }
         
@@ -259,14 +401,24 @@
             items: invoiceItems,
             total: quotation.grandTotal,
             invoiceNo: 'INV-' + Date.now(),
-            status: 'pending'
+            status: invType === 'cash' ? 'Paid' : 'Pending',
+            invoiceType: invType
         };
+        
+        const originalCreateSalesInvoice = window.createSalesInvoice;
+        window.createSalesInvoice = createSalesInvoiceWithoutStockCheck;
+        
         try {
             createSalesInvoice(invoice);
-            alert('Quotation converted to Sales Invoice!');
-            if (confirm('Delete this quotation after conversion?')) deleteQuotation(id, false);
+            alert(`Quotation converted to ${invType === 'cash' ? 'Cash' : 'Credit'} Sales Invoice! (Stock check bypassed)`);
+            if (confirm('Delete this quotation after conversion?')) deleteQuotation(pendingQuotationId, false);
             loadQuotations();
-        } catch(err) { alert('Error: ' + err.message); }
+        } catch(err) {
+            alert('Error: ' + err.message);
+        } finally {
+            window.createSalesInvoice = originalCreateSalesInvoice;
+            pendingQuotationId = null;
+        }
     }
 
     function editQuotation(id) {
