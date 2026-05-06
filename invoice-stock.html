@@ -336,6 +336,74 @@
 </div>
 
 <script>
+    // ========== LOAD FROM QUOTATION OR PROFORMA CONVERSION ==========
+(function loadConversionData() {
+    const pending = localStorage.getItem('pendingQuotationConversion');
+    if (!pending) return;
+    
+    try {
+        const data = JSON.parse(pending);
+        if (data.source !== 'quotation' && data.source !== 'proforma') return;
+
+        function fillData() {
+            // Set invoice type radio
+            const cashRadio = document.querySelector('input[name="invoiceType"][value="cash"]');
+            const creditRadio = document.querySelector('input[name="invoiceType"][value="credit"]');
+            const creditDiv = document.getElementById('creditFields');
+            if (data.invoiceType === 'credit') {
+                if (creditRadio) creditRadio.checked = true;
+                if (creditDiv) creditDiv.style.display = 'flex';
+            } else {
+                if (cashRadio) cashRadio.checked = true;
+                if (creditDiv) creditDiv.style.display = 'none';
+            }
+
+            // Fill customer fields
+            const customerMap = {
+                buyerName: data.customer.name,
+                buyerEmail: data.customer.email,
+                buyerPhone: data.customer.phone,
+                buyerAddress: data.customer.address,
+                buyerGstin: data.customer.gstin,
+                buyerState: data.customer.state
+            };
+            for (const [id, val] of Object.entries(customerMap)) {
+                const el = document.getElementById(id);
+                if (el) el.value = val || '';
+            }
+
+            // Build cart items and store in localStorage as 'invoiceCart'
+            const cartItems = data.items.map(item => ({
+                part: item.part,
+                desc: item.desc,
+                hsn: item.hsn || '',
+                qty: item.qty,
+                price: item.price,
+                discount: item.discount || 0
+            }));
+            localStorage.setItem('invoiceCart', JSON.stringify(cartItems));
+
+            // Clear the pending data
+            localStorage.removeItem('pendingQuotationConversion');
+
+            // Show a friendly message
+            const sourceName = data.source === 'quotation' ? 'Quotation' : 'Proforma';
+            alert(`${sourceName} ${data.proformaNo || data.quotationNo} loaded. Please review and click "Save Invoice".`);
+
+            // Reload the page once to let the normal script render the cart
+            window.location.reload();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', fillData);
+        } else {
+            fillData();
+        }
+    } catch(e) {
+        console.error('Conversion loader error:', e);
+        localStorage.removeItem('pendingQuotationConversion');
+    }
+})();
     // ========== SINGLE QUOTATION LOADER - RUNS FIRST, NO PAGE RELOAD ==========
     (function() {
         const pending = localStorage.getItem('pendingQuotationConversion');
