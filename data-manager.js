@@ -15,6 +15,16 @@ function saveSalesInvoices(invoices) { localStorage.setItem('salesInvoices', JSO
 function getPurchaseInvoices() { return JSON.parse(localStorage.getItem('purchaseInvoices') || '[]'); }
 function savePurchaseInvoices(invoices) { localStorage.setItem('purchaseInvoices', JSON.stringify(invoices)); }
 
+// ----- Helper: find product by SKU or ID (SKU first) -----
+function findProduct(productId) {
+    const products = getProducts();
+    // 1. Try by SKU (most reliable, matches part number)
+    let product = products.find(p => p.sku === productId);
+    // 2. Fallback to ID
+    if (!product) product = products.find(p => p.id == productId);
+    return product;
+}
+
 // ----- 1. Sales Invoice – reduces stock, increases customer outstanding -----
 function createSalesInvoice(invoice) {
     // invoice: { id, date, customerEmail, items: [{productId, quantity, price}], total, invoiceNo, status }
@@ -23,16 +33,32 @@ function createSalesInvoice(invoice) {
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
     
     for (let item of invoice.items) {
-        let product = products.find(p => p.id == item.productId);
-        if (!product) throw new Error(`Product ${item.productId} not found`);
+        let product = findProduct(item.productId);
+        if (!product) {
+            // Auto-create product if missing (using SKU as ID)
+            product = {
+                id: item.productId,
+                sku: item.productId,
+                name: `Product ${item.productId}`,
+                currentStock: 0,
+                unit: 'pc',
+                price: item.price,
+                reorderLevel: 10,
+                createdAt: new Date().toISOString()
+            };
+            products.push(product);
+        }
         let oldStock = product.currentStock || 0;
         let newStock = oldStock - item.quantity;
-        if (newStock < 0) throw new Error(`Insufficient stock for ${product.name}`);
+        if (newStock < 0) {
+            // Allow negative stock? You can comment out this check if needed
+            console.warn(`Negative stock for ${product.name}: ${newStock}`);
+        }
         product.currentStock = newStock;
         
         invTransactions.push({
             id: Date.now() + Math.random(),
-            productId: item.productId,
+            productId: product.id,
             type: 'sales',
             quantity: -item.quantity,
             date: invoice.date,
@@ -76,16 +102,18 @@ function createPurchaseInvoice(purchase) {
     let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
     
     for (let item of purchase.items) {
-        let product = products.find(p => p.id == item.productId);
+        let product = findProduct(item.productId);
         if (!product) {
-            // Auto-create product if not exists (optional)
+            // Auto-create product using SKU as ID
             product = {
                 id: item.productId,
-                name: `Product ${item.productId}`,
-                sku: `SKU${item.productId}`,
+                sku: item.productId,
+                name: item.desc || `Product ${item.productId}`,
                 currentStock: 0,
                 unit: 'pc',
-                price: item.cost
+                price: item.cost,
+                reorderLevel: 10,
+                createdAt: new Date().toISOString()
             };
             products.push(product);
         }
@@ -95,7 +123,7 @@ function createPurchaseInvoice(purchase) {
         
         invTransactions.push({
             id: Date.now() + Math.random(),
-            productId: item.productId,
+            productId: product.id,
             type: 'purchase',
             quantity: item.quantity,
             date: purchase.date,
@@ -215,12 +243,12 @@ function deleteSalesInvoice(invoiceId) {
     let products = getProducts();
     let invTransactions = getInventoryTransactions();
     for (let item of invoice.items) {
-        let product = products.find(p => p.id == item.productId);
+        let product = findProduct(item.productId);
         if (product) {
             product.currentStock += item.quantity;
             invTransactions.push({
                 id: Date.now(),
-                productId: item.productId,
+                productId: product.id,
                 type: 'sales_return',
                 quantity: item.quantity,
                 date: new Date().toISOString(),
