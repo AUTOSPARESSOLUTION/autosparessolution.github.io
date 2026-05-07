@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
-        /* (your existing styles – unchanged) */
+        /* ========== YOUR EXISTING STYLES (unchanged) ========== */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -122,18 +122,21 @@
             overflow-wrap: break-word;
             white-space: normal;
         }
+        /* Adjusted column widths to add UOM column */
         .items-table th:nth-child(1) { width: 4%; }
         .items-table th:nth-child(2) { width: 10%; }
         .items-table th:nth-child(3) { width: 12%; }
         .items-table th:nth-child(4) { width: 8%; }
         .items-table th:nth-child(5) { width: 4%; }
-        .items-table th:nth-child(6) { width: 7%; }
-        .items-table th:nth-child(7) { width: 6%; }
-        .items-table th:nth-child(8) { width: 8%; }
-        .items-table th:nth-child(9) { width: 6%; }
-        .items-table th:nth-child(10) { width: 8%; }
-        .items-table th:nth-child(11) { width: 8%; }
-        .items-table th:nth-child(12) { width: 8%; }
+        .items-table th:nth-child(6) { width: 5%; }   /* UOM column */
+        .items-table th:nth-child(7) { width: 4%; }   /* Qty */
+        .items-table th:nth-child(8) { width: 7%; }   /* Unit Price */
+        .items-table th:nth-child(9) { width: 6%; }   /* Disc % */
+        .items-table th:nth-child(10) { width: 8%; }  /* Taxable */
+        .items-table th:nth-child(11) { width: 6%; }  /* GST% */
+        .items-table th:nth-child(12) { width: 8%; }  /* CGST */
+        .items-table th:nth-child(13) { width: 8%; }  /* SGST */
+        .items-table th:nth-child(14) { width: 8%; }  /* Total */
         .items-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .tax-summary-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
@@ -199,6 +202,36 @@
             color: #777;
             margin-top: 10px;
         }
+        /* New styles for Packing & Forwarding */
+        .packing-section {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-end;
+            border: 1px solid #dee2e6;
+        }
+        .packing-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .packing-field label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+        }
+        .packing-field input {
+            width: 120px;
+            padding: 6px;
+        }
+        .packing-total {
+            font-weight: bold;
+            color: #0a7c71;
+        }
     </style>
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -234,7 +267,7 @@
         </div>
     </div>
 
-    <!-- Buyer and Consignee -->
+    <!-- Buyer and Consignee (unchanged) -->
     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
@@ -265,7 +298,7 @@
         </div>
     </div>
 
-    <!-- Order and Dispatch Details -->
+    <!-- Order and Dispatch Details (unchanged) -->
     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <div style="flex: 1;">
             <div class="info-box">
@@ -287,31 +320,53 @@
         </div>
     </div>
 
-    <!-- Items Table -->
+    <!-- Items Table (with UOM column added) -->
     <table class="items-table">
         <thead>
-            <tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
+            <tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>UOM</th><th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
         </thead>
         <tbody id="itemsBody"></tbody>
     </table>
 
-    <!-- Tax Summary Table -->
+    <!-- Packing & Forwarding Charges Section (No GST) -->
+    <div class="packing-section no-print">
+        <div class="packing-field">
+            <label>📦 Carton Quantity</label>
+            <input type="number" id="packingCartons" value="0" step="1" min="0" onchange="calculatePackingCharges()">
+        </div>
+        <div class="packing-field">
+            <label>💰 Charges per Carton (₹)</label>
+            <input type="number" id="packingRate" value="0" step="0.01" min="0" onchange="calculatePackingCharges()">
+        </div>
+        <div class="packing-field">
+            <label>🧾 Total Packing Charges (₹)</label>
+            <input type="text" id="packingTotal" readonly style="background:#e9ecef; font-weight:bold;">
+        </div>
+        <div class="packing-field">
+            <span style="font-size:11px; color:#6c757d;">(No GST applicable)</span>
+        </div>
+    </div>
+
+    <!-- Tax Summary Table (unchanged) -->
     <table class="tax-summary-table">
         <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
-    <!-- Totals -->
+    <!-- Totals (with packing charges added) -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></strong></tr>
+            <tr id="packingRow" style="border-top:1px solid #dee2e6;">
+                <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></strong></td>
+            </tr>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></strong></tr>
+            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></strong></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></strong></tr>
         </table>
     </div>
 
-    <!-- Payment QR and Bank Details -->
+    <!-- Payment QR and Bank Details (unchanged) -->
     <div class="qr-box">
         <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
             <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
@@ -337,85 +392,13 @@
 
 <script>
     // ========== LOAD FROM QUOTATION OR PROFORMA CONVERSION ==========
-(function loadConversionData() {
-    const pending = localStorage.getItem('pendingQuotationConversion');
-    if (!pending) return;
-    
-    try {
-        const data = JSON.parse(pending);
-        if (data.source !== 'quotation' && data.source !== 'proforma') return;
-
-        function fillData() {
-            // Set invoice type radio
-            const cashRadio = document.querySelector('input[name="invoiceType"][value="cash"]');
-            const creditRadio = document.querySelector('input[name="invoiceType"][value="credit"]');
-            const creditDiv = document.getElementById('creditFields');
-            if (data.invoiceType === 'credit') {
-                if (creditRadio) creditRadio.checked = true;
-                if (creditDiv) creditDiv.style.display = 'flex';
-            } else {
-                if (cashRadio) cashRadio.checked = true;
-                if (creditDiv) creditDiv.style.display = 'none';
-            }
-
-            // Fill customer fields
-            const customerMap = {
-                buyerName: data.customer.name,
-                buyerEmail: data.customer.email,
-                buyerPhone: data.customer.phone,
-                buyerAddress: data.customer.address,
-                buyerGstin: data.customer.gstin,
-                buyerState: data.customer.state
-            };
-            for (const [id, val] of Object.entries(customerMap)) {
-                const el = document.getElementById(id);
-                if (el) el.value = val || '';
-            }
-
-            // Build cart items and store in localStorage as 'invoiceCart'
-            const cartItems = data.items.map(item => ({
-                part: item.part,
-                desc: item.desc,
-                hsn: item.hsn || '',
-                qty: item.qty,
-                price: item.price,
-                discount: item.discount || 0
-            }));
-            localStorage.setItem('invoiceCart', JSON.stringify(cartItems));
-
-            // Clear the pending data
-            localStorage.removeItem('pendingQuotationConversion');
-
-            // Show a friendly message
-            const sourceName = data.source === 'quotation' ? 'Quotation' : 'Proforma';
-            alert(`${sourceName} ${data.proformaNo || data.quotationNo} loaded. Please review and click "Save Invoice".`);
-
-            // Reload the page once to let the normal script render the cart
-            window.location.reload();
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', fillData);
-        } else {
-            fillData();
-        }
-    } catch(e) {
-        console.error('Conversion loader error:', e);
-        localStorage.removeItem('pendingQuotationConversion');
-    }
-})();
-    // ========== SINGLE QUOTATION LOADER - RUNS FIRST, NO PAGE RELOAD ==========
-    (function() {
+    (function loadConversionData() {
         const pending = localStorage.getItem('pendingQuotationConversion');
         if (!pending) return;
-        
         try {
             const data = JSON.parse(pending);
-            if (data.source !== 'quotation') return;
-
-            // Wait for DOM to be ready
-            function applyQuotationData() {
-                // 1. Set invoice type radio
+            if (data.source !== 'quotation' && data.source !== 'proforma') return;
+            function fillData() {
                 const cashRadio = document.querySelector('input[name="invoiceType"][value="cash"]');
                 const creditRadio = document.querySelector('input[name="invoiceType"][value="credit"]');
                 const creditDiv = document.getElementById('creditFields');
@@ -426,8 +409,6 @@
                     if (cashRadio) cashRadio.checked = true;
                     if (creditDiv) creditDiv.style.display = 'none';
                 }
-
-                // 2. Fill customer fields
                 const customerMap = {
                     buyerName: data.customer.name,
                     buyerEmail: data.customer.email,
@@ -440,43 +421,45 @@
                     const el = document.getElementById(id);
                     if (el) el.value = val || '';
                 }
-
-                // 3. Convert items to cart format and store in localStorage
-                const cartItems = data.items.map(item => ({
-                    part: item.part,
-                    desc: item.desc,
-                    hsn: item.hsn || '',
-                    qty: item.qty,
-                    price: item.price,
-                    discount: item.discount || 0
-                }));
+                // For quotation/proforma, we need to fetch UOM from product master
+                const cartItems = data.items.map(item => {
+                    const product = getProducts().find(p => p.sku === item.part);
+                    const unit = product ? (product.unit || 'pc') : 'pc';
+                    return {
+                        part: item.part,
+                        desc: item.desc,
+                        hsn: item.hsn || '',
+                        qty: item.qty,
+                        price: item.price,
+                        discount: item.discount || 0,
+                        unit: unit
+                    };
+                });
                 localStorage.setItem('invoiceCart', JSON.stringify(cartItems));
-
-                // 4. Remove the pending data so it doesn't load again
                 localStorage.removeItem('pendingQuotationConversion');
-
-                // 5. Show a success message (optional)
-                alert(`Quotation ${data.quotationNo} loaded. Please review and click "Save Invoice".`);
-
-                // 6. Reload the page? No! Instead, let the normal script run.
-                //    The page will now read the updated invoiceCart and render correctly.
-                //    We do NOT reload to avoid infinite loops.
+                const sourceName = data.source === 'quotation' ? 'Quotation' : 'Proforma';
+                alert(`${sourceName} ${data.proformaNo || data.quotationNo} loaded. Please review and click "Save Invoice".`);
+                window.location.reload();
             }
-
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', applyQuotationData);
-            } else {
-                applyQuotationData();
-            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillData);
+            else fillData();
         } catch(e) {
-            console.error('Quotation loader error:', e);
+            console.error('Conversion loader error:', e);
             localStorage.removeItem('pendingQuotationConversion');
         }
     })();
 
     // ========== NORMAL INVOICE SCRIPT ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
-    cart = cart.map(i => ({ ...i, hsn: i.hsn || '' }));
+    // Ensure each cart item has a unit (fetch from product master if missing)
+    const allProducts = getProducts();
+    cart = cart.map(item => {
+        if (!item.unit) {
+            const prod = allProducts.find(p => p.sku === item.part);
+            item.unit = prod ? (prod.unit || 'pc') : 'pc';
+        }
+        return { ...item, hsn: item.hsn || '' };
+    });
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
@@ -521,6 +504,21 @@
         }
     }
 
+    // Packing & Forwarding functions
+    function calculatePackingCharges() {
+        const cartons = parseFloat(document.getElementById('packingCartons').value) || 0;
+        const rate = parseFloat(document.getElementById('packingRate').value) || 0;
+        const total = cartons * rate;
+        document.getElementById('packingTotal').value = total.toFixed(2);
+        document.getElementById('packingChargeDisplay').innerText = total.toFixed(2);
+        updateTotalsWithPacking();
+    }
+
+    function getPackingCharge() {
+        return parseFloat(document.getElementById('packingTotal').value) || 0;
+    }
+
+    // GST logic (unchanged)
     function isLocalGst() {
         const gst = document.getElementById('buyerGstin').value.trim();
         return gst.startsWith('19');
@@ -541,6 +539,7 @@
     }
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
+    // Financial year & invoice numbering (unchanged)
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -555,7 +554,7 @@
         let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
         let maxNumber = 0;
         allInvoices.forEach(inv => {
-            if (inv.invoiceType === type && inv.invoiceNo.startsWith(prefix)) {
+            if (inv.invoiceType === type && inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
                 const match = inv.invoiceNo.match(/(\d+)$/);
                 if (match) {
                     const num = parseInt(match[1]);
@@ -575,11 +574,8 @@
     function computeDueDate(invoiceDate, type, paymentTermsDays) {
         const date = new Date(invoiceDate);
         if (type === 'cash') return date;
-        if (paymentTermsDays && !isNaN(paymentTermsDays)) {
-            date.setDate(date.getDate() + paymentTermsDays);
-        } else {
-            date.setDate(date.getDate() + 30);
-        }
+        if (paymentTermsDays && !isNaN(paymentTermsDays)) date.setDate(date.getDate() + paymentTermsDays);
+        else date.setDate(date.getDate() + 30);
         return date;
     }
 
@@ -602,7 +598,8 @@
         updateDueDate();
     }
 
-    function calculateTotalsAndTaxGroups() {
+    // Calculate totals EXCLUDING packing charges (for taxable part)
+    function calculateTaxableTotals() {
         let sub = 0;
         let taxGroups = {};
         const isLocal = isLocalGst();
@@ -629,9 +626,17 @@
             sgstTotal += taxGroups[hsn].sgst;
             igstTotal += taxGroups[hsn].igst;
         }
-        let grand = sub + (isLocal ? cgstTotal + sgstTotal : igstTotal);
-        grand = Math.round(grand);
-        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, grand, taxGroups, isLocal };
+        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, taxGroups, isLocal };
+    }
+
+    function updateTotalsWithPacking() {
+        const taxableTotals = calculateTaxableTotals();
+        const packing = getPackingCharge();
+        const grand = taxableTotals.subtotal + (taxableTotals.isLocal ? taxableTotals.cgstTotal + taxableTotals.sgstTotal : taxableTotals.igstTotal) + packing;
+        document.getElementById('subtotal').innerText = taxableTotals.subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = taxableTotals.cgstTotal.toFixed(2);
+        document.getElementById('sgstTotal').innerText = taxableTotals.sgstTotal.toFixed(2);
+        document.getElementById('grandTotal').innerText = grand.toFixed(2);
     }
 
     function renderItemsAndTaxSummary() {
@@ -650,41 +655,38 @@
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             itemsHtml += `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
                 <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td style="text-align:center;">${item.qty}</td>
-                <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="text-align:center;">18%</td>
-                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
+                <td style="text-align:center;">${escapeHtml(item.unit || 'pc')}</strong></td>
+                <td style="text-align:center;">${item.qty}</strong></td>
+                <td style="text-align:right;">₹${item.price.toFixed(2)}</strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="text-align:center;">18%</strong></td>
+                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
 
-        const totals = calculateTotalsAndTaxGroups();
-        document.getElementById('subtotal').innerText = totals.subtotal.toFixed(2);
-        document.getElementById('cgstTotal').innerText = totals.cgstTotal.toFixed(2);
-        document.getElementById('sgstTotal').innerText = totals.sgstTotal.toFixed(2);
-        document.getElementById('grandTotal').innerText = totals.grand.toFixed(2);
-
+        const totals = calculateTaxableTotals();
         let taxHtml = '';
         for (let hsn in totals.taxGroups) {
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
+        updateTotalsWithPacking();
     }
 
     function updateDiscount(part, discPercent) {
@@ -708,74 +710,6 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    // ========== OVERRIDE createSalesInvoice to allow zero/negative stock ==========
-    const originalCreateSalesInvoice = window.createSalesInvoice;
-    window.createSalesInvoice = function(invoice) {
-        let products = getProducts();
-        let invTransactions = getInventoryTransactions();
-        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        
-        for (let item of invoice.items) {
-            let product = products.find(p => p.id == item.productId);
-            if (!product) {
-                product = {
-                    id: item.productId,
-                    name: `Product ${item.productId}`,
-                    sku: item.productId,
-                    currentStock: 0,
-                    unit: 'pc',
-                    price: item.price,
-                    reorderLevel: 10,
-                    createdAt: new Date().toISOString()
-                };
-                products.push(product);
-            }
-            let oldStock = product.currentStock || 0;
-            let newStock = oldStock - item.quantity;
-            product.currentStock = newStock;
-            
-            invTransactions.push({
-                id: Date.now() + Math.random(),
-                productId: item.productId,
-                type: 'sales',
-                quantity: -item.quantity,
-                date: invoice.date,
-                ref: invoice.invoiceNo || `INV-${invoice.id}`,
-                balanceAfter: newStock
-            });
-        }
-        saveProducts(products);
-        saveInventoryTransactions(invTransactions);
-        
-        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        salesInvoices.push(invoice);
-        localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
-        
-        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        allInvoices.push(invoice);
-        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-        
-        let customer = customers.find(c => c.email === invoice.customerEmail);
-        if (customer) {
-            customer.outstanding = (customer.outstanding || 0) + invoice.total;
-            localStorage.setItem('customers', JSON.stringify(customers));
-            
-            let customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
-            customerLedger.push({
-                id: Date.now(),
-                customerEmail: invoice.customerEmail,
-                date: invoice.date,
-                type: 'invoice',
-                ref: invoice.invoiceNo || `INV-${invoice.id}`,
-                debit: invoice.total,
-                credit: 0,
-                balance: customer.outstanding
-            });
-            localStorage.setItem('customerLedger', JSON.stringify(customerLedger));
-        }
-        return true;
-    };
-
     function saveInvoice() {
         if (cart.length === 0) {
             alert('Cart empty. Please add items first.');
@@ -783,7 +717,10 @@
         }
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const totals = calculateTotalsAndTaxGroups();
+        const taxableTotals = calculateTaxableTotals();
+        const packing = getPackingCharge();
+        const grandTotal = taxableTotals.subtotal + (taxableTotals.isLocal ? taxableTotals.cgstTotal + taxableTotals.sgstTotal : taxableTotals.igstTotal) + packing;
+
         const finalNo = getNextInvoiceNumber(type);
 
         const buyer = {
@@ -808,7 +745,7 @@
                 state: buyer.state,
                 outstanding: 0,
                 totalPurchased: 0,
-                creditLimit: parseFloat(document.getElementById('creditLimit')?.value) || 50000,
+                creditLimit: 50000,
                 status: 'active',
                 customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
                 createdAt: new Date().toISOString()
@@ -821,37 +758,6 @@
         if (!buyer.email) {
             alert('Customer email is required to link invoice.');
             return;
-        }
-
-        let products = getProducts();
-        let modified = false;
-        for (let item of cart) {
-            let part = item.part ? item.part.trim() : '';
-            if (!part) continue;
-            let existing = products.find(p => p.id === part || p.sku === part);
-            if (!existing) {
-                let newProduct = {
-                    id: part,
-                    name: item.desc || part,
-                    sku: part,
-                    brand: '',
-                    make: '',
-                    group: '',
-                    lineCode: null,
-                    hsn: item.hsn || '',
-                    unit: 'pc',
-                    price: item.price,
-                    currentStock: 0,
-                    reorderLevel: 10,
-                    costPrice: 0,
-                    createdAt: new Date().toISOString()
-                };
-                products.push(newProduct);
-                modified = true;
-            }
-        }
-        if (modified) {
-            saveProducts(products);
         }
 
         const items = cart.map(item => ({
@@ -868,11 +774,14 @@
             date: invoiceDateFormatted,
             customerEmail: buyer.email,
             items: items,
-            total: totals.grand,
+            total: grandTotal,
             invoiceNo: finalNo,
             invoiceType: type,
             status: type === 'cash' ? 'Paid' : 'Pending',
-            grandTotal: totals.grand,
+            grandTotal: grandTotal,
+            packingCharges: packing,
+            cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
+            packingRate: parseFloat(document.getElementById('packingRate').value) || 0,
             buyer: buyer,
             consignee: {
                 name: document.getElementById('consigneeName').value,
@@ -899,20 +808,22 @@
                 hsn: item.hsn || '',
                 qty: item.qty,
                 price: item.price,
-                discount: item.discount || 0
+                discount: item.discount || 0,
+                unit: item.unit || 'pc'
             }))
         };
 
         try {
             createSalesInvoice(invoice);
-            alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced (negative allowed).\nCustomer outstanding updated.\nLedger entry created.`);
+            alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced (negative allowed).\nCustomer outstanding updated.\nLedger entry created.\nPacking charges: ₹${packing.toFixed(2)} (no GST).`);
             localStorage.setItem('invoiceCart', '[]');
-            window.close();
+            setTimeout(() => window.close(), 1000);
         } catch (err) {
             alert('Error saving invoice: ' + err.message);
         }
     }
 
+    // Print and PDF functions (unchanged)
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -992,10 +903,8 @@
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
     updateGstDisplay();
-
-    window.addEventListener('beforeunload', function() {
-        window.createSalesInvoice = originalCreateSalesInvoice;
-    });
+    // Initial packing calculation
+    calculatePackingCharges();
 </script>
 </body>
-    </html>
+                                                                                </html>
