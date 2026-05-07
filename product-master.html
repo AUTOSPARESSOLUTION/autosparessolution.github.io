@@ -79,9 +79,8 @@
     let products = [];
     let editId = null;
 
-    // Helper to always get fresh data from localStorage (via data-manager.js)
     function refreshProducts() {
-        products = getProducts();  // from data-manager.js
+        products = getProducts();
         return products;
     }
 
@@ -107,21 +106,20 @@
         let html = '<table><thead>运转<th>SKU</th><th>Name</th><th>HSN</th><th>Unit</th><th>Price</th><th>Stock</th><th>Reorder</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(p => {
             const lowStock = (p.currentStock || 0) <= (p.reorderLevel || 0);
-            // Convert ID to string for safe onclick
             const productId = String(p.id);
             html += `<tr class="${lowStock ? 'low-stock' : ''}">
-                <td>${escapeHtml(p.sku)}</td>
+                <td>${escapeHtml(p.sku)}</strong></td>
                 <td><strong>${escapeHtml(p.name)}</strong></td>
-                <td>${escapeHtml(p.hsn || '')}</td>
-                <td>${escapeHtml(p.unit || 'pc')}</td>
-                <td>₹${(p.price || 0).toLocaleString()}</td>
-                <td>${(p.currentStock || 0).toLocaleString()}</td>
-                <td>${(p.reorderLevel || 0)}</td>
-                <td>${lowStock ? '⚠️ Low Stock' : 'OK'}</td>
+                <td>${escapeHtml(p.hsn || '')}</strong></td>
+                <td>${escapeHtml(p.unit || 'pc')}</strong></td>
+                <td>₹${(p.price || 0).toLocaleString()}</strong></td>
+                <td>${(p.currentStock || 0).toLocaleString()}</strong></td>
+                <td>${(p.reorderLevel || 0)}</strong></td>
+                <td>${lowStock ? '⚠️ Low Stock' : 'OK'}</strong></td>
                 <td class="action-buttons">
                     <button onclick="editProduct('${productId}')" style="background:#17a2b8;">✏️ Edit</button>
                     <button onclick="deleteProduct('${productId}')" class="btn-danger">🗑️ Delete</button>
-                </td>
+                </strong></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -133,11 +131,18 @@
         const sku = document.getElementById('prodSku').value.trim();
         if (!name || !sku) { alert('Product Name and SKU are required'); return; }
 
-        // Refresh products to avoid overwriting changes made elsewhere
         refreshProducts();
 
+        // Check for duplicate SKU (except when editing the same product)
+        const existing = products.find(p => p.sku === sku && (editId === null || p.id !== editId));
+        if (existing) {
+            alert(`Product with SKU "${sku}" already exists. Please use a unique SKU.`);
+            return;
+        }
+
+        // Use SKU as the permanent ID
         const productData = {
-            id: editId ? String(editId) : String(Date.now()),
+            id: sku,
             name: name,
             sku: sku,
             hsn: document.getElementById('prodHsn').value.trim(),
@@ -153,12 +158,11 @@
             productData.createdAt = new Date().toISOString();
             products.push(productData);
         } else {
-            const index = products.findIndex(p => String(p.id) === String(editId));
+            const index = products.findIndex(p => p.id === editId);
             if (index !== -1) {
                 productData.createdAt = products[index].createdAt;
                 products[index] = productData;
             } else {
-                // If not found (should not happen), just add
                 productData.createdAt = new Date().toISOString();
                 products.push(productData);
             }
@@ -170,8 +174,8 @@
     }
 
     function editProduct(id) {
-        refreshProducts();  // ensure we have latest
-        const product = products.find(p => String(p.id) === String(id));
+        refreshProducts();
+        const product = products.find(p => p.id === id);
         if (!product) return;
         editId = id;
         document.getElementById('formTitle').innerHTML = 'Edit Product';
@@ -188,30 +192,17 @@
 
     function deleteProduct(id) {
         if (!confirm('Delete this product? This may affect existing invoices.')) return;
-        
-        // Refresh products to ensure we have the latest array
         refreshProducts();
-        
-        // Filter out the product (compare as strings)
-        const newProducts = products.filter(p => String(p.id) !== String(id));
-        
+        const newProducts = products.filter(p => p.id !== id);
         if (newProducts.length === products.length) {
-            alert('Product not found. It may have been already deleted.');
+            alert('Product not found.');
             loadProducts();
             return;
         }
-        
-        // Save back to localStorage
         saveProducts(newProducts);
-        
-        // Update global array and refresh display
         products = newProducts;
         displayProducts();
-        
-        // If the deleted product was being edited, clear the form
-        if (editId && String(editId) === String(id)) {
-            clearForm();
-        }
+        if (editId === id) clearForm();
     }
 
     function clearForm() {
@@ -243,7 +234,7 @@
             const priceIdx = headers.indexOf('price') !== -1 ? headers.indexOf('price') : headers.indexOf('sellingprice');
             const stockIdx = headers.indexOf('stock') !== -1 ? headers.indexOf('stock') : null;
             let imported = 0;
-            let products = getProducts(); // fresh from localStorage
+            let products = getProducts();
             for (let i = 1; i < lines.length; i++) {
                 const cols = lines[i].split(',');
                 if (cols.length < 2) continue;
@@ -255,7 +246,7 @@
                 const stock = stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0;
                 if (!products.find(p => p.sku === part)) {
                     products.push({
-                        id: String(Date.now() + Math.random()),
+                        id: part,   // Use SKU as ID
                         name: name,
                         sku: part,
                         hsn: hsn,
@@ -282,7 +273,7 @@
     }
 
     function exportToCSV() {
-        refreshProducts(); // ensure latest
+        refreshProducts();
         let csv = "SKU,Name,HSN,Unit,Price,Current Stock,Reorder Level\n";
         products.forEach(p => {
             csv += `"${p.sku}","${p.name}","${p.hsn || ''}","${p.unit || 'pc'}",${p.price || 0},${p.currentStock || 0},${p.reorderLevel || 0}\n`;
