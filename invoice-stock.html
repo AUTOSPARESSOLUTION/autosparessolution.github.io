@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
-        /* ========== YOUR EXISTING STYLES (unchanged) ========== */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -34,16 +33,54 @@
             .invoice-container {
                 box-shadow: none;
                 border-radius: 0;
-                padding: 0;
+                padding: 0 10px 5px 10px;
                 margin: 0;
-                border: 1px solid #aaa;
+                border: none;
             }
             .company-header {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+                background: #0a7c71;
+                color: white;
+                margin: 0 -10px 10px -10px;
             }
             .items-table th, .tax-summary-table th {
                 background: #f8f9fa !important;
+            }
+            /* Prevent page breaks inside important containers */
+            .qr-box, .signature-row, .packing-section, .totals, .info-box {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .company-header, .totals {
+                page-break-after: avoid;
+                break-after: avoid;
+            }
+            /* Reduce padding/margins for more compact print */
+            .invoice-container {
+                font-size: 10pt;
+            }
+            .info-box, .packing-section {
+                padding: 5px 8px;
+                margin-bottom: 8px;
+            }
+            .items-table td, .items-table th {
+                padding: 4px 3px;
+                font-size: 9pt;
+            }
+            .totals table {
+                margin-top: 5px;
+                margin-bottom: 5px;
+            }
+            .qr-box img {
+                max-width: 80px;
+            }
+            .signature-box {
+                padding-top: 3px;
+            }
+            .footer-legal {
+                margin-top: 8px;
+                padding-top: 5px;
             }
         }
         .company-header {
@@ -69,8 +106,8 @@
         .info-box {
             background: #f8f9fa;
             border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 12px;
+            padding: 8px;
+            margin-bottom: 10px;
             width: 100%;
         }
         .info-box h3 {
@@ -122,21 +159,19 @@
             overflow-wrap: break-word;
             white-space: normal;
         }
-        /* Adjusted column widths to add UOM column */
         .items-table th:nth-child(1) { width: 4%; }
         .items-table th:nth-child(2) { width: 10%; }
         .items-table th:nth-child(3) { width: 12%; }
         .items-table th:nth-child(4) { width: 8%; }
-        .items-table th:nth-child(5) { width: 4%; }
-        .items-table th:nth-child(6) { width: 5%; }   /* UOM column */
-        .items-table th:nth-child(7) { width: 4%; }   /* Qty */
-        .items-table th:nth-child(8) { width: 7%; }   /* Unit Price */
-        .items-table th:nth-child(9) { width: 6%; }   /* Disc % */
-        .items-table th:nth-child(10) { width: 8%; }  /* Taxable */
-        .items-table th:nth-child(11) { width: 6%; }  /* GST% */
-        .items-table th:nth-child(12) { width: 8%; }  /* CGST */
-        .items-table th:nth-child(13) { width: 8%; }  /* SGST */
-        .items-table th:nth-child(14) { width: 8%; }  /* Total */
+        .items-table th:nth-child(5) { width: 5%; }   /* UOM */
+        .items-table th:nth-child(6) { width: 4%; }   /* Qty */
+        .items-table th:nth-child(7) { width: 7%; }   /* Price */
+        .items-table th:nth-child(8) { width: 6%; }   /* Disc % */
+        .items-table th:nth-child(9) { width: 8%; }   /* Taxable */
+        .items-table th:nth-child(10) { width: 6%; }  /* GST% */
+        .items-table th:nth-child(11) { width: 8%; }  /* CGST */
+        .items-table th:nth-child(12) { width: 8%; }  /* SGST */
+        .items-table th:nth-child(13) { width: 8%; }  /* Total */
         .items-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .tax-summary-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
@@ -145,16 +180,16 @@
         .qr-box, .carton-box {
             background: #f8f9fa;
             border-radius: 6px;
-            padding: 10px;
-            margin: 12px 0;
+            padding: 8px;
+            margin: 8px 0;
             border: 1px solid #dee2e6;
         }
         .qr-box img { max-width: 120px; height: auto; }
         .signature-row {
             display: flex;
             justify-content: space-between;
-            margin-top: 20px;
-            gap: 20px;
+            margin-top: 12px;
+            gap: 15px;
         }
         .signature-box {
             text-align: center;
@@ -165,10 +200,10 @@
         .footer-legal {
             font-size: 9px;
             text-align: center;
-            margin-top: 20px;
+            margin-top: 10px;
             color: #555;
             border-top: 1px solid #dee2e6;
-            padding-top: 10px;
+            padding-top: 8px;
         }
         .actions {
             margin-top: 30px;
@@ -202,10 +237,9 @@
             color: #777;
             margin-top: 10px;
         }
-        /* New styles for Packing & Forwarding */
         .packing-section {
             background: #f8f9fa;
-            padding: 10px 15px;
+            padding: 8px 15px;
             border-radius: 8px;
             margin: 15px 0;
             display: flex;
@@ -231,6 +265,11 @@
         .packing-total {
             font-weight: bold;
             color: #0a7c71;
+        }
+        /* Ensure no page breaks inside these blocks (screen + print) */
+        .qr-box, .signature-row, .packing-section, .totals {
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
     </style>
     <script src="data-manager.js"></script>
@@ -267,7 +306,7 @@
         </div>
     </div>
 
-    <!-- Buyer and Consignee (unchanged) -->
+    <!-- Buyer and Consignee -->
     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
@@ -298,7 +337,7 @@
         </div>
     </div>
 
-    <!-- Order and Dispatch Details (unchanged) -->
+    <!-- Order and Dispatch Details -->
     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <div style="flex: 1;">
             <div class="info-box">
@@ -320,7 +359,7 @@
         </div>
     </div>
 
-    <!-- Items Table (with UOM column added) -->
+    <!-- Items Table with UOM column -->
     <table class="items-table">
         <thead>
             <tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>UOM</th><th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
@@ -347,26 +386,25 @@
         </div>
     </div>
 
-    <!-- Tax Summary Table (unchanged) -->
+    <!-- Tax Summary Table -->
     <table class="tax-summary-table">
         <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
-    <!-- Totals (with packing charges added) -->
+    <!-- Totals (with packing row) -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></strong></tr>
-            <tr id="packingRow" style="border-top:1px solid #dee2e6;">
-                <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></strong></td>
-            </tr>
-            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></strong></tr>
-            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></strong></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></strong></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr id="packingRow">
+                <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
-    <!-- Payment QR and Bank Details (unchanged) -->
+    <!-- Payment QR and Bank Details -->
     <div class="qr-box">
         <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
             <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
@@ -421,10 +459,11 @@
                     const el = document.getElementById(id);
                     if (el) el.value = val || '';
                 }
-                // For quotation/proforma, we need to fetch UOM from product master
+                // Fetch unit from product master for each item
+                const allProds = getProducts();
                 const cartItems = data.items.map(item => {
-                    const product = getProducts().find(p => p.sku === item.part);
-                    const unit = product ? (product.unit || 'pc') : 'pc';
+                    const prod = allProds.find(p => p.sku === item.part);
+                    const unit = prod ? (prod.unit || 'pc') : 'pc';
                     return {
                         part: item.part,
                         desc: item.desc,
@@ -451,7 +490,6 @@
 
     // ========== NORMAL INVOICE SCRIPT ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
-    // Ensure each cart item has a unit (fetch from product master if missing)
     const allProducts = getProducts();
     cart = cart.map(item => {
         if (!item.unit) {
@@ -518,7 +556,7 @@
         return parseFloat(document.getElementById('packingTotal').value) || 0;
     }
 
-    // GST logic (unchanged)
+    // GST logic
     function isLocalGst() {
         const gst = document.getElementById('buyerGstin').value.trim();
         return gst.startsWith('19');
@@ -539,7 +577,7 @@
     }
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
-    // Financial year & invoice numbering (unchanged)
+    // Financial year & invoice numbering
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -823,7 +861,6 @@
         }
     }
 
-    // Print and PDF functions (unchanged)
     function printInvoice() {
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
@@ -873,7 +910,7 @@
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
         const opt = {
-            margin: [0.2, 0.2, 0.2, 0.2],
+            margin: [0.3, 0.3, 0.3, 0.3],
             filename: `Invoice_${document.getElementById('invoiceNo').innerText}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, letterRendering: true, useCORS: true },
@@ -903,8 +940,7 @@
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
     updateGstDisplay();
-    // Initial packing calculation
     calculatePackingCharges();
 </script>
 </body>
-                                                                                </html>
+                    </html>
