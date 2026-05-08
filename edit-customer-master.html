@@ -51,8 +51,6 @@
         button:hover { background: #09645a; }
         .btn-warning { background: #ffc107; color: #333; }
         .btn-warning:hover { background: #e0a800; }
-        .btn-danger { background: #dc3545; }
-        .btn-danger:hover { background: #c82333; }
         .form-row {
             display: flex;
             flex-wrap: wrap;
@@ -62,15 +60,21 @@
             flex: 1;
             min-width: 180px;
         }
-        hr {
-            margin: 15px 0;
-            border-color: #dee2e6;
+        hr { margin: 15px 0; }
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 8px;
+            font-size: 12px;
+            margin-bottom: 15px;
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
 <div class="container">
     <h1><i class="fas fa-user-edit"></i> Edit Customer</h1>
+    <div id="debugInfo" class="debug-info"></div>
     <hr>
 
     <div class="form-group">
@@ -144,21 +148,36 @@
     }
 
     function loadCustomer() {
-        const id = getCustomerIdFromUrl();
-        if (!id) {
-            alert('No customer ID provided.');
-            window.close();
+        const idParam = getCustomerIdFromUrl();
+        const debugDiv = document.getElementById('debugInfo');
+        debugDiv.innerHTML = `Received ID from URL: <strong>${idParam}</strong> (type: ${typeof idParam})<br>`;
+
+        if (!idParam) {
+            debugDiv.innerHTML += '❌ No ID provided. Please go back and click Edit again.';
             return;
         }
-        customerId = id;
+
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        const customer = customers.find(c => String(c.id) === String(id));
+        debugDiv.innerHTML += `Total customers in storage: ${customers.length}<br>`;
+
+        // Try to find by exact ID match (as string)
+        let customer = customers.find(c => String(c.id) === String(idParam));
         if (!customer) {
-            alert('Customer not found. It may have been deleted.');
-            window.close();
-            return;
+            // If not found, try to find by customerCode (in case the ID passed is actually the code)
+            customer = customers.find(c => c.customerCode === idParam);
+            if (customer) {
+                debugDiv.innerHTML += `✅ Found by customerCode: ${customer.customerCode}<br>`;
+            } else {
+                debugDiv.innerHTML += `❌ No customer found with ID = "${idParam}" or customerCode = "${idParam}".<br>`;
+                debugDiv.innerHTML += `Available IDs: ${customers.map(c => `${c.customerCode} (id: ${c.id})`).join(', ')}`;
+                return;
+            }
+        } else {
+            debugDiv.innerHTML += `✅ Found by ID: ${customer.id}<br>`;
         }
-        // Fill form (customer code is read‑only)
+
+        customerId = customer.id;
+        // Fill form
         document.getElementById('custCode').value = customer.customerCode || '';
         document.getElementById('custName').value = customer.name || '';
         document.getElementById('custEmail').value = customer.email || '';
@@ -173,6 +192,11 @@
     }
 
     function updateCustomer() {
+        if (!customerId) {
+            alert('No customer loaded. Please refresh and try again.');
+            return;
+        }
+
         const name = document.getElementById('custName').value.trim();
         const email = document.getElementById('custEmail').value.trim();
         const phone = document.getElementById('custPhone').value.trim();
@@ -184,7 +208,7 @@
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const index = customers.findIndex(c => String(c.id) === String(customerId));
         if (index === -1) {
-            alert('Customer not found in storage.');
+            alert('Customer not found in storage. It may have been deleted.');
             window.close();
             return;
         }
@@ -207,7 +231,7 @@
         customers[index] = updatedCustomer;
         localStorage.setItem('customers', JSON.stringify(customers));
 
-        // Also sync to users (if the users array exists)
+        // Sync to users
         try {
             let users = JSON.parse(localStorage.getItem('users') || '[]');
             const userIdx = users.findIndex(u => u.email === updatedCustomer.email);
@@ -229,7 +253,7 @@
         } catch(e) { console.warn('User sync failed', e); }
 
         alert('Customer updated successfully!');
-        window.close(); // close this edit window – the main page will refresh automatically when you return
+        window.close();
     }
 
     loadCustomer();
