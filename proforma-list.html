@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proforma Invoices – Auto Spares</title>
+    <title>Create Proforma Invoice – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -16,388 +16,387 @@
             padding: 20px;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         }
-        h1 { color: #0a7c71; }
-        .search-box {
+        h1, h2 { color: #0a7c71; }
+        .form-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .form-row {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
             flex-wrap: wrap;
-            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
         }
-        table {
+        .form-group {
+            flex: 1;
+            min-width: 180px;
+        }
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #555;
+        }
+        input, select, textarea {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
         }
-        th, td {
-            border: 1px solid #dee2e6;
-            padding: 10px;
-            text-align: left;
-            vertical-align: top;
-        }
-        th { background: #0a7c71; color: white; }
         button {
             background: #0a7c71;
             color: white;
             border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
+            padding: 8px 16px;
+            border-radius: 6px;
             cursor: pointer;
-            margin: 2px;
+            margin-right: 10px;
         }
-        .btn-pdf { background: #e67e22; }
-        .btn-edit { background: #17a2b8; }
-        .btn-delete { background: #dc3545; }
-        .btn-convert { background: #28a745; }
-        .debug {
-            background: #fff3cd;
-            border: 1px solid #ffeeba;
-            padding: 10px;
-            margin-bottom: 20px;
-            font-family: monospace;
-            font-size: 12px;
-            display: none;
-        }
-        /* Modal styles (same as quotations) */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 10000;
-            left: 0;
-            top: 0;
+        button:hover { background: #09645a; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .items-table {
             width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            align-items: center;
-            justify-content: center;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 12px;
         }
-        .modal-content {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            max-width: 400px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        .items-table th, .items-table td {
+            border: 1px solid #dee2e6;
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
         }
-        .modal-content h3 {
-            margin-top: 0;
-            color: #0a7c71;
+        .items-table th { background: #f8f9fa; }
+        .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .add-item { background: #28a745; margin-bottom: 15px; }
+        .totals {
+            text-align: right;
+            margin-top: 20px;
+            font-size: 14px;
         }
-        .modal-options {
-            margin: 20px 0;
+        .totals table {
+            width: 300px;
+            margin-left: auto;
+        }
+        .totals td { padding: 5px; }
+        .actions {
+            margin-top: 30px;
             display: flex;
-            gap: 20px;
-            justify-content: center;
-        }
-        .modal-options label {
-            font-size: 16px;
-            cursor: pointer;
-        }
-        .modal-buttons button {
-            margin: 0 10px;
-            padding: 8px 20px;
+            justify-content: flex-end;
+            gap: 15px;
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1><i class="fas fa-file-invoice"></i> Proforma Invoices</h1>
-        <a href="proforma-invoice.html" style="background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;"><i class="fas fa-plus"></i> New Proforma</a>
+    <h1><i class="fas fa-file-invoice"></i> Proforma Invoice</h1>
+    <hr>
+
+    <!-- Customer Details -->
+    <div class="form-section">
+        <h2>Customer Information</h2>
+        <div class="form-row">
+            <div class="form-group"><label>Customer Name *</label><input type="text" id="custName" placeholder="Customer name"></div>
+            <div class="form-group"><label>Customer Email *</label><input type="email" id="custEmail" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Phone</label><input type="text" id="custPhone" placeholder="Phone"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Address</label><textarea id="custAddress" rows="2" placeholder="Address"></textarea></div>
+            <div class="form-group"><label>GSTIN</label><input type="text" id="custGstin" placeholder="GSTIN"></div>
+            <div class="form-group"><label>State</label><input type="text" id="custState" placeholder="State"></div>
+        </div>
     </div>
 
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by Proforma No, Customer..." style="flex:1; padding: 8px;">
-        <button onclick="filterProformas()"><i class="fas fa-search"></i> Search</button>
-        <button onclick="loadProformas()"><i class="fas fa-sync-alt"></i> Refresh</button>
-        <button onclick="exportToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
-        <button onclick="toggleDebug()"><i class="fas fa-bug"></i> Debug</button>
+    <!-- Proforma Details -->
+    <div class="form-section">
+        <h2>Proforma Details</h2>
+        <div class="form-row">
+            <div class="form-group"><label>Proforma No.</label><input type="text" id="proformaNo" placeholder="Auto if blank"></div>
+            <div class="form-group"><label>Date</label><input type="date" id="proformaDate"></div>
+            <div class="form-group"><label>Valid Until</label><input type="date" id="validUntil"></div>
+        </div>
     </div>
 
-    <div id="debugPanel" class="debug"></div>
-    <div id="proformasTable"></div>
-    <button onclick="window.location.href='index.html'" style="margin-top: 20px;">Back to Dashboard</button>
-</div>
+    <!-- Items Table -->
+    <h2>Items</h2>
+    <div id="itemsContainer"></div>
+    <button class="add-item" onclick="addItemRow()"><i class="fas fa-plus"></i> Add Item</button>
 
-<!-- Modal for selecting invoice type (same as quotations) -->
-<div id="invoiceTypeModal" class="modal">
-    <div class="modal-content">
-        <h3><i class="fas fa-file-invoice"></i> Select Invoice Type</h3>
-        <div class="modal-options">
-            <label><input type="radio" name="invType" value="cash" checked> Cash Bill</label>
-            <label><input type="radio" name="invType" value="credit"> Credit Bill</label>
-        </div>
-        <div class="modal-buttons">
-            <button onclick="proceedConversion()">Convert</button>
-            <button onclick="closeModal()">Cancel</button>
-        </div>
+    <!-- Totals -->
+    <div class="totals">
+        <table>
+            <tr><td style="text-align:right;">Subtotal:</td><td>₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%):</td><td>₹<span id="cgst">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%):</td><td>₹<span id="sgst">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td>₹<span id="grandTotal">0.00</span></td></tr>
+        </table>
+    </div>
+
+    <div class="actions">
+        <button onclick="saveProforma()">💾 Save Proforma</button>
+        <button class="btn-warning" onclick="generatePDF()">📄 Save as PDF</button>
+        <button onclick="window.close()">Cancel</button>
     </div>
 </div>
 
 <script>
-    let proformas = [];
-    let pendingProformaId = null;
+    // ========== EDIT LOADER ==========
+    (function loadEditData() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('edit') === '1') {
+            const editData = localStorage.getItem('editProformaData');
+            if (editData) {
+                try {
+                    const proforma = JSON.parse(editData);
+                    // Fill customer details
+                    document.getElementById('custName').value = proforma.customer.name || '';
+                    document.getElementById('custEmail').value = proforma.customer.email || '';
+                    document.getElementById('custPhone').value = proforma.customer.phone || '';
+                    document.getElementById('custAddress').value = proforma.customer.address || '';
+                    document.getElementById('custGstin').value = proforma.customer.gstin || '';
+                    document.getElementById('custState').value = proforma.customer.state || '';
+                    // Proforma details
+                    document.getElementById('proformaNo').value = proforma.proformaNo || '';
+                    document.getElementById('proformaDate').value = proforma.date || new Date().toISOString().slice(0,10);
+                    document.getElementById('validUntil').value = proforma.validUntil || '';
+                    // Items
+                    items = proforma.items.map(item => ({
+                        part: item.part || '',
+                        desc: item.desc || '',
+                        hsn: item.hsn || '',
+                        qty: item.qty || 1,
+                        price: item.price || 0,
+                        discount: item.discount || 0
+                    }));
+                    renderItems();
+                    recalcTotals();
+                    alert(`Editing proforma ${proforma.proformaNo}. Make changes and save.`);
+                    localStorage.removeItem('editProformaData');
+                } catch(e) { console.error('Edit load error', e); }
+            }
+        }
+    })();
 
-    function loadProformas() {
-        let raw = localStorage.getItem('proformas');
-        if (!raw) raw = '[]';
-        try {
-            proformas = JSON.parse(raw);
-        } catch(e) { proformas = []; }
-        
-        proformas = proformas.map(p => {
-            let customer = p.customer || {};
-            if (!customer.name && p.customerName) customer.name = p.customerName;
-            if (!customer.email && p.customerEmail) customer.email = p.customerEmail;
-            if (!customer.phone && p.customerPhone) customer.phone = p.customerPhone;
-            if (!customer.address && p.customerAddress) customer.address = p.customerAddress;
-            if (!customer.gstin && p.customerGstin) customer.gstin = p.customerGstin;
-            if (!customer.state && p.customerState) customer.state = p.customerState;
-            
-            return {
-                id: String(p.id || p.proformaId || Date.now()),
-                proformaNo: p.proformaNo || p.invoiceNo || 'N/A',
-                date: p.date || (p.createdAt ? p.createdAt.slice(0,10) : 'N/A'),
-                validUntil: p.validUntil || p.validTill || '',
-                customer: customer,
-                items: p.items || [],
-                subtotal: p.subtotal || 0,
-                cgst: p.cgst || 0,
-                sgst: p.sgst || 0,
-                grandTotal: p.grandTotal || p.total || 0
-            };
-        });
-        
-        localStorage.setItem('proformas', JSON.stringify(proformas));
-        displayProformas();
+    let items = [];  // each item: { part, desc, hsn, qty, price, discount }
+
+    // Set default date
+    document.getElementById('proformaDate').valueAsDate = new Date();
+    const validDate = new Date();
+    validDate.setDate(validDate.getDate() + 15);
+    document.getElementById('validUntil').valueAsDate = validDate;
+
+    function addItemRow() {
+        items.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0 });
+        renderItems();
+        recalcTotals();
     }
 
-    function displayProformas(filter = '') {
-        if (proformas.length === 0) {
-            document.getElementById('proformasTable').innerHTML = '<p>No proforma invoices found. Click "Debug" to see raw storage.</p>';
+    function removeItemRow(idx) {
+        items.splice(idx, 1);
+        renderItems();
+        recalcTotals();
+    }
+
+    function updateItem(idx, field, value) {
+        items[idx][field] = value;
+        recalcTotals();
+    }
+
+    function renderItems() {
+        const container = document.getElementById('itemsContainer');
+        if (items.length === 0) {
+            container.innerHTML = '<p>No items added. Click "Add Item" to start.</p>';
             return;
         }
-        
-        let filtered = proformas;
-        if (filter) {
-            const term = filter.toLowerCase();
-            filtered = proformas.filter(p => 
-                p.proformaNo.toLowerCase().includes(term) ||
-                (p.customer.name && p.customer.name.toLowerCase().includes(term)) ||
-                (p.customer.email && p.customer.email.toLowerCase().includes(term))
-            );
-        }
-        
-        if (filtered.length === 0) {
-            document.getElementById('proformasTable').innerHTML = '<p>No matching proformas found.</p>';
-            return;
-        }
-        
-        filtered.sort((a,b) => b.proformaNo.localeCompare(a.proformaNo));
-        let html = '<table><thead>运转<th>#</th><th>Proforma No</th><th>Date</th><th>Customer</th><th>Amount (₹)</th><th>Valid Until</th><th>Actions</th></tr></thead><tbody>';
-        filtered.forEach((p, idx) => {
+        let html = '<table class="items-table"><thead><tr><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th><th></th></tr></thead><tbody>';
+        items.forEach((item, idx) => {
+            const taxable = item.qty * item.price * (1 - item.discount / 100);
+            const cgst = taxable * 0.09;
+            const sgst = taxable * 0.09;
+            const total = taxable + cgst + sgst;
             html += `<tr>
                 <td>${idx+1}</td>
-                <td><strong>${escapeHtml(p.proformaNo)}</strong></td>
-                <td>${p.date}</td>
-                <td>${escapeHtml(p.customer.name || p.customer.email || '?')}</td>
-                <td>₹${p.grandTotal.toFixed(2)}</strong></td>
-                <td>${p.validUntil || '-'}</td>
-                <td><div style="display:flex; gap:5px; flex-wrap:wrap;">
-                    <button class="btn-pdf" onclick="generatePDF('${p.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
-                    <button class="btn-convert" onclick="openTypeModal('${p.id}')"><i class="fas fa-exchange-alt"></i> Convert</button>
-                    <button class="btn-edit" onclick="editProforma('${p.id}')"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn-delete" onclick="deleteProforma('${p.id}')"><i class="fas fa-trash"></i> Delete</button>
-                </div></td>
+                <td><input type="text" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="width:100%;"></td>
+                <td><input type="text" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="width:100%;"></td>
+                <td><input type="text" value="${escapeHtml(item.hsn)}" onchange="updateItem(${idx}, 'hsn', this.value)" style="width:100%;"></td>
+                <td><input type="number" value="${item.qty}" step="1" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="width:70px;"></td>
+                <td><input type="number" value="${item.price}" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))" style="width:90px;"></td>
+                <td><input type="number" value="${item.discount}" step="0.01" onchange="updateItem(${idx}, 'discount', parseFloat(this.value))" style="width:70px;"></td>
+                <td style="text-align:right;">${taxable.toFixed(2)}</td>
+                <td style="text-align:right;">${cgst.toFixed(2)}</td>
+                <td style="text-align:right;">${sgst.toFixed(2)}</td>
+                <td style="text-align:right;">${total.toFixed(2)}</td>
+                <td><button class="remove-item" onclick="removeItemRow(${idx})">X</button></td>
             </tr>`;
         });
         html += '</tbody></table>';
-        document.getElementById('proformasTable').innerHTML = html;
+        container.innerHTML = html;
     }
 
-    function generatePDF(id) {
-        const proforma = proformas.find(p => p.id == id);
-        if (!proforma) { alert('Proforma not found'); return; }
+    function recalcTotals() {
+        let subtotal = 0;
+        items.forEach(item => {
+            const taxable = item.qty * item.price * (1 - item.discount / 100);
+            subtotal += taxable;
+        });
+        const cgst = subtotal * 0.09;
+        const sgst = subtotal * 0.09;
+        const grand = subtotal + cgst + sgst;
+        document.getElementById('subtotal').innerText = subtotal.toFixed(2);
+        document.getElementById('cgst').innerText = cgst.toFixed(2);
+        document.getElementById('sgst').innerText = sgst.toFixed(2);
+        document.getElementById('grandTotal').innerText = grand.toFixed(2);
+        return { subtotal, cgst, sgst, grand };
+    }
+
+    function getFinancialYear() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        return (month >= 4) ? `${year}-${(year+1).toString().slice(-2)}` : `${year-1}-${year.toString().slice(-2)}`;
+    }
+
+    function getNextProformaNumber() {
+        const finYear = getFinancialYear();
+        let maxNum = 0;
+        const prefix = `PRO/${finYear}/`;
+        const all = JSON.parse(localStorage.getItem('proformas') || '[]');
+        all.forEach(p => {
+            const no = p.proformaNo || '';
+            if (no.startsWith(prefix)) {
+                const match = no.match(/\/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > maxNum) maxNum = num;
+                }
+            }
+        });
+        return prefix + (maxNum + 1).toString().padStart(4, '0');
+    }
+
+    function saveProforma() {
+        const name = document.getElementById('custName').value.trim();
+        const email = document.getElementById('custEmail').value.trim();
+        if (!name || !email) { alert('Customer name and email are required'); return; }
+        if (items.length === 0) { alert('Please add at least one item'); return; }
+
+        let proformaNo = document.getElementById('proformaNo').value.trim();
+        if (!proformaNo) proformaNo = getNextProformaNumber();
+
+        const totals = recalcTotals();
+
+        const proforma = {
+            id: Date.now(),
+            proformaNo: proformaNo,
+            date: document.getElementById('proformaDate').value,
+            validUntil: document.getElementById('validUntil').value,
+            customer: {
+                name: name,
+                email: email,
+                phone: document.getElementById('custPhone').value,
+                address: document.getElementById('custAddress').value,
+                gstin: document.getElementById('custGstin').value,
+                state: document.getElementById('custState').value
+            },
+            items: items.map(i => ({ ...i })),
+            subtotal: totals.subtotal,
+            cgst: totals.cgst,
+            sgst: totals.sgst,
+            grandTotal: totals.grand,
+            createdAt: new Date().toISOString()
+        };
+
+        let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
+        proformas.push(proforma);
+        localStorage.setItem('proformas', JSON.stringify(proformas));
+        alert(`Proforma ${proformaNo} saved successfully!`);
+        window.location.href = 'proformas.html';
+    }
+
+    function generatePDF() {
+        // Build a printable clone of the current proforma
+        const name = document.getElementById('custName').value.trim();
+        const email = document.getElementById('custEmail').value.trim();
+        if (!name || !email) { alert('Customer details required before PDF'); return; }
+        if (items.length === 0) { alert('No items to generate PDF'); return; }
+
         const container = document.createElement('div');
         container.style.maxWidth = '1200px';
         container.style.margin = '0 auto';
         container.style.backgroundColor = 'white';
         container.style.padding = '0 15px 15px 15px';
         container.style.fontFamily = 'Roboto, sans-serif';
-        
+
         let itemsHtml = '';
-        (proforma.items || []).forEach((item, idx) => {
-            const qty = item.qty || 1;
-            const price = item.price || 0;
-            const disc = item.discount || 0;
-            const taxable = qty * price * (1 - disc/100);
+        items.forEach((item, idx) => {
+            const taxable = item.qty * item.price * (1 - item.discount / 100);
             const cgst = taxable * 0.09;
             const sgst = taxable * 0.09;
             const total = taxable + cgst + sgst;
             itemsHtml += `<tr>
                 <td style="border:1px solid #dee2e6; padding:4px;">${idx+1}</td>
-                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.part || '')}</td>
-                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.desc || '')}</td>
-                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.hsn || '')}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${qty}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${price.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${disc}%</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">18%</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</strong></td>
-                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.part)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.desc)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px;">${escapeHtml(item.hsn)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${item.qty}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${item.price.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:center;">${item.discount}%</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${cgst.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${sgst.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:4px; text-align:right;">₹${total.toFixed(2)}</td>
             </tr>`;
         });
-        
+
+        const totals = recalcTotals();
         container.innerHTML = `
             <div style="background:#0a7c71; color:white; padding:15px 20px; display:flex; justify-content:space-between; margin:0 -15px 15px -15px;">
                 <div><div style="font-size:24px;">Auto Spares Solution</div><div>GSTIN: 19ANOPD3300R1ZO</div><div>101, 1st floor, Howrah, WB 711108</div></div>
-                <div style="text-align:right;"><div style="font-size:20px;">PROFORMA INVOICE</div><div>${proforma.proformaNo}</div><div>${proforma.date}</div><div>Valid Till: ${proforma.validUntil}</div></div>
+                <div style="text-align:right;"><div style="font-size:20px;">PROFORMA INVOICE</div><div>${document.getElementById('proformaNo').value || 'NEW'}</div><div>${document.getElementById('proformaDate').value}</div><div>Valid Till: ${document.getElementById('validUntil').value}</div></div>
             </div>
             <div style="background:#f8f9fa; padding:10px; margin-bottom:15px;">
-                <strong>Customer:</strong> ${escapeHtml(proforma.customer.name)}<br>
-                ${escapeHtml(proforma.customer.address)}<br>
-                GSTIN: ${escapeHtml(proforma.customer.gstin)} | State: ${escapeHtml(proforma.customer.state)}<br>
-                Phone: ${escapeHtml(proforma.customer.phone)} | Email: ${escapeHtml(proforma.customer.email)}
+                <strong>Customer:</strong> ${escapeHtml(name)}<br>
+                ${escapeHtml(document.getElementById('custAddress').value)}<br>
+                GSTIN: ${escapeHtml(document.getElementById('custGstin').value)} | State: ${escapeHtml(document.getElementById('custState').value)}<br>
+                Phone: ${escapeHtml(document.getElementById('custPhone').value)} | Email: ${escapeHtml(email)}
             </div>
             <table style="width:100%; border-collapse:collapse; font-size:11px;">
-                <thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
+                <thead><tr style="background:#f8f9fa;"><th>#</th><th>Part No</th><th>Description</th><th>HSN</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Taxable</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
                 <tbody>${itemsHtml}</tbody>
             </table>
             <div style="text-align:right; margin-top:10px;">
                 <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹${proforma.subtotal.toFixed(2)}</strong></td></tr>
-                    <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹${proforma.cgst.toFixed(2)}</strong></td></tr>
-                    <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹${proforma.sgst.toFixed(2)}</strong></td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹${proforma.grandTotal.toFixed(2)}</strong></td></tr>
-                60
+                    <tr><td style="text-align:right;">Subtotal:</td><td style="text-align:right;">₹${totals.subtotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹${totals.cgst.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹${totals.sgst.toFixed(2)}</td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹${totals.grand.toFixed(2)}</td></tr>
+                </table>
             </div>
             <div style="margin-top:20px; border-top:1px solid #aaa; padding-top:10px; text-align:center; font-size:10px;">
                 This is a proforma invoice – not a tax invoice. Valid for 15 days. Thank you for your business.
             </div>
         `;
-        html2pdf().set({ margin: 0.2, filename: `Proforma_${proforma.proformaNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4' } }).from(container).save();
-    }
 
-    // --- MODIFIED CONVERSION: modal + redirect (same as quotations) ---
-    function openTypeModal(proformaId) {
-        const proforma = proformas.find(p => p.id == proformaId);
-        if (!proforma) {
-            loadProformas();
-            return;
-        }
-        pendingProformaId = String(proformaId);
-        document.getElementById('invoiceTypeModal').style.display = 'flex';
-    }
-
-    function closeModal() {
-        document.getElementById('invoiceTypeModal').style.display = 'none';
-        pendingProformaId = null;
-    }
-
-    function proceedConversion() {
-        if (!pendingProformaId) {
-            closeModal();
-            return;
-        }
-        const proforma = proformas.find(p => p.id === pendingProformaId);
-        if (!proforma) {
-            alert('Proforma not found. It may have been deleted.');
-            loadProformas();
-            closeModal();
-            return;
-        }
-
-        const invType = document.querySelector('input[name="invType"]:checked').value;
-        closeModal();
-
-        if (!proforma.customer.email) {
-            alert('Customer email missing. Cannot convert to invoice.');
-            return;
-        }
-
-        // Prepare data for the professional invoice page
-        const conversionData = {
-            source: 'proforma',               // <-- tells invoice page it's from proforma
-            proformaId: proforma.id,
-            proformaNo: proforma.proformaNo,
-            invoiceType: invType,
-            customer: {
-                name: proforma.customer.name || '',
-                email: proforma.customer.email,
-                phone: proforma.customer.phone || '',
-                address: proforma.customer.address || '',
-                gstin: proforma.customer.gstin || '',
-                state: proforma.customer.state || ''
-            },
-            items: proforma.items.map(item => ({
-                part: item.part,
-                desc: item.desc,
-                hsn: item.hsn || '',
-                qty: item.qty,
-                price: item.price,
-                discount: item.discount || 0
-            })),
-            grandTotal: proforma.grandTotal
-        };
-
-        localStorage.setItem('pendingQuotationConversion', JSON.stringify(conversionData));
-        window.location.href = 'invoice.html?fromProforma=1';
-    }
-
-    function editProforma(id) {
-        localStorage.setItem('editProformaId', id);
-        window.open('edit-proforma.html', '_blank');
-    }
-
-    function deleteProforma(id, ask = true) {
-        if (ask && !confirm('Delete this proforma?')) return;
-        proformas = proformas.filter(p => p.id != id);
-        localStorage.setItem('proformas', JSON.stringify(proformas));
-        loadProformas();
-    }
-
-    function filterProformas() {
-        displayProformas(document.getElementById('searchInput').value.toLowerCase());
-    }
-
-    function exportToCSV() {
-        if (!proformas.length) return;
-        let csv = "Proforma No,Date,Customer,Amount,Valid Until\n";
-        proformas.forEach(p => {
-            csv += `"${p.proformaNo}",${p.date},"${p.customer.name || p.customer.email}",${p.grandTotal},${p.validUntil}\n`;
-        });
-        const blob = new Blob([csv], {type:'text/csv'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'proformas_list.csv';
-        a.click();
-        URL.revokeObjectURL(blob);
-    }
-
-    function toggleDebug() {
-        const panel = document.getElementById('debugPanel');
-        if (panel.style.display === 'none' || panel.style.display === '') {
-            let raw = localStorage.getItem('proformas');
-            panel.innerHTML = `<strong>Raw localStorage 'proformas':</strong><br>${raw || 'null'}`;
-            panel.style.display = 'block';
-        } else {
-            panel.style.display = 'none';
-        }
+        html2pdf().set({ margin: 0.2, filename: `Proforma_${document.getElementById('proformaNo').value || 'new'}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4' } }).from(container).save();
     }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
-    loadProformas();
+    // Initialise with one empty row
+    if (items.length === 0) addItemRow();
 </script>
 </body>
-            </html>
+</html>
