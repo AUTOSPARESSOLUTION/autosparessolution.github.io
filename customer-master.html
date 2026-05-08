@@ -200,16 +200,10 @@
 
     function loadCustomers() {
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        // ----- FIX: Ensure every customer has an ID as string and other defaults -----
-        customers = customers.map(c => {
-            return {
-                ...c,
-                id: String(c.id || Date.now()),
-                customerCode: c.customerCode || generateCustomerCode(),
-                outstanding: c.outstanding !== undefined ? c.outstanding : 0,
-                totalPurchased: c.totalPurchased !== undefined ? c.totalPurchased : 0,
-                status: c.status || 'active'
-            };
+        customers.forEach(c => {
+            if (!c.customerCode) c.customerCode = generateCustomerCode();
+            if (c.outstanding === undefined) c.outstanding = 0;
+            if (c.totalPurchased === undefined) c.totalPurchased = 0;
         });
         localStorage.setItem('customers', JSON.stringify(customers));
         displayCustomers();
@@ -240,25 +234,25 @@
             document.getElementById('customersTable').innerHTML = '<p>No customers found.</p>';
             return;
         }
-        let html = '<tr><thead>运转<th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>GSTIN</th><th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>GSTIN</th><th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(c => {
             const outstanding = c.outstanding || 0;
             const creditLimit = c.creditLimit || 50000;
             const isOverLimit = outstanding > creditLimit;
             html += `<tr class="${isOverLimit ? 'credit-warning' : ''}">
-                <td>${escapeHtml(c.customerCode)}</strong></td>
-                <td><strong>${escapeHtml(c.name)}</strong></strong></td>
-                <td>${escapeHtml(c.email)}</strong></td>
-                <td>${escapeHtml(c.phone)}</strong></td>
-                <td>${escapeHtml(c.gstin || '-')}</strong></td>
-                <td>₹${creditLimit.toLocaleString()}</strong></td>
-                <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</strong></td>
-                <td class="${c.status === 'active' ? 'status-active' : 'status-inactive'}">${c.status || 'active'}</strong></td>
+                <td>${escapeHtml(c.customerCode)}</td>
+                <td><strong>${escapeHtml(c.name)}</strong></td>
+                <td>${escapeHtml(c.email)}</td>
+                <td>${escapeHtml(c.phone)}</td>
+                <td>${escapeHtml(c.gstin || '-')}</td>
+                <td>₹${creditLimit.toLocaleString()}</td>
+                <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</td>
+                <td class="${c.status === 'active' ? 'status-active' : 'status-inactive'}">${c.status || 'active'}</td>
                 <td class="action-buttons">
-                    <button onclick="editCustomer('${c.id}')" style="background:#17a2b8;"><i class="fas fa-edit"></i> Edit</button>
+                    <button onclick="window.open('edit-customer-master.html?id=' + encodeURIComponent('${c.id}'), '_blank')" style="background:#17a2b8;"><i class="fas fa-edit"></i> Edit</button>
                     <button onclick="viewLedger('${c.email}')" style="background:#e67e22;"><i class="fas fa-book"></i> Ledger</button>
                     <button onclick="deleteCustomer('${c.id}')" class="btn-danger"><i class="fas fa-trash"></i> Delete</button>
-                </strong></td>
+                </td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -273,14 +267,12 @@
             alert('Please fill Name, Email, and Phone');
             return;
         }
-        // Check duplicate email (case-insensitive) only for new customers
-        if (editId === null && customers.some(c => c.email?.toLowerCase() === email.toLowerCase())) {
+        if (editId === null && customers.some(c => c.email === email)) {
             alert('Customer with this email already exists!');
             return;
         }
-        // Prepare customer data with string ID
         const customerData = {
-            id: editId ? String(editId) : String(Date.now()),
+            id: editId || Date.now(),
             name: name,
             email: email,
             phone: phone,
@@ -300,17 +292,14 @@
             customerData.totalPurchased = 0;
             customers.push(customerData);
         } else {
-            const index = customers.findIndex(c => String(c.id) === String(editId));
-            if (index !== -1) {
-                const old = customers[index];
-                customerData.outstanding = old.outstanding || 0;
-                customerData.totalPurchased = old.totalPurchased || 0;
+            const old = customers.find(c => c.id == editId);
+            if (old) {
+                customerData.outstanding = old.outstanding;
+                customerData.totalPurchased = old.totalPurchased;
                 customerData.createdAt = old.createdAt;
-                customers[index] = customerData;
-            } else {
-                alert('Customer not found. It may have been deleted.');
-                return;
             }
+            const index = customers.findIndex(c => c.id == editId);
+            customers[index] = customerData;
         }
         localStorage.setItem('customers', JSON.stringify(customers));
         syncToUsers(customerData);
@@ -320,49 +309,41 @@
     }
 
     function syncToUsers(customer) {
-        try {
-            let users = JSON.parse(localStorage.getItem('users') || '[]');
-            const idx = users.findIndex(u => u.email === customer.email);
-            const userData = {
-                name: customer.name,
-                email: customer.email,
-                password: customer.email.split('@')[0] + '123',
-                phone: customer.phone,
-                business: customer.business,
-                gstin: customer.gstin,
-                address: customer.address,
-                pincode: customer.pincode,
-                state: customer.state,
-                role: 'customer'
-            };
-            if (idx !== -1) users[idx] = { ...users[idx], ...userData };
-            else users.push(userData);
-            localStorage.setItem('users', JSON.stringify(users));
-        } catch(e) { console.warn('User sync failed', e); }
+        let users = JSON.parse(localStorage.getItem('users') || '[]');
+        const idx = users.findIndex(u => u.email === customer.email);
+        const userData = {
+            name: customer.name,
+            email: customer.email,
+            password: customer.email.split('@')[0] + '123',
+            phone: customer.phone,
+            business: customer.business,
+            gstin: customer.gstin,
+            address: customer.address,
+            pincode: customer.pincode,
+            state: customer.state,
+            role: 'customer'
+        };
+        if (idx !== -1) users[idx] = { ...users[idx], ...userData };
+        else users.push(userData);
+        localStorage.setItem('users', JSON.stringify(users));
     }
 
     function editCustomer(id) {
-        // Convert both to string for reliable comparison
-        const stringId = String(id);
-        const customer = customers.find(c => String(c.id) === stringId);
-        if (!customer) {
-            alert('Customer not found. It may have been deleted.');
-            loadCustomers(); // refresh list
-            return;
-        }
-        editId = customer.id;
+        const c = customers.find(c => c.id == id);
+        if (!c) return;
+        editId = id;
         document.getElementById('formTitle').innerHTML = '<i class="fas fa-user-edit"></i> Edit Customer';
-        document.getElementById('custName').value = customer.name;
-        document.getElementById('custEmail').value = customer.email;
-        document.getElementById('custPhone').value = customer.phone;
-        document.getElementById('custAddress').value = customer.address || '';
-        document.getElementById('custPincode').value = customer.pincode || '';
-        document.getElementById('custGstin').value = customer.gstin || '';
-        document.getElementById('custState').value = customer.state || '';
-        document.getElementById('custCreditLimit').value = customer.creditLimit || 50000;
-        document.getElementById('custBusiness').value = customer.business || '';
-        document.getElementById('custStatus').value = customer.status || 'active';
-        document.getElementById('custCode').value = customer.customerCode || '';
+        document.getElementById('custName').value = c.name;
+        document.getElementById('custEmail').value = c.email;
+        document.getElementById('custPhone').value = c.phone;
+        document.getElementById('custAddress').value = c.address || '';
+        document.getElementById('custPincode').value = c.pincode || '';
+        document.getElementById('custGstin').value = c.gstin || '';
+        document.getElementById('custState').value = c.state || '';
+        document.getElementById('custCreditLimit').value = c.creditLimit || 50000;
+        document.getElementById('custBusiness').value = c.business || '';
+        document.getElementById('custStatus').value = c.status || 'active';
+        document.getElementById('custCode').value = c.customerCode || '';
         document.getElementById('cancelEditBtn').style.display = 'inline-block';
         document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
     }
@@ -388,7 +369,7 @@
 
     function deleteCustomer(id) {
         if (!confirm('Delete this customer? This will NOT delete invoices.')) return;
-        customers = customers.filter(c => String(c.id) !== String(id));
+        customers = customers.filter(c => c.id != id);
         localStorage.setItem('customers', JSON.stringify(customers));
         loadCustomers();
     }
@@ -422,4 +403,4 @@
     loadCustomers();
 </script>
 </body>
-    </html>
+</html>
