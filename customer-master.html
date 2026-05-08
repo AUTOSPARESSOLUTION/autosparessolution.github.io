@@ -200,10 +200,13 @@
 
     function loadCustomers() {
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        // Ensure every customer has required fields
         customers.forEach(c => {
             if (!c.customerCode) c.customerCode = generateCustomerCode();
             if (c.outstanding === undefined) c.outstanding = 0;
             if (c.totalPurchased === undefined) c.totalPurchased = 0;
+            // Ensure id is stored as string for consistent comparison
+            if (c.id !== undefined) c.id = String(c.id);
         });
         localStorage.setItem('customers', JSON.stringify(customers));
         displayCustomers();
@@ -234,25 +237,25 @@
             document.getElementById('customersTable').innerHTML = '<p>No customers found.</p>';
             return;
         }
-        let html = '<table><thead><tr><th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>GSTIN</th><th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<table><thead>运转<th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>GSTIN</th><th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(c => {
             const outstanding = c.outstanding || 0;
             const creditLimit = c.creditLimit || 50000;
             const isOverLimit = outstanding > creditLimit;
             html += `<tr class="${isOverLimit ? 'credit-warning' : ''}">
-                <td>${escapeHtml(c.customerCode)}</td>
-                <td><strong>${escapeHtml(c.name)}</strong></td>
-                <td>${escapeHtml(c.email)}</td>
-                <td>${escapeHtml(c.phone)}</td>
-                <td>${escapeHtml(c.gstin || '-')}</td>
-                <td>₹${creditLimit.toLocaleString()}</td>
-                <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</td>
-                <td class="${c.status === 'active' ? 'status-active' : 'status-inactive'}">${c.status || 'active'}</td>
+                <td>${escapeHtml(c.customerCode)}</strong></td>
+                <td><strong>${escapeHtml(c.name)}</strong></strong></td>
+                <td>${escapeHtml(c.email)}</strong></td>
+                <td>${escapeHtml(c.phone)}</strong></td>
+                <td>${escapeHtml(c.gstin || '-')}</strong></td>
+                <td>₹${creditLimit.toLocaleString()}</strong></td>
+                <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</strong></strong></td>
+                <td class="${c.status === 'active' ? 'status-active' : 'status-inactive'}">${c.status || 'active'}</strong></strong></td>
                 <td class="action-buttons">
                     <button onclick="editCustomer('${c.id}')" style="background:#17a2b8;"><i class="fas fa-edit"></i> Edit</button>
                     <button onclick="viewLedger('${c.email}')" style="background:#e67e22;"><i class="fas fa-book"></i> Ledger</button>
                     <button onclick="deleteCustomer('${c.id}')" class="btn-danger"><i class="fas fa-trash"></i> Delete</button>
-                </td>
+                </strong></strong>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -267,12 +270,14 @@
             alert('Please fill Name, Email, and Phone');
             return;
         }
+        // Check duplicate email only for new customer
         if (editId === null && customers.some(c => c.email === email)) {
             alert('Customer with this email already exists!');
             return;
         }
+        // Prepare customer object
         const customerData = {
-            id: editId || Date.now(),
+            id: editId ? String(editId) : String(Date.now()),
             name: name,
             email: email,
             phone: phone,
@@ -292,14 +297,15 @@
             customerData.totalPurchased = 0;
             customers.push(customerData);
         } else {
-            const old = customers.find(c => c.id == editId);
+            const old = customers.find(c => c.id === String(editId));
             if (old) {
                 customerData.outstanding = old.outstanding;
                 customerData.totalPurchased = old.totalPurchased;
                 customerData.createdAt = old.createdAt;
             }
-            const index = customers.findIndex(c => c.id == editId);
-            customers[index] = customerData;
+            const index = customers.findIndex(c => c.id === String(editId));
+            if (index !== -1) customers[index] = customerData;
+            else customers.push(customerData); // fallback
         }
         localStorage.setItem('customers', JSON.stringify(customers));
         syncToUsers(customerData);
@@ -309,41 +315,48 @@
     }
 
     function syncToUsers(customer) {
-        let users = JSON.parse(localStorage.getItem('users') || '[]');
-        const idx = users.findIndex(u => u.email === customer.email);
-        const userData = {
-            name: customer.name,
-            email: customer.email,
-            password: customer.email.split('@')[0] + '123',
-            phone: customer.phone,
-            business: customer.business,
-            gstin: customer.gstin,
-            address: customer.address,
-            pincode: customer.pincode,
-            state: customer.state,
-            role: 'customer'
-        };
-        if (idx !== -1) users[idx] = { ...users[idx], ...userData };
-        else users.push(userData);
-        localStorage.setItem('users', JSON.stringify(users));
+        try {
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            const idx = users.findIndex(u => u.email === customer.email);
+            const userData = {
+                name: customer.name,
+                email: customer.email,
+                password: customer.email.split('@')[0] + '123',
+                phone: customer.phone,
+                business: customer.business,
+                gstin: customer.gstin,
+                address: customer.address,
+                pincode: customer.pincode,
+                state: customer.state,
+                role: 'customer'
+            };
+            if (idx !== -1) users[idx] = { ...users[idx], ...userData };
+            else users.push(userData);
+            localStorage.setItem('users', JSON.stringify(users));
+        } catch(e) { console.warn('User sync failed', e); }
     }
 
     function editCustomer(id) {
-        const c = customers.find(c => c.id == id);
-        if (!c) return;
-        editId = id;
+        // id is passed as string from the button
+        const customer = customers.find(c => c.id === String(id));
+        if (!customer) {
+            alert('Customer not found. It may have been deleted.');
+            loadCustomers();
+            return;
+        }
+        editId = customer.id;
         document.getElementById('formTitle').innerHTML = '<i class="fas fa-user-edit"></i> Edit Customer';
-        document.getElementById('custName').value = c.name;
-        document.getElementById('custEmail').value = c.email;
-        document.getElementById('custPhone').value = c.phone;
-        document.getElementById('custAddress').value = c.address || '';
-        document.getElementById('custPincode').value = c.pincode || '';
-        document.getElementById('custGstin').value = c.gstin || '';
-        document.getElementById('custState').value = c.state || '';
-        document.getElementById('custCreditLimit').value = c.creditLimit || 50000;
-        document.getElementById('custBusiness').value = c.business || '';
-        document.getElementById('custStatus').value = c.status || 'active';
-        document.getElementById('custCode').value = c.customerCode || '';
+        document.getElementById('custName').value = customer.name;
+        document.getElementById('custEmail').value = customer.email;
+        document.getElementById('custPhone').value = customer.phone;
+        document.getElementById('custAddress').value = customer.address || '';
+        document.getElementById('custPincode').value = customer.pincode || '';
+        document.getElementById('custGstin').value = customer.gstin || '';
+        document.getElementById('custState').value = customer.state || '';
+        document.getElementById('custCreditLimit').value = customer.creditLimit || 50000;
+        document.getElementById('custBusiness').value = customer.business || '';
+        document.getElementById('custStatus').value = customer.status || 'active';
+        document.getElementById('custCode').value = customer.customerCode || '';
         document.getElementById('cancelEditBtn').style.display = 'inline-block';
         document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
     }
@@ -369,7 +382,7 @@
 
     function deleteCustomer(id) {
         if (!confirm('Delete this customer? This will NOT delete invoices.')) return;
-        customers = customers.filter(c => c.id != id);
+        customers = customers.filter(c => c.id !== String(id));
         localStorage.setItem('customers', JSON.stringify(customers));
         loadCustomers();
     }
