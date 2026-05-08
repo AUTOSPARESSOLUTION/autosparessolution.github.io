@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Supplier Ledger – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -64,12 +65,16 @@
             border: 1px solid #ccc;
             border-radius: 6px;
         }
-        .back-link {
-            background: #6c757d;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            text-decoration: none;
+        .date-range {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .date-range input { width: 130px; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; padding: 10px; }
         }
     </style>
 </head>
@@ -82,7 +87,7 @@
 
     <div id="supplierInfo" class="supplier-info">Select or enter supplier email</div>
 
-    <div class="search-box">
+    <div class="search-box no-print">
         <select id="supplierSelect" style="flex:1;">
             <option value="">-- Select Supplier --</option>
         </select>
@@ -90,9 +95,21 @@
         <input type="email" id="supplierEmailInput" placeholder="Enter supplier email directly" style="flex:1;">
         <button onclick="loadLedgerByEmail()"><i class="fas fa-chart-line"></i> Load Ledger</button>
         <button onclick="refreshDropdown()"><i class="fas fa-sync-alt"></i> Refresh List</button>
-        <button onclick="exportLedger()"><i class="fas fa-file-csv"></i> Export CSV</button>
-        <input type="text" id="searchRef" placeholder="Search by ref...">
+    </div>
+
+    <div class="search-box no-print">
+        <div class="date-range">
+            <label>From:</label>
+            <input type="date" id="startDate">
+            <label>To:</label>
+            <input type="date" id="endDate">
+            <button onclick="applyDateFilter()"><i class="fas fa-calendar-alt"></i> Filter</button>
+            <button onclick="clearDateFilter()"><i class="fas fa-undo-alt"></i> Clear</button>
+        </div>
+        <input type="text" id="searchRef" placeholder="Search by reference...">
         <button onclick="filterLedger()"><i class="fas fa-search"></i> Search</button>
+        <button onclick="exportLedger()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <button onclick="downloadPDF()"><i class="fas fa-file-pdf"></i> Download PDF</button>
     </div>
 
     <div id="ledgerTable"></div>
@@ -101,6 +118,9 @@
 <script>
     let currentSupplier = null;
     let allTransactions = [];
+    let filteredTransactions = [];
+    let currentFilterStart = null;
+    let currentFilterEnd = null;
 
     function refreshDropdown() {
         const suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
@@ -109,13 +129,18 @@
         suppliers.forEach(s => {
             select.innerHTML += `<option value="${s.email}">${s.name} (${s.email})</option>`;
         });
-        // Auto-select if coming from Supplier Master
         const viewEmail = localStorage.getItem('viewSupplierEmail');
         if (viewEmail) {
             select.value = viewEmail;
             localStorage.removeItem('viewSupplierEmail');
             loadLedgerByEmail();
         }
+        // Set default dates (last 30 days)
+        const today = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+        document.getElementById('endDate').value = today.toISOString().split('T')[0];
     }
 
     function loadLedgerByEmail() {
@@ -138,9 +163,7 @@
             Outstanding: <strong>₹${(currentSupplier.outstanding||0).toLocaleString()}</strong>
         `;
 
-        // Build transactions
         const transactions = [];
-        // Purchase invoices
         const allPurchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         const supplierInvoices = allPurchaseInvoices.filter(inv => inv.supplier?.email === email || inv.supplierEmail === email);
         supplierInvoices.forEach(inv => {
@@ -148,13 +171,12 @@
                 date: inv.date,
                 type: 'Purchase',
                 ref: inv.poNo || inv.invoiceNo,
-                debit: inv.grandTotal || inv.total || 0,   // increase outstanding (supplier owes more)
+                debit: inv.grandTotal || inv.total || 0,
                 credit: 0,
                 narration: `Purchase Invoice`
             });
         });
 
-        // Supplier payments
         const allPayments = JSON.parse(localStorage.getItem('supplierPayments') || '[]');
         const supplierPayments = allPayments.filter(p => p.supplierEmail === email);
         supplierPayments.forEach(p => {
@@ -170,25 +192,78 @@
 
         transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
         allTransactions = transactions;
+        applyDateFilter();
+    }
+
+    function applyDateFilter() {
+        if (!currentSupplier) return;
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
+        currentFilterStart = start;
+        currentFilterEnd = end;
+        if (!start && !end) {
+            filteredTransactions = [...allTransactions];
+        } else {
+            filteredTransactions = allTransactions.filter(t => {
+                const tDate = t.date;
+                if (start && tDate < start) return false;
+                if (end && tDate > end) return false;
+                return true;
+            });
+        }
         displayLedger();
+    }
+
+    function clearDateFilter() {
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        currentFilterStart = null;
+        currentFilterEnd = null;
+        filteredTransactions = [...allTransactions];
+        displayLedger();
+    }
+
+    function getOpeningBalanceBeforeDate(date) {
+        if (!date) return currentSupplier?.openingBalance || 0;
+        let balance = currentSupplier?.openingBalance || 0;
+        for (let t of allTransactions) {
+            if (t.date >= date) break;
+            balance += (t.debit - t.credit);
+        }
+        return balance;
+    }
+
+    function computeRunningBalance(transactions, startingBalance = 0) {
+        let running = startingBalance;
+        return transactions.map(t => {
+            running += (t.debit - t.credit);
+            return { ...t, balance: running };
+        });
     }
 
     function displayLedger() {
         if (!currentSupplier) return;
-        let running = currentSupplier.openingBalance || 0;
-        let html = '<td><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>';
-        allTransactions.forEach(t => {
-            running += (t.debit - t.credit);
-            html += `<tr>
-                <td>${t.date}</td>
-                <td>${t.type}</td>
-                <td>${escapeHtml(t.ref)}</td>
-                <td>${t.debit ? '₹'+t.debit.toLocaleString() : '-'}</td>
-                <td>${t.credit ? '₹'+t.credit.toLocaleString() : '-'}</td>
-                <td class="${running>=0?'balance-positive':'balance-negative'}">₹${running.toLocaleString()}</td>
-                <td>${escapeHtml(t.narration)}</td>
-            </tr>`;
-        });
+        let transactionsToShow = [...filteredTransactions];
+        transactionsToShow.sort((a,b) => new Date(a.date) - new Date(b.date));
+        const openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
+        const transactionsWithBalance = computeRunningBalance(transactionsToShow, openingBalance);
+        
+        let html = '</table><thead>运转<th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>';
+        if (transactionsWithBalance.length === 0) {
+            html += `<tr><td colspan="7">No transactions in selected period.</td></tr>`;
+        } else {
+            transactionsWithBalance.forEach(t => {
+                html += `<tr>
+                    <td>${t.date}</td>
+                    <td>${t.type}</td>
+                    <td>${escapeHtml(t.ref)}</strong></td>
+                    <td>${t.debit ? '₹'+t.debit.toLocaleString() : '-'}</strong></td>
+                    <td>${t.credit ? '₹'+t.credit.toLocaleString() : '-'}</strong></td>
+                    <td class="${t.balance>=0?'balance-positive':'balance-negative'}">₹${t.balance.toLocaleString()}</strong></td>
+                    <td>${escapeHtml(t.narration)}</strong></td>
+                </tr>`;
+            });
+        }
         html += '</tbody></table>';
         document.getElementById('ledgerTable').innerHTML = html;
     }
@@ -199,7 +274,7 @@
             displayLedger();
             return;
         }
-        const filtered = allTransactions.filter(t => 
+        const filtered = filteredTransactions.filter(t => 
             (t.ref && t.ref.toLowerCase().includes(term)) || 
             t.type.toLowerCase().includes(term)
         );
@@ -207,32 +282,34 @@
             document.getElementById('ledgerTable').innerHTML = '<p>No matching transactions.</p>';
             return;
         }
-        let running = currentSupplier.openingBalance || 0;
-        let html = '<table><thead>…</thead><tbody>';
+        const openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
+        let running = openingBalance;
+        let rows = '';
         filtered.forEach(t => {
             running += (t.debit - t.credit);
-            html += `<tr>
+            rows += `<tr>
                 <td>${t.date}</td>
                 <td>${t.type}</td>
-                <td>${escapeHtml(t.ref)}</td>
-                <td>${t.debit ? '₹'+t.debit.toLocaleString() : '-'}</td>
-                <td>${t.credit ? '₹'+t.credit.toLocaleString() : '-'}</td>
-                <td class="${running>=0?'balance-positive':'balance-negative'}">₹${running.toLocaleString()}</td>
-                <td>${escapeHtml(t.narration)}</td>
+                <td>${escapeHtml(t.ref)}</strong></td>
+                <td>${t.debit ? '₹'+t.debit.toLocaleString() : '-'}</strong></td>
+                <td>${t.credit ? '₹'+t.credit.toLocaleString() : '-'}</strong></td>
+                <td class="${running>=0?'balance-positive':'balance-negative'}">₹${running.toLocaleString()}</strong></td>
+                <td>${escapeHtml(t.narration)}</strong></td>
             </tr>`;
         });
-        html += '</tbody></table>';
-        document.getElementById('ledgerTable').innerHTML = html;
+        document.getElementById('ledgerTable').innerHTML = `<table><thead>…</thead><tbody>${rows}</tbody></table>`;
     }
 
     function exportLedger() {
-        if (!allTransactions.length) {
+        if (!filteredTransactions.length) {
             alert('No data to export');
             return;
         }
         let csv = "Date,Type,Reference,Debit,Credit,Balance,Narration\n";
-        let running = currentSupplier.openingBalance || 0;
-        allTransactions.forEach(t => {
+        let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
+        let running = openingBalance;
+        filteredTransactions.sort((a,b) => new Date(a.date) - new Date(b.date));
+        filteredTransactions.forEach(t => {
             running += (t.debit - t.credit);
             csv += `"${t.date}","${t.type}","${t.ref}",${t.debit},${t.credit},${running},"${t.narration}"\n`;
         });
@@ -240,9 +317,50 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `supplier_ledger_${currentSupplier.email}.csv`;
+        a.download = `supplier_ledger_${currentSupplier.email}_${currentFilterStart || 'all'}_to_${currentFilterEnd || 'all'}.csv`;
         a.click();
         URL.revokeObjectURL(url);
+    }
+
+    function downloadPDF() {
+        if (!currentSupplier) {
+            alert('Please load a supplier ledger first.');
+            return;
+        }
+        const originalContainer = document.getElementById('ledgerTable');
+        const cloneContainer = originalContainer.cloneNode(true);
+        const infoDiv = document.getElementById('supplierInfo').cloneNode(true);
+        const title = document.createElement('h2');
+        title.innerText = 'Supplier Ledger Statement';
+        const period = document.createElement('p');
+        period.innerHTML = `<strong>Period:</strong> ${currentFilterStart || 'All'} to ${currentFilterEnd || 'All'}`;
+        
+        const pdfContent = document.createElement('div');
+        pdfContent.style.fontFamily = 'Roboto, sans-serif';
+        pdfContent.style.padding = '20px';
+        pdfContent.style.backgroundColor = 'white';
+        pdfContent.appendChild(title);
+        pdfContent.appendChild(infoDiv);
+        pdfContent.appendChild(period);
+        pdfContent.appendChild(cloneContainer);
+        
+        const header = document.createElement('div');
+        header.style.backgroundColor = '#0a7c71';
+        header.style.color = 'white';
+        header.style.padding = '10px';
+        header.style.marginBottom = '15px';
+        header.style.textAlign = 'center';
+        header.innerHTML = '<h2>Auto Spares Solution</h2><p>GSTIN: 19ANOPD3300R1ZO | 101, Howrah, WB</p>';
+        pdfContent.prepend(header);
+        
+        const opt = {
+            margin: [0.3, 0.3, 0.3, 0.3],
+            filename: `Supplier_Ledger_${currentSupplier.name}_${currentFilterStart || 'all'}_to_${currentFilterEnd || 'all'}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, letterRendering: true },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+        };
+        html2pdf().set(opt).from(pdfContent).save();
     }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
@@ -250,4 +368,4 @@
     refreshDropdown();
 </script>
 </body>
-    </html>
+</html>
