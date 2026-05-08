@@ -200,13 +200,16 @@
 
     function loadCustomers() {
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        // Ensure every customer has required fields
-        customers.forEach(c => {
-            if (!c.customerCode) c.customerCode = generateCustomerCode();
-            if (c.outstanding === undefined) c.outstanding = 0;
-            if (c.totalPurchased === undefined) c.totalPurchased = 0;
-            // Ensure id is stored as string for consistent comparison
-            if (c.id !== undefined) c.id = String(c.id);
+        // ----- FIX: Ensure every customer has an ID as string and other defaults -----
+        customers = customers.map(c => {
+            return {
+                ...c,
+                id: String(c.id || Date.now()),
+                customerCode: c.customerCode || generateCustomerCode(),
+                outstanding: c.outstanding !== undefined ? c.outstanding : 0,
+                totalPurchased: c.totalPurchased !== undefined ? c.totalPurchased : 0,
+                status: c.status || 'active'
+            };
         });
         localStorage.setItem('customers', JSON.stringify(customers));
         displayCustomers();
@@ -237,7 +240,7 @@
             document.getElementById('customersTable').innerHTML = '<p>No customers found.</p>';
             return;
         }
-        let html = '<table><thead>运转<th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>GSTIN</th><th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<tr><thead>运转<th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>GSTIN</th><th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
         filtered.forEach(c => {
             const outstanding = c.outstanding || 0;
             const creditLimit = c.creditLimit || 50000;
@@ -249,13 +252,13 @@
                 <td>${escapeHtml(c.phone)}</strong></td>
                 <td>${escapeHtml(c.gstin || '-')}</strong></td>
                 <td>₹${creditLimit.toLocaleString()}</strong></td>
-                <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</strong></strong></td>
-                <td class="${c.status === 'active' ? 'status-active' : 'status-inactive'}">${c.status || 'active'}</strong></strong></td>
+                <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</strong></td>
+                <td class="${c.status === 'active' ? 'status-active' : 'status-inactive'}">${c.status || 'active'}</strong></td>
                 <td class="action-buttons">
                     <button onclick="editCustomer('${c.id}')" style="background:#17a2b8;"><i class="fas fa-edit"></i> Edit</button>
                     <button onclick="viewLedger('${c.email}')" style="background:#e67e22;"><i class="fas fa-book"></i> Ledger</button>
                     <button onclick="deleteCustomer('${c.id}')" class="btn-danger"><i class="fas fa-trash"></i> Delete</button>
-                </strong></strong>
+                </strong></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -270,12 +273,12 @@
             alert('Please fill Name, Email, and Phone');
             return;
         }
-        // Check duplicate email only for new customer
-        if (editId === null && customers.some(c => c.email === email)) {
+        // Check duplicate email (case-insensitive) only for new customers
+        if (editId === null && customers.some(c => c.email?.toLowerCase() === email.toLowerCase())) {
             alert('Customer with this email already exists!');
             return;
         }
-        // Prepare customer object
+        // Prepare customer data with string ID
         const customerData = {
             id: editId ? String(editId) : String(Date.now()),
             name: name,
@@ -297,15 +300,17 @@
             customerData.totalPurchased = 0;
             customers.push(customerData);
         } else {
-            const old = customers.find(c => c.id === String(editId));
-            if (old) {
-                customerData.outstanding = old.outstanding;
-                customerData.totalPurchased = old.totalPurchased;
+            const index = customers.findIndex(c => String(c.id) === String(editId));
+            if (index !== -1) {
+                const old = customers[index];
+                customerData.outstanding = old.outstanding || 0;
+                customerData.totalPurchased = old.totalPurchased || 0;
                 customerData.createdAt = old.createdAt;
+                customers[index] = customerData;
+            } else {
+                alert('Customer not found. It may have been deleted.');
+                return;
             }
-            const index = customers.findIndex(c => c.id === String(editId));
-            if (index !== -1) customers[index] = customerData;
-            else customers.push(customerData); // fallback
         }
         localStorage.setItem('customers', JSON.stringify(customers));
         syncToUsers(customerData);
@@ -337,11 +342,12 @@
     }
 
     function editCustomer(id) {
-        // id is passed as string from the button
-        const customer = customers.find(c => c.id === String(id));
+        // Convert both to string for reliable comparison
+        const stringId = String(id);
+        const customer = customers.find(c => String(c.id) === stringId);
         if (!customer) {
             alert('Customer not found. It may have been deleted.');
-            loadCustomers();
+            loadCustomers(); // refresh list
             return;
         }
         editId = customer.id;
@@ -382,7 +388,7 @@
 
     function deleteCustomer(id) {
         if (!confirm('Delete this customer? This will NOT delete invoices.')) return;
-        customers = customers.filter(c => c.id !== String(id));
+        customers = customers.filter(c => String(c.id) !== String(id));
         localStorage.setItem('customers', JSON.stringify(customers));
         loadCustomers();
     }
@@ -416,4 +422,4 @@
     loadCustomers();
 </script>
 </body>
-</html>
+    </html>
