@@ -7,20 +7,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; margin-bottom: 20px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #555; }
@@ -31,13 +19,15 @@
         .form-row { display: flex; flex-wrap: wrap; gap: 15px; }
         .form-row .form-group { flex: 1; min-width: 180px; }
         hr { margin: 15px 0; }
-        .debug-info { background: #f8f9fa; border: 1px solid #dee2e6; padding: 8px; font-size: 12px; margin-bottom: 15px; font-family: monospace; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1><i class="fas fa-user-edit"></i> Edit Customer</h1>
-    <div id="debugInfo" class="debug-info"></div>
+    <div class="form-group">
+        <label>Select Customer to Edit</label>
+        <select id="customerSelect" onchange="loadSelectedCustomer()"></select>
+    </div>
     <hr>
 
     <div class="form-group">
@@ -75,50 +65,25 @@
 </div>
 
 <script>
-    let originalCustomerCode = null;
+    let currentCustomerCode = null;
 
-    function getParameter(param) {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(param);
+    function loadCustomerList() {
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const select = document.getElementById('customerSelect');
+        select.innerHTML = '<option value="">-- Select a customer --</option>';
+        customers.forEach(c => {
+            select.innerHTML += `<option value="${c.customerCode}">${c.customerCode} - ${c.name} (${c.email})</option>`;
+        });
     }
 
-    function loadCustomer() {
-        const debugDiv = document.getElementById('debugInfo');
-        const idParam = getParameter('id');
-        const codeParam = getParameter('code');
-        debugDiv.innerHTML = `Received: id=${idParam}, code=${codeParam}<br>`;
-
-        if (!idParam && !codeParam) {
-            debugDiv.innerHTML += '❌ No identifier provided. Please go back and click Edit again.';
-            return;
-        }
-
+    function loadSelectedCustomer() {
+        const code = document.getElementById('customerSelect').value;
+        if (!code) return;
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        debugDiv.innerHTML += `Total customers: ${customers.length}<br>`;
+        const customer = customers.find(c => c.customerCode === code);
+        if (!customer) return;
 
-        let customer = null;
-        if (codeParam) {
-            customer = customers.find(c => c.customerCode === codeParam);
-            if (customer) debugDiv.innerHTML += `✅ Found by customerCode: ${codeParam}<br>`;
-        }
-        if (!customer && idParam) {
-            customer = customers.find(c => String(c.id) === String(idParam));
-            if (customer) debugDiv.innerHTML += `✅ Found by id: ${idParam}<br>`;
-        }
-        if (!customer) {
-            // Last resort: try to find by customerCode matching idParam (if idParam looks like a code)
-            if (idParam && idParam.startsWith('CUST')) {
-                customer = customers.find(c => c.customerCode === idParam);
-                if (customer) debugDiv.innerHTML += `✅ Found by customerCode (fallback): ${idParam}<br>`;
-            }
-        }
-
-        if (!customer) {
-            debugDiv.innerHTML += `❌ No customer found. Available IDs/codes: ${customers.map(c => `${c.customerCode} (id:${c.id})`).join(', ')}`;
-            return;
-        }
-
-        originalCustomerCode = customer.customerCode;
+        currentCustomerCode = customer.customerCode;
         document.getElementById('custCode').value = customer.customerCode;
         document.getElementById('custName').value = customer.name || '';
         document.getElementById('custEmail').value = customer.email || '';
@@ -133,8 +98,8 @@
     }
 
     function updateCustomer() {
-        if (!originalCustomerCode) {
-            alert('No customer loaded.');
+        if (!currentCustomerCode) {
+            alert('Please select a customer first.');
             return;
         }
 
@@ -147,18 +112,15 @@
         }
 
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        const index = customers.findIndex(c => c.customerCode === originalCustomerCode);
+        const index = customers.findIndex(c => c.customerCode === currentCustomerCode);
         if (index === -1) {
-            alert('Customer not found in storage.');
-            window.close();
+            alert('Customer not found.');
             return;
         }
 
         const updatedCustomer = {
             ...customers[index],
-            name: name,
-            email: email,
-            phone: phone,
+            name, email, phone,
             address: document.getElementById('custAddress').value,
             pincode: document.getElementById('custPincode').value,
             gstin: document.getElementById('custGstin').value,
@@ -172,21 +134,15 @@
         customers[index] = updatedCustomer;
         localStorage.setItem('customers', JSON.stringify(customers));
 
-        // Sync to users
+        // Sync to users (optional, keep as before)
         try {
             let users = JSON.parse(localStorage.getItem('users') || '[]');
             const userIdx = users.findIndex(u => u.email === updatedCustomer.email);
             const userData = {
-                name: updatedCustomer.name,
-                email: updatedCustomer.email,
-                password: updatedCustomer.email.split('@')[0] + '123',
-                phone: updatedCustomer.phone,
-                business: updatedCustomer.business,
-                gstin: updatedCustomer.gstin,
-                address: updatedCustomer.address,
-                pincode: updatedCustomer.pincode,
-                state: updatedCustomer.state,
-                role: 'customer'
+                name, email, password: email.split('@')[0] + '123', phone: updatedCustomer.phone,
+                business: updatedCustomer.business, gstin: updatedCustomer.gstin,
+                address: updatedCustomer.address, pincode: updatedCustomer.pincode,
+                state: updatedCustomer.state, role: 'customer'
             };
             if (userIdx !== -1) users[userIdx] = { ...users[userIdx], ...userData };
             else users.push(userData);
@@ -197,7 +153,7 @@
         window.close();
     }
 
-    loadCustomer();
+    loadCustomerList();
 </script>
 </body>
 </html>
