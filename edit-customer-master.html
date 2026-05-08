@@ -77,31 +77,48 @@
 <script>
     let originalCustomerCode = null;
 
-    function getCustomerCodeFromUrl() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('code');
+    function getParameter(param) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(param);
     }
 
     function loadCustomer() {
-        const code = getCustomerCodeFromUrl();
         const debugDiv = document.getElementById('debugInfo');
-        debugDiv.innerHTML = `Received customerCode from URL: <strong>${code}</strong><br>`;
+        const idParam = getParameter('id');
+        const codeParam = getParameter('code');
+        debugDiv.innerHTML = `Received: id=${idParam}, code=${codeParam}<br>`;
 
-        if (!code) {
-            debugDiv.innerHTML += '❌ No customer code provided.';
+        if (!idParam && !codeParam) {
+            debugDiv.innerHTML += '❌ No identifier provided. Please go back and click Edit again.';
             return;
         }
 
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        const customer = customers.find(c => c.customerCode === code);
+        debugDiv.innerHTML += `Total customers: ${customers.length}<br>`;
+
+        let customer = null;
+        if (codeParam) {
+            customer = customers.find(c => c.customerCode === codeParam);
+            if (customer) debugDiv.innerHTML += `✅ Found by customerCode: ${codeParam}<br>`;
+        }
+        if (!customer && idParam) {
+            customer = customers.find(c => String(c.id) === String(idParam));
+            if (customer) debugDiv.innerHTML += `✅ Found by id: ${idParam}<br>`;
+        }
         if (!customer) {
-            debugDiv.innerHTML += `❌ Customer with code "${code}" not found.<br>Available codes: ${customers.map(c => c.customerCode).join(', ')}`;
+            // Last resort: try to find by customerCode matching idParam (if idParam looks like a code)
+            if (idParam && idParam.startsWith('CUST')) {
+                customer = customers.find(c => c.customerCode === idParam);
+                if (customer) debugDiv.innerHTML += `✅ Found by customerCode (fallback): ${idParam}<br>`;
+            }
+        }
+
+        if (!customer) {
+            debugDiv.innerHTML += `❌ No customer found. Available IDs/codes: ${customers.map(c => `${c.customerCode} (id:${c.id})`).join(', ')}`;
             return;
         }
 
         originalCustomerCode = customer.customerCode;
-        debugDiv.innerHTML += `✅ Found: ${customer.name} (${customer.customerCode})<br>`;
-
         document.getElementById('custCode').value = customer.customerCode;
         document.getElementById('custName').value = customer.name || '';
         document.getElementById('custEmail').value = customer.email || '';
