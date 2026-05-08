@@ -22,53 +22,16 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         }
         h1 { color: #0a7c71; margin-bottom: 20px; }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 4px;
-            color: #555;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-family: inherit;
-        }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #555; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
         button:hover { background: #09645a; }
         .btn-warning { background: #ffc107; color: #333; }
-        .btn-warning:hover { background: #e0a800; }
-        .form-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        .form-row .form-group {
-            flex: 1;
-            min-width: 180px;
-        }
+        .form-row { display: flex; flex-wrap: wrap; gap: 15px; }
+        .form-row .form-group { flex: 1; min-width: 180px; }
         hr { margin: 15px 0; }
-        .debug-info {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 8px;
-            font-size: 12px;
-            margin-bottom: 15px;
-            font-family: monospace;
-        }
+        .debug-info { background: #f8f9fa; border: 1px solid #dee2e6; padding: 8px; font-size: 12px; margin-bottom: 15px; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -82,50 +45,22 @@
         <input type="text" id="custCode" readonly style="background:#e9ecef;">
     </div>
     <div class="form-row">
-        <div class="form-group">
-            <label>Customer Name *</label>
-            <input type="text" id="custName">
-        </div>
-        <div class="form-group">
-            <label>Email *</label>
-            <input type="email" id="custEmail">
-        </div>
-        <div class="form-group">
-            <label>Phone *</label>
-            <input type="text" id="custPhone">
-        </div>
+        <div class="form-group"><label>Customer Name *</label><input type="text" id="custName"></div>
+        <div class="form-group"><label>Email *</label><input type="email" id="custEmail"></div>
+        <div class="form-group"><label>Phone *</label><input type="text" id="custPhone"></div>
     </div>
     <div class="form-row">
-        <div class="form-group">
-            <label>Address</label>
-            <textarea id="custAddress" rows="2"></textarea>
-        </div>
-        <div class="form-group">
-            <label>PIN Code</label>
-            <input type="text" id="custPincode">
-        </div>
-        <div class="form-group">
-            <label>GSTIN</label>
-            <input type="text" id="custGstin">
-        </div>
+        <div class="form-group"><label>Address</label><textarea id="custAddress" rows="2"></textarea></div>
+        <div class="form-group"><label>PIN Code</label><input type="text" id="custPincode"></div>
+        <div class="form-group"><label>GSTIN</label><input type="text" id="custGstin"></div>
     </div>
     <div class="form-row">
-        <div class="form-group">
-            <label>State</label>
-            <input type="text" id="custState">
-        </div>
-        <div class="form-group">
-            <label>Credit Limit (₹)</label>
-            <input type="number" id="custCreditLimit" step="1000">
-        </div>
-        <div class="form-group">
-            <label>Business Name</label>
-            <input type="text" id="custBusiness">
-        </div>
+        <div class="form-group"><label>State</label><input type="text" id="custState"></div>
+        <div class="form-group"><label>Credit Limit (₹)</label><input type="number" id="custCreditLimit" step="1000"></div>
+        <div class="form-group"><label>Business Name</label><input type="text" id="custBusiness"></div>
     </div>
     <div class="form-row">
-        <div class="form-group">
-            <label>Status</label>
+        <div class="form-group"><label>Status</label>
             <select id="custStatus">
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -140,45 +75,34 @@
 </div>
 
 <script>
-    let customerId = null;
+    let originalCustomerCode = null;
 
-    function getCustomerIdFromUrl() {
+    function getCustomerCodeFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        return params.get('id');
+        return params.get('code');
     }
 
     function loadCustomer() {
-        const idParam = getCustomerIdFromUrl();
+        const code = getCustomerCodeFromUrl();
         const debugDiv = document.getElementById('debugInfo');
-        debugDiv.innerHTML = `Received ID from URL: <strong>${idParam}</strong> (type: ${typeof idParam})<br>`;
+        debugDiv.innerHTML = `Received customerCode from URL: <strong>${code}</strong><br>`;
 
-        if (!idParam) {
-            debugDiv.innerHTML += '❌ No ID provided. Please go back and click Edit again.';
+        if (!code) {
+            debugDiv.innerHTML += '❌ No customer code provided.';
             return;
         }
 
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        debugDiv.innerHTML += `Total customers in storage: ${customers.length}<br>`;
-
-        // Try to find by exact ID match (as string)
-        let customer = customers.find(c => String(c.id) === String(idParam));
+        const customer = customers.find(c => c.customerCode === code);
         if (!customer) {
-            // If not found, try to find by customerCode (in case the ID passed is actually the code)
-            customer = customers.find(c => c.customerCode === idParam);
-            if (customer) {
-                debugDiv.innerHTML += `✅ Found by customerCode: ${customer.customerCode}<br>`;
-            } else {
-                debugDiv.innerHTML += `❌ No customer found with ID = "${idParam}" or customerCode = "${idParam}".<br>`;
-                debugDiv.innerHTML += `Available IDs: ${customers.map(c => `${c.customerCode} (id: ${c.id})`).join(', ')}`;
-                return;
-            }
-        } else {
-            debugDiv.innerHTML += `✅ Found by ID: ${customer.id}<br>`;
+            debugDiv.innerHTML += `❌ Customer with code "${code}" not found.<br>Available codes: ${customers.map(c => c.customerCode).join(', ')}`;
+            return;
         }
 
-        customerId = customer.id;
-        // Fill form
-        document.getElementById('custCode').value = customer.customerCode || '';
+        originalCustomerCode = customer.customerCode;
+        debugDiv.innerHTML += `✅ Found: ${customer.name} (${customer.customerCode})<br>`;
+
+        document.getElementById('custCode').value = customer.customerCode;
         document.getElementById('custName').value = customer.name || '';
         document.getElementById('custEmail').value = customer.email || '';
         document.getElementById('custPhone').value = customer.phone || '';
@@ -192,8 +116,8 @@
     }
 
     function updateCustomer() {
-        if (!customerId) {
-            alert('No customer loaded. Please refresh and try again.');
+        if (!originalCustomerCode) {
+            alert('No customer loaded.');
             return;
         }
 
@@ -206,9 +130,9 @@
         }
 
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        const index = customers.findIndex(c => String(c.id) === String(customerId));
+        const index = customers.findIndex(c => c.customerCode === originalCustomerCode);
         if (index === -1) {
-            alert('Customer not found in storage. It may have been deleted.');
+            alert('Customer not found in storage.');
             window.close();
             return;
         }
