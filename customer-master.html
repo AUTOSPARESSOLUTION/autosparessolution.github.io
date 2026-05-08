@@ -249,7 +249,7 @@
                 <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</td>
                 <td class="${c.status === 'active' ? 'status-active' : 'status-inactive'}">${c.status || 'active'}</td>
                 <td class="action-buttons">
-                    <button onclick="window.open('edit-customer-master.html?id=' + encodeURIComponent('${c.id}'), '_blank')" style="background:#17a2b8;"><i class="fas fa-edit"></i> Edit</button>
+                    <button onclick="window.open('edit-customer-master.html?code=' + encodeURIComponent('${c.customerCode}'), '_blank')" style="background:#17a2b8;"><i class="fas fa-edit"></i> Edit</button>
                     <button onclick="viewLedger('${c.email}')" style="background:#e67e22;"><i class="fas fa-book"></i> Ledger</button>
                     <button onclick="deleteCustomer('${c.id}')" class="btn-danger"><i class="fas fa-trash"></i> Delete</button>
                 </td>
