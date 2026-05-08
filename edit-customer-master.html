@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Customer – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        h1 { color: #0a7c71; margin-bottom: 20px; }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-family: inherit;
+        }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover { background: #09645a; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+            min-width: 180px;
+        }
+        hr {
+            margin: 15px 0;
+            border-color: #dee2e6;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-user-edit"></i> Edit Customer</h1>
+    <hr>
+
+    <div class="form-group">
+        <label>Customer Code (read‑only)</label>
+        <input type="text" id="custCode" readonly style="background:#e9ecef;">
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Customer Name *</label>
+            <input type="text" id="custName">
+        </div>
+        <div class="form-group">
+            <label>Email *</label>
+            <input type="email" id="custEmail">
+        </div>
+        <div class="form-group">
+            <label>Phone *</label>
+            <input type="text" id="custPhone">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Address</label>
+            <textarea id="custAddress" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+            <label>PIN Code</label>
+            <input type="text" id="custPincode">
+        </div>
+        <div class="form-group">
+            <label>GSTIN</label>
+            <input type="text" id="custGstin">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>State</label>
+            <input type="text" id="custState">
+        </div>
+        <div class="form-group">
+            <label>Credit Limit (₹)</label>
+            <input type="number" id="custCreditLimit" step="1000">
+        </div>
+        <div class="form-group">
+            <label>Business Name</label>
+            <input type="text" id="custBusiness">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Status</label>
+            <select id="custStatus">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <button onclick="updateCustomer()"><i class="fas fa-save"></i> Update Customer</button>
+        <button class="btn-warning" onclick="window.close()">Cancel</button>
+    </div>
+</div>
+
+<script>
+    let customerId = null;
+
+    function getCustomerIdFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('id');
+    }
+
+    function loadCustomer() {
+        const id = getCustomerIdFromUrl();
+        if (!id) {
+            alert('No customer ID provided.');
+            window.close();
+            return;
+        }
+        customerId = id;
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const customer = customers.find(c => String(c.id) === String(id));
+        if (!customer) {
+            alert('Customer not found. It may have been deleted.');
+            window.close();
+            return;
+        }
+        // Fill form (customer code is read‑only)
+        document.getElementById('custCode').value = customer.customerCode || '';
+        document.getElementById('custName').value = customer.name || '';
+        document.getElementById('custEmail').value = customer.email || '';
+        document.getElementById('custPhone').value = customer.phone || '';
+        document.getElementById('custAddress').value = customer.address || '';
+        document.getElementById('custPincode').value = customer.pincode || '';
+        document.getElementById('custGstin').value = customer.gstin || '';
+        document.getElementById('custState').value = customer.state || '';
+        document.getElementById('custCreditLimit').value = customer.creditLimit || 50000;
+        document.getElementById('custBusiness').value = customer.business || '';
+        document.getElementById('custStatus').value = customer.status || 'active';
+    }
+
+    function updateCustomer() {
+        const name = document.getElementById('custName').value.trim();
+        const email = document.getElementById('custEmail').value.trim();
+        const phone = document.getElementById('custPhone').value.trim();
+        if (!name || !email || !phone) {
+            alert('Please fill Name, Email, and Phone');
+            return;
+        }
+
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const index = customers.findIndex(c => String(c.id) === String(customerId));
+        if (index === -1) {
+            alert('Customer not found in storage.');
+            window.close();
+            return;
+        }
+
+        const updatedCustomer = {
+            ...customers[index],
+            name: name,
+            email: email,
+            phone: phone,
+            address: document.getElementById('custAddress').value,
+            pincode: document.getElementById('custPincode').value,
+            gstin: document.getElementById('custGstin').value,
+            state: document.getElementById('custState').value,
+            creditLimit: parseFloat(document.getElementById('custCreditLimit').value) || 50000,
+            business: document.getElementById('custBusiness').value,
+            status: document.getElementById('custStatus').value,
+            updatedAt: new Date().toISOString()
+        };
+
+        customers[index] = updatedCustomer;
+        localStorage.setItem('customers', JSON.stringify(customers));
+
+        // Also sync to users (if the users array exists)
+        try {
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            const userIdx = users.findIndex(u => u.email === updatedCustomer.email);
+            const userData = {
+                name: updatedCustomer.name,
+                email: updatedCustomer.email,
+                password: updatedCustomer.email.split('@')[0] + '123',
+                phone: updatedCustomer.phone,
+                business: updatedCustomer.business,
+                gstin: updatedCustomer.gstin,
+                address: updatedCustomer.address,
+                pincode: updatedCustomer.pincode,
+                state: updatedCustomer.state,
+                role: 'customer'
+            };
+            if (userIdx !== -1) users[userIdx] = { ...users[userIdx], ...userData };
+            else users.push(userData);
+            localStorage.setItem('users', JSON.stringify(users));
+        } catch(e) { console.warn('User sync failed', e); }
+
+        alert('Customer updated successfully!');
+        window.close(); // close this edit window – the main page will refresh automatically when you return
+    }
+
+    loadCustomer();
+</script>
+</body>
+</html>
