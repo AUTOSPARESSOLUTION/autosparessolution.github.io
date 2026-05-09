@@ -23,7 +23,6 @@
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         .date-range { display: flex; gap: 10px; align-items: center; }
         .date-range input { width: 130px; }
-        .debug-msg { background: #fff3cd; border: 1px solid #ffeeba; padding: 10px; margin-bottom: 10px; font-family: monospace; font-size: 12px; display: none; }
         @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .container { box-shadow: none; padding: 10px; } }
     </style>
 </head>
@@ -35,7 +34,6 @@
     </div>
 
     <div id="customerInfo" class="customer-info">Select or enter customer email</div>
-    <div id="debugMsg" class="debug-msg"></div>
 
     <div class="search-box no-print">
         <select id="customerSelect" style="flex:1;">
@@ -43,7 +41,7 @@
         </select>
         <span style="color:#555;">OR</span>
         <input type="email" id="customerEmailInput" placeholder="Enter customer email directly" style="flex:1;">
-        <button onclick="loadLedgerByEmail()"><i class="fas fa-chart-line"></i> Load Ledger</button>
+        <button onclick="loadLedger()"><i class="fas fa-chart-line"></i> Load Ledger</button>
         <button onclick="refreshDropdown()"><i class="fas fa-sync-alt"></i> Refresh List</button>
     </div>
 
@@ -72,16 +70,8 @@
     let currentFilterStart = null;
     let currentFilterEnd = null;
 
-    function showDebug(msg) {
-        const debugDiv = document.getElementById('debugMsg');
-        debugDiv.style.display = 'block';
-        debugDiv.innerHTML += `<div>${new Date().toLocaleTimeString()} - ${msg}</div>`;
-        console.log(msg);
-    }
-
     function refreshDropdown() {
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        showDebug(`Loaded ${customers.length} customers from storage`);
         const select = document.getElementById('customerSelect');
         select.innerHTML = '<option value="">-- Select Customer --</option>';
         customers.forEach(c => {
@@ -91,58 +81,80 @@
         if (viewEmail) {
             select.value = viewEmail;
             localStorage.removeItem('viewCustomerEmail');
-            loadLedgerByEmail();
+            loadLedger();
         }
+        // Set default dates (last 60 days to capture more history)
         const today = new Date();
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(today.getDate() - 60);
+        document.getElementById('startDate').value = sixtyDaysAgo.toISOString().split('T')[0];
         document.getElementById('endDate').value = today.toISOString().split('T')[0];
     }
 
-    function loadLedgerByEmail() {
+    function loadLedger() {
         let email = document.getElementById('customerSelect').value;
         if (!email) email = document.getElementById('customerEmailInput').value.trim();
         if (!email) {
             alert('Please select or enter a customer email');
             return;
         }
-        showDebug(`Loading ledger for email: ${email}`);
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         currentCustomer = customers.find(c => c.email === email);
         if (!currentCustomer) {
             alert(`Customer with email "${email}" not found.`);
-            showDebug(`Customer not found: ${email}`);
             return;
         }
 
+        // Display customer info with current outstanding
         document.getElementById('customerInfo').innerHTML = `
             <strong>${escapeHtml(currentCustomer.name)}</strong><br>
             Email: ${escapeHtml(currentCustomer.email)} | Phone: ${escapeHtml(currentCustomer.phone)}<br>
-            Outstanding: <strong>₹${(currentCustomer.outstanding||0).toLocaleString()}</strong>
+            Current Outstanding: <strong>₹${(currentCustomer.outstanding || 0).toLocaleString()}</strong>
         `;
 
+        // Build transactions
         const transactions = [];
-        // Sales invoices
-        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        showDebug(`Found ${allInvoices.length} total invoices`);
-        const customerInvoices = allInvoices.filter(inv => inv.buyer?.email === email || inv.customerEmail === email);
-        showDebug(`Filtered invoices for ${email}: ${customerInvoices.length}`);
-        customerInvoices.forEach(inv => {
+
+        // 1. Sales Invoices (from salesInvoices array)
+        const salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+        const customerSales = salesInvoices.filter(inv => 
+            inv.customerEmail === email || inv.buyer?.email === email
+        );
+        customerSales.forEach(inv => {
+            const amount = inv.grandTotal || inv.total || 0;
             transactions.push({
                 date: inv.date,
-                type: 'Invoice',
+                type: 'Sales Invoice',
                 ref: inv.invoiceNo,
-                debit: inv.grandTotal || inv.total || 0,
+                debit: amount,   // Debit increases outstanding
                 credit: 0,
-                narration: 'Sales Invoice'
+                narration: `Invoice ${inv.invoiceNo}`
             });
         });
 
-        // Customer payments
+        // 2. Also check allInvoices (fallback)
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        const customerAllInvoices = allInvoices.filter(inv => 
+            inv.customerEmail === email || inv.buyer?.email === email
+        );
+        // Avoid duplicates by checking reference already added
+        customerAllInvoices.forEach(inv => {
+            if (!customerSales.some(s => s.invoiceNo === inv.invoiceNo)) {
+                const amount = inv.grandTotal || inv.total || 0;
+                transactions.push({
+                    date: inv.date,
+                    type: 'Sales Invoice',
+                    ref: inv.invoiceNo,
+                    debit: amount,
+                    credit: 0,
+                    narration: `Invoice ${inv.invoiceNo}`
+                });
+            }
+        });
+
+        // 3. Payments received
         const allPayments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
         const customerPayments = allPayments.filter(p => p.customerEmail === email);
-        showDebug(`Customer payments: ${customerPayments.length}`);
         customerPayments.forEach(p => {
             transactions.push({
                 date: p.date,
@@ -150,18 +162,16 @@
                 ref: p.reference || 'Payment',
                 debit: 0,
                 credit: p.amount,
-                narration: `Payment via ${p.mode || 'cash'}`
+                narration: `Payment via ${p.mode || 'cash'} - ${p.remarks || ''}`
             });
         });
 
+        // Sort by date
         transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
         allTransactions = transactions;
-        showDebug(`Total transactions built: ${allTransactions.length}`);
-        if (allTransactions.length === 0) {
-            document.getElementById('ledgerTable').innerHTML = '<p>No transactions found for this customer.</p>';
-        } else {
-            applyDateFilter();
-        }
+
+        // Apply date filter and display
+        applyDateFilter();
     }
 
     function applyDateFilter() {
@@ -170,9 +180,9 @@
         const end = document.getElementById('endDate').value;
         currentFilterStart = start;
         currentFilterEnd = end;
+
         if (!start && !end) {
             filteredTransactions = [...allTransactions];
-            showDebug(`Clear filter: showing all ${filteredTransactions.length} transactions`);
         } else {
             filteredTransactions = allTransactions.filter(t => {
                 const tDate = t.date;
@@ -180,7 +190,6 @@
                 if (end && tDate > end) return false;
                 return true;
             });
-            showDebug(`Date filter ${start} to ${end}: kept ${filteredTransactions.length} of ${allTransactions.length}`);
         }
         displayLedger();
     }
@@ -191,12 +200,20 @@
         applyDateFilter();
     }
 
+    function calculateRunningBalance(transactions, openingBalance = 0) {
+        let running = openingBalance;
+        return transactions.map(t => {
+            running = running + t.debit - t.credit;
+            return { ...t, balance: running };
+        });
+    }
+
     function getOpeningBalanceBeforeDate(date) {
         if (!date) return 0;
         let balance = 0;
         for (let t of allTransactions) {
             if (t.date >= date) break;
-            balance += (t.debit - t.credit);
+            balance += t.debit - t.credit;
         }
         return balance;
     }
@@ -211,13 +228,14 @@
         
         if (transactionsToShow.length === 0) {
             document.getElementById('ledgerTable').innerHTML = '<p>No transactions in selected period.</p>';
+            // Optionally show opening and closing balance
             return;
         }
 
         let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
-        let running = openingBalance;
+        let transWithBalance = calculateRunningBalance(transactionsToShow, openingBalance);
         
-        let html = `<table><thead>
+        let html = `<tr><thead>
             <tr>
                 <th>Date</th>
                 <th>Type</th>
@@ -229,21 +247,19 @@
             </tr>
         </thead><tbody>`;
         
-        transactionsToShow.forEach(t => {
-            running += (t.debit - t.credit);
+        transWithBalance.forEach(t => {
             html += `<tr>
                 <td>${t.date}</td>
                 <td>${t.type}</td>
                 <td>${escapeHtml(t.ref)}</strong></td>
-                <td>${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
-                <td>${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
-                <td class="${running >= 0 ? 'balance-positive' : 'balance-negative'}">₹${running.toLocaleString()}</strong></td>
+                <td style="text-align:right;">${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right;">${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right;" class="${t.balance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${t.balance.toLocaleString()}</strong></td>
                 <td>${escapeHtml(t.narration)}</strong></td>
             </tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('ledgerTable').innerHTML = html;
-        showDebug(`Table rendered with ${transactionsToShow.length} rows`);
     }
 
     function filterLedger() {
@@ -254,28 +270,28 @@
         }
         const filtered = filteredTransactions.filter(t => 
             (t.ref && t.ref.toLowerCase().includes(term)) || 
-            t.type.toLowerCase().includes(term)
+            t.type.toLowerCase().includes(term) ||
+            (t.narration && t.narration.toLowerCase().includes(term))
         );
         if (filtered.length === 0) {
             document.getElementById('ledgerTable').innerHTML = '<p>No matching transactions.</p>';
             return;
         }
         let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
-        let running = openingBalance;
+        let transWithBalance = calculateRunningBalance(filtered, openingBalance);
         let rows = '';
-        filtered.forEach(t => {
-            running += (t.debit - t.credit);
+        transWithBalance.forEach(t => {
             rows += `<tr>
                 <td>${t.date}</td>
                 <td>${t.type}</td>
                 <td>${escapeHtml(t.ref)}</strong></td>
-                <td>${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
-                <td>${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
-                <td class="${running >= 0 ? 'balance-positive' : 'balance-negative'}">₹${running.toLocaleString()}</strong></td>
+                <td style="text-align:right;">${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right;">${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right;" class="${t.balance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${t.balance.toLocaleString()}</strong></td>
                 <td>${escapeHtml(t.narration)}</strong></td>
             </tr>`;
         });
-        document.getElementById('ledgerTable').innerHTML = `</tr><thead>运转<th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
+        document.getElementById('ledgerTable').innerHTML = `</table><thead>运转<th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function exportLedger() {
@@ -288,7 +304,7 @@
         let running = openingBalance;
         filteredTransactions.sort((a,b) => new Date(a.date) - new Date(b.date));
         filteredTransactions.forEach(t => {
-            running += (t.debit - t.credit);
+            running += t.debit - t.credit;
             csv += `"${t.date}","${t.type}","${t.ref}",${t.debit},${t.credit},${running},"${t.narration}"\n`;
         });
         const blob = new Blob([csv], {type: 'text/csv'});
@@ -305,8 +321,8 @@
             alert('Please load a customer ledger first.');
             return;
         }
-        const originalContainer = document.getElementById('ledgerTable');
-        const cloneContainer = originalContainer.cloneNode(true);
+        const originalTable = document.getElementById('ledgerTable');
+        const cloneTable = originalTable.cloneNode(true);
         const infoDiv = document.getElementById('customerInfo').cloneNode(true);
         const title = document.createElement('h2');
         title.innerText = 'Customer Ledger Statement';
@@ -320,7 +336,7 @@
         pdfContent.appendChild(title);
         pdfContent.appendChild(infoDiv);
         pdfContent.appendChild(period);
-        pdfContent.appendChild(cloneContainer);
+        pdfContent.appendChild(cloneTable);
         
         const header = document.createElement('div');
         header.style.backgroundColor = '#0a7c71';
