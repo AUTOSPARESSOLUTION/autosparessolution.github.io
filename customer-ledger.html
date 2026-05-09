@@ -139,7 +139,7 @@
 
     function refreshLedger() {
         if (currentCustomer) {
-            loadLedger();  // reload from storage
+            loadLedger();
         } else {
             alert('Please load a customer first.');
         }
@@ -150,7 +150,6 @@
         return String(email).trim().toLowerCase();
     }
 
-    // Match exactly as stored in invoices (buyer.email)
     function matchesCustomer(invoice, customerEmail) {
         const normTarget = normalizeEmail(customerEmail);
         return (invoice.buyer?.email && normalizeEmail(invoice.buyer.email) === normTarget) ||
@@ -210,7 +209,6 @@
             });
         });
 
-        // Sort by date
         transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
         allTransactions = transactions;
 
@@ -300,7 +298,6 @@
         html += '</tbody>\n</table>';
         document.getElementById('ledgerTable').innerHTML = html;
 
-        // Warning if mismatch
         const finalBalance = running;
         const masterOutstanding = currentCustomer.outstanding || 0;
         if (Math.abs(finalBalance - masterOutstanding) > 1) {
@@ -364,6 +361,7 @@
         URL.revokeObjectURL(url);
     }
 
+    // ------------- FIXED PDF DOWNLOAD (includes selected period) -------------
     function downloadPDF() {
         if (!currentCustomer) { alert('Load a customer first'); return; }
         const container = document.getElementById('ledgerTable');
@@ -372,7 +370,9 @@
         const title = document.createElement('h2');
         title.innerText = 'Customer Ledger Statement';
         const period = document.createElement('p');
-        period.innerHTML = `<strong>Period:</strong> ${currentFilterStart || 'All'} to ${currentFilterEnd || 'All'}`;
+        let fromDate = currentFilterStart || 'All';
+        let toDate = currentFilterEnd || 'All';
+        period.innerHTML = `<strong>Selected Period:</strong> ${fromDate} to ${toDate}`;
         const pdfDiv = document.createElement('div');
         pdfDiv.style.padding = '20px';
         pdfDiv.style.fontFamily = 'Roboto';
@@ -387,7 +387,7 @@
         header.style.textAlign = 'center';
         header.innerHTML = '<h2>Auto Spares Solution</h2><p>GSTIN: 19ANOPD3300R1ZO | Howrah, WB</p>';
         pdfDiv.prepend(header);
-        html2pdf().set({ margin: 0.3, filename: `Customer_Ledger_${currentCustomer.name}.pdf`, image: { quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' } }).from(pdfDiv).save();
+        html2pdf().set({ margin: 0.3, filename: `Customer_Ledger_${currentCustomer.name}_${fromDate}_to_${toDate}.pdf`, image: { quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' } }).from(pdfDiv).save();
     }
 
     function escapeHtml(str) {
@@ -398,4 +398,4 @@
     refreshDropdown();
 </script>
 </body>
-            </html>
+                                                                                        </html>
