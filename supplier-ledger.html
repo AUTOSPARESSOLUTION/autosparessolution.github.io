@@ -23,6 +23,8 @@
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         .date-range { display: flex; gap: 10px; align-items: center; }
         .date-range input { width: 130px; }
+        .recalc-btn { background: #fd7e14; }
+        .recalc-btn:hover { background: #e06c0e; }
         @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .container { box-shadow: none; padding: 10px; } }
     </style>
 </head>
@@ -44,6 +46,7 @@
         <button onclick="loadLedgerByEmail()"><i class="fas fa-chart-line"></i> Load Ledger</button>
         <button onclick="refreshDropdown()"><i class="fas fa-sync-alt"></i> Refresh List</button>
         <button onclick="refreshLedger()" style="background:#17a2b8;"><i class="fas fa-undo-alt"></i> Refresh</button>
+        <button onclick="recalculateOutstanding()" class="recalc-btn"><i class="fas fa-calculator"></i> Recalc Outstanding</button>
     </div>
 
     <div class="search-box no-print">
@@ -97,7 +100,7 @@
             localStorage.removeItem('viewSupplierEmail');
             loadLedgerByEmail();
         }
-        // NO default date range – show all transactions initially
+        // No default date range – show all transactions
         document.getElementById('startDate').value = '';
         document.getElementById('endDate').value = '';
     }
@@ -226,6 +229,36 @@
         return balance;
     }
 
+    function calculateTotalOutstanding() {
+        let totalDebit = 0, totalCredit = 0;
+        for (let t of allTransactions) {
+            totalDebit += t.debit;
+            totalCredit += t.credit;
+        }
+        return totalDebit - totalCredit;
+    }
+
+    function recalculateOutstanding() {
+        if (!currentSupplier) { alert('Load a supplier first'); return; }
+        let calculated = calculateTotalOutstanding();
+        if (confirm(`Recalculate outstanding for ${currentSupplier.name}?\nCurrent master: ₹${(currentSupplier.outstanding||0).toLocaleString()}\nLedger total: ₹${calculated.toLocaleString()}\n\nUpdate master to ₹${calculated.toLocaleString()}?`)) {
+            let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+            let idx = suppliers.findIndex(s => s.email === currentSupplier.email);
+            if (idx !== -1) {
+                suppliers[idx].outstanding = calculated;
+                localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                currentSupplier.outstanding = calculated;
+                document.getElementById('supplierInfo').innerHTML = `
+                    <strong>${escapeHtml(currentSupplier.name)}</strong><br>
+                    Email: ${escapeHtml(currentSupplier.email)} | Phone: ${escapeHtml(currentSupplier.phone)}<br>
+                    Outstanding in Master: <strong>₹${(currentSupplier.outstanding||0).toLocaleString()}</strong>
+                `;
+                alert('Outstanding updated from ledger.');
+                displayLedger(); // refresh display to remove warning
+            }
+        }
+    }
+
     function displayLedger() {
         if (!currentSupplier) {
             document.getElementById('ledgerTable').innerHTML = '<p>No supplier selected.</p>';
@@ -242,19 +275,17 @@
         let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
         let running = openingBalance;
         
-        let html = `<table class="ledger-table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>Reference</th>
-                    <th style="text-align:right">Debit (₹)</th>
-                    <th style="text-align:right">Credit (₹)</th>
-                    <th style="text-align:right">Balance (₹)</th>
-                    <th>Narration</th>
-                </tr>
-            </thead>
-            <tbody>`;
+        let html = `<table><thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Reference</th>
+                <th style="text-align:right">Debit (₹)</th>
+                <th style="text-align:right">Credit (₹)</th>
+                <th style="text-align:right">Balance (₹)</th>
+                <th>Narration</th>
+            </tr>
+        </thead><tbody>`;
 
         if (openingBalance !== 0 && currentFilterStart) {
             html += `<tr>
@@ -290,7 +321,7 @@
         if (Math.abs(finalBalance - masterOutstanding) > 1) {
             const warning = `<div style="background:#fff3cd; padding:10px; margin-top:10px; border:1px solid #ffeeba;">
                 ⚠️ Ledger closing balance (₹${finalBalance.toLocaleString()}) differs from Master outstanding (₹${masterOutstanding.toLocaleString()}).
-                Click "Refresh" after editing to reload.
+                Use the <strong>"Recalc Outstanding"</strong> button to fix.
             </div>`;
             document.getElementById('ledgerTable').innerHTML += warning;
         }
@@ -324,7 +355,7 @@
                 <td>${escapeHtml(t.narration)}</strong></td>
             </tr>`;
         });
-        document.getElementById('ledgerTable').innerHTML = `<tr><thead>运转<th>Date</th><th>Type</th><th>Reference</th><th style="text-align:right">Debit (₹)</th><th style="text-align:right">Credit (₹)</th><th style="text-align:right">Balance (₹)</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
+        document.getElementById('ledgerTable').innerHTML = `<td><thead>运转<th>Date</th><th>Type</th><th>Reference</th><th style="text-align:right">Debit (₹)</th><th style="text-align:right">Credit (₹)</th><th style="text-align:right">Balance (₹)</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function exportLedger() {
@@ -408,4 +439,4 @@
     refreshDropdown();
 </script>
 </body>
-</html>
+    </html>
