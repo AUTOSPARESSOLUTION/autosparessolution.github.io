@@ -22,8 +22,10 @@
         button:hover { background: #09645a; }
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         .date-range { display: flex; gap: 10px; align-items: center; }
-        .debug-panel { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 11px; display: none; max-height: 200px; overflow: auto; }
+        .debug-panel { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 11px; display: none; max-height: 300px; overflow: auto; }
         @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .container { box-shadow: none; padding: 10px; } }
+        .recalc-btn { background: #fd7e14; }
+        .recalc-btn:hover { background: #e06c0e; }
     </style>
 </head>
 <body>
@@ -44,6 +46,7 @@
         <button onclick="loadLedger()">Load Ledger</button>
         <button onclick="refreshDropdown()">Refresh List</button>
         <button onclick="toggleDebug()" style="background:#6c757d;">Toggle Debug</button>
+        <button onclick="recalculateOutstanding()" class="recalc-btn" style="background:#fd7e14;">Recalc Outstanding</button>
     </div>
 
     <div id="debugPanel" class="debug-panel"></div>
@@ -103,13 +106,28 @@
         document.getElementById('endDate').value = today.toISOString().slice(0,10);
     }
 
+    // Check if a transaction matches a given customer email (case-insensitive)
+    function matchesCustomerEmail(obj, customerEmail) {
+        if (!obj) return false;
+        const checkFields = ['customerEmail', 'customer.email', 'buyer.email', 'email'];
+        for (let field of checkFields) {
+            let value = field.includes('.') ? 
+                field.split('.').reduce((o, k) => o?.[k], obj) : 
+                obj[field];
+            if (value && String(value).toLowerCase() === String(customerEmail).toLowerCase()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function loadLedger() {
         let email = document.getElementById('customerSelect').value;
         if (!email) email = document.getElementById('customerEmailInput').value.trim();
         if (!email) { alert('Please select or enter a customer email'); return; }
 
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        currentCustomer = customers.find(c => c.email === email);
+        currentCustomer = customers.find(c => c.email.toLowerCase() === email.toLowerCase());
         if (!currentCustomer) { alert('Customer not found.'); return; }
 
         document.getElementById('customerInfo').innerHTML = `
@@ -119,53 +137,48 @@
         `;
 
         document.getElementById('debugPanel').innerHTML = '';
-        logDebug(`Loading ledger for ${email}`);
+        logDebug(`Loading ledger for ${currentCustomer.email}`);
 
         let transactions = [];
 
-        // Helper to add invoice
+        // Helper to add invoice (debit)
         function addInvoice(inv, source) {
             let amount = inv.grandTotal || inv.total || 0;
             if (amount === 0) return;
+            // Avoid duplicate by reference
+            if (transactions.some(t => t.ref === inv.invoiceNo && t.type === 'Invoice')) return;
             transactions.push({
                 date: inv.date,
                 type: 'Invoice',
                 ref: inv.invoiceNo,
                 debit: amount,
                 credit: 0,
-                narration: `Sales Invoice (${source})`
+                narration: `Invoice from ${source}`
             });
-            logDebug(`Added invoice ${inv.invoiceNo} amount ${amount} from ${source}`);
+            logDebug(`Added invoice ${inv.invoiceNo} amount ₹${amount} (${source})`);
         }
 
-        // Check salesInvoices
+        // 1. Check salesInvoices
         let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        let matchedSales = salesInvoices.filter(inv => 
-            inv.customerEmail === email || 
-            inv.buyer?.email === email ||
-            inv.customer?.email === email
-        );
+        let matchedSales = salesInvoices.filter(inv => matchesCustomerEmail(inv, currentCustomer.email));
         matchedSales.forEach(inv => addInvoice(inv, 'salesInvoices'));
         logDebug(`Found ${matchedSales.length} invoices in salesInvoices`);
 
-        // Check allInvoices
+        // 2. Check allInvoices (fallback)
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        let matchedAll = allInvoices.filter(inv => 
-            inv.customerEmail === email || 
-            inv.buyer?.email === email ||
-            inv.customer?.email === email
-        );
-        // Avoid duplicates (by invoice number)
-        matchedAll.forEach(inv => {
-            if (!transactions.some(t => t.ref === inv.invoiceNo)) {
-                addInvoice(inv, 'allInvoices');
-            }
-        });
+        let matchedAll = allInvoices.filter(inv => matchesCustomerEmail(inv, currentCustomer.email));
+        matchedAll.forEach(inv => addInvoice(inv, 'allInvoices'));
         logDebug(`Found ${matchedAll.length} invoices in allInvoices`);
 
-        // Payments
+        // 3. Check legacy invoices (if any)
+        let legacyInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+        let matchedLegacy = legacyInvoices.filter(inv => matchesCustomerEmail(inv, currentCustomer.email));
+        matchedLegacy.forEach(inv => addInvoice(inv, 'invoices'));
+        logDebug(`Found ${matchedLegacy.length} invoices in invoices (legacy)`);
+
+        // 4. Payments
         let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
-        let matchedPayments = payments.filter(p => p.customerEmail === email);
+        let matchedPayments = payments.filter(p => p.customerEmail && p.customerEmail.toLowerCase() === currentCustomer.email.toLowerCase());
         matchedPayments.forEach(p => {
             transactions.push({
                 date: p.date,
@@ -175,7 +188,7 @@
                 credit: p.amount,
                 narration: `Payment via ${p.mode || 'cash'}`
             });
-            logDebug(`Added payment ${p.reference} amount ${p.amount}`);
+            logDebug(`Added payment ${p.reference} amount ₹${p.amount}`);
         });
         logDebug(`Found ${matchedPayments.length} payments`);
 
@@ -215,6 +228,36 @@
         applyDateFilter();
     }
 
+    function calculateOutstandingFromTransactions() {
+        let totalDebit = 0, totalCredit = 0;
+        for (let t of allTransactions) {
+            totalDebit += t.debit;
+            totalCredit += t.credit;
+        }
+        return totalDebit - totalCredit;
+    }
+
+    function recalculateOutstanding() {
+        if (!currentCustomer) { alert('Load a customer first'); return; }
+        let calculated = calculateOutstandingFromTransactions();
+        if (confirm(`Recalculate outstanding for ${currentCustomer.name}?\nCurrent master outstanding: ₹${(currentCustomer.outstanding||0).toLocaleString()}\nLedger calculated: ₹${calculated.toLocaleString()}\n\nUpdate master to ₹${calculated.toLocaleString()}?`)) {
+            let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+            let idx = customers.findIndex(c => c.email.toLowerCase() === currentCustomer.email.toLowerCase());
+            if (idx !== -1) {
+                customers[idx].outstanding = calculated;
+                localStorage.setItem('customers', JSON.stringify(customers));
+                currentCustomer.outstanding = calculated;
+                document.getElementById('customerInfo').innerHTML = `
+                    <strong>${escapeHtml(currentCustomer.name)}</strong><br>
+                    Email: ${escapeHtml(currentCustomer.email)} | Phone: ${escapeHtml(currentCustomer.phone)}<br>
+                    Outstanding in Master: <strong>₹${(currentCustomer.outstanding || 0).toLocaleString()}</strong>
+                `;
+                alert('Outstanding updated from ledger.');
+                displayLedger(); // refresh display to remove warning
+            }
+        }
+    }
+
     function displayLedger() {
         if (!currentCustomer) {
             document.getElementById('ledgerTable').innerHTML = '<p>No customer selected.</p>';
@@ -225,22 +268,30 @@
             return;
         }
 
-        // Calculate opening balance (sum of all transactions before start date)
+        // Calculate opening balance
         let opening = 0;
         for (let t of allTransactions) {
             if (currentFilterStart && t.date < currentFilterStart) {
                 opening += t.debit - t.credit;
-            } else if (!currentFilterStart) {
-                break;
             }
         }
 
         let balance = opening;
-        let html = '<table><thead><tr>';
-        html += '<th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th>';
-        html += '</thead><tbody>';
+        let html = `<table class="ledger-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Reference</th>
+                    <th>Debit (₹)</th>
+                    <th>Credit (₹)</th>
+                    <th>Balance (₹)</th>
+                    <th>Narration</th>
+                </tr>
+            </thead>
+            <tbody>`;
 
-        // Show opening balance row if non-zero
+        // Opening balance row
         if (opening !== 0) {
             html += `<tr>
                 <td>${currentFilterStart || 'Before start'}</td>
@@ -267,13 +318,15 @@
         }
         html += '</tbody></table>';
         document.getElementById('ledgerTable').innerHTML = html;
-        
-        // Show comparison with master outstanding
+
+        // Compare with master
         const finalBalance = balance;
         const masterOutstanding = currentCustomer.outstanding || 0;
         if (Math.abs(finalBalance - masterOutstanding) > 1) {
-            logDebug(`WARNING: Ledger closing balance ₹${finalBalance.toLocaleString()} does not match Master outstanding ₹${masterOutstanding.toLocaleString()}`);
-            const warning = `<div style="background:#fff3cd; padding:8px; margin-top:10px; border:1px solid #ffeeba;">⚠️ Ledger balance (₹${finalBalance.toLocaleString()}) differs from Master outstanding (₹${masterOutstanding.toLocaleString()}).</div>`;
+            const warning = `<div style="background:#fff3cd; padding:10px; margin-top:10px; border:1px solid #ffeeba; border-radius:6px;">
+                ⚠️ <strong>Mismatch detected:</strong> Ledger closing balance (₹${finalBalance.toLocaleString()}) differs from Master outstanding (₹${masterOutstanding.toLocaleString()}). 
+                Use the <strong>"Recalc Outstanding"</strong> button above to fix.
+            </div>`;
             document.getElementById('ledgerTable').innerHTML += warning;
         }
     }
@@ -290,13 +343,12 @@
             document.getElementById('ledgerTable').innerHTML = '<p>No matching transactions.</p>';
             return;
         }
-        // Reuse display logic with filtered subset but keep original opening balance calculation
         let opening = 0;
         for (let t of allTransactions) {
             if (currentFilterStart && t.date < currentFilterStart) opening += t.debit - t.credit;
         }
         let balance = opening;
-        let html = '<table><thead>…</thead><tbody>';
+        let html = `<table><thead>…</thead><tbody>`;
         if (opening !== 0) {
             html += `<tr><td>${currentFilterStart || 'Before start'}</td><td>Opening Balance</td><td>-</td><td style="text-align:right">${opening>0?'₹'+opening.toLocaleString():'-'}</td><td style="text-align:right">${opening<0?'₹'+(-opening).toLocaleString():'-'}</td><td class="${opening>=0?'balance-positive':'balance-negative'}" style="text-align:right">₹${opening.toLocaleString()}</td><td>Opening</td></tr>`;
         }
@@ -326,7 +378,7 @@
         a.href = URL.createObjectURL(blob);
         a.download = `customer_ledger_${currentCustomer.email}.csv`;
         a.click();
-        URL.revokeObjectURL(blob);
+        URL.revokeObjectURL(url);
     }
 
     function downloadPDF() {
