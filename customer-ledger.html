@@ -22,12 +22,13 @@
         button:hover { background: #09645a; }
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         .date-range { display: flex; gap: 10px; align-items: center; }
-        .debug-panel { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 11px; display: none; max-height: 400px; overflow: auto; white-space: pre-wrap; }
-        .raw-data-panel { background: #e9ecef; border: 1px solid #0a7c71; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 11px; display: none; max-height: 300px; overflow: auto; }
+        .debug-panel { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 11px; display: none; max-height: 300px; overflow: auto; }
         @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .container { box-shadow: none; padding: 10px; } }
         .recalc-btn { background: #fd7e14; }
         .recalc-btn:hover { background: #e06c0e; }
         .debug-btn { background: #6c757d; }
+        td, th { vertical-align: middle; }
+        .text-right { text-align: right; }
     </style>
 </head>
 <body>
@@ -47,13 +48,11 @@
         <input type="email" id="customerEmailInput" placeholder="Enter customer email" style="flex:1;">
         <button onclick="loadLedger()">Load Ledger</button>
         <button onclick="refreshDropdown()">Refresh List</button>
-        <button onclick="toggleDebug()" class="debug-btn">Show Debug</button>
-        <button onclick="showRawData()" class="debug-btn">Show Raw Invoices</button>
+        <button onclick="toggleDebug()" class="debug-btn">Toggle Debug</button>
         <button onclick="recalculateOutstanding()" class="recalc-btn">Recalc Outstanding</button>
     </div>
 
     <div id="debugPanel" class="debug-panel"></div>
-    <div id="rawDataPanel" class="raw-data-panel"></div>
 
     <div class="search-box no-print">
         <div class="date-range">
@@ -85,26 +84,6 @@
         panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     }
 
-    function showRawData() {
-        const panel = document.getElementById('rawDataPanel');
-        if (panel.style.display === 'none' || !panel.style.display) {
-            let raw = '';
-            raw += '=== salesInvoices ===\n';
-            let sales = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-            raw += JSON.stringify(sales, null, 2) + '\n\n';
-            raw += '=== allInvoices ===\n';
-            let all = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-            raw += JSON.stringify(all, null, 2) + '\n\n';
-            raw += '=== invoices (legacy) ===\n';
-            let legacy = JSON.parse(localStorage.getItem('invoices') || '[]');
-            raw += JSON.stringify(legacy, null, 2);
-            panel.innerText = raw;
-            panel.style.display = 'block';
-        } else {
-            panel.style.display = 'none';
-        }
-    }
-
     function logDebug(msg) {
         const panel = document.getElementById('debugPanel');
         panel.innerHTML += new Date().toLocaleTimeString() + ' - ' + msg + '<br>';
@@ -124,41 +103,25 @@
             localStorage.removeItem('viewCustomerEmail');
             loadLedger();
         }
-        const today = new Date();
-        const start = new Date(); start.setDate(today.getDate() - 90);
-        document.getElementById('startDate').value = start.toISOString().slice(0,10);
-        document.getElementById('endDate').value = today.toISOString().slice(0,10);
+        // NO default dates – show all transactions
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
     }
 
-    // Normalize email for comparison (trim, lowercase)
     function normalizeEmail(email) {
         if (!email) return '';
         return String(email).trim().toLowerCase();
     }
 
-    // Check if any field in the invoice matches the customer email
     function matchesCustomer(invoice, customerEmail) {
-        const normalizedTarget = normalizeEmail(customerEmail);
-        const fieldsToCheck = ['customerEmail', 'customer.email', 'buyer.email', 'email', 'custEmail'];
-        for (let field of fieldsToCheck) {
-            let value;
-            if (field.includes('.')) {
-                const parts = field.split('.');
-                value = parts.reduce((obj, key) => obj?.[key], invoice);
-            } else {
-                value = invoice[field];
-            }
-            if (value && normalizeEmail(value) === normalizedTarget) {
-                return true;
-            }
+        const normTarget = normalizeEmail(customerEmail);
+        const fields = ['customerEmail', 'customer.email', 'buyer.email', 'email', 'custEmail'];
+        for (let f of fields) {
+            let val = f.includes('.') ? f.split('.').reduce((o,k)=>o?.[k], invoice) : invoice[f];
+            if (val && normalizeEmail(val) === normTarget) return true;
         }
-        // Also check inside buyer object if it exists as an object
-        if (invoice.buyer && typeof invoice.buyer === 'object') {
-            if (normalizeEmail(invoice.buyer.email) === normalizedTarget) return true;
-        }
-        if (invoice.customer && typeof invoice.customer === 'object') {
-            if (normalizeEmail(invoice.customer.email) === normalizedTarget) return true;
-        }
+        if (invoice.buyer?.email && normalizeEmail(invoice.buyer.email) === normTarget) return true;
+        if (invoice.customer?.email && normalizeEmail(invoice.customer.email) === normTarget) return true;
         return false;
     }
 
@@ -185,11 +148,7 @@
         function addInvoice(inv, source) {
             let amount = inv.grandTotal || inv.total || 0;
             if (amount === 0) return;
-            // Avoid duplicate by ref and type
-            if (transactions.some(t => t.ref === inv.invoiceNo && t.type === 'Invoice')) {
-                logDebug(`Skipping duplicate invoice ${inv.invoiceNo}`);
-                return;
-            }
+            if (transactions.some(t => t.ref === inv.invoiceNo && t.type === 'Invoice')) return;
             transactions.push({
                 date: inv.date,
                 type: 'Invoice',
@@ -201,7 +160,6 @@
             logDebug(`+ Invoice ${inv.invoiceNo} ₹${amount} (${source})`);
         }
 
-        // Collect all possible invoice arrays
         const sources = [
             { name: 'salesInvoices', data: JSON.parse(localStorage.getItem('salesInvoices') || '[]') },
             { name: 'allInvoices', data: JSON.parse(localStorage.getItem('allInvoices') || '[]') },
@@ -214,31 +172,38 @@
             logDebug(`Found ${matched.length} invoices in ${src.name}`);
         }
 
-        // Payments
         let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
         let matchedPayments = payments.filter(p => normalizeEmail(p.customerEmail) === normalizeEmail(currentCustomer.email));
         matchedPayments.forEach(p => {
+            let ref = p.reference || p.id || 'Payment';
+            if (ref === 'Payment' && p.id) ref = 'Payment-' + p.id;
             transactions.push({
                 date: p.date,
                 type: 'Payment',
-                ref: p.reference || 'Payment',
+                ref: ref,
                 debit: 0,
                 credit: p.amount,
                 narration: `Payment via ${p.mode || 'cash'}`
             });
-            logDebug(`+ Payment ${p.reference} ₹${p.amount}`);
+            logDebug(`+ Payment ${ref} ₹${p.amount}`);
         });
         logDebug(`Found ${matchedPayments.length} payments`);
 
-        // Sort by date
         transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
         allTransactions = transactions;
         logDebug(`Total transactions: ${allTransactions.length}`);
         
+        // Reset filter to show all transactions initially
+        currentFilterStart = null;
+        currentFilterEnd = null;
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        filteredTransactions = [...allTransactions];
+        
         if (allTransactions.length === 0) {
             document.getElementById('ledgerTable').innerHTML = '<p>No transactions found for this customer. Check debug panel for details.</p>';
         } else {
-            applyDateFilter();
+            displayLedger();
         }
     }
 
@@ -306,7 +271,7 @@
             return;
         }
 
-        // Calculate opening balance (transactions before start date)
+        // Calculate opening balance before start date
         let opening = 0;
         for (let t of allTransactions) {
             if (currentFilterStart && t.date < currentFilterStart) {
@@ -321,24 +286,23 @@
                     <th>Date</th>
                     <th>Type</th>
                     <th>Reference</th>
-                    <th>Debit (₹)</th>
-                    <th>Credit (₹)</th>
-                    <th>Balance (₹)</th>
+                    <th class="text-right">Debit (₹)</th>
+                    <th class="text-right">Credit (₹)</th>
+                    <th class="text-right">Balance (₹)</th>
                     <th>Narration</th>
                 </tr>
             </thead>
             <tbody>`;
 
-        // Opening balance row (only if non-zero)
-        if (opening !== 0) {
+        if (opening !== 0 && currentFilterStart) {
             html += `<tr>
                 <td>${currentFilterStart || 'Before start'}</td>
-                <td>Opening Balance</strong></td>
-                <td>-</strong></td>
-                <td style="text-align:right">${opening > 0 ? '₹' + opening.toLocaleString() : '-'}</strong></td>
-                <td style="text-align:right">${opening < 0 ? '₹' + (-opening).toLocaleString() : '-'}</strong></td>
-                <td style="text-align:right" class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">₹${opening.toLocaleString()}</strong></td>
-                <td>Opening Balance (before selected period)</strong></td>
+                <td>Opening Balance</td>
+                <td>-</td>
+                <td class="text-right">${opening > 0 ? '₹' + opening.toLocaleString() : '-'}</td>
+                <td class="text-right">${opening < 0 ? '₹' + (-opening).toLocaleString() : '-'}</td>
+                <td class="text-right ${opening >= 0 ? 'balance-positive' : 'balance-negative'}">₹${opening.toLocaleString()}</td>
+                <td>Opening Balance (before selected period)</td>
             </tr>`;
         }
 
@@ -346,18 +310,17 @@
             balance += t.debit - t.credit;
             html += `<tr>
                 <td>${t.date}</td>
-                <td>${t.type}</strong></td>
+                <td>${t.type}</td>
                 <td><strong>${escapeHtml(t.ref)}</strong></td>
-                <td style="text-align:right"><strong>${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
-                <td style="text-align:right"><strong>${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
-                <td style="text-align:right" class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}"><strong>₹${balance.toLocaleString()}</strong></td>
-                <td>${escapeHtml(t.narration)}</strong></td>
+                <td class="text-right">${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</td>
+                <td class="text-right">${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</td>
+                <td class="text-right ${balance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${balance.toLocaleString()}</td>
+                <td>${escapeHtml(t.narration)}</td>
             </tr>`;
         }
-        html += '</tbody></td>';
+        html += '</tbody></table>';
         document.getElementById('ledgerTable').innerHTML = html;
 
-        // Compare with master
         const finalBalance = balance;
         const masterOutstanding = currentCustomer.outstanding || 0;
         if (Math.abs(finalBalance - masterOutstanding) > 1) {
@@ -387,12 +350,13 @@
         }
         let balance = opening;
         let html = `<table><thead>…</thead><tbody>`;
-        if (opening !== 0) {
-            html += `<tr><td colspan="7">Opening Balance: ₹${opening.toLocaleString()}…</td></tr>`;
-        }
         for (let t of filtered) {
             balance += t.debit - t.credit;
-            html += `<tr><td>${t.date}</td><td>${t.type}</td><td>${escapeHtml(t.ref)}</td><td style="text-align:right">${t.debit?'₹'+t.debit.toLocaleString():'-'}</td><td style="text-align:right">${t.credit?'₹'+t.credit.toLocaleString():'-'}</td><td style="text-align:right" class="${balance>=0?'balance-positive':'balance-negative'}">₹${balance.toLocaleString()}</td><td>${escapeHtml(t.narration)}</td></tr>`;
+            html += `<tr><td>${t.date}</td><td>${t.type}</td><td>${escapeHtml(t.ref)}</td>
+                <td class="text-right">${t.debit?'₹'+t.debit.toLocaleString():'-'}</td>
+                <td class="text-right">${t.credit?'₹'+t.credit.toLocaleString():'-'}</td>
+                <td class="text-right ${balance>=0?'balance-positive':'balance-negative'}">₹${balance.toLocaleString()}</td>
+                <td>${escapeHtml(t.narration)}</td></tr>`;
         }
         html += '</tbody></table>';
         document.getElementById('ledgerTable').innerHTML = html;
@@ -406,7 +370,9 @@
             if (currentFilterStart && t.date < currentFilterStart) opening += t.debit - t.credit;
         }
         let balance = opening;
-        if (opening !== 0) csv += `"${currentFilterStart || 'Before start'}","Opening Balance","-",${opening>0?opening:0},${opening<0?-opening:0},${opening},"Opening Balance"\n`;
+        if (opening !== 0 && currentFilterStart) {
+            csv += `"${currentFilterStart || 'Before start'}","Opening Balance","-",${opening>0?opening:0},${opening<0?-opening:0},${opening},"Opening Balance"\n`;
+        }
         for (let t of filteredTransactions) {
             balance += t.debit - t.credit;
             csv += `"${t.date}","${t.type}","${t.ref}",${t.debit},${t.credit},${balance},"${t.narration}"\n`;
