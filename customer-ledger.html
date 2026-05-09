@@ -5,87 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Ledger – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; }
-        .customer-info {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #0a7c71;
-        }
-        .search-box {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #dee2e6;
-            padding: 10px;
-            text-align: left;
-            vertical-align: top;
-        }
+        .customer-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0a7c71; }
+        .search-box { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         .balance-positive { color: #28a745; font-weight: bold; }
         .balance-negative { color: #dc3545; font-weight: bold; }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
         button:hover { background: #09645a; }
-        input, select {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        .date-range { display: flex; gap: 10px; align-items: center; }
+        .date-range input { width: 130px; }
+        @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .container { box-shadow: none; padding: 10px; } }
     </style>
 </head>
 <body>
 <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1><i class="fas fa-book"></i> Customer Ledger</h1>
-        <a href="customer-master.html" style="background:#6c757d; color:white; padding:8px 16px; border-radius:6px; text-decoration:none;"><i class="fas fa-arrow-left"></i> Back</a>
+        <a href="customer-master.html" style="background:#6c757d; color:white; padding:8px 16px; border-radius:6px; text-decoration:none;"><i class="fas fa-arrow-left"></i> Back to Customers</a>
     </div>
 
     <div id="customerInfo" class="customer-info">Select or enter customer email</div>
 
-    <div class="search-box">
+    <div class="search-box no-print">
         <select id="customerSelect" style="flex:1;">
             <option value="">-- Select Customer --</option>
         </select>
         <span style="color:#555;">OR</span>
         <input type="email" id="customerEmailInput" placeholder="Enter customer email directly" style="flex:1;">
-        <button onclick="loadLedgerByEmail()">Load Ledger</button>
+        <button onclick="loadLedgerByEmail()"><i class="fas fa-chart-line"></i> Load Ledger</button>
         <button onclick="refreshDropdown()"><i class="fas fa-sync-alt"></i> Refresh List</button>
+    </div>
+
+    <div class="search-box no-print">
+        <div class="date-range">
+            <label>From:</label>
+            <input type="date" id="startDate">
+            <label>To:</label>
+            <input type="date" id="endDate">
+            <button onclick="applyDateFilter()"><i class="fas fa-calendar-alt"></i> Filter</button>
+            <button onclick="clearDateFilter()"><i class="fas fa-undo-alt"></i> Clear</button>
+        </div>
+        <input type="text" id="searchRef" placeholder="Search by reference...">
+        <button onclick="filterLedger()"><i class="fas fa-search"></i> Search</button>
         <button onclick="exportLedger()"><i class="fas fa-file-csv"></i> Export CSV</button>
-        <input type="text" id="searchRef" placeholder="Search by ref...">
-        <button onclick="filterLedger()">Search</button>
+        <button onclick="downloadPDF()"><i class="fas fa-file-pdf"></i> Download PDF</button>
     </div>
 
     <div id="ledgerTable"></div>
@@ -94,24 +66,31 @@
 <script>
     let currentCustomer = null;
     let allTransactions = [];
+    let filteredTransactions = [];
+    let currentFilterStart = null;
+    let currentFilterEnd = null;
 
     function refreshDropdown() {
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const select = document.getElementById('customerSelect');
         select.innerHTML = '<option value="">-- Select Customer --</option>';
         customers.forEach(c => {
-            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+            select.innerHTML += `<option value="${c.email}">${escapeHtml(c.name)} (${c.email})</option>`;
         });
-        // Auto-select if coming from master
         const viewEmail = localStorage.getItem('viewCustomerEmail');
         if (viewEmail) {
             select.value = viewEmail;
             localStorage.removeItem('viewCustomerEmail');
             loadLedgerByEmail();
         }
+        const today = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+        document.getElementById('endDate').value = today.toISOString().split('T')[0];
     }
 
-    async function loadLedgerByEmail() {
+    function loadLedgerByEmail() {
         let email = document.getElementById('customerSelect').value;
         if (!email) email = document.getElementById('customerEmailInput').value.trim();
         if (!email) {
@@ -121,7 +100,7 @@
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         currentCustomer = customers.find(c => c.email === email);
         if (!currentCustomer) {
-            alert(`Customer with email "${email}" not found. Please add in Customer Master.`);
+            alert(`Customer with email "${email}" not found.`);
             return;
         }
 
@@ -131,8 +110,8 @@
             Outstanding: <strong>₹${(currentCustomer.outstanding||0).toLocaleString()}</strong>
         `;
 
-        // Build transactions
         const transactions = [];
+        // Sales invoices
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const customerInvoices = allInvoices.filter(inv => inv.buyer?.email === email || inv.customerEmail === email);
         customerInvoices.forEach(inv => {
@@ -142,10 +121,11 @@
                 ref: inv.invoiceNo,
                 debit: inv.grandTotal || inv.total || 0,
                 credit: 0,
-                narration: `Invoice`
+                narration: 'Sales Invoice'
             });
         });
 
+        // Customer payments
         const allPayments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
         const customerPayments = allPayments.filter(p => p.customerEmail === email);
         customerPayments.forEach(p => {
@@ -161,23 +141,82 @@
 
         transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
         allTransactions = transactions;
+        applyDateFilter();
+    }
+
+    function applyDateFilter() {
+        if (!currentCustomer) return;
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
+        currentFilterStart = start;
+        currentFilterEnd = end;
+        if (!start && !end) {
+            filteredTransactions = [...allTransactions];
+        } else {
+            filteredTransactions = allTransactions.filter(t => {
+                const tDate = t.date;
+                if (start && tDate < start) return false;
+                if (end && tDate > end) return false;
+                return true;
+            });
+        }
         displayLedger();
     }
 
+    function clearDateFilter() {
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        applyDateFilter();
+    }
+
+    function getOpeningBalanceBeforeDate(date) {
+        if (!date) return currentCustomer?.outstanding || 0;
+        let balance = 0;
+        for (let t of allTransactions) {
+            if (t.date >= date) break;
+            balance += (t.debit - t.credit);
+        }
+        return balance;
+    }
+
     function displayLedger() {
-        if (!currentCustomer) return;
-        let running = currentCustomer.openingBalance || 0;
-        let html = '<table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>';
-        allTransactions.forEach(t => {
+        if (!currentCustomer) {
+            document.getElementById('ledgerTable').innerHTML = '<p>No customer selected.</p>';
+            return;
+        }
+        let transactionsToShow = [...filteredTransactions];
+        transactionsToShow.sort((a,b) => new Date(a.date) - new Date(b.date));
+        
+        if (transactionsToShow.length === 0) {
+            document.getElementById('ledgerTable').innerHTML = '<p>No transactions in selected period.</p>';
+            return;
+        }
+
+        let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
+        let running = openingBalance;
+        
+        let html = `<tr><thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Reference</th>
+                <th>Debit (₹)</th>
+                <th>Credit (₹)</th>
+                <th>Balance (₹)</th>
+                <th>Narration</th>
+            </tr>
+        </thead><tbody>`;
+        
+        transactionsToShow.forEach(t => {
             running += (t.debit - t.credit);
             html += `<tr>
                 <td>${t.date}</td>
                 <td>${t.type}</td>
-                <td>${escapeHtml(t.ref)}</td>
-                <td>${t.debit ? '₹'+t.debit.toLocaleString() : '-'}</td>
-                <td>${t.credit ? '₹'+t.credit.toLocaleString() : '-'}</td>
-                <td class="${running>=0?'balance-positive':'balance-negative'}">₹${running.toLocaleString()}</td>
-                <td>${escapeHtml(t.narration)}</td>
+                <td>${escapeHtml(t.ref)}</strong></td>
+                <td>${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
+                <td>${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
+                <td class="${running >= 0 ? 'balance-positive' : 'balance-negative'}">₹${running.toLocaleString()}</strong></td>
+                <td>${escapeHtml(t.narration)}</strong></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -190,34 +229,42 @@
             displayLedger();
             return;
         }
-        const filtered = allTransactions.filter(t => (t.ref && t.ref.toLowerCase().includes(term)) || t.type.toLowerCase().includes(term));
+        const filtered = filteredTransactions.filter(t => 
+            (t.ref && t.ref.toLowerCase().includes(term)) || 
+            t.type.toLowerCase().includes(term)
+        );
         if (filtered.length === 0) {
             document.getElementById('ledgerTable').innerHTML = '<p>No matching transactions.</p>';
             return;
         }
-        let running = currentCustomer.openingBalance || 0;
-        let html = '<table><thead>…</thead><tbody>';
+        let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
+        let running = openingBalance;
+        let rows = '';
         filtered.forEach(t => {
             running += (t.debit - t.credit);
-            html += `<tr>...</tr>`; // simplified for brevity, but same as above
+            rows += `<tr>
+                <td>${t.date}</td>
+                <td>${t.type}</td>
+                <td>${escapeHtml(t.ref)}</strong></td>
+                <td>${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
+                <td>${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
+                <td class="${running >= 0 ? 'balance-positive' : 'balance-negative'}">₹${running.toLocaleString()}</strong></td>
+                <td>${escapeHtml(t.narration)}</strong></td>
+            </tr>`;
         });
-        // Actually, just call displayLedger and then filter visually? Let's keep simple:
-        // Re‑implement correctly:
-        let rows = '';
-        let bal = currentCustomer.openingBalance || 0;
-        filtered.forEach(t => {
-            bal += (t.debit - t.credit);
-            rows += `<tr><td>${t.date}</td><td>${t.type}</td><td>${escapeHtml(t.ref)}</td><td>${t.debit? '₹'+t.debit.toLocaleString():'-'}</td><td>${t.credit? '₹'+t.credit.toLocaleString():'-'}</td><td class="${bal>=0?'balance-positive':'balance-negative'}">₹${bal.toLocaleString()}</td><td>${escapeHtml(t.narration)}</td></tr>`;
-        });
-        document.getElementById('ledgerTable').innerHTML = `<table>...${rows}</table>`;
-        // Full implementation above would be repetitive; I'll trust you can reuse.
+        document.getElementById('ledgerTable').innerHTML = `<table><thead>运转<th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function exportLedger() {
-        if (!allTransactions.length) { alert('No data'); return; }
+        if (!filteredTransactions.length) {
+            alert('No data to export');
+            return;
+        }
         let csv = "Date,Type,Reference,Debit,Credit,Balance,Narration\n";
-        let running = currentCustomer.openingBalance || 0;
-        allTransactions.forEach(t => {
+        let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
+        let running = openingBalance;
+        filteredTransactions.sort((a,b) => new Date(a.date) - new Date(b.date));
+        filteredTransactions.forEach(t => {
             running += (t.debit - t.credit);
             csv += `"${t.date}","${t.type}","${t.ref}",${t.debit},${t.credit},${running},"${t.narration}"\n`;
         });
@@ -225,12 +272,61 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `customer_ledger_${currentCustomer.email}.csv`;
+        a.download = `customer_ledger_${currentCustomer.email}_${currentFilterStart || 'all'}_to_${currentFilterEnd || 'all'}.csv`;
         a.click();
         URL.revokeObjectURL(url);
     }
 
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function downloadPDF() {
+        if (!currentCustomer) {
+            alert('Please load a customer ledger first.');
+            return;
+        }
+        const originalContainer = document.getElementById('ledgerTable');
+        const cloneContainer = originalContainer.cloneNode(true);
+        const infoDiv = document.getElementById('customerInfo').cloneNode(true);
+        const title = document.createElement('h2');
+        title.innerText = 'Customer Ledger Statement';
+        const period = document.createElement('p');
+        period.innerHTML = `<strong>Period:</strong> ${currentFilterStart || 'All'} to ${currentFilterEnd || 'All'}`;
+        
+        const pdfContent = document.createElement('div');
+        pdfContent.style.fontFamily = 'Roboto, sans-serif';
+        pdfContent.style.padding = '20px';
+        pdfContent.style.backgroundColor = 'white';
+        pdfContent.appendChild(title);
+        pdfContent.appendChild(infoDiv);
+        pdfContent.appendChild(period);
+        pdfContent.appendChild(cloneContainer);
+        
+        const header = document.createElement('div');
+        header.style.backgroundColor = '#0a7c71';
+        header.style.color = 'white';
+        header.style.padding = '10px';
+        header.style.marginBottom = '15px';
+        header.style.textAlign = 'center';
+        header.innerHTML = '<h2>Auto Spares Solution</h2><p>GSTIN: 19ANOPD3300R1ZO | 101, Howrah, WB</p>';
+        pdfContent.prepend(header);
+        
+        const opt = {
+            margin: [0.3, 0.3, 0.3, 0.3],
+            filename: `Customer_Ledger_${currentCustomer.name}_${currentFilterStart || 'all'}_to_${currentFilterEnd || 'all'}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, letterRendering: true },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+        };
+        html2pdf().set(opt).from(pdfContent).save();
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
 
     refreshDropdown();
 </script>
