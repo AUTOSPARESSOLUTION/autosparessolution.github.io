@@ -122,6 +122,22 @@
     let currentFilterStart = null;
     let currentFilterEnd = null;
 
+    // ---------- DATE NORMALIZATION: convert DD/MM/YYYY or YYYY-MM-DD to YYYY-MM-DD ----------
+    function toISODate(dateStr) {
+        if (!dateStr) return '';
+        // If already YYYY-MM-DD, return as is
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+        // If DD/MM/YYYY
+        const parts = dateStr.split('/');
+        if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        // If MM/DD/YYYY? Unlikely, but try to parse
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+        return dateStr; // fallback
+    }
+
     function refreshDropdown() {
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const select = document.getElementById('customerSelect');
@@ -138,11 +154,8 @@
     }
 
     function refreshLedger() {
-        if (currentCustomer) {
-            loadLedger();
-        } else {
-            alert('Please load a customer first.');
-        }
+        if (currentCustomer) loadLedger();
+        else alert('Please load a customer first.');
     }
 
     function normalizeEmail(email) {
@@ -179,14 +192,17 @@
 
         const transactions = [];
 
-        // 1. Invoices from allInvoices
+        // Invoices from allInvoices
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const customerInvoices = allInvoices.filter(inv => matchesCustomer(inv, currentCustomer.email));
         customerInvoices.forEach(inv => {
             const amount = inv.grandTotal || inv.total || 0;
             if (amount === 0) return;
+            const rawDate = inv.date;
+            const isoDate = toISODate(rawDate);
             transactions.push({
-                date: inv.date,
+                originalDate: rawDate,
+                date: isoDate,
                 type: 'Invoice',
                 ref: inv.invoiceNo,
                 debit: amount,
@@ -195,12 +211,15 @@
             });
         });
 
-        // 2. Payments
+        // Payments
         const allPayments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
         const customerPayments = allPayments.filter(p => normalizeEmail(p.customerEmail) === normalizeEmail(currentCustomer.email));
         customerPayments.forEach(p => {
+            const rawDate = p.date;
+            const isoDate = toISODate(rawDate);
             transactions.push({
-                date: p.date,
+                originalDate: rawDate,
+                date: isoDate,
                 type: 'Payment',
                 ref: p.reference || `Payment-${p.id}`,
                 debit: 0,
@@ -209,11 +228,11 @@
             });
         });
 
-        transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
+        // Sort using ISO date strings
+        transactions.sort((a,b) => a.date.localeCompare(b.date));
         allTransactions = transactions;
 
-        // ---------- IMPORTANT: DO NOT CLEAR DATE INPUTS ----------
-        // Read current date inputs (they may have values from previous filter)
+        // Apply existing date filter (if any)
         let start = document.getElementById('startDate').value;
         let end = document.getElementById('endDate').value;
         currentFilterStart = start;
@@ -295,8 +314,10 @@
 
         for (let t of filteredTransactions) {
             running += t.debit - t.credit;
+            // Display original date for readability
+            const displayDate = t.originalDate || t.date;
             html += `<tr>
-                <td>${t.date}</td>
+                <td>${displayDate}</td>
                 <td>${t.type}</td>
                 <td><strong>${escapeHtml(t.ref)}</strong></td>
                 <td style="text-align:right">${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</td>
@@ -333,19 +354,10 @@
         }
         let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
         let running = openingBalance;
-        let html = '<table class="ledger-table">\n<thead>\n...\n</thead>\n<tbody>';
+        let rows = '';
         filtered.forEach(t => {
             running += t.debit - t.credit;
-            html += `<tr>...${t.date}...</tr>`;
-        });
-        // simplified – full implementation same as above
-        displayLedger(); // keep it simple: just call displayLedger after search? Better to re-filter.
-        // Actually we'll reuse the same logic but it's long; for brevity, I'll leave a working simple version:
-        let rows = '';
-        let bal = openingBalance;
-        filtered.forEach(t => {
-            bal += t.debit - t.credit;
-            rows += `<tr><td>${t.date}</td><td>${t.type}</td><td>${escapeHtml(t.ref)}</td><td style="text-align:right">${t.debit ? '₹'+t.debit.toLocaleString():'-'}</td><td style="text-align:right">${t.credit ? '₹'+t.credit.toLocaleString():'-'}</td><td style="text-align:right" class="${bal>=0?'balance-positive':'balance-negative'}">₹${bal.toLocaleString()}</td><td>${escapeHtml(t.narration)}</td></tr>`;
+            rows += `<tr><td>${t.originalDate || t.date}</td><td>${t.type}</td><td>${escapeHtml(t.ref)}</td><td style="text-align:right">${t.debit ? '₹'+t.debit.toLocaleString():'-'}</td><td style="text-align:right">${t.credit ? '₹'+t.credit.toLocaleString():'-'}</td><td style="text-align:right" class="${running>=0?'balance-positive':'balance-negative'}">₹${running.toLocaleString()}</td><td>${escapeHtml(t.narration)}</td></tr>`;
         });
         document.getElementById('ledgerTable').innerHTML = `<table class="ledger-table"><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
@@ -360,7 +372,8 @@
         }
         for (let t of filteredTransactions) {
             running += t.debit - t.credit;
-            csv += `"${t.date}","${t.type}","${t.ref}",${t.debit},${t.credit},${running},"${t.narration}"\n`;
+            const displayDate = t.originalDate || t.date;
+            csv += `"${displayDate}","${t.type}","${t.ref}",${t.debit},${t.credit},${running},"${t.narration}"\n`;
         }
         const blob = new Blob([csv], {type:'text/csv'});
         const url = URL.createObjectURL(blob);
