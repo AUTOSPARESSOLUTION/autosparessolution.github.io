@@ -22,7 +22,7 @@
         button:hover { background: #09645a; }
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         .date-range { display: flex; gap: 10px; align-items: center; }
-        .debug { background: #fff3cd; padding: 8px; margin-bottom: 15px; font-family: monospace; font-size: 12px; display: none; }
+        .debug-panel { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 11px; display: none; max-height: 200px; overflow: auto; }
         @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .container { box-shadow: none; padding: 10px; } }
     </style>
 </head>
@@ -34,8 +34,7 @@
     </div>
 
     <div id="customerInfo" class="customer-info">Select or enter customer email</div>
-    <div id="debugMsg" class="debug"></div>
-
+    
     <div class="search-box no-print">
         <select id="customerSelect" style="flex:1;">
             <option value="">-- Select Customer --</option>
@@ -44,7 +43,10 @@
         <input type="email" id="customerEmailInput" placeholder="Enter customer email" style="flex:1;">
         <button onclick="loadLedger()">Load Ledger</button>
         <button onclick="refreshDropdown()">Refresh List</button>
+        <button onclick="toggleDebug()" style="background:#6c757d;">Toggle Debug</button>
     </div>
+
+    <div id="debugPanel" class="debug-panel"></div>
 
     <div class="search-box no-print">
         <div class="date-range">
@@ -71,10 +73,14 @@
     let currentFilterStart = null;
     let currentFilterEnd = null;
 
-    function showDebug(msg) {
-        const div = document.getElementById('debugMsg');
-        div.style.display = 'block';
-        div.innerHTML += new Date().toLocaleTimeString() + ' - ' + msg + '<br>';
+    function toggleDebug() {
+        const panel = document.getElementById('debugPanel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function logDebug(msg) {
+        const panel = document.getElementById('debugPanel');
+        panel.innerHTML += new Date().toLocaleTimeString() + ' - ' + msg + '<br>';
         console.log(msg);
     }
 
@@ -92,7 +98,7 @@
             loadLedger();
         }
         const today = new Date();
-        const start = new Date(); start.setDate(today.getDate() - 60);
+        const start = new Date(); start.setDate(today.getDate() - 90);
         document.getElementById('startDate').value = start.toISOString().slice(0,10);
         document.getElementById('endDate').value = today.toISOString().slice(0,10);
     }
@@ -109,50 +115,58 @@
         document.getElementById('customerInfo').innerHTML = `
             <strong>${escapeHtml(currentCustomer.name)}</strong><br>
             Email: ${escapeHtml(currentCustomer.email)} | Phone: ${escapeHtml(currentCustomer.phone)}<br>
-            Outstanding: <strong>₹${(currentCustomer.outstanding || 0).toLocaleString()}</strong>
+            Outstanding in Master: <strong>₹${(currentCustomer.outstanding || 0).toLocaleString()}</strong>
         `;
-        showDebug(`Loading ledger for ${email}`);
+
+        document.getElementById('debugPanel').innerHTML = '';
+        logDebug(`Loading ledger for ${email}`);
 
         let transactions = [];
 
-        // Sales invoices
-        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        let invFiltered = salesInvoices.filter(inv => inv.customerEmail === email || inv.buyer?.email === email);
-        invFiltered.forEach(inv => {
+        // Helper to add invoice
+        function addInvoice(inv, source) {
             let amount = inv.grandTotal || inv.total || 0;
+            if (amount === 0) return;
             transactions.push({
                 date: inv.date,
                 type: 'Invoice',
                 ref: inv.invoiceNo,
                 debit: amount,
                 credit: 0,
-                narration: 'Sales Invoice'
+                narration: `Sales Invoice (${source})`
             });
-        });
-        showDebug(`Found ${invFiltered.length} invoices`);
+            logDebug(`Added invoice ${inv.invoiceNo} amount ${amount} from ${source}`);
+        }
 
-        // Also check allInvoices
+        // Check salesInvoices
+        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+        let matchedSales = salesInvoices.filter(inv => 
+            inv.customerEmail === email || 
+            inv.buyer?.email === email ||
+            inv.customer?.email === email
+        );
+        matchedSales.forEach(inv => addInvoice(inv, 'salesInvoices'));
+        logDebug(`Found ${matchedSales.length} invoices in salesInvoices`);
+
+        // Check allInvoices
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        let allFiltered = allInvoices.filter(inv => inv.customerEmail === email || inv.buyer?.email === email);
-        // Avoid duplicates by checking ref
-        allFiltered.forEach(inv => {
+        let matchedAll = allInvoices.filter(inv => 
+            inv.customerEmail === email || 
+            inv.buyer?.email === email ||
+            inv.customer?.email === email
+        );
+        // Avoid duplicates (by invoice number)
+        matchedAll.forEach(inv => {
             if (!transactions.some(t => t.ref === inv.invoiceNo)) {
-                let amount = inv.grandTotal || inv.total || 0;
-                transactions.push({
-                    date: inv.date,
-                    type: 'Invoice',
-                    ref: inv.invoiceNo,
-                    debit: amount,
-                    credit: 0,
-                    narration: 'Sales Invoice'
-                });
+                addInvoice(inv, 'allInvoices');
             }
         });
+        logDebug(`Found ${matchedAll.length} invoices in allInvoices`);
 
         // Payments
         let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
-        let payFiltered = payments.filter(p => p.customerEmail === email);
-        payFiltered.forEach(p => {
+        let matchedPayments = payments.filter(p => p.customerEmail === email);
+        matchedPayments.forEach(p => {
             transactions.push({
                 date: p.date,
                 type: 'Payment',
@@ -161,13 +175,20 @@
                 credit: p.amount,
                 narration: `Payment via ${p.mode || 'cash'}`
             });
+            logDebug(`Added payment ${p.reference} amount ${p.amount}`);
         });
-        showDebug(`Found ${payFiltered.length} payments`);
+        logDebug(`Found ${matchedPayments.length} payments`);
 
+        // Sort by date
         transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
         allTransactions = transactions;
-        showDebug(`Total transactions: ${allTransactions.length}`);
-        applyDateFilter();
+        logDebug(`Total transactions: ${allTransactions.length}`);
+        
+        if (allTransactions.length === 0) {
+            document.getElementById('ledgerTable').innerHTML = '<p>No transactions found for this customer. Create a sales invoice or record a payment.</p>';
+        } else {
+            applyDateFilter();
+        }
     }
 
     function applyDateFilter() {
@@ -185,7 +206,6 @@
                 return true;
             });
         }
-        showDebug(`Filtered to ${filteredTransactions.length} transactions`);
         displayLedger();
     }
 
@@ -218,17 +238,17 @@
         let balance = opening;
         let html = '<table><thead><tr>';
         html += '<th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th>';
-        html += '</tr></thead><tbody>';
+        html += '</thead><tbody>';
 
-        // If opening balance is non-zero, show as first row
+        // Show opening balance row if non-zero
         if (opening !== 0) {
             html += `<tr>
                 <td>${currentFilterStart || 'Before start'}</td>
                 <td>Opening Balance</td>
                 <td>-</td>
-                <td>${opening > 0 ? '₹' + opening.toLocaleString() : '-'}</td>
-                <td>${opening < 0 ? '₹' + (-opening).toLocaleString() : '-'}</td>
-                <td class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">₹${opening.toLocaleString()}</td>
+                <td style="text-align:right">${opening > 0 ? '₹' + opening.toLocaleString() : '-'}</td>
+                <td style="text-align:right">${opening < 0 ? '₹' + (-opening).toLocaleString() : '-'}</td>
+                <td style="text-align:right" class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">₹${opening.toLocaleString()}</td>
                 <td>Opening Balance</td>
             </tr>`;
         }
@@ -247,6 +267,15 @@
         }
         html += '</tbody></table>';
         document.getElementById('ledgerTable').innerHTML = html;
+        
+        // Show comparison with master outstanding
+        const finalBalance = balance;
+        const masterOutstanding = currentCustomer.outstanding || 0;
+        if (Math.abs(finalBalance - masterOutstanding) > 1) {
+            logDebug(`WARNING: Ledger closing balance ₹${finalBalance.toLocaleString()} does not match Master outstanding ₹${masterOutstanding.toLocaleString()}`);
+            const warning = `<div style="background:#fff3cd; padding:8px; margin-top:10px; border:1px solid #ffeeba;">⚠️ Ledger balance (₹${finalBalance.toLocaleString()}) differs from Master outstanding (₹${masterOutstanding.toLocaleString()}).</div>`;
+            document.getElementById('ledgerTable').innerHTML += warning;
+        }
     }
 
     function filterLedger() {
@@ -261,15 +290,15 @@
             document.getElementById('ledgerTable').innerHTML = '<p>No matching transactions.</p>';
             return;
         }
-        // Reuse display logic with filtered subset
+        // Reuse display logic with filtered subset but keep original opening balance calculation
         let opening = 0;
         for (let t of allTransactions) {
             if (currentFilterStart && t.date < currentFilterStart) opening += t.debit - t.credit;
         }
         let balance = opening;
-        let html = '<table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>';
+        let html = '<table><thead>…</thead><tbody>';
         if (opening !== 0) {
-            html += `<tr><td>${currentFilterStart || 'Before start'}</td><td>Opening Balance</td><td>-</td><td>${opening>0?'₹'+opening.toLocaleString():'-'}</td><td>${opening<0?'₹'+(-opening).toLocaleString():'-'}</td><td class="${opening>=0?'balance-positive':'balance-negative'}">₹${opening.toLocaleString()}</td><td>Opening</td></tr>`;
+            html += `<tr><td>${currentFilterStart || 'Before start'}</td><td>Opening Balance</td><td>-</td><td style="text-align:right">${opening>0?'₹'+opening.toLocaleString():'-'}</td><td style="text-align:right">${opening<0?'₹'+(-opening).toLocaleString():'-'}</td><td class="${opening>=0?'balance-positive':'balance-negative'}" style="text-align:right">₹${opening.toLocaleString()}</td><td>Opening</td></tr>`;
         }
         for (let t of filtered) {
             balance += t.debit - t.credit;
