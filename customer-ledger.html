@@ -212,7 +212,7 @@
         transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
         allTransactions = transactions;
 
-        // Reset date filter
+        // Reset date filter to show all transactions
         document.getElementById('startDate').value = '';
         document.getElementById('endDate').value = '';
         currentFilterStart = null;
@@ -274,12 +274,12 @@
         if (openingBalance !== 0 && currentFilterStart) {
             html += `<tr>
                 <td>${currentFilterStart || 'Before start'}</td>
-                <td>Opening Balance</td>
-                <td>-</td>
-                <td style="text-align:right">${openingBalance > 0 ? '₹' + openingBalance.toLocaleString() : '-'}</td>
-                <td style="text-align:right">${openingBalance < 0 ? '₹' + (-openingBalance).toLocaleString() : '-'}</td>
-                <td style="text-align:right" class="${openingBalance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${openingBalance.toLocaleString()}</td>
-                <td>Opening Balance (before selected period)</td>
+                <td>Opening Balance</strong></td>
+                <td>-</strong></td>
+                <td style="text-align:right">${openingBalance > 0 ? '₹' + openingBalance.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right">${openingBalance < 0 ? '₹' + (-openingBalance).toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right" class="${openingBalance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${openingBalance.toLocaleString()}</strong></td>
+                <td>Opening Balance (before selected period)</strong></td>
             </tr>`;
         }
 
@@ -295,7 +295,7 @@
                 <td>${escapeHtml(t.narration)}</td>
             </tr>`;
         }
-        html += '</tbody>\n</table>';
+        html += '</tbody>\n<table>';
         document.getElementById('ledgerTable').innerHTML = html;
 
         const finalBalance = running;
@@ -361,7 +361,7 @@
         URL.revokeObjectURL(url);
     }
 
-    // ------------- FIXED PDF DOWNLOAD (includes selected period) -------------
+    // ------------- FIXED PDF DOWNLOAD: shows selected period correctly -------------
     function downloadPDF() {
         if (!currentCustomer) { alert('Load a customer first'); return; }
         const container = document.getElementById('ledgerTable');
@@ -370,8 +370,9 @@
         const title = document.createElement('h2');
         title.innerText = 'Customer Ledger Statement';
         const period = document.createElement('p');
-        let fromDate = currentFilterStart || 'All';
-        let toDate = currentFilterEnd || 'All';
+        // Use the actual current filter values (from variables or inputs)
+        let fromDate = currentFilterStart || document.getElementById('startDate').value || 'All';
+        let toDate = currentFilterEnd || document.getElementById('endDate').value || 'All';
         period.innerHTML = `<strong>Selected Period:</strong> ${fromDate} to ${toDate}`;
         const pdfDiv = document.createElement('div');
         pdfDiv.style.padding = '20px';
@@ -387,7 +388,9 @@
         header.style.textAlign = 'center';
         header.innerHTML = '<h2>Auto Spares Solution</h2><p>GSTIN: 19ANOPD3300R1ZO | Howrah, WB</p>';
         pdfDiv.prepend(header);
-        html2pdf().set({ margin: 0.3, filename: `Customer_Ledger_${currentCustomer.name}_${fromDate}_to_${toDate}.pdf`, image: { quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' } }).from(pdfDiv).save();
+        // Filename includes period
+        const filename = `Customer_Ledger_${currentCustomer.name}_${fromDate}_to_${toDate}.pdf`;
+        html2pdf().set({ margin: 0.3, filename: filename, image: { quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' } }).from(pdfDiv).save();
     }
 
     function escapeHtml(str) {
@@ -398,4 +401,4 @@
     refreshDropdown();
 </script>
 </body>
-                                                                                        </html>
+    </html>
