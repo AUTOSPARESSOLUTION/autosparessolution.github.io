@@ -22,10 +22,12 @@
         button:hover { background: #09645a; }
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         .date-range { display: flex; gap: 10px; align-items: center; }
-        .debug-panel { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 11px; display: none; max-height: 300px; overflow: auto; }
+        .debug-panel { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 11px; display: none; max-height: 400px; overflow: auto; white-space: pre-wrap; }
+        .raw-data-panel { background: #e9ecef; border: 1px solid #0a7c71; padding: 10px; margin-bottom: 15px; font-family: monospace; font-size: 11px; display: none; max-height: 300px; overflow: auto; }
         @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .container { box-shadow: none; padding: 10px; } }
         .recalc-btn { background: #fd7e14; }
         .recalc-btn:hover { background: #e06c0e; }
+        .debug-btn { background: #6c757d; }
     </style>
 </head>
 <body>
@@ -45,11 +47,13 @@
         <input type="email" id="customerEmailInput" placeholder="Enter customer email" style="flex:1;">
         <button onclick="loadLedger()">Load Ledger</button>
         <button onclick="refreshDropdown()">Refresh List</button>
-        <button onclick="toggleDebug()" style="background:#6c757d;">Toggle Debug</button>
-        <button onclick="recalculateOutstanding()" class="recalc-btn" style="background:#fd7e14;">Recalc Outstanding</button>
+        <button onclick="toggleDebug()" class="debug-btn">Show Debug</button>
+        <button onclick="showRawData()" class="debug-btn">Show Raw Invoices</button>
+        <button onclick="recalculateOutstanding()" class="recalc-btn">Recalc Outstanding</button>
     </div>
 
     <div id="debugPanel" class="debug-panel"></div>
+    <div id="rawDataPanel" class="raw-data-panel"></div>
 
     <div class="search-box no-print">
         <div class="date-range">
@@ -81,6 +85,26 @@
         panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     }
 
+    function showRawData() {
+        const panel = document.getElementById('rawDataPanel');
+        if (panel.style.display === 'none' || !panel.style.display) {
+            let raw = '';
+            raw += '=== salesInvoices ===\n';
+            let sales = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+            raw += JSON.stringify(sales, null, 2) + '\n\n';
+            raw += '=== allInvoices ===\n';
+            let all = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+            raw += JSON.stringify(all, null, 2) + '\n\n';
+            raw += '=== invoices (legacy) ===\n';
+            let legacy = JSON.parse(localStorage.getItem('invoices') || '[]');
+            raw += JSON.stringify(legacy, null, 2);
+            panel.innerText = raw;
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
     function logDebug(msg) {
         const panel = document.getElementById('debugPanel');
         panel.innerHTML += new Date().toLocaleTimeString() + ' - ' + msg + '<br>';
@@ -106,17 +130,34 @@
         document.getElementById('endDate').value = today.toISOString().slice(0,10);
     }
 
-    // Check if a transaction matches a given customer email (case-insensitive)
-    function matchesCustomerEmail(obj, customerEmail) {
-        if (!obj) return false;
-        const checkFields = ['customerEmail', 'customer.email', 'buyer.email', 'email'];
-        for (let field of checkFields) {
-            let value = field.includes('.') ? 
-                field.split('.').reduce((o, k) => o?.[k], obj) : 
-                obj[field];
-            if (value && String(value).toLowerCase() === String(customerEmail).toLowerCase()) {
+    // Normalize email for comparison (trim, lowercase)
+    function normalizeEmail(email) {
+        if (!email) return '';
+        return String(email).trim().toLowerCase();
+    }
+
+    // Check if any field in the invoice matches the customer email
+    function matchesCustomer(invoice, customerEmail) {
+        const normalizedTarget = normalizeEmail(customerEmail);
+        const fieldsToCheck = ['customerEmail', 'customer.email', 'buyer.email', 'email', 'custEmail'];
+        for (let field of fieldsToCheck) {
+            let value;
+            if (field.includes('.')) {
+                const parts = field.split('.');
+                value = parts.reduce((obj, key) => obj?.[key], invoice);
+            } else {
+                value = invoice[field];
+            }
+            if (value && normalizeEmail(value) === normalizedTarget) {
                 return true;
             }
+        }
+        // Also check inside buyer object if it exists as an object
+        if (invoice.buyer && typeof invoice.buyer === 'object') {
+            if (normalizeEmail(invoice.buyer.email) === normalizedTarget) return true;
+        }
+        if (invoice.customer && typeof invoice.customer === 'object') {
+            if (normalizeEmail(invoice.customer.email) === normalizedTarget) return true;
         }
         return false;
     }
@@ -127,7 +168,7 @@
         if (!email) { alert('Please select or enter a customer email'); return; }
 
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        currentCustomer = customers.find(c => c.email.toLowerCase() === email.toLowerCase());
+        currentCustomer = customers.find(c => normalizeEmail(c.email) === normalizeEmail(email));
         if (!currentCustomer) { alert('Customer not found.'); return; }
 
         document.getElementById('customerInfo').innerHTML = `
@@ -141,12 +182,14 @@
 
         let transactions = [];
 
-        // Helper to add invoice (debit)
         function addInvoice(inv, source) {
             let amount = inv.grandTotal || inv.total || 0;
             if (amount === 0) return;
-            // Avoid duplicate by reference
-            if (transactions.some(t => t.ref === inv.invoiceNo && t.type === 'Invoice')) return;
+            // Avoid duplicate by ref and type
+            if (transactions.some(t => t.ref === inv.invoiceNo && t.type === 'Invoice')) {
+                logDebug(`Skipping duplicate invoice ${inv.invoiceNo}`);
+                return;
+            }
             transactions.push({
                 date: inv.date,
                 type: 'Invoice',
@@ -155,30 +198,25 @@
                 credit: 0,
                 narration: `Invoice from ${source}`
             });
-            logDebug(`Added invoice ${inv.invoiceNo} amount ₹${amount} (${source})`);
+            logDebug(`+ Invoice ${inv.invoiceNo} ₹${amount} (${source})`);
         }
 
-        // 1. Check salesInvoices
-        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        let matchedSales = salesInvoices.filter(inv => matchesCustomerEmail(inv, currentCustomer.email));
-        matchedSales.forEach(inv => addInvoice(inv, 'salesInvoices'));
-        logDebug(`Found ${matchedSales.length} invoices in salesInvoices`);
+        // Collect all possible invoice arrays
+        const sources = [
+            { name: 'salesInvoices', data: JSON.parse(localStorage.getItem('salesInvoices') || '[]') },
+            { name: 'allInvoices', data: JSON.parse(localStorage.getItem('allInvoices') || '[]') },
+            { name: 'invoices', data: JSON.parse(localStorage.getItem('invoices') || '[]') }
+        ];
 
-        // 2. Check allInvoices (fallback)
-        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        let matchedAll = allInvoices.filter(inv => matchesCustomerEmail(inv, currentCustomer.email));
-        matchedAll.forEach(inv => addInvoice(inv, 'allInvoices'));
-        logDebug(`Found ${matchedAll.length} invoices in allInvoices`);
+        for (let src of sources) {
+            let matched = src.data.filter(inv => matchesCustomer(inv, currentCustomer.email));
+            matched.forEach(inv => addInvoice(inv, src.name));
+            logDebug(`Found ${matched.length} invoices in ${src.name}`);
+        }
 
-        // 3. Check legacy invoices (if any)
-        let legacyInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
-        let matchedLegacy = legacyInvoices.filter(inv => matchesCustomerEmail(inv, currentCustomer.email));
-        matchedLegacy.forEach(inv => addInvoice(inv, 'invoices'));
-        logDebug(`Found ${matchedLegacy.length} invoices in invoices (legacy)`);
-
-        // 4. Payments
+        // Payments
         let payments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
-        let matchedPayments = payments.filter(p => p.customerEmail && p.customerEmail.toLowerCase() === currentCustomer.email.toLowerCase());
+        let matchedPayments = payments.filter(p => normalizeEmail(p.customerEmail) === normalizeEmail(currentCustomer.email));
         matchedPayments.forEach(p => {
             transactions.push({
                 date: p.date,
@@ -188,7 +226,7 @@
                 credit: p.amount,
                 narration: `Payment via ${p.mode || 'cash'}`
             });
-            logDebug(`Added payment ${p.reference} amount ₹${p.amount}`);
+            logDebug(`+ Payment ${p.reference} ₹${p.amount}`);
         });
         logDebug(`Found ${matchedPayments.length} payments`);
 
@@ -198,7 +236,7 @@
         logDebug(`Total transactions: ${allTransactions.length}`);
         
         if (allTransactions.length === 0) {
-            document.getElementById('ledgerTable').innerHTML = '<p>No transactions found for this customer. Create a sales invoice or record a payment.</p>';
+            document.getElementById('ledgerTable').innerHTML = '<p>No transactions found for this customer. Check debug panel for details.</p>';
         } else {
             applyDateFilter();
         }
@@ -240,9 +278,9 @@
     function recalculateOutstanding() {
         if (!currentCustomer) { alert('Load a customer first'); return; }
         let calculated = calculateOutstandingFromTransactions();
-        if (confirm(`Recalculate outstanding for ${currentCustomer.name}?\nCurrent master outstanding: ₹${(currentCustomer.outstanding||0).toLocaleString()}\nLedger calculated: ₹${calculated.toLocaleString()}\n\nUpdate master to ₹${calculated.toLocaleString()}?`)) {
+        if (confirm(`Recalculate outstanding for ${currentCustomer.name}?\nCurrent master: ₹${(currentCustomer.outstanding||0).toLocaleString()}\nLedger total: ₹${calculated.toLocaleString()}\n\nUpdate master to ₹${calculated.toLocaleString()}?`)) {
             let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-            let idx = customers.findIndex(c => c.email.toLowerCase() === currentCustomer.email.toLowerCase());
+            let idx = customers.findIndex(c => normalizeEmail(c.email) === normalizeEmail(currentCustomer.email));
             if (idx !== -1) {
                 customers[idx].outstanding = calculated;
                 localStorage.setItem('customers', JSON.stringify(customers));
@@ -253,7 +291,7 @@
                     Outstanding in Master: <strong>₹${(currentCustomer.outstanding || 0).toLocaleString()}</strong>
                 `;
                 alert('Outstanding updated from ledger.');
-                displayLedger(); // refresh display to remove warning
+                displayLedger();
             }
         }
     }
@@ -268,7 +306,7 @@
             return;
         }
 
-        // Calculate opening balance
+        // Calculate opening balance (transactions before start date)
         let opening = 0;
         for (let t of allTransactions) {
             if (currentFilterStart && t.date < currentFilterStart) {
@@ -291,16 +329,16 @@
             </thead>
             <tbody>`;
 
-        // Opening balance row
+        // Opening balance row (only if non-zero)
         if (opening !== 0) {
             html += `<tr>
                 <td>${currentFilterStart || 'Before start'}</td>
-                <td>Opening Balance</td>
-                <td>-</td>
-                <td style="text-align:right">${opening > 0 ? '₹' + opening.toLocaleString() : '-'}</td>
-                <td style="text-align:right">${opening < 0 ? '₹' + (-opening).toLocaleString() : '-'}</td>
-                <td style="text-align:right" class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">₹${opening.toLocaleString()}</td>
-                <td>Opening Balance</td>
+                <td>Opening Balance</strong></td>
+                <td>-</strong></td>
+                <td style="text-align:right">${opening > 0 ? '₹' + opening.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right">${opening < 0 ? '₹' + (-opening).toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right" class="${opening >= 0 ? 'balance-positive' : 'balance-negative'}">₹${opening.toLocaleString()}</strong></td>
+                <td>Opening Balance (before selected period)</strong></td>
             </tr>`;
         }
 
@@ -308,15 +346,15 @@
             balance += t.debit - t.credit;
             html += `<tr>
                 <td>${t.date}</td>
-                <td>${t.type}</td>
-                <td>${escapeHtml(t.ref)}</td>
-                <td style="text-align:right">${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</td>
-                <td style="text-align:right">${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</td>
-                <td style="text-align:right" class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${balance.toLocaleString()}</td>
-                <td>${escapeHtml(t.narration)}</td>
+                <td>${t.type}</strong></td>
+                <td><strong>${escapeHtml(t.ref)}</strong></td>
+                <td style="text-align:right"><strong>${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right"><strong>${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right" class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}"><strong>₹${balance.toLocaleString()}</strong></td>
+                <td>${escapeHtml(t.narration)}</strong></td>
             </tr>`;
         }
-        html += '</tbody></table>';
+        html += '</tbody></td>';
         document.getElementById('ledgerTable').innerHTML = html;
 
         // Compare with master
@@ -325,7 +363,7 @@
         if (Math.abs(finalBalance - masterOutstanding) > 1) {
             const warning = `<div style="background:#fff3cd; padding:10px; margin-top:10px; border:1px solid #ffeeba; border-radius:6px;">
                 ⚠️ <strong>Mismatch detected:</strong> Ledger closing balance (₹${finalBalance.toLocaleString()}) differs from Master outstanding (₹${masterOutstanding.toLocaleString()}). 
-                Use the <strong>"Recalc Outstanding"</strong> button above to fix.
+                Use the <strong>"Recalc Outstanding"</strong> button to fix.
             </div>`;
             document.getElementById('ledgerTable').innerHTML += warning;
         }
@@ -350,7 +388,7 @@
         let balance = opening;
         let html = `<table><thead>…</thead><tbody>`;
         if (opening !== 0) {
-            html += `<tr><td>${currentFilterStart || 'Before start'}</td><td>Opening Balance</td><td>-</td><td style="text-align:right">${opening>0?'₹'+opening.toLocaleString():'-'}</td><td style="text-align:right">${opening<0?'₹'+(-opening).toLocaleString():'-'}</td><td class="${opening>=0?'balance-positive':'balance-negative'}" style="text-align:right">₹${opening.toLocaleString()}</td><td>Opening</td></tr>`;
+            html += `<tr><td colspan="7">Opening Balance: ₹${opening.toLocaleString()}…</td></tr>`;
         }
         for (let t of filtered) {
             balance += t.debit - t.credit;
@@ -378,7 +416,7 @@
         a.href = URL.createObjectURL(blob);
         a.download = `customer_ledger_${currentCustomer.email}.csv`;
         a.click();
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(blob);
     }
 
     function downloadPDF() {
