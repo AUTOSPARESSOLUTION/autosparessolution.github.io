@@ -23,6 +23,7 @@
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
         .date-range { display: flex; gap: 10px; align-items: center; }
         .date-range input { width: 130px; }
+        .debug-msg { background: #fff3cd; border: 1px solid #ffeeba; padding: 10px; margin-bottom: 10px; font-family: monospace; font-size: 12px; display: none; }
         @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .container { box-shadow: none; padding: 10px; } }
     </style>
 </head>
@@ -34,6 +35,7 @@
     </div>
 
     <div id="customerInfo" class="customer-info">Select or enter customer email</div>
+    <div id="debugMsg" class="debug-msg"></div>
 
     <div class="search-box no-print">
         <select id="customerSelect" style="flex:1;">
@@ -70,8 +72,16 @@
     let currentFilterStart = null;
     let currentFilterEnd = null;
 
+    function showDebug(msg) {
+        const debugDiv = document.getElementById('debugMsg');
+        debugDiv.style.display = 'block';
+        debugDiv.innerHTML += `<div>${new Date().toLocaleTimeString()} - ${msg}</div>`;
+        console.log(msg);
+    }
+
     function refreshDropdown() {
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        showDebug(`Loaded ${customers.length} customers from storage`);
         const select = document.getElementById('customerSelect');
         select.innerHTML = '<option value="">-- Select Customer --</option>';
         customers.forEach(c => {
@@ -97,10 +107,12 @@
             alert('Please select or enter a customer email');
             return;
         }
+        showDebug(`Loading ledger for email: ${email}`);
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         currentCustomer = customers.find(c => c.email === email);
         if (!currentCustomer) {
             alert(`Customer with email "${email}" not found.`);
+            showDebug(`Customer not found: ${email}`);
             return;
         }
 
@@ -113,7 +125,9 @@
         const transactions = [];
         // Sales invoices
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        showDebug(`Found ${allInvoices.length} total invoices`);
         const customerInvoices = allInvoices.filter(inv => inv.buyer?.email === email || inv.customerEmail === email);
+        showDebug(`Filtered invoices for ${email}: ${customerInvoices.length}`);
         customerInvoices.forEach(inv => {
             transactions.push({
                 date: inv.date,
@@ -128,6 +142,7 @@
         // Customer payments
         const allPayments = JSON.parse(localStorage.getItem('customerPayments') || '[]');
         const customerPayments = allPayments.filter(p => p.customerEmail === email);
+        showDebug(`Customer payments: ${customerPayments.length}`);
         customerPayments.forEach(p => {
             transactions.push({
                 date: p.date,
@@ -141,7 +156,12 @@
 
         transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
         allTransactions = transactions;
-        applyDateFilter();
+        showDebug(`Total transactions built: ${allTransactions.length}`);
+        if (allTransactions.length === 0) {
+            document.getElementById('ledgerTable').innerHTML = '<p>No transactions found for this customer.</p>';
+        } else {
+            applyDateFilter();
+        }
     }
 
     function applyDateFilter() {
@@ -152,6 +172,7 @@
         currentFilterEnd = end;
         if (!start && !end) {
             filteredTransactions = [...allTransactions];
+            showDebug(`Clear filter: showing all ${filteredTransactions.length} transactions`);
         } else {
             filteredTransactions = allTransactions.filter(t => {
                 const tDate = t.date;
@@ -159,6 +180,7 @@
                 if (end && tDate > end) return false;
                 return true;
             });
+            showDebug(`Date filter ${start} to ${end}: kept ${filteredTransactions.length} of ${allTransactions.length}`);
         }
         displayLedger();
     }
@@ -170,7 +192,7 @@
     }
 
     function getOpeningBalanceBeforeDate(date) {
-        if (!date) return currentCustomer?.outstanding || 0;
+        if (!date) return 0;
         let balance = 0;
         for (let t of allTransactions) {
             if (t.date >= date) break;
@@ -195,7 +217,7 @@
         let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
         let running = openingBalance;
         
-        let html = `<tr><thead>
+        let html = `<table><thead>
             <tr>
                 <th>Date</th>
                 <th>Type</th>
@@ -221,6 +243,7 @@
         });
         html += '</tbody></table>';
         document.getElementById('ledgerTable').innerHTML = html;
+        showDebug(`Table rendered with ${transactionsToShow.length} rows`);
     }
 
     function filterLedger() {
@@ -252,7 +275,7 @@
                 <td>${escapeHtml(t.narration)}</strong></td>
             </tr>`;
         });
-        document.getElementById('ledgerTable').innerHTML = `<table><thead>运转<th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
+        document.getElementById('ledgerTable').innerHTML = `</tr><thead>运转<th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function exportLedger() {
