@@ -43,6 +43,7 @@
         <input type="email" id="supplierEmailInput" placeholder="Enter supplier email directly" style="flex:1;">
         <button onclick="loadLedgerByEmail()"><i class="fas fa-chart-line"></i> Load Ledger</button>
         <button onclick="refreshDropdown()"><i class="fas fa-sync-alt"></i> Refresh List</button>
+        <button onclick="refreshLedger()" style="background:#17a2b8;"><i class="fas fa-undo-alt"></i> Refresh</button>
     </div>
 
     <div class="search-box no-print">
@@ -70,6 +71,19 @@
     let currentFilterStart = null;
     let currentFilterEnd = null;
 
+    // ---------- DATE NORMALIZATION (supports DD/MM/YYYY and YYYY-MM-DD) ----------
+    function toISODate(dateStr) {
+        if (!dateStr) return '';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+        const parts = dateStr.split('/');
+        if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+        return dateStr;
+    }
+
     function refreshDropdown() {
         const suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
         const select = document.getElementById('supplierSelect');
@@ -83,11 +97,14 @@
             localStorage.removeItem('viewSupplierEmail');
             loadLedgerByEmail();
         }
-        const today = new Date();
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
-        document.getElementById('endDate').value = today.toISOString().split('T')[0];
+        // NO default date range – show all transactions initially
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+    }
+
+    function refreshLedger() {
+        if (currentSupplier) loadLedgerByEmail();
+        else alert('Please load a supplier first.');
     }
 
     function loadLedgerByEmail() {
@@ -107,28 +124,39 @@
         document.getElementById('supplierInfo').innerHTML = `
             <strong>${escapeHtml(currentSupplier.name)}</strong><br>
             Email: ${escapeHtml(currentSupplier.email)} | Phone: ${escapeHtml(currentSupplier.phone)}<br>
-            Outstanding: <strong>₹${(currentSupplier.outstanding||0).toLocaleString()}</strong>
+            Outstanding in Master: <strong>₹${(currentSupplier.outstanding||0).toLocaleString()}</strong>
         `;
 
         const transactions = [];
+
+        // Purchase invoices (debit – increases supplier outstanding)
         const allPurchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         const supplierInvoices = allPurchaseInvoices.filter(inv => inv.supplier?.email === email || inv.supplierEmail === email);
         supplierInvoices.forEach(inv => {
+            const amount = inv.grandTotal || inv.total || 0;
+            if (amount === 0) return;
+            const rawDate = inv.date;
+            const isoDate = toISODate(rawDate);
             transactions.push({
-                date: inv.date,
+                originalDate: rawDate,
+                date: isoDate,
                 type: 'Purchase',
                 ref: inv.poNo || inv.invoiceNo,
-                debit: inv.grandTotal || inv.total || 0,
+                debit: amount,
                 credit: 0,
                 narration: 'Purchase Invoice'
             });
         });
 
+        // Supplier payments (credit – reduces outstanding)
         const allPayments = JSON.parse(localStorage.getItem('supplierPayments') || '[]');
         const supplierPayments = allPayments.filter(p => p.supplierEmail === email);
         supplierPayments.forEach(p => {
+            const rawDate = p.date;
+            const isoDate = toISODate(rawDate);
             transactions.push({
-                date: p.date,
+                originalDate: rawDate,
+                date: isoDate,
                 type: 'Payment',
                 ref: p.reference || 'Payment',
                 debit: 0,
@@ -137,9 +165,31 @@
             });
         });
 
-        transactions.sort((a,b) => new Date(a.date) - new Date(b.date));
+        // Sort using ISO date strings
+        transactions.sort((a,b) => a.date.localeCompare(b.date));
         allTransactions = transactions;
-        applyDateFilter();
+
+        // Apply current date filter (if any)
+        let start = document.getElementById('startDate').value;
+        let end = document.getElementById('endDate').value;
+        currentFilterStart = start;
+        currentFilterEnd = end;
+
+        if (!start && !end) {
+            filteredTransactions = [...allTransactions];
+        } else {
+            filteredTransactions = allTransactions.filter(t => {
+                if (start && t.date < start) return false;
+                if (end && t.date > end) return false;
+                return true;
+            });
+        }
+
+        if (allTransactions.length === 0) {
+            document.getElementById('ledgerTable').innerHTML = '<p>No transactions found for this supplier.</p>';
+        } else {
+            displayLedger();
+        }
     }
 
     function applyDateFilter() {
@@ -152,9 +202,8 @@
             filteredTransactions = [...allTransactions];
         } else {
             filteredTransactions = allTransactions.filter(t => {
-                const tDate = t.date;
-                if (start && tDate < start) return false;
-                if (end && tDate > end) return false;
+                if (start && t.date < start) return false;
+                if (end && t.date > end) return false;
                 return true;
             });
         }
@@ -168,11 +217,11 @@
     }
 
     function getOpeningBalanceBeforeDate(date) {
-        if (!date) return currentSupplier?.outstanding || 0;  // Use outstanding as closing balance
+        if (!date) return 0;
         let balance = 0;
         for (let t of allTransactions) {
             if (t.date >= date) break;
-            balance += (t.debit - t.credit);
+            balance += t.debit - t.credit;
         }
         return balance;
     }
@@ -183,7 +232,7 @@
             return;
         }
         let transactionsToShow = [...filteredTransactions];
-        transactionsToShow.sort((a,b) => new Date(a.date) - new Date(b.date));
+        transactionsToShow.sort((a,b) => a.date.localeCompare(b.date));
         
         if (transactionsToShow.length === 0) {
             document.getElementById('ledgerTable').innerHTML = '<p>No transactions in selected period.</p>';
@@ -193,43 +242,67 @@
         let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
         let running = openingBalance;
         
-        let html = `<table><thead>
-            <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Reference</th>
-                <th>Debit (₹)</th>
-                <th>Credit (₹)</th>
-                <th>Balance (₹)</th>
-                <th>Narration</th>
-            </tr>
-        </thead><tbody>`;
-        
-        transactionsToShow.forEach(t => {
-            running += (t.debit - t.credit);
+        let html = `<table class="ledger-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Reference</th>
+                    <th style="text-align:right">Debit (₹)</th>
+                    <th style="text-align:right">Credit (₹)</th>
+                    <th style="text-align:right">Balance (₹)</th>
+                    <th>Narration</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        if (openingBalance !== 0 && currentFilterStart) {
             html += `<tr>
-                <td>${t.date}</td>
-                <td>${t.type}</td>
-                <td>${escapeHtml(t.ref)}</td>
-                <td>${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</td>
-                <td>${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</td>
-                <td class="${running >= 0 ? 'balance-positive' : 'balance-negative'}">₹${running.toLocaleString()}</td>
-                <td>${escapeHtml(t.narration)}</td>
+                <td>${currentFilterStart || 'Before start'}</td>
+                <td>Opening Balance</strong></td>
+                <td>-</strong></td>
+                <td style="text-align:right">${openingBalance > 0 ? '₹' + openingBalance.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right">${openingBalance < 0 ? '₹' + (-openingBalance).toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right" class="${openingBalance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${openingBalance.toLocaleString()}</strong></td>
+                <td>Opening Balance (before selected period)</strong></td>
             </tr>`;
-        });
+        }
+
+        for (let t of transactionsToShow) {
+            running += t.debit - t.credit;
+            const displayDate = t.originalDate || t.date;
+            html += `<tr>
+                <td>${displayDate}</td>
+                <td>${t.type}</td>
+                <td><strong>${escapeHtml(t.ref)}</strong></td>
+                <td style="text-align:right">${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right">${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right" class="${running >= 0 ? 'balance-positive' : 'balance-negative'}">₹${running.toLocaleString()}</strong></td>
+                <td>${escapeHtml(t.narration)}</strong></td>
+            </tr>`;
+        }
         html += '</tbody></table>';
         document.getElementById('ledgerTable').innerHTML = html;
+
+        // Compare with master outstanding
+        const finalBalance = running;
+        const masterOutstanding = currentSupplier.outstanding || 0;
+        if (Math.abs(finalBalance - masterOutstanding) > 1) {
+            const warning = `<div style="background:#fff3cd; padding:10px; margin-top:10px; border:1px solid #ffeeba;">
+                ⚠️ Ledger closing balance (₹${finalBalance.toLocaleString()}) differs from Master outstanding (₹${masterOutstanding.toLocaleString()}).
+                Click "Refresh" after editing to reload.
+            </div>`;
+            document.getElementById('ledgerTable').innerHTML += warning;
+        }
     }
 
     function filterLedger() {
         const term = document.getElementById('searchRef').value.toLowerCase();
-        if (!term) {
-            displayLedger();
-            return;
-        }
+        if (!term) { displayLedger(); return; }
         const filtered = filteredTransactions.filter(t => 
             (t.ref && t.ref.toLowerCase().includes(term)) || 
-            t.type.toLowerCase().includes(term)
+            t.type.toLowerCase().includes(term) ||
+            (t.narration && t.narration.toLowerCase().includes(term))
         );
         if (filtered.length === 0) {
             document.getElementById('ledgerTable').innerHTML = '<p>No matching transactions.</p>';
@@ -240,17 +313,18 @@
         let rows = '';
         filtered.forEach(t => {
             running += (t.debit - t.credit);
+            const displayDate = t.originalDate || t.date;
             rows += `<tr>
-                <td>${t.date}</td>
+                <td>${displayDate}</td>
                 <td>${t.type}</td>
-                <td>${escapeHtml(t.ref)}</td>
-                <td>${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</td>
-                <td>${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</td>
-                <td class="${running >= 0 ? 'balance-positive' : 'balance-negative'}">₹${running.toLocaleString()}</td>
-                <td>${escapeHtml(t.narration)}</td>
+                <td>${escapeHtml(t.ref)}</strong></td>
+                <td style="text-align:right">${t.debit ? '₹' + t.debit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right">${t.credit ? '₹' + t.credit.toLocaleString() : '-'}</strong></td>
+                <td style="text-align:right" class="${running >= 0 ? 'balance-positive' : 'balance-negative'}">₹${running.toLocaleString()}</strong></td>
+                <td>${escapeHtml(t.narration)}</strong></td>
             </tr>`;
         });
-        document.getElementById('ledgerTable').innerHTML = `<table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
+        document.getElementById('ledgerTable').innerHTML = `<tr><thead>运转<th>Date</th><th>Type</th><th>Reference</th><th style="text-align:right">Debit (₹)</th><th style="text-align:right">Credit (₹)</th><th style="text-align:right">Balance (₹)</th><th>Narration</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function exportLedger() {
@@ -261,11 +335,14 @@
         let csv = "Date,Type,Reference,Debit,Credit,Balance,Narration\n";
         let openingBalance = getOpeningBalanceBeforeDate(currentFilterStart);
         let running = openingBalance;
-        filteredTransactions.sort((a,b) => new Date(a.date) - new Date(b.date));
-        filteredTransactions.forEach(t => {
+        if (openingBalance !== 0 && currentFilterStart) {
+            csv += `"${currentFilterStart || 'Before start'}","Opening Balance","-",${openingBalance>0?openingBalance:0},${openingBalance<0?-openingBalance:0},${openingBalance},"Opening Balance"\n`;
+        }
+        for (let t of filteredTransactions) {
             running += (t.debit - t.credit);
-            csv += `"${t.date}","${t.type}","${t.ref}",${t.debit},${t.credit},${running},"${t.narration}"\n`;
-        });
+            const displayDate = t.originalDate || t.date;
+            csv += `"${displayDate}","${t.type}","${t.ref}",${t.debit},${t.credit},${running},"${t.narration}"\n`;
+        }
         const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -285,8 +362,10 @@
         const infoDiv = document.getElementById('supplierInfo').cloneNode(true);
         const title = document.createElement('h2');
         title.innerText = 'Supplier Ledger Statement';
+        let fromDate = currentFilterStart || document.getElementById('startDate').value || 'All';
+        let toDate = currentFilterEnd || document.getElementById('endDate').value || 'All';
         const period = document.createElement('p');
-        period.innerHTML = `<strong>Period:</strong> ${currentFilterStart || 'All'} to ${currentFilterEnd || 'All'}`;
+        period.innerHTML = `<strong>Selected Period:</strong> ${fromDate} to ${toDate}`;
         
         const pdfContent = document.createElement('div');
         pdfContent.style.fontFamily = 'Roboto, sans-serif';
@@ -308,7 +387,7 @@
         
         const opt = {
             margin: [0.3, 0.3, 0.3, 0.3],
-            filename: `Supplier_Ledger_${currentSupplier.name}_${currentFilterStart || 'all'}_to_${currentFilterEnd || 'all'}.pdf`,
+            filename: `Supplier_Ledger_${currentSupplier.name}_${fromDate}_to_${toDate}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, letterRendering: true },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
