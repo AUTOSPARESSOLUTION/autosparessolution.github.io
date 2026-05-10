@@ -356,7 +356,7 @@
         </div>
     </div>
 
-    <!-- Items Table with UOM column -->
+    <!-- Items Table with editable UOM -->
     <table class="items-table">
         <thead>
             <tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>UOM</th><th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
@@ -389,7 +389,7 @@
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
-    <!-- Totals (with packing row and round off) -->
+    <!-- Totals -->
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
@@ -458,6 +458,11 @@
                     const el = document.getElementById(id);
                     if (el) el.value = val || '';
                 }
+                // Auto-fill consignee from buyer
+                document.getElementById('consigneeName').value = data.customer.name || '';
+                document.getElementById('consigneeAddress').value = data.customer.address || '';
+                document.getElementById('consigneePhone').value = data.customer.phone || '';
+
                 const allProds = getProducts();
                 const cartItems = data.items.map(item => {
                     const prod = allProds.find(p => p.sku === item.part);
@@ -506,6 +511,10 @@
         document.getElementById('buyerEmail').value = currentUser.email || '';
         document.getElementById('buyerGstin').value = currentUser.gstin || '';
         document.getElementById('buyerState').value = currentUser.state || '';
+        // Auto-fill consignee from buyer (current user)
+        document.getElementById('consigneeName').value = currentUser.name || '';
+        document.getElementById('consigneeAddress').value = currentUser.address || '';
+        document.getElementById('consigneePhone').value = currentUser.phone || '';
     }
 
     // ========== ADMIN CUSTOMER QUICK SELECT ==========
@@ -536,6 +545,10 @@
             document.getElementById('buyerGstin').value = cust.gstin || '';
             document.getElementById('buyerState').value = cust.state || '';
             document.getElementById('customerCode').value = cust.customerCode || '';
+            // Auto-fill consignee from selected buyer
+            document.getElementById('consigneeName').value = cust.name || '';
+            document.getElementById('consigneeAddress').value = cust.address || '';
+            document.getElementById('consigneePhone').value = cust.phone || '';
             updateGstDisplay();
         }
     }
@@ -676,7 +689,6 @@
         const taxableTotals = calculateTaxableTotals();
         const gstApplicable = getGSTApplicableTotal();
         const packing = getPackingCharge();
-        // Round off on GST‑applicable amount only
         const roundedGSTApplicable = Math.round(gstApplicable);
         const roundOff = roundedGSTApplicable - gstApplicable;
         const grandTotal = roundedGSTApplicable + packing;
@@ -687,6 +699,15 @@
         document.getElementById('packingChargeDisplay').innerText = packing.toFixed(2);
         document.getElementById('roundOff').innerText = roundOff.toFixed(2);
         document.getElementById('grandTotal').innerText = grandTotal.toFixed(2);
+    }
+
+    // Editable UOM function
+    function updateUnit(part, newUnit) {
+        const item = cart.find(i => i.part === part);
+        if (item) {
+            item.unit = newUnit;
+            renderItemsAndTaxSummary();
+        }
     }
 
     function renderItemsAndTaxSummary() {
@@ -708,9 +729,9 @@
                 <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
                 <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
                 <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td style="text-align:center;">${escapeHtml(item.unit || 'pc')}</strong></td>
-                <td style="text-align:center;">${item.qty}</strong></td>
-                <td style="text-align:right;">₹${item.price.toFixed(2)}</strong></td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></td>
+                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></td>
                 <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
                 <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
                 <td style="text-align:center;">18%</strong></td>
@@ -751,6 +772,22 @@
         const item = cart.find(i => i.part === part);
         if (item) {
             item.hsn = hsnValue;
+            renderItemsAndTaxSummary();
+        }
+    }
+
+    function updateQty(part, newQty) {
+        const item = cart.find(i => i.part === part);
+        if (item) {
+            item.qty = parseFloat(newQty) || 0;
+            renderItemsAndTaxSummary();
+        }
+    }
+
+    function updatePrice(part, newPrice) {
+        const item = cart.find(i => i.part === part);
+        if (item) {
+            item.price = parseFloat(newPrice) || 0;
             renderItemsAndTaxSummary();
         }
     }
@@ -959,4 +996,4 @@
     calculatePackingCharges();
 </script>
 </body>
-                                                                                                                </html>
+                </html>
