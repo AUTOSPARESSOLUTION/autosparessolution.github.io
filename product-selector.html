@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Quote / Proforma – Select Products</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="data-manager.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        h1 { color: #0a7c71; }
+        .toolbar {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #09645a; }
+        .btn-quote { background: #28a745; }
+        .btn-quote:hover { background: #218838; }
+        .btn-proforma { background: #e67e22; }
+        .btn-proforma:hover { background: #d35400; }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .search-box input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            width: 250px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        th {
+            background: #0a7c71;
+            color: white;
+        }
+        .qty-input, .disc-input {
+            width: 80px;
+            padding: 4px;
+            text-align: center;
+        }
+        .select-all {
+            margin-right: 5px;
+        }
+        .product-name {
+            font-weight: 500;
+        }
+        .price {
+            font-weight: bold;
+            color: #0a7c71;
+        }
+        @media (max-width: 768px) {
+            .qty-input, .disc-input { width: 60px; }
+            table { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="toolbar">
+        <h1><i class="fas fa-boxes"></i> Select Products</h1>
+        <div class="actions">
+            <button class="btn-quote" onclick="createDocument('quotation')"><i class="fas fa-file-alt"></i> Create Quotation</button>
+            <button class="btn-proforma" onclick="createDocument('proforma')"><i class="fas fa-file-invoice"></i> Create Proforma Invoice</button>
+            <button onclick="window.location.href='index.html'"><i class="fas fa-home"></i> Back to Dashboard</button>
+        </div>
+    </div>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by Part No, Name, HSN...">
+        <button onclick="filterProducts()"><i class="fas fa-search"></i> Search</button>
+        <button onclick="clearSearch()"><i class="fas fa-eraser"></i> Clear</button>
+        <label style="margin-left: auto;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"> Select All</label>
+    </div>
+    <div id="productsTableContainer"></div>
+</div>
+
+<script>
+    let allProducts = [];
+    let selectedProductRows = new Map(); // key = product id, value = { qty, discount }
+    let filteredProducts = [];
+
+    function loadProducts() {
+        allProducts = getProducts();
+        // Normalise – ensure every product has id, sku, name, hsn, price
+        allProducts.forEach(p => {
+            p.id = String(p.id);
+            p.sku = p.sku || '';
+            p.name = p.name || '';
+            p.hsn = p.hsn || '';
+            p.price = p.price || 0;
+            p.currentStock = p.currentStock || 0;
+            p.unit = p.unit || 'pc';
+        });
+        filterProducts(); // initial display
+    }
+
+    function filterProducts() {
+        const term = document.getElementById('searchInput').value.trim().toLowerCase();
+        if (!term) {
+            filteredProducts = [...allProducts];
+        } else {
+            filteredProducts = allProducts.filter(p => 
+                p.sku.toLowerCase().includes(term) ||
+                p.name.toLowerCase().includes(term) ||
+                (p.hsn && p.hsn.toLowerCase().includes(term))
+            );
+        }
+        renderTable();
+    }
+
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        filterProducts();
+    }
+
+    function renderTable() {
+        if (filteredProducts.length === 0) {
+            document.getElementById('productsTableContainer').innerHTML = '<p>No products found. Please add products in Product Master.</p>';
+            return;
+        }
+        let html = `<table>
+            <thead>
+                <tr>
+                    <th style="width:5%">Select</th>
+                    <th style="width:12%">Part No (SKU)</th>
+                    <th style="width:25%">Product Name</th>
+                    <th style="width:10%">HSN</th>
+                    <th style="width:8%">Unit</th>
+                    <th style="width:10%">Price (₹)</th>
+                    <th style="width:8%">Stock</th>
+                    <th style="width:8%">Qty</th>
+                    <th style="width:8%">Disc %</th>
+                 </tr>
+            </thead>
+            <tbody>`;
+        for (let p of filteredProducts) {
+            const selected = selectedProductRows.has(p.id);
+            const qty = selected ? selectedProductRows.get(p.id).qty : 1;
+            const discount = selected ? selectedProductRows.get(p.id).discount : 0;
+            html += `<tr>
+                <td style="text-align:center"><input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)"></td>
+                <td><strong>${escapeHtml(p.sku)}</strong></td>
+                <td class="product-name">${escapeHtml(p.name)}</td>
+                <td>${escapeHtml(p.hsn)}</td>
+                <td>${escapeHtml(p.unit)}</td>
+                <td class="price">₹${(p.price || 0).toLocaleString()}</td>
+                <td>${(p.currentStock || 0).toLocaleString()}</td>
+                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></td>
+                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></td>
+             </tr>`;
+        }
+        html += `</tbody></table>`;
+        document.getElementById('productsTableContainer').innerHTML = html;
+        // Update "Select All" checkbox state
+        const allCheckboxes = document.querySelectorAll('.product-checkbox');
+        const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+        document.getElementById('selectAllCheckbox').checked = allChecked && allCheckboxes.length > 0;
+    }
+
+    function toggleProduct(id, isSelected) {
+        if (isSelected) {
+            // Set default qty=1, discount=0
+            selectedProductRows.set(id, { qty: 1, discount: 0 });
+        } else {
+            selectedProductRows.delete(id);
+        }
+        renderTable(); // re-render to enable/disable qty/discount inputs
+    }
+
+    function updateQty(id, newQty) {
+        const qty = parseFloat(newQty);
+        if (isNaN(qty) || qty <= 0) return;
+        if (selectedProductRows.has(id)) {
+            const current = selectedProductRows.get(id);
+            selectedProductRows.set(id, { ...current, qty: qty });
+        }
+    }
+
+    function updateDiscount(id, newDisc) {
+        const disc = parseFloat(newDisc);
+        if (isNaN(disc) || disc < 0) return;
+        if (selectedProductRows.has(id)) {
+            const current = selectedProductRows.get(id);
+            selectedProductRows.set(id, { ...current, discount: disc });
+        }
+    }
+
+    function toggleSelectAll() {
+        const checkAll = document.getElementById('selectAllCheckbox').checked;
+        if (checkAll) {
+            // Select all currently filtered products
+            for (let p of filteredProducts) {
+                if (!selectedProductRows.has(p.id)) {
+                    selectedProductRows.set(p.id, { qty: 1, discount: 0 });
+                }
+            }
+        } else {
+            // Deselect all currently filtered products
+            for (let p of filteredProducts) {
+                selectedProductRows.delete(p.id);
+            }
+        }
+        renderTable();
+    }
+
+    function createDocument(type) {
+        if (selectedProductRows.size === 0) {
+            alert('Please select at least one product.');
+            return;
+        }
+        // Build cart array from selected products
+        const cart = [];
+        for (let [prodId, { qty, discount }] of selectedProductRows.entries()) {
+            const product = allProducts.find(p => p.id === prodId);
+            if (!product) continue;
+            cart.push({
+                part: product.sku,
+                desc: product.name,
+                hsn: product.hsn || '',
+                qty: qty,
+                price: product.price,
+                discount: discount
+            });
+        }
+        if (cart.length === 0) {
+            alert('Selected products could not be processed.');
+            return;
+        }
+        // Save to localStorage
+        localStorage.setItem('invoiceCart', JSON.stringify(cart));
+        // Redirect based on type
+        if (type === 'quotation') {
+            window.location.href = 'quotation.html';
+        } else {
+            window.location.href = 'proforma-invoice.html';
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+    }
+
+    // Load products on page load
+    loadProducts();
+</script>
+</body>
+</html>
