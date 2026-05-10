@@ -59,7 +59,7 @@
     let products = [];
     let stockTransactions = [];
 
-    // Helper: convert any date to YYYY-MM-DD for sorting
+    // Convert any date to YYYY-MM-DD for sorting
     function toISODate(dateStr) {
         if (!dateStr) return '';
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
@@ -74,10 +74,12 @@
 
     function loadData() {
         products = getProducts();
-        // Normalise product IDs to strings
-        products.forEach(p => { if (p.id !== undefined) p.id = String(p.id); });
-        
-        // Build stock transactions ONLY from purchase invoices and sales invoices (no inventoryTransactions)
+        // Normalise product IDs and sku to strings for matching
+        products.forEach(p => {
+            if (p.id !== undefined) p.id = String(p.id);
+            if (p.sku !== undefined) p.sku = String(p.sku);
+        });
+
         stockTransactions = [];
 
         // 1. Purchase invoices (stock IN)
@@ -85,53 +87,57 @@
         purchaseInvoices.forEach(inv => {
             const items = inv.items || [];
             items.forEach(item => {
-                const productId = item.productId || item.part;
+                // In purchase invoices, productId may be the part number or sku
+                let productId = item.productId || item.part;
                 if (!productId) return;
+                productId = String(productId);
                 const qty = parseFloat(item.quantity) || 0;
                 if (qty === 0) return;
                 stockTransactions.push({
                     date: inv.date,
-                    productId: String(productId),
+                    productId: productId,
                     type: 'Purchase',
                     inQty: qty,
                     outQty: 0,
                     ref: inv.invoiceNo || inv.poNo,
-                    description: 'Purchase Invoice'
                 });
             });
         });
 
-        // 2. Sales invoices (stock OUT) – using allInvoices (which is updated on edit, no duplicates)
+        // 2. Sales invoices (stock OUT) – read exactly as Order History does
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         allInvoices.forEach(inv => {
             const items = inv.items || [];
             items.forEach(item => {
-                const productId = item.productId || item.part;
+                // Sales invoices use 'part' field (e.g., item.part)
+                let productId = item.part || item.productId;
                 if (!productId) return;
-                const qty = parseFloat(item.quantity) || 0;
+                productId = String(productId);
+                const qty = parseFloat(item.qty) || 0;
                 if (qty === 0) return;
                 stockTransactions.push({
                     date: inv.date,
-                    productId: String(productId),
+                    productId: productId,
                     type: 'Sales',
                     inQty: 0,
                     outQty: qty,
                     ref: inv.invoiceNo,
-                    description: 'Sales Invoice'
                 });
             });
         });
 
-        // Sort all transactions by date (ISO)
+        // Sort by date (ISO)
         stockTransactions.forEach(t => { t.isoDate = toISODate(t.date); });
         stockTransactions.sort((a,b) => a.isoDate.localeCompare(b.isoDate));
+
+        // Debug: log first few transactions
+        console.log('Stock transactions built:', stockTransactions.slice(0,5));
 
         populateFilters();
         displayLedger();
     }
 
     function populateFilters() {
-        // Brand dropdown
         const brands = new Set();
         products.forEach(p => { if (p.brand) brands.add(p.brand); });
         const brandSelect = document.getElementById('brandFilter');
@@ -140,7 +146,6 @@
             brandSelect.innerHTML += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
         });
 
-        // Make dropdown
         const makes = new Set();
         products.forEach(p => { if (p.make) makes.add(p.make); });
         const makeSelect = document.getElementById('makeFilter');
@@ -149,7 +154,6 @@
             makeSelect.innerHTML += `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`;
         });
 
-        // Product dropdown
         const productSelect = document.getElementById('productFilter');
         productSelect.innerHTML = '<option value="">-- All Products --</option>';
         products.forEach(p => {
@@ -174,11 +178,22 @@
             document.getElementById('ledgerTable').innerHTML = '<p>No products match the filter.</p>';
             return;
         }
-        let html = '<table class="ledger-table">\n<thead>\n<tr>\n<th>Product</th><th>SKU</th><th>Brand</th><th>Make</th><th>Date</th><th>Transaction Type</th><th>In (+)</th><th>Out (-)</th><th>Running Balance</th><th>Reference</th>\n</tr>\n</thead>\n<tbody>';
-        
+
+        let html = `<table class="ledger-table">
+            <thead>
+                <tr>
+                    <th>Product</th><th>SKU</th><th>Brand</th><th>Make</th>
+                    <th>Date</th><th>Transaction Type</th><th>In (+)</th><th>Out (-)</th>
+                    <th>Running Balance</th><th>Reference</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
         for (let prod of filteredProducts) {
-            // Get all transactions for this product
-            let prodTrans = stockTransactions.filter(t => t.productId === prod.id);
+            // Match transactions by productId OR by sku (fallback)
+            let prodTrans = stockTransactions.filter(t => 
+                t.productId === prod.id || t.productId === prod.sku
+            );
             if (prodTrans.length === 0) {
                 html += `<tr><td colspan="10">No transactions for ${escapeHtml(prod.name)}</td></tr>`;
                 continue;
@@ -189,7 +204,7 @@
             for (let t of prodTrans) {
                 balance += t.inQty - t.outQty;
                 const displayDate = t.date;
-                let typeLabel = t.type === 'Purchase' ? 'Purchase' : 'Sales';
+                const typeLabel = t.type === 'Purchase' ? 'Purchase' : 'Sales';
                 html += `<tr>
                     <td><strong>${escapeHtml(prod.name)}</strong></td>
                     <td><strong>${escapeHtml(prod.sku)}</strong></td>
@@ -203,7 +218,7 @@
                     <td>${escapeHtml(t.ref || '-')}</td>
                 </tr>`;
             }
-            // Blank separator between products
+            // Separator between products
             html += '<tr style="background:#f1f3f5;"><td colspan="10" style="padding:2px;"></td></tr>';
         }
         html += '</tbody>\n</table>';
@@ -211,36 +226,44 @@
     }
 
     function loadLedger() {
-        // Reload fresh data (same as loadData but without resetting filters)
+        // Reload fresh data (same as loadData)
         products = getProducts();
-        products.forEach(p => { if (p.id !== undefined) p.id = String(p.id); });
+        products.forEach(p => {
+            if (p.id !== undefined) p.id = String(p.id);
+            if (p.sku !== undefined) p.sku = String(p.sku);
+        });
         stockTransactions = [];
+
         const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         purchaseInvoices.forEach(inv => {
             (inv.items || []).forEach(item => {
-                const productId = item.productId || item.part;
+                let productId = item.productId || item.part;
                 if (!productId) return;
+                productId = String(productId);
                 const qty = parseFloat(item.quantity) || 0;
                 if (qty === 0) return;
                 stockTransactions.push({
-                    date: inv.date, productId: String(productId), type: 'Purchase',
+                    date: inv.date, productId: productId, type: 'Purchase',
                     inQty: qty, outQty: 0, ref: inv.invoiceNo || inv.poNo
                 });
             });
         });
+
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         allInvoices.forEach(inv => {
             (inv.items || []).forEach(item => {
-                const productId = item.productId || item.part;
+                let productId = item.part || item.productId;
                 if (!productId) return;
-                const qty = parseFloat(item.quantity) || 0;
+                productId = String(productId);
+                const qty = parseFloat(item.qty) || 0;
                 if (qty === 0) return;
                 stockTransactions.push({
-                    date: inv.date, productId: String(productId), type: 'Sales',
+                    date: inv.date, productId: productId, type: 'Sales',
                     inQty: 0, outQty: qty, ref: inv.invoiceNo
                 });
             });
         });
+
         stockTransactions.forEach(t => { t.isoDate = toISODate(t.date); });
         stockTransactions.sort((a,b) => a.isoDate.localeCompare(b.isoDate));
         displayLedger();
@@ -251,7 +274,7 @@
         if (filteredProducts.length === 0) return;
         let csv = "Product Name,SKU,Brand,Make,Date,Transaction Type,In,Out,Running Balance,Reference\n";
         for (let prod of filteredProducts) {
-            let prodTrans = stockTransactions.filter(t => t.productId === prod.id);
+            let prodTrans = stockTransactions.filter(t => t.productId === prod.id || t.productId === prod.sku);
             if (prodTrans.length === 0) continue;
             prodTrans.sort((a,b) => a.isoDate.localeCompare(b.isoDate));
             let balance = 0;
