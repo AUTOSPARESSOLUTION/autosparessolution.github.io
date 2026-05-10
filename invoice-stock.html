@@ -47,7 +47,6 @@
             .items-table th, .tax-summary-table th {
                 background: #f8f9fa !important;
             }
-            /* Prevent page breaks inside important containers */
             .qr-box, .signature-row, .packing-section, .totals, .info-box {
                 page-break-inside: avoid;
                 break-inside: avoid;
@@ -56,7 +55,6 @@
                 page-break-after: avoid;
                 break-after: avoid;
             }
-            /* Reduce padding/margins for more compact print */
             .invoice-container {
                 font-size: 10pt;
             }
@@ -163,19 +161,19 @@
         .items-table th:nth-child(2) { width: 10%; }
         .items-table th:nth-child(3) { width: 12%; }
         .items-table th:nth-child(4) { width: 8%; }
-        .items-table th:nth-child(5) { width: 5%; }   /* UOM */
-        .items-table th:nth-child(6) { width: 4%; }   /* Qty */
-        .items-table th:nth-child(7) { width: 7%; }   /* Price */
-        .items-table th:nth-child(8) { width: 6%; }   /* Disc % */
-        .items-table th:nth-child(9) { width: 8%; }   /* Taxable */
-        .items-table th:nth-child(10) { width: 6%; }  /* GST% */
-        .items-table th:nth-child(11) { width: 8%; }  /* CGST */
-        .items-table th:nth-child(12) { width: 8%; }  /* SGST */
-        .items-table th:nth-child(13) { width: 8%; }  /* Total */
+        .items-table th:nth-child(5) { width: 5%; }
+        .items-table th:nth-child(6) { width: 4%; }
+        .items-table th:nth-child(7) { width: 7%; }
+        .items-table th:nth-child(8) { width: 6%; }
+        .items-table th:nth-child(9) { width: 8%; }
+        .items-table th:nth-child(10) { width: 6%; }
+        .items-table th:nth-child(11) { width: 8%; }
+        .items-table th:nth-child(12) { width: 8%; }
+        .items-table th:nth-child(13) { width: 8%; }
         .items-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .tax-summary-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
-        .totals table { width: 280px; margin-left: auto; }
+        .totals table { width: 300px; margin-left: auto; }
         .totals td { border: none; padding: 3px; }
         .qr-box, .carton-box {
             background: #f8f9fa;
@@ -266,7 +264,6 @@
             font-weight: bold;
             color: #0a7c71;
         }
-        /* Ensure no page breaks inside these blocks (screen + print) */
         .qr-box, .signature-row, .packing-section, .totals {
             break-inside: avoid;
             page-break-inside: avoid;
@@ -392,7 +389,7 @@
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
-    <!-- Totals (with packing row) -->
+    <!-- Totals (with packing row and round off) -->
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
@@ -400,6 +397,8 @@
                 <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
             <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr id="roundOffRow">
+                <td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
@@ -459,7 +458,6 @@
                     const el = document.getElementById(id);
                     if (el) el.value = val || '';
                 }
-                // Fetch unit from product master for each item
                 const allProds = getProducts();
                 const cartItems = data.items.map(item => {
                     const prod = allProds.find(p => p.sku === item.part);
@@ -549,7 +547,7 @@
         const total = cartons * rate;
         document.getElementById('packingTotal').value = total.toFixed(2);
         document.getElementById('packingChargeDisplay').innerText = total.toFixed(2);
-        updateTotalsWithPacking();
+        updateTotalsWithPackingAndRound();
     }
 
     function getPackingCharge() {
@@ -636,7 +634,7 @@
         updateDueDate();
     }
 
-    // Calculate totals EXCLUDING packing charges (for taxable part)
+    // Calculate GST‑applicable totals (subtotal + tax) WITHOUT packing
     function calculateTaxableTotals() {
         let sub = 0;
         let taxGroups = {};
@@ -667,14 +665,28 @@
         return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, taxGroups, isLocal };
     }
 
-    function updateTotalsWithPacking() {
+    // Get the GST‑applicable total (subtotal + GST)
+    function getGSTApplicableTotal() {
         const taxableTotals = calculateTaxableTotals();
+        const gstTotal = taxableTotals.isLocal ? taxableTotals.cgstTotal + taxableTotals.sgstTotal : taxableTotals.igstTotal;
+        return taxableTotals.subtotal + gstTotal;
+    }
+
+    function updateTotalsWithPackingAndRound() {
+        const taxableTotals = calculateTaxableTotals();
+        const gstApplicable = getGSTApplicableTotal();
         const packing = getPackingCharge();
-        const grand = taxableTotals.subtotal + (taxableTotals.isLocal ? taxableTotals.cgstTotal + taxableTotals.sgstTotal : taxableTotals.igstTotal) + packing;
+        // Round off on GST‑applicable amount only
+        const roundedGSTApplicable = Math.round(gstApplicable);
+        const roundOff = roundedGSTApplicable - gstApplicable;
+        const grandTotal = roundedGSTApplicable + packing;
+        
         document.getElementById('subtotal').innerText = taxableTotals.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = taxableTotals.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = taxableTotals.sgstTotal.toFixed(2);
-        document.getElementById('grandTotal').innerText = grand.toFixed(2);
+        document.getElementById('packingChargeDisplay').innerText = packing.toFixed(2);
+        document.getElementById('roundOff').innerText = roundOff.toFixed(2);
+        document.getElementById('grandTotal').innerText = grandTotal.toFixed(2);
     }
 
     function renderItemsAndTaxSummary() {
@@ -724,7 +736,7 @@
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
-        updateTotalsWithPacking();
+        updateTotalsWithPackingAndRound();
     }
 
     function updateDiscount(part, discPercent) {
@@ -756,8 +768,11 @@
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const taxableTotals = calculateTaxableTotals();
+        const gstApplicable = getGSTApplicableTotal();
         const packing = getPackingCharge();
-        const grandTotal = taxableTotals.subtotal + (taxableTotals.isLocal ? taxableTotals.cgstTotal + taxableTotals.sgstTotal : taxableTotals.igstTotal) + packing;
+        const roundedGSTApplicable = Math.round(gstApplicable);
+        const roundOff = roundedGSTApplicable - gstApplicable;
+        const grandTotal = roundedGSTApplicable + packing;
 
         const finalNo = getNextInvoiceNumber(type);
 
@@ -820,6 +835,7 @@
             packingCharges: packing,
             cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
             packingRate: parseFloat(document.getElementById('packingRate').value) || 0,
+            roundOff: roundOff,
             buyer: buyer,
             consignee: {
                 name: document.getElementById('consigneeName').value,
@@ -853,7 +869,7 @@
 
         try {
             createSalesInvoice(invoice);
-            alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced (negative allowed).\nCustomer outstanding updated.\nLedger entry created.\nPacking charges: ₹${packing.toFixed(2)} (no GST).`);
+            alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced.\nCustomer outstanding updated.\nLedger entry created.\nPacking charges: ₹${packing.toFixed(2)} (no GST).\nRound Off (on taxable + GST): ₹${roundOff.toFixed(2)}`);
             localStorage.setItem('invoiceCart', '[]');
             setTimeout(() => window.close(), 1000);
         } catch (err) {
@@ -943,4 +959,4 @@
     calculatePackingCharges();
 </script>
 </body>
-                    </html>
+                                                                                                                </html>
