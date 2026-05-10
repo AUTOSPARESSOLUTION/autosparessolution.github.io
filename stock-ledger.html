@@ -57,7 +57,7 @@
 
 <script>
     let products = [];
-    let stockTransactions = []; // unified transactions
+    let stockTransactions = [];
 
     // Helper: convert any date to YYYY-MM-DD for sorting
     function toISODate(dateStr) {
@@ -77,7 +77,7 @@
         // Normalise product IDs to strings
         products.forEach(p => { if (p.id !== undefined) p.id = String(p.id); });
         
-        // Build stock transactions from purchase invoices and sales invoices
+        // Build stock transactions ONLY from purchase invoices and sales invoices (no inventoryTransactions)
         stockTransactions = [];
 
         // 1. Purchase invoices (stock IN)
@@ -101,7 +101,7 @@
             });
         });
 
-        // 2. Sales invoices (stock OUT)
+        // 2. Sales invoices (stock OUT) – using allInvoices (which is updated on edit, no duplicates)
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         allInvoices.forEach(inv => {
             const items = inv.items || [];
@@ -119,31 +119,6 @@
                     ref: inv.invoiceNo,
                     description: 'Sales Invoice'
                 });
-            });
-        });
-
-        // 3. Additional inventory transactions (adjustments, returns, etc.)
-        const invTransactions = getInventoryTransactions() || [];
-        invTransactions.forEach(t => {
-            let inQty = 0, outQty = 0;
-            const qty = parseFloat(t.quantity) || 0;
-            if (t.type === 'purchase' || t.type === 'sales_return') {
-                inQty = Math.abs(qty);
-            } else if (t.type === 'sales' || t.type === 'purchase_return') {
-                outQty = Math.abs(qty);
-            } else if (t.type === 'adjustment') {
-                if (qty > 0) inQty = qty;
-                else outQty = -qty;
-            }
-            if (inQty === 0 && outQty === 0) return;
-            stockTransactions.push({
-                date: t.date,
-                productId: String(t.productId),
-                type: t.type,
-                inQty: inQty,
-                outQty: outQty,
-                ref: t.ref,
-                description: t.type
             });
         });
 
@@ -199,7 +174,7 @@
             document.getElementById('ledgerTable').innerHTML = '<p>No products match the filter.</p>';
             return;
         }
-        let html = '<table class="ledger-table">\n<thead>\n极\n<th>Product</th><th>SKU</th><th>Brand</th><th>Make</th><th>Date</th><th>Transaction Type</th><th>In (+)</th><th>Out (-)</th><th>Running Balance</th><th>Reference</th>\n</tr>\n</thead>\n<tbody>';
+        let html = '<table class="ledger-table">\n<thead>\n<tr>\n<th>Product</th><th>SKU</th><th>Brand</th><th>Make</th><th>Date</th><th>Transaction Type</th><th>In (+)</th><th>Out (-)</th><th>Running Balance</th><th>Reference</th>\n</tr>\n</thead>\n<tbody>';
         
         for (let prod of filteredProducts) {
             // Get all transactions for this product
@@ -214,38 +189,32 @@
             for (let t of prodTrans) {
                 balance += t.inQty - t.outQty;
                 const displayDate = t.date;
-                let typeLabel = t.type;
-                if (t.type === 'Purchase') typeLabel = 'Purchase';
-                else if (t.type === 'Sales') typeLabel = 'Sales';
-                else if (t.type === 'adjustment') typeLabel = 'Stock Adjustment';
-                else if (t.type === 'sales_return') typeLabel = 'Sales Return';
-                else if (t.type === 'purchase_return') typeLabel = 'Purchase Return';
+                let typeLabel = t.type === 'Purchase' ? 'Purchase' : 'Sales';
                 html += `<tr>
-                    <td>${escapeHtml(prod.name)}</strong></td>
-                    <td>${escapeHtml(prod.sku)}</strong></td>
+                    <td><strong>${escapeHtml(prod.name)}</strong></td>
+                    <td><strong>${escapeHtml(prod.sku)}</strong></td>
                     <td>${escapeHtml(prod.brand || '-')}</td>
                     <td>${escapeHtml(prod.make || '-')}</td>
-                    <td>${displayDate} </strong></td>
-                    <td>${typeLabel} </strong></td>
-                    <td class="in">${t.inQty > 0 ? t.inQty : '-'}</strong></td>
-                    <td class="out">${t.outQty > 0 ? t.outQty : '-'}</strong></td>
-                    <td>${balance}</strong></td>
-                    <td>${escapeHtml(t.ref || '-')}</strong></td>
+                    <td>${displayDate}</td>
+                    <td>${typeLabel}</td>
+                    <td class="in">${t.inQty > 0 ? t.inQty : '-'}</td>
+                    <td class="out">${t.outQty > 0 ? t.outQty : '-'}</td>
+                    <td>${balance}</td>
+                    <td>${escapeHtml(t.ref || '-')}</td>
                 </tr>`;
             }
-            // Optional: blank line between products
+            // Blank separator between products
             html += '<tr style="background:#f1f3f5;"><td colspan="10" style="padding:2px;"></td></tr>';
         }
-        html += '</tbody>\n</td>';
+        html += '</tbody>\n</table>';
         document.getElementById('ledgerTable').innerHTML = html;
     }
 
     function loadLedger() {
-        // Reload fresh data
+        // Reload fresh data (same as loadData but without resetting filters)
         products = getProducts();
         products.forEach(p => { if (p.id !== undefined) p.id = String(p.id); });
         stockTransactions = [];
-        // Rebuild transactions (same as loadData but without resetting filters)
         const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         purchaseInvoices.forEach(inv => {
             (inv.items || []).forEach(item => {
@@ -255,7 +224,7 @@
                 if (qty === 0) return;
                 stockTransactions.push({
                     date: inv.date, productId: String(productId), type: 'Purchase',
-                    inQty: qty, outQty: 0, ref: inv.invoiceNo || inv.poNo, description: 'Purchase Invoice'
+                    inQty: qty, outQty: 0, ref: inv.invoiceNo || inv.poNo
                 });
             });
         });
@@ -268,21 +237,8 @@
                 if (qty === 0) return;
                 stockTransactions.push({
                     date: inv.date, productId: String(productId), type: 'Sales',
-                    inQty: 0, outQty: qty, ref: inv.invoiceNo, description: 'Sales Invoice'
+                    inQty: 0, outQty: qty, ref: inv.invoiceNo
                 });
-            });
-        });
-        const invTransactions = getInventoryTransactions() || [];
-        invTransactions.forEach(t => {
-            let inQty = 0, outQty = 0;
-            const qty = parseFloat(t.quantity) || 0;
-            if (t.type === 'purchase' || t.type === 'sales_return') inQty = Math.abs(qty);
-            else if (t.type === 'sales' || t.type === 'purchase_return') outQty = Math.abs(qty);
-            else if (t.type === 'adjustment') { if (qty > 0) inQty = qty; else outQty = -qty; }
-            if (inQty === 0 && outQty === 0) return;
-            stockTransactions.push({
-                date: t.date, productId: String(t.productId), type: t.type,
-                inQty: inQty, outQty: outQty, ref: t.ref, description: t.type
             });
         });
         stockTransactions.forEach(t => { t.isoDate = toISODate(t.date); });
