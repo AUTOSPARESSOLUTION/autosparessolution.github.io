@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quick Quote / Proforma – Select Products</title>
+    <title>Quick Quote / Proforma – Select Products (In Stock Only)</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="data-manager.js"></script>
     <style>
@@ -90,6 +90,9 @@
             font-weight: bold;
             color: #0a7c71;
         }
+        .stock-zero {
+            background-color: #f8d7da;
+        }
         @media (max-width: 768px) {
             .qty-input, .disc-input { width: 60px; }
             table { font-size: 12px; }
@@ -99,7 +102,7 @@
 <body>
 <div class="container">
     <div class="toolbar">
-        <h1><i class="fas fa-boxes"></i> Select Products</h1>
+        <h1><i class="fas fa-boxes"></i> Select Products (In Stock Only)</h1>
         <div class="actions">
             <button class="btn-quote" onclick="createDocument('quotation')"><i class="fas fa-file-alt"></i> Create Quotation</button>
             <button class="btn-proforma" onclick="createDocument('proforma')"><i class="fas fa-file-invoice"></i> Create Proforma Invoice</button>
@@ -110,7 +113,7 @@
         <input type="text" id="searchInput" placeholder="Search by Part No, Name, HSN...">
         <button onclick="filterProducts()"><i class="fas fa-search"></i> Search</button>
         <button onclick="clearSearch()"><i class="fas fa-eraser"></i> Clear</button>
-        <label style="margin-left: auto;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"> Select All</label>
+        <label style="margin-left: auto;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"> Select All (visible)</label>
     </div>
     <div id="productsTableContainer"></div>
 </div>
@@ -122,7 +125,8 @@
 
     function loadProducts() {
         allProducts = getProducts();
-        // Normalise – ensure every product has id, sku, name, hsn, price
+        // Normalise, and keep only products with positive stock
+        allProducts = allProducts.filter(p => (p.currentStock || 0) > 0);
         allProducts.forEach(p => {
             p.id = String(p.id);
             p.sku = p.sku || '';
@@ -156,7 +160,7 @@
 
     function renderTable() {
         if (filteredProducts.length === 0) {
-            document.getElementById('productsTableContainer').innerHTML = '<p>No products found. Please add products in Product Master.</p>';
+            document.getElementById('productsTableContainer').innerHTML = '<p>No products with positive stock found. Please add stock via Purchase Entry.</p>';
             return;
         }
         let html = `<table>
@@ -181,14 +185,14 @@
             html += `<tr>
                 <td style="text-align:center"><input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)"></td>
                 <td><strong>${escapeHtml(p.sku)}</strong></td>
-                <td class="product-name">${escapeHtml(p.name)}</td>
-                <td>${escapeHtml(p.hsn)}</td>
-                <td>${escapeHtml(p.unit)}</td>
-                <td class="price">₹${(p.price || 0).toLocaleString()}</td>
-                <td>${(p.currentStock || 0).toLocaleString()}</td>
-                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></td>
-                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></td>
-             </tr>`;
+                <td class="product-name">${escapeHtml(p.name)}</strong></td>
+                <td>${escapeHtml(p.hsn)}</strong></td>
+                <td>${escapeHtml(p.unit)}</strong></td>
+                <td class="price">₹${(p.price || 0).toLocaleString()}</strong></td>
+                <td>${(p.currentStock || 0).toLocaleString()}</strong></td>
+                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" max="${p.currentStock}" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></strong></td>
+                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></strong></td>
+            </tr>`;
         }
         html += `</tbody></table>`;
         document.getElementById('productsTableContainer').innerHTML = html;
@@ -200,17 +204,22 @@
 
     function toggleProduct(id, isSelected) {
         if (isSelected) {
-            // Set default qty=1, discount=0
             selectedProductRows.set(id, { qty: 1, discount: 0 });
         } else {
             selectedProductRows.delete(id);
         }
-        renderTable(); // re-render to enable/disable qty/discount inputs
+        renderTable();
     }
 
     function updateQty(id, newQty) {
         const qty = parseFloat(newQty);
         if (isNaN(qty) || qty <= 0) return;
+        const product = allProducts.find(p => p.id === id);
+        if (product && qty > product.currentStock) {
+            alert(`Quantity cannot exceed available stock (${product.currentStock})`);
+            renderTable(); // reset to previous value
+            return;
+        }
         if (selectedProductRows.has(id)) {
             const current = selectedProductRows.get(id);
             selectedProductRows.set(id, { ...current, qty: qty });
@@ -254,6 +263,10 @@
         for (let [prodId, { qty, discount }] of selectedProductRows.entries()) {
             const product = allProducts.find(p => p.id === prodId);
             if (!product) continue;
+            if (qty > product.currentStock) {
+                alert(`Cannot add ${product.sku}: requested quantity (${qty}) exceeds available stock (${product.currentStock})`);
+                return;
+            }
             cart.push({
                 part: product.sku,
                 desc: product.name,
@@ -286,4 +299,4 @@
     loadProducts();
 </script>
 </body>
-</html>
+    </html>
