@@ -5,9 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quotation – Auto Spares</title>
     <style>
-        /* ========== STYLES (exactly as invoice) ========== */
+        /* ===== EXACTLY THE SAME AS YOUR INVOICE ===== */
         * { box-sizing: border-box; }
-        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
         .quotation-container {
             max-width: 1200px;
             margin: 0 auto;
@@ -18,23 +23,68 @@
             border: 1px solid #dee2e6;
         }
         @media print {
-            .no-print, .actions, button, input, textarea, select {
+            .no-print, .actions, .invoice-type, button, input, textarea, select {
                 display: none !important;
             }
-            body { background: white; padding: 0; }
-            .quotation-container { box-shadow: none; border-radius: 0; padding: 0 10px 5px 10px; margin: 0; border: none; }
-            .company-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0a7c71; color: white; margin: 0 -10px 10px -10px; }
-            .items-table th, .tax-summary-table th { background: #f8f9fa !important; }
-            .qr-box, .signature-row, .packing-section, .totals, .info-box { page-break-inside: avoid; break-inside: avoid; }
-            .company-header, .totals { page-break-after: avoid; break-after: avoid; }
-            .quotation-container { font-size: 10pt; }
-            .info-box, .packing-section { padding: 5px 8px; margin-bottom: 8px; }
-            .items-table td, .items-table th { padding: 4px 3px; font-size: 9pt; }
-            .totals table { margin-top: 5px; margin-bottom: 5px; }
-            .qr-box img { max-width: 80px; }
-            .signature-box { padding-top: 3px; }
-            .footer-legal { margin-top: 8px; padding-top: 5px; }
-            .items-table th:last-child, .items-table td:last-child { display: none; }
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .quotation-container {
+                box-shadow: none;
+                border-radius: 0;
+                padding: 0 10px 5px 10px;
+                margin: 0;
+                border: none;
+            }
+            .company-header {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                background: #0a7c71;
+                color: white;
+                margin: 0 -10px 10px -10px;
+            }
+            .items-table th, .tax-summary-table th {
+                background: #f8f9fa !important;
+            }
+            .qr-box, .signature-row, .packing-section, .totals, .info-box {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .company-header, .totals {
+                page-break-after: avoid;
+                break-after: avoid;
+            }
+            .quotation-container {
+                font-size: 10pt;
+            }
+            .info-box, .packing-section {
+                padding: 5px 8px;
+                margin-bottom: 8px;
+            }
+            .items-table td, .items-table th {
+                padding: 4px 3px;
+                font-size: 9pt;
+            }
+            .totals table {
+                margin-top: 5px;
+                margin-bottom: 5px;
+            }
+            .qr-box img {
+                max-width: 80px;
+            }
+            .signature-box {
+                padding-top: 3px;
+            }
+            .footer-legal {
+                margin-top: 8px;
+                padding-top: 5px;
+            }
+            /* Hide delete column in print */
+            .items-table th:last-child, .items-table td:last-child {
+                display: none;
+            }
         }
         .company-header {
             background: #0a7c71;
@@ -46,7 +96,11 @@
             flex-wrap: wrap;
             margin: 0 -15px 15px -15px;
         }
-        .logo-area { display: flex; align-items: center; gap: 15px; }
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
         .logo-area img { height: 60px; }
         .company-details h1 { margin: 0; font-size: 24px; }
         .company-details p { margin: 3px 0 0; font-size: 12px; opacity: 0.8; }
@@ -66,9 +120,21 @@
             border-bottom: 1px solid #dee2e6;
             padding-bottom: 4px;
         }
-        .info-row { display: flex; margin-bottom: 5px; font-size: 12px; }
-        .info-label { width: 110px; font-weight: 600; color: #555; }
-        .info-value { flex: 1; color: #333; word-break: break-word; }
+        .info-row {
+            display: flex;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .info-label {
+            width: 110px;
+            font-weight: 600;
+            color: #555;
+        }
+        .info-value {
+            flex: 1;
+            color: #333;
+            word-break: break-word;
+        }
         input, textarea, select {
             width: 100%;
             padding: 4px 6px;
@@ -77,7 +143,9 @@
             font-size: 12px;
             font-family: inherit;
         }
-        .editable { background: #fff9e0; }
+        .editable {
+            background: #fff9e0;
+        }
         .items-table, .tax-summary-table {
             width: 100%;
             border-collapse: collapse;
@@ -112,7 +180,7 @@
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
         .totals table { width: 300px; margin-left: auto; }
         .totals td { border: none; padding: 3px; }
-        .qr-box {
+        .qr-box, .carton-box {
             background: #f8f9fa;
             border-radius: 6px;
             padding: 8px;
@@ -156,6 +224,22 @@
             font-size: 14px;
         }
         button:hover { background: #09645a; }
+        .invoice-type {
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+        .page-number {
+            text-align: center;
+            font-size: 10px;
+            color: #777;
+            margin-top: 10px;
+        }
         .packing-section {
             background: #f8f9fa;
             padding: 8px 15px;
@@ -167,9 +251,20 @@
             align-items: flex-end;
             border: 1px solid #dee2e6;
         }
-        .packing-field { display: flex; flex-direction: column; gap: 4px; }
-        .packing-field label { font-size: 11px; font-weight: 600; color: #555; }
-        .packing-field input { width: 120px; padding: 6px; }
+        .packing-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .packing-field label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+        }
+        .packing-field input {
+            width: 120px;
+            padding: 6px;
+        }
         .delete-btn {
             background: #dc3545;
             color: white;
@@ -185,7 +280,6 @@
 </head>
 <body>
 <div class="quotation-container" id="quotationContainer">
-    <!-- Exactly the same HTML structure as the invoice, but with QUOTATION heading -->
     <div class="company-header">
         <div class="logo-area">
             <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
@@ -203,7 +297,7 @@
         </div>
     </div>
 
-    <!-- Buyer and Consignee (same as invoice) -->
+    <!-- Buyer and Consignee (exactly as invoice) -->
     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
@@ -256,7 +350,7 @@
         </div>
     </div>
 
-    <!-- Items Table -->
+    <!-- Items Table (editable, includes delete column) -->
     <table class="items-table">
         <thead>
             <tr>
@@ -270,13 +364,24 @@
 
     <!-- Packing & Forwarding -->
     <div class="packing-section no-print">
-        <div class="packing-field"><label>📦 Carton Quantity</label><input type="number" id="packingCartons" value="0" step="1" min="0" onchange="calculatePackingCharges()"></div>
-        <div class="packing-field"><label>💰 Charges per Carton (₹)</label><input type="number" id="packingRate" value="0" step="0.01" min="0" onchange="calculatePackingCharges()"></div>
-        <div class="packing-field"><label>🧾 Total Packing Charges (₹)</label><input type="text" id="packingTotal" readonly style="background:#e9ecef; font-weight:bold;"></div>
-        <div class="packing-field"><span style="font-size:11px; color:#6c757d;">(No GST applicable)</span></div>
+        <div class="packing-field">
+            <label>📦 Carton Quantity</label>
+            <input type="number" id="packingCartons" value="0" step="1" min="0" onchange="calculatePackingCharges()">
+        </div>
+        <div class="packing-field">
+            <label>💰 Charges per Carton (₹)</label>
+            <input type="number" id="packingRate" value="0" step="0.01" min="0" onchange="calculatePackingCharges()">
+        </div>
+        <div class="packing-field">
+            <label>🧾 Total Packing Charges (₹)</label>
+            <input type="text" id="packingTotal" readonly style="background:#e9ecef; font-weight:bold;">
+        </div>
+        <div class="packing-field">
+            <span style="font-size:11px; color:#6c757d;">(No GST applicable)</span>
+        </div>
     </div>
 
-    <!-- Tax Summary -->
+    <!-- Tax Summary Table -->
     <table class="tax-summary-table">
         <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
         <tbody id="taxSummaryBody"></tbody>
@@ -286,15 +391,17 @@
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
+            <tr id="packingRow">
+                <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
             <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
+            <tr id="roundOffRow">
+                <td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
-    <!-- QR and Bank Details -->
+    <!-- Payment QR and Bank Details -->
     <div class="qr-box">
         <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
             <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
@@ -321,12 +428,13 @@
 </div>
 
 <script>
-    // ========== QUOTATION NUMBERING ==========
+    // ========== QUOTATION NUMBERING (same as invoice but with QTN prefix) ==========
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
-        return (month >= 4) ? `${year}-${(year+1).toString().slice(-2)}` : `${year-1}-${year.toString().slice(-2)}`;
+        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
+        else return `${year-1}-${year.toString().slice(-2)}`;
     }
     function getNextQuotationNumber() {
         const finYear = getFinancialYear();
@@ -339,10 +447,11 @@
                 if (!isNaN(num) && num > maxNum) maxNum = num;
             }
         });
-        return prefix + (maxNum + 1).toString().padStart(4, '0');
+        const nextNum = maxNum + 1;
+        return prefix + nextNum.toString().padStart(4, '0');
     }
 
-    // Packing & Forwarding
+    // ========== PACKING & FORWARDING (same as invoice) ==========
     function calculatePackingCharges() {
         const cartons = parseFloat(document.getElementById('packingCartons').value) || 0;
         const rate = parseFloat(document.getElementById('packingRate').value) || 0;
@@ -355,7 +464,7 @@
         return parseFloat(document.getElementById('packingTotal').value) || 0;
     }
 
-    // Load cart from localStorage
+    // ========== CART & INITIAL LOAD ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
     const allProducts = getProducts();
     cart = cart.map(item => {
@@ -367,7 +476,7 @@
     });
     if (cart.length === 0) addItem();
 
-    // Prefill customer from logged‑in user
+    // Prefill customer data from logged‑in user
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
@@ -380,12 +489,14 @@
         document.getElementById('consigneeAddress').value = currentUser.address || '';
         document.getElementById('consigneePhone').value = currentUser.phone || '';
     }
+
+    // Set dates
     document.getElementById('quotationNo').innerText = getNextQuotationNumber();
     document.getElementById('quotationDate').innerText = new Date().toLocaleDateString('en-IN');
     let valid = new Date(); valid.setDate(valid.getDate() + 15);
     document.getElementById('validUntil').innerText = valid.toLocaleDateString('en-IN');
 
-    // Admin quick select
+    // ========== ADMIN CUSTOMER QUICK SELECT ==========
     if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
         document.getElementById('adminCustomerSelect').style.display = 'flex';
         populateCustomerSelect();
@@ -394,7 +505,9 @@
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const select = document.getElementById('quickCustomerSelect');
         select.innerHTML = '<option value="">-- Select Customer (Admin only) --</option>';
-        customers.forEach(c => { select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`; });
+        customers.forEach(c => {
+            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+        });
     }
     function loadCustomerData() {
         const select = document.getElementById('quickCustomerSelect');
@@ -417,8 +530,11 @@
         }
     }
 
-    // GST
-    function isLocalGst() { return document.getElementById('buyerGstin').value.trim().startsWith('19'); }
+    // ========== GST LOGIC ==========
+    function isLocalGst() {
+        const gst = document.getElementById('buyerGstin').value.trim();
+        return gst.startsWith('19');
+    }
     function updateGstDisplay() {
         const isLocal = isLocalGst();
         const cgstLabel = document.getElementById('gstLabel1');
@@ -434,113 +550,211 @@
     }
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
-    // Calculations
+    // ========== CALCULATIONS (same as invoice) ==========
     function calculateTaxableTotals() {
-        let sub = 0, taxGroups = {};
+        let sub = 0;
+        let taxGroups = {};
         const isLocal = isLocalGst();
         cart.forEach(i => {
-            const taxable = (i.price * i.qty) * (1 - (i.discount||0)/100);
-            sub += taxable;
-            let cgst=0,sgst=0,igst=0;
-            if (isLocal) { cgst = taxable*0.09; sgst = taxable*0.09; }
-            else { igst = taxable*0.18; }
             const hsn = i.hsn || '';
-            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable:0,cgst:0,sgst:0,igst:0 };
+            const taxable = (i.price * i.qty) * (1 - (i.discount || 0) / 100);
+            sub += taxable;
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
             taxGroups[hsn].taxable += taxable;
             taxGroups[hsn].cgst += cgst;
             taxGroups[hsn].sgst += sgst;
             taxGroups[hsn].igst += igst;
         });
-        let cgstT=0,sgstT=0,igstT=0;
-        for(let h in taxGroups){
-            cgstT+=taxGroups[h].cgst;
-            sgstT+=taxGroups[h].sgst;
-            igstT+=taxGroups[h].igst;
+        let cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
+        for (let hsn in taxGroups) {
+            cgstTotal += taxGroups[hsn].cgst;
+            sgstTotal += taxGroups[hsn].sgst;
+            igstTotal += taxGroups[hsn].igst;
         }
-        return { subtotal:sub, cgstTotal:cgstT, sgstTotal:sgstT, igstTotal:igstT, taxGroups, isLocal };
+        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, taxGroups, isLocal };
     }
     function getGSTApplicableTotal() {
-        const t = calculateTaxableTotals();
-        const gst = t.isLocal ? t.cgstTotal + t.sgstTotal : t.igstTotal;
-        return t.subtotal + gst;
+        const taxableTotals = calculateTaxableTotals();
+        const gstTotal = taxableTotals.isLocal ? taxableTotals.cgstTotal + taxableTotals.sgstTotal : taxableTotals.igstTotal;
+        return taxableTotals.subtotal + gstTotal;
     }
     function updateTotals() {
-        const t = calculateTaxableTotals();
-        const gstApp = getGSTApplicableTotal();
-        const pack = getPackingCharge();
-        const rounded = Math.round(gstApp);
-        const roundOff = rounded - gstApp;
-        const grand = rounded + pack;
-        document.getElementById('subtotal').innerText = t.subtotal.toFixed(2);
-        document.getElementById('cgstTotal').innerText = t.cgstTotal.toFixed(2);
-        document.getElementById('sgstTotal').innerText = t.sgstTotal.toFixed(2);
+        const taxableTotals = calculateTaxableTotals();
+        const gstApplicable = getGSTApplicableTotal();
+        const packing = getPackingCharge();
+        const roundedGSTApplicable = Math.round(gstApplicable);
+        const roundOff = roundedGSTApplicable - gstApplicable;
+        const grandTotal = roundedGSTApplicable + packing;
+        document.getElementById('subtotal').innerText = taxableTotals.subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = taxableTotals.cgstTotal.toFixed(2);
+        document.getElementById('sgstTotal').innerText = taxableTotals.sgstTotal.toFixed(2);
+        document.getElementById('packingChargeDisplay').innerText = packing.toFixed(2);
         document.getElementById('roundOff').innerText = roundOff.toFixed(2);
-        document.getElementById('packingChargeDisplay').innerText = pack.toFixed(2);
-        document.getElementById('grandTotal').innerText = grand.toFixed(2);
+        document.getElementById('grandTotal').innerText = grandTotal.toFixed(2);
+        // Tax summary
         let taxHtml = '';
-        for(let hsn in t.taxGroups){
-            const g = t.taxGroups[hsn];
+        for (let hsn in taxableTotals.taxGroups) {
+            const g = taxableTotals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
-            taxHtml += `<tr><td style="word-wrap:break-word;">${hsn||'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">${t.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
-                ${t.isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>` : ''}
-                <td style="text-align:right;">${!t.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
-            </tr>`;
+            taxHtml += `<tr>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${taxableTotals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
+                ${taxableTotals.isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</strong></td>` : ''}
+                <td style="text-align:right;">${!taxableTotals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
+            <td>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
     }
 
-    // Editable functions
+    // ========== EDITABLE ITEMS TABLE ==========
     function updatePart(idx, val) { cart[idx].part = val; renderItems(); }
     function updateDesc(idx, val) { cart[idx].desc = val; renderItems(); }
-    function updateUnit(part, val) { const i = cart.find(i=>i.part===part); if(i){ i.unit=val; renderItems(); } }
-    function updateQty(part, val) { const i = cart.find(i=>i.part===part); if(i){ i.qty=parseFloat(val)||0; renderItems(); } }
-    function updatePrice(part, val) { const i = cart.find(i=>i.part===part); if(i){ i.price=parseFloat(val)||0; renderItems(); } }
-    function updateDiscount(part, val) { const i = cart.find(i=>i.part===part); if(i){ i.discount=parseFloat(val)||0; renderItems(); } }
-    function updateHsn(part, val) { const i = cart.find(i=>i.part===part); if(i){ i.hsn=val; renderItems(); } }
+    function updateUnit(part, val) { const i = cart.find(i => i.part === part); if (i) { i.unit = val; renderItems(); } }
+    function updateQty(part, val) { const i = cart.find(i => i.part === part); if (i) { i.qty = parseFloat(val) || 0; renderItems(); } }
+    function updatePrice(part, val) { const i = cart.find(i => i.part === part); if (i) { i.price = parseFloat(val) || 0; renderItems(); } }
+    function updateDiscount(part, val) { const i = cart.find(i => i.part === part); if (i) { i.discount = parseFloat(val) || 0; renderItems(); } }
+    function updateHsn(part, val) { const i = cart.find(i => i.part === part); if (i) { i.hsn = val; renderItems(); } }
 
     function renderItems() {
         const tbody = document.getElementById('itemsBody');
         tbody.innerHTML = '';
         const isLocal = isLocalGst();
         cart.forEach((item, idx) => {
-            const taxable = (item.price * item.qty) * (1 - (item.discount||0)/100);
-            let cgst=0,sgst=0,igst=0;
-            if(isLocal){ cgst=taxable*0.09; sgst=taxable*0.09; }
-            else { igst=taxable*0.18; }
-            const total = taxable + (isLocal ? cgst+sgst : igst);
+            const discount = item.discount || 0;
+            const taxable = (item.price * item.qty) * (1 - discount / 100);
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             const row = tbody.insertRow();
-            row.insertCell(0).innerText = idx+1;
-            row.insertCell(1).innerHTML = `<input type="text" value="${escapeHtml(item.part)}" class="editable" onchange="updatePart(${idx}, this.value)">`;
-            row.insertCell(2).innerHTML = `<input type="text" value="${escapeHtml(item.desc)}" class="editable" onchange="updateDesc(${idx}, this.value)">`;
-            row.insertCell(3).innerHTML = `<input type="text" value="${escapeHtml(item.hsn)}" class="editable" onchange="updateHsn('${item.part}', this.value)">`;
-            row.insertCell(4).innerHTML = `<input type="text" value="${escapeHtml(item.unit||'pc')}" class="editable" onchange="updateUnit('${item.part}', this.value)">`;
-            row.insertCell(5).innerHTML = `<input type="number" step="0.01" value="${item.qty}" class="editable" onchange="updateQty('${item.part}', this.value)">`;
-            row.insertCell(6).innerHTML = `<input type="number" step="0.01" value="${item.price}" class="editable" onchange="updatePrice('${item.part}', this.value)">`;
-            row.insertCell(7).innerHTML = `<input type="number" step="0.01" value="${item.discount}" class="editable" onchange="updateDiscount('${item.part}', this.value)">`;
-            row.insertCell(8).innerHTML = `<span style="text-align:right;">₹${taxable.toFixed(2)}</span>`;
-            row.insertCell(9).innerHTML = '18%';
-            row.insertCell(10).innerHTML = isLocal ? `₹${cgst.toFixed(2)}` : `₹${igst.toFixed(2)}`;
-            if(isLocal) row.insertCell(11).innerHTML = `₹${sgst.toFixed(2)}`;
-            else row.insertCell(11).innerHTML = '-';
-            row.insertCell(12).innerHTML = `<span style="text-align:right;">₹${total.toFixed(2)}</span>`;
+            row.insertCell(0).innerText = idx + 1;
+            // Part No
+            const cellPart = row.insertCell(1);
+            const partInput = document.createElement('input');
+            partInput.type = 'text';
+            partInput.value = item.part || '';
+            partInput.className = 'editable';
+            partInput.onchange = (function(i) { return function() { updatePart(i, this.value); }; })(idx);
+            cellPart.appendChild(partInput);
+            // Description
+            const cellDesc = row.insertCell(2);
+            const descInput = document.createElement('input');
+            descInput.type = 'text';
+            descInput.value = item.desc || '';
+            descInput.className = 'editable';
+            descInput.onchange = (function(i) { return function() { updateDesc(i, this.value); }; })(idx);
+            cellDesc.appendChild(descInput);
+            // HSN
+            const cellHsn = row.insertCell(3);
+            const hsnInput = document.createElement('input');
+            hsnInput.type = 'text';
+            hsnInput.value = item.hsn || '';
+            hsnInput.className = 'editable';
+            hsnInput.onchange = (function(i) { return function() { updateHsn(item.part, this.value); }; })(idx);
+            cellHsn.appendChild(hsnInput);
+            // UOM
+            const cellUom = row.insertCell(4);
+            const uomInput = document.createElement('input');
+            uomInput.type = 'text';
+            uomInput.value = item.unit || 'pc';
+            uomInput.className = 'editable';
+            uomInput.onchange = (function(i) { return function() { updateUnit(item.part, this.value); }; })(idx);
+            cellUom.appendChild(uomInput);
+            // Qty
+            const cellQty = row.insertCell(5);
+            const qtyInput = document.createElement('input');
+            qtyInput.type = 'number';
+            qtyInput.step = '0.01';
+            qtyInput.value = item.qty;
+            qtyInput.className = 'editable';
+            qtyInput.style.textAlign = 'right';
+            qtyInput.onchange = (function(i) { return function() { updateQty(item.part, this.value); }; })(idx);
+            cellQty.appendChild(qtyInput);
+            // Unit Price
+            const cellPrice = row.insertCell(6);
+            const priceInput = document.createElement('input');
+            priceInput.type = 'number';
+            priceInput.step = '0.01';
+            priceInput.value = item.price;
+            priceInput.className = 'editable';
+            priceInput.style.textAlign = 'right';
+            priceInput.onchange = (function(i) { return function() { updatePrice(item.part, this.value); }; })(idx);
+            cellPrice.appendChild(priceInput);
+            // Discount %
+            const cellDisc = row.insertCell(7);
+            const discInput = document.createElement('input');
+            discInput.type = 'number';
+            discInput.step = '0.01';
+            discInput.value = discount;
+            discInput.className = 'editable';
+            discInput.style.textAlign = 'right';
+            discInput.onchange = (function(i) { return function() { updateDiscount(item.part, this.value); }; })(idx);
+            cellDisc.appendChild(discInput);
+            // Taxable
+            const cellTaxable = row.insertCell(8);
+            cellTaxable.innerText = `₹${taxable.toFixed(2)}`;
+            cellTaxable.style.textAlign = 'right';
+            // GST%
+            const cellGstPct = row.insertCell(9);
+            cellGstPct.innerText = '18%';
+            cellGstPct.style.textAlign = 'center';
+            // CGST/IGST
+            const cellCgst = row.insertCell(10);
+            cellCgst.innerText = isLocal ? `₹${cgst.toFixed(2)}` : `₹${igst.toFixed(2)}`;
+            cellCgst.style.textAlign = 'right';
+            // SGST (if local)
+            const cellSgst = row.insertCell(11);
+            if (isLocal) {
+                cellSgst.innerText = `₹${sgst.toFixed(2)}`;
+                cellSgst.style.textAlign = 'right';
+            } else {
+                cellSgst.innerText = '-';
+                cellSgst.style.textAlign = 'center';
+            }
+            // Total
+            const cellTotal = row.insertCell(12);
+            cellTotal.innerText = `₹${totalItem.toFixed(2)}`;
+            cellTotal.style.textAlign = 'right';
+            // Delete button
+            const cellDel = row.insertCell(13);
             const delBtn = document.createElement('button');
             delBtn.innerText = '🗑️';
             delBtn.className = 'delete-btn';
-            delBtn.onclick = (i=>()=>removeItem(i))(idx);
-            row.insertCell(13).appendChild(delBtn);
+            delBtn.onclick = (function(i) { return function() { removeItem(i); }; })(idx);
+            cellDel.appendChild(delBtn);
         });
         updateTotals();
     }
 
-    function removeItem(idx) { cart.splice(idx,1); if(cart.length===0) addItem(); renderItems(); }
-    function addItem() { cart.push({ part:'', desc:'', hsn:'', unit:'pc', qty:1, price:0, discount:0 }); renderItems(); }
+    function removeItem(idx) {
+        cart.splice(idx, 1);
+        if (cart.length === 0) addItem();
+        renderItems();
+    }
+    function addItem() {
+        cart.push({ part: '', desc: '', hsn: '', unit: 'pc', qty: 1, price: 0, discount: 0 });
+        renderItems();
+    }
 
     // ========== SAVE QUOTATION ==========
     function saveQuotation() {
-        if (cart.length===0 || (cart.length===1 && !cart[0].part)) { alert('Please add at least one item'); return; }
+        if (cart.length === 0 || (cart.length === 1 && !cart[0].part)) {
+            alert('Please add at least one item');
+            return;
+        }
         const quotation = {
             id: Date.now(),
             quotationNo: document.getElementById('quotationNo').innerText,
@@ -559,76 +773,92 @@
                 address: document.getElementById('consigneeAddress').value,
                 phone: document.getElementById('consigneePhone').value
             },
-            items: cart.map(i=>({...i})),
+            items: cart.map(i => ({ ...i })),
             subtotal: parseFloat(document.getElementById('subtotal').innerText),
             cgst: parseFloat(document.getElementById('cgstTotal').innerText),
             sgst: parseFloat(document.getElementById('sgstTotal').innerText),
             grandTotal: parseFloat(document.getElementById('grandTotal').innerText),
             roundOff: parseFloat(document.getElementById('roundOff').innerText),
             packingCharges: getPackingCharge(),
-            cartonQty: parseFloat(document.getElementById('packingCartons').value)||0,
-            packingRate: parseFloat(document.getElementById('packingRate').value)||0
+            cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
+            packingRate: parseFloat(document.getElementById('packingRate').value) || 0
         };
-        let arr = JSON.parse(localStorage.getItem('quotations') || '[]');
-        arr.push(quotation);
-        localStorage.setItem('quotations', JSON.stringify(arr));
-        alert(`Quotation ${quotation.quotationNo} saved`);
+        let quotations = JSON.parse(localStorage.getItem('quotations') || '[]');
+        quotations.push(quotation);
+        localStorage.setItem('quotations', JSON.stringify(quotations));
+        alert(`Quotation ${quotation.quotationNo} saved successfully`);
         window.close();
     }
 
-    // ========== CONVERT TO INVOICE ==========
+    // ========== CONVERT TO SALES INVOICE ==========
     function convertToInvoice() {
-        if (cart.length===0) { alert('No items'); return; }
-        const email = document.getElementById('buyerEmail').value.trim();
-        if (!email) { alert('Customer email required'); return; }
+        if (cart.length === 0) {
+            alert('No items to convert');
+            return;
+        }
+        const customerEmail = document.getElementById('buyerEmail').value.trim();
+        if (!customerEmail) {
+            alert('Customer email is required to convert to invoice');
+            return;
+        }
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        let cust = customers.find(c=>c.email===email);
-        if (!cust) {
-            cust = {
+        let customer = customers.find(c => c.email === customerEmail);
+        if (!customer) {
+            customer = {
                 id: Date.now(),
                 name: document.getElementById('buyerName').value,
-                email,
+                email: customerEmail,
                 phone: document.getElementById('buyerPhone').value,
                 address: document.getElementById('buyerAddress').value,
                 gstin: document.getElementById('buyerGstin').value,
                 state: document.getElementById('buyerState').value,
-                creditLimit:50000, outstanding:0, totalPurchased:0, status:'active',
-                customerCode:'CUST'+(customers.length+1).toString().padStart(4,'0'),
+                creditLimit: 50000,
+                outstanding: 0,
+                totalPurchased: 0,
+                status: 'active',
+                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
                 createdAt: new Date().toISOString()
             };
-            customers.push(cust);
+            customers.push(customer);
             localStorage.setItem('customers', JSON.stringify(customers));
         }
+        const invoiceItems = cart.map(item => ({
+            productId: item.part,
+            quantity: item.qty,
+            price: item.price
+        }));
         const invoice = {
             id: Date.now(),
-            date: new Date().toISOString().slice(0,10),
-            customerEmail: email,
-            items: cart.map(i=>({ productId:i.part, quantity:i.qty, price:i.price })),
+            date: new Date().toISOString().slice(0, 10),
+            customerEmail: customerEmail,
+            items: invoiceItems,
             total: parseFloat(document.getElementById('grandTotal').innerText),
-            invoiceNo: 'INV-'+Date.now(),
+            invoiceNo: 'INV-' + Date.now(),
             status: 'pending',
             packingCharges: getPackingCharge(),
-            cartonQty: parseFloat(document.getElementById('packingCartons').value)||0,
-            packingRate: parseFloat(document.getElementById('packingRate').value)||0,
+            cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
+            packingRate: parseFloat(document.getElementById('packingRate').value) || 0,
             roundOff: parseFloat(document.getElementById('roundOff').innerText)
         };
         try {
             createSalesInvoice(invoice);
-            alert('Converted to Sales Invoice!');
-            if (confirm('Delete this quotation?')) {
-                let arr = JSON.parse(localStorage.getItem('quotations') || '[]');
-                arr = arr.filter(q => q.quotationNo !== document.getElementById('quotationNo').innerText);
-                localStorage.setItem('quotations', JSON.stringify(arr));
+            alert('Quotation converted to Sales Invoice! Stock & customer outstanding updated.');
+            if (confirm('Delete this quotation after conversion?')) {
+                let quotations = JSON.parse(localStorage.getItem('quotations') || '[]');
+                quotations = quotations.filter(q => q.quotationNo !== document.getElementById('quotationNo').innerText);
+                localStorage.setItem('quotations', JSON.stringify(quotations));
             }
             window.close();
-        } catch(e) { alert('Error: '+e.message); }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
     }
 
-    // ========== PDF GENERATION (clone + replace inputs with spans) ==========
-    function generatePDF() {
+    // ========== PDF GENERATION (clone, replace inputs with spans, remove delete column and action buttons) ==========
+    function downloadPDF() {
         const originalContainer = document.getElementById('quotationContainer');
         const clone = originalContainer.cloneNode(true);
-        // Replace all inputs, textareas, selects with spans
+        // Replace all inputs, textareas, selects with plain text spans
         clone.querySelectorAll('input, textarea, select').forEach(el => {
             const span = document.createElement('span');
             span.className = 'info-value-text';
@@ -636,17 +866,18 @@
             if (el.tagName === 'TEXTAREA') span.innerText = el.value;
             else if (el.tagName === 'SELECT') span.innerText = el.options[el.selectedIndex]?.text || '';
             else span.innerText = el.value;
-            span.style.fontSize = window.getComputedStyle(el).fontSize;
-            span.style.fontFamily = window.getComputedStyle(el).fontFamily;
+            const styles = window.getComputedStyle(el);
+            span.style.fontSize = styles.fontSize;
+            span.style.fontFamily = styles.fontFamily;
             span.style.color = '#333';
             span.style.display = 'inline-block';
             span.style.width = '100%';
             el.parentNode.replaceChild(span, el);
         });
-        // Remove delete column (last th/td) – done by CSS, but also ensure
+        // Remove the delete column (last th/td) from items table
         clone.querySelectorAll('.items-table th:last-child, .items-table td:last-child').forEach(el => el.remove());
-        // Hide action buttons
-        clone.querySelectorAll('.actions, .no-print, button').forEach(el => el.style.display = 'none');
+        // Hide all action buttons and any .no-print elements
+        clone.querySelectorAll('.actions, .no-print, .actions button, .delete-btn').forEach(el => el.style.display = 'none');
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
         const opt = {
@@ -662,11 +893,14 @@
         });
     }
 
-    function escapeHtml(s) { return (s||'').replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+    }
 
     renderItems();
     updateGstDisplay();
     calculatePackingCharges();
 </script>
 </body>
-                                                                                                               </html>
+    </html>
