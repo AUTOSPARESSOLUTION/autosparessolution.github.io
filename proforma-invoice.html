@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Proforma Invoice – Auto Spares</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="data-manager.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
+        /* ===== EXACTLY THE SAME AS YOUR INVOICE ===== */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -20,16 +18,73 @@
             margin: 0 auto;
             background: white;
             border-radius: 12px;
-            padding: 0 15px 15px 15px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 0 15px 15px 15px;
             border: 1px solid #dee2e6;
         }
         @media print {
-            .no-print, .actions, button, input, textarea, select {
+            .no-print, .actions, .invoice-type, button, input, textarea, select {
                 display: none !important;
             }
-            body { background: white; padding: 0; }
-            .proforma-container { box-shadow: none; border: 1px solid #aaa; }
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .proforma-container {
+                box-shadow: none;
+                border-radius: 0;
+                padding: 0 10px 5px 10px;
+                margin: 0;
+                border: none;
+            }
+            .company-header {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                background: #0a7c71;
+                color: white;
+                margin: 0 -10px 10px -10px;
+            }
+            .items-table th, .tax-summary-table th {
+                background: #f8f9fa !important;
+            }
+            .qr-box, .signature-row, .packing-section, .totals, .info-box {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .company-header, .totals {
+                page-break-after: avoid;
+                break-after: avoid;
+            }
+            .proforma-container {
+                font-size: 10pt;
+            }
+            .info-box, .packing-section {
+                padding: 5px 8px;
+                margin-bottom: 8px;
+            }
+            .items-table td, .items-table th {
+                padding: 4px 3px;
+                font-size: 9pt;
+            }
+            .totals table {
+                margin-top: 5px;
+                margin-bottom: 5px;
+            }
+            .qr-box img {
+                max-width: 80px;
+            }
+            .signature-box {
+                padding-top: 3px;
+            }
+            .footer-legal {
+                margin-top: 8px;
+                padding-top: 5px;
+            }
+            /* Hide delete column in print */
+            .items-table th:last-child, .items-table td:last-child {
+                display: none;
+            }
         }
         .company-header {
             background: #0a7c71;
@@ -41,22 +96,45 @@
             flex-wrap: wrap;
             margin: 0 -15px 15px -15px;
         }
-        .logo-area { display: flex; align-items: center; gap: 15px; }
-        .logo-area img { height: 60px; object-fit: contain; }
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo-area img { height: 60px; }
         .company-details h1 { margin: 0; font-size: 24px; }
         .company-details p { margin: 3px 0 0; font-size: 12px; opacity: 0.8; }
-        .invoice-title h2 { margin: 0; font-size: 20px; color: #e67e22; }
+        .invoice-title h2 { margin: 0; font-size: 20px; }
+        .invoice-title p { margin: 5px 0; font-size: 12px; }
         .info-box {
             background: #f8f9fa;
             border-radius: 6px;
             padding: 8px;
-            margin-bottom: 12px;
-            border: 1px solid #dee2e6;
+            margin-bottom: 10px;
+            width: 100%;
         }
-        .info-box h3 { margin: 0 0 8px; font-size: 14px; color: #0a7c71; }
-        .info-row { display: flex; margin-bottom: 5px; font-size: 12px; }
-        .info-label { width: 110px; font-weight: 600; color: #555; }
-        .info-value { flex: 1; }
+        .info-box h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #0a7c71;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 4px;
+        }
+        .info-row {
+            display: flex;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .info-label {
+            width: 110px;
+            font-weight: 600;
+            color: #555;
+        }
+        .info-value {
+            flex: 1;
+            color: #333;
+            word-break: break-word;
+        }
         input, textarea, select {
             width: 100%;
             padding: 4px 6px;
@@ -65,40 +143,103 @@
             font-size: 12px;
             font-family: inherit;
         }
-        .items-table {
+        .editable {
+            background: #fff9e0;
+        }
+        .items-table, .tax-summary-table {
             width: 100%;
             border-collapse: collapse;
             margin: 15px 0;
             font-size: 11px;
             table-layout: fixed;
         }
-        .items-table th, .items-table td {
+        .items-table th, .items-table td, .tax-summary-table th, .tax-summary-table td {
             border: 1px solid #dee2e6;
             padding: 6px 4px;
             text-align: left;
-            vertical-align: middle;
+            vertical-align: top;
             word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
         }
-        .items-table th { background: #f8f9fa; font-weight: 600; }
-        .items-table input {
-            width: 100%;
-            padding: 2px 4px;
-            margin: -2px 0;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            background: #fff9e0;
+        .items-table th:nth-child(1) { width: 4%; }
+        .items-table th:nth-child(2) { width: 10%; }
+        .items-table th:nth-child(3) { width: 12%; }
+        .items-table th:nth-child(4) { width: 8%; }
+        .items-table th:nth-child(5) { width: 5%; }
+        .items-table th:nth-child(6) { width: 4%; }
+        .items-table th:nth-child(7) { width: 7%; }
+        .items-table th:nth-child(8) { width: 6%; }
+        .items-table th:nth-child(9) { width: 8%; }
+        .items-table th:nth-child(10) { width: 6%; }
+        .items-table th:nth-child(11) { width: 8%; }
+        .items-table th:nth-child(12) { width: 8%; }
+        .items-table th:nth-child(13) { width: 8%; }
+        .items-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
+        .tax-summary-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
+        .totals { text-align: right; margin-top: 15px; font-size: 12px; }
+        .totals table { width: 300px; margin-left: auto; }
+        .totals td { border: none; padding: 3px; }
+        .qr-box, .carton-box {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 8px;
+            margin: 8px 0;
+            border: 1px solid #dee2e6;
         }
-        .items-table input[type="number"] { text-align: right; }
-        .delete-btn {
-            background: #dc3545;
+        .qr-box img { max-width: 120px; height: auto; }
+        .signature-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            gap: 15px;
+        }
+        .signature-box {
+            text-align: center;
+            width: 45%;
+            border-top: 1px solid #333;
+            padding-top: 5px;
+        }
+        .footer-legal {
+            font-size: 9px;
+            text-align: center;
+            margin-top: 10px;
+            color: #555;
+            border-top: 1px solid #dee2e6;
+            padding-top: 8px;
+        }
+        .actions {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+        }
+        button {
+            background: #0a7c71;
             color: white;
             border: none;
-            border-radius: 4px;
+            padding: 8px 16px;
+            border-radius: 6px;
             cursor: pointer;
-            padding: 2px 6px;
-            font-size: 11px;
+            font-size: 14px;
         }
-        .delete-btn:hover { background: #c82333; }
+        button:hover { background: #09645a; }
+        .invoice-type {
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+        .page-number {
+            text-align: center;
+            font-size: 10px;
+            color: #777;
+            margin-top: 10px;
+        }
         .packing-section {
             background: #f8f9fa;
             padding: 8px 15px;
@@ -124,60 +265,24 @@
             width: 120px;
             padding: 6px;
         }
-        .qr-box {
-            background: #f8f9fa;
-            border-radius: 6px;
-            padding: 8px;
-            margin: 8px 0;
-            border: 1px solid #dee2e6;
-        }
-        .qr-box img { max-width: 120px; height: auto; }
-        .totals { text-align: right; margin-top: 15px; }
-        .totals table { width: 300px; margin-left: auto; border-collapse: collapse; }
-        .totals td { padding: 3px; border: none; }
-        .actions {
-            margin-top: 30px;
-            display: flex;
-            gap: 15px;
-            justify-content: flex-end;
-            flex-wrap: wrap;
-        }
-        button {
-            background: #0a7c71;
+        .delete-btn {
+            background: #dc3545;
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
+            padding: 2px 6px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
-        }
-        button:hover { background: #09645a; }
-        .btn-warning { background: #e67e22; }
-        .btn-warning:hover { background: #d35400; }
-        .btn-success { background: #28a745; }
-        .btn-success:hover { background: #218838; }
-        .footer-box {
-            margin-top: 30px;
-            border-top: 1px solid #dee2e6;
-            padding-top: 15px;
             font-size: 11px;
         }
-        .signature-box {
-            width: 250px;
-            border-top: 1px solid #333;
-            padding-top: 5px;
-            margin-left: auto;
-            text-align: center;
-        }
-        .no-print { display: inline-block; }
-        @media print { .no-print { display: none !important; } }
     </style>
+    <script src="data-manager.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="proforma-container" id="proformaContainer">
     <div class="company-header">
         <div class="logo-area">
-            <img src="images/ASS.jpg" alt="Logo" onerror="this.style.display='none'">
+            <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
             <div class="company-details">
                 <h1>Auto Spares Solution</h1>
                 <p>GSTIN: 19ANOPD3300R1ZO</p>
@@ -192,11 +297,11 @@
         </div>
     </div>
 
-    <!-- Buyer & Consignee -->
+    <!-- Buyer and Consignee (exactly as invoice) -->
     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-        <div style="flex: 1;">
+        <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
-                <h3>Bill To</h3>
+                <h3>Buyer (Bill to)</h3>
                 <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
                     <div class="info-label">Quick Select:</div>
                     <div class="info-value">
@@ -205,48 +310,59 @@
                         </select>
                     </div>
                 </div>
-                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="customerName" class="editable" placeholder="Customer name"></div></div>
-                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="customerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
-                <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="customerGstin" class="editable" placeholder="GSTIN"></div></div>
-                <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="customerState" class="editable" placeholder="State"></div></div>
-                <div class="info-row"><div class="info-label">Phone:</div><div class="info-value"><input type="text" id="customerPhone" class="editable" placeholder="Phone"></div></div>
-                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="customerEmail" class="editable" placeholder="Email"></div></div>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN"></div></div>
+                <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="buyerState" class="editable" placeholder="State"></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="buyerPhone" class="editable" placeholder="Phone"></div></div>
+                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="buyerEmail" class="editable" placeholder="Email"></div></div>
             </div>
         </div>
-        <div style="flex: 1;">
+        <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
-                <h3>Ship To</h3>
+                <h3>Consignee (Ship to)</h3>
                 <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="consigneeName" class="editable" placeholder="Consignee name"></div></div>
                 <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="consigneeAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
-                <div class="info-row"><div class="info-label">Phone:</div><div class="info-value"><input type="text" id="consigneePhone" class="editable" placeholder="Phone"></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="consigneePhone" class="editable" placeholder="Phone"></div></div>
             </div>
         </div>
     </div>
 
-    <!-- Items Table -->
-    <table class="items-table" id="itemsTable">
+    <!-- Order and Dispatch Details -->
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex: 1;">
+            <div class="info-box">
+                <h3>Order Details</h3>
+                <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode" class="editable" placeholder="Code"></div></div>
+                <div class="info-row"><div class="info-label">Sales Order No:</div><div class="info-value"><input type="text" id="salesOrderNo" class="editable" placeholder="SO No."></div></div>
+                <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo" class="editable" placeholder="Ref No."></div></div>
+                <div class="info-row"><div class="info-label">Order Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
+            </div>
+        </div>
+        <div style="flex: 1;">
+            <div class="info-box">
+                <h3>Dispatch Details</h3>
+                <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo" class="editable" placeholder="Doc No."></div></div>
+                <div class="info-row"><div class="info-label">Mode of Transport:</div><div class="info-value"><input type="text" id="transportMode" class="editable" placeholder="Road/Rail/Air"></div></div>
+                <div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value"><input type="text" id="vehicleNo" class="editable" placeholder="Optional"></div></div>
+                <div class="info-row"><div class="info-label">No. of Cartons:</div><div class="info-value"><input type="text" id="cartons" class="editable" placeholder="Number of cartons"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items Table (editable, includes delete column) -->
+    <table class="items-table">
         <thead>
             <tr>
-                <th style="width:4%">#</th>
-                <th style="width:10%">Part No</th>
-                <th style="width:15%">Description</th>
-                <th style="width:8%">HSN</th>
-                <th style="width:6%">UOM</th>
-                <th style="width:6%">Qty</th>
-                <th style="width:8%">Unit Price (₹)</th>
-                <th style="width:6%">Disc %</th>
-                <th style="width:8%">Taxable (₹)</th>
-                <th style="width:5%">GST%</th>
-                <th style="width:8%">CGST (₹)</th>
-                <th style="width:8%">SGST (₹)</th>
-                <th style="width:8%">Total (₹)</th>
-                <th style="width:4%">Act</th>
+                <th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>UOM</th>
+                <th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th>
+                <th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th><th>Act</th>
             </tr>
         </thead>
         <tbody id="itemsBody"></tbody>
     </table>
 
-    <!-- Packing & Forwarding Charges Section (No GST) -->
+    <!-- Packing & Forwarding -->
     <div class="packing-section no-print">
         <div class="packing-field">
             <label>📦 Carton Quantity</label>
@@ -265,20 +381,18 @@
         </div>
     </div>
 
-    <!-- Payment QR and Bank Details -->
-    <div class="qr-box">
-        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
-            <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;" onerror="this.style.display='none'"></div>
-            <div><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</div>
-        </div>
-    </div>
+    <!-- Tax Summary Table -->
+    <table class="tax-summary-table">
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
+        <tbody id="taxSummaryBody"></tbody>
+    </table>
 
     <!-- Totals -->
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr id="packingRow">
-                <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></td>
+                <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
             <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
             <tr id="roundOffRow">
@@ -287,72 +401,69 @@
         </table>
     </div>
 
-    <div class="footer-box">
-        <p><strong>Terms:</strong> This is a proforma invoice – not a tax invoice. Payment required before order processing.</p>
-        <div class="signature-box">
-            For Auto Spares Solution<br>(Authorised Signatory)
+    <!-- Payment QR and Bank Details -->
+    <div class="qr-box">
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+            <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
+            <div><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</div>
         </div>
     </div>
 
+    <div class="signature-row">
+        <div class="signature-box">Customer's Stamp & Signature<br><span style="font-size: 10px;">(Receiver's acknowledgment)</span></div>
+        <div class="signature-box">For Auto Spares Solution<br>(Authorised Signatory)<br><span style="font-size: 10px;">(Stamp & Signature)</span></div>
+    </div>
+
+    <div class="footer-legal">This is a computer generated proforma invoice. All disputes are subject to Howrah jurisdiction only.</div>
+    <div id="pageNumber" class="page-number"></div>
+
     <div class="actions no-print">
-        <button onclick="addItem()"><i class="fas fa-plus"></i> Add Item</button>
-        <button onclick="saveProforma()"><i class="fas fa-save"></i> Save Proforma</button>
-        <button class="btn-success" onclick="convertToInvoice()"><i class="fas fa-exchange-alt"></i> Convert to Sales Invoice</button>
-        <button class="btn-warning" onclick="downloadPDF()"><i class="fas fa-file-pdf"></i> Download PDF</button>
-        <button onclick="window.print()"><i class="fas fa-print"></i> Print</button>
-        <button onclick="window.close()">Close</button>
+        <button onclick="addItem()">➕ Add Item</button>
+        <button onclick="saveProforma()">💾 Save Proforma</button>
+        <button class="btn-success" onclick="convertToInvoice()">🔄 Convert to Sales Invoice</button>
+        <button class="btn-warning" onclick="downloadPDF()">📄 Download PDF</button>
+        <button onclick="window.print()">🖨️ Print</button>
+        <button onclick="window.close()">❌ Close</button>
     </div>
 </div>
 
 <script>
-    // ---------- Helper: Load all proformas from localStorage ----------
+    // ========== PROFORMA NUMBERING (PROF-YYYY-XXXX) ==========
     function getAllProformas() {
         let raw = localStorage.getItem('proformas');
         if (!raw) return [];
-        let proformas;
-        try {
-            proformas = JSON.parse(raw);
-        } catch(e) {
-            return [];
-        }
-        return proformas.map(p => {
-            let proformaNo = p.proformaNo || p.invoiceNo || '';
-            return { ...p, proformaNo: proformaNo };
-        });
+        try { return JSON.parse(raw); } catch(e) { return []; }
     }
-
-    // ---------- Get the next proforma number (PROF-YYYY-XXXX) ----------
     function getNextProformaNumber() {
         const now = new Date();
         const currentYear = now.getFullYear().toString();
-        const allProformas = getAllProformas();
         let maxSuffix = 0;
         const regex = new RegExp(`PROF-${currentYear}-(\\d{4})$`);
-        for (let p of allProformas) {
-            const match = p.proformaNo.match(regex);
+        getAllProformas().forEach(p => {
+            const match = p.proformaNo?.match(regex);
             if (match) {
                 let num = parseInt(match[1], 10);
                 if (!isNaN(num) && num > maxSuffix) maxSuffix = num;
             }
-        }
+        });
         const nextSuffix = maxSuffix + 1;
         return `PROF-${currentYear}-${nextSuffix.toString().padStart(4, '0')}`;
     }
 
-    // Packing & Forwarding
+    // ========== PACKING & FORWARDING (same as invoice) ==========
     function calculatePackingCharges() {
         const cartons = parseFloat(document.getElementById('packingCartons').value) || 0;
         const rate = parseFloat(document.getElementById('packingRate').value) || 0;
         const total = cartons * rate;
         document.getElementById('packingTotal').value = total.toFixed(2);
         document.getElementById('packingChargeDisplay').innerText = total.toFixed(2);
-        updateAllTotals();
+        updateTotals();
     }
     function getPackingCharge() {
         return parseFloat(document.getElementById('packingTotal').value) || 0;
     }
 
-    // Load cart from localStorage
+    // ========== CART & INITIAL LOAD ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
     const allProducts = getProducts();
     cart = cart.map(item => {
@@ -367,12 +478,12 @@
     // Prefill customer data from logged‑in user
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     if (currentUser) {
-        document.getElementById('customerName').value = currentUser.name || '';
-        document.getElementById('customerAddress').value = currentUser.address || '';
-        document.getElementById('customerPhone').value = currentUser.phone || '';
-        document.getElementById('customerEmail').value = currentUser.email || '';
-        document.getElementById('customerGstin').value = currentUser.gstin || '';
-        document.getElementById('customerState').value = currentUser.state || '';
+        document.getElementById('buyerName').value = currentUser.name || '';
+        document.getElementById('buyerAddress').value = currentUser.address || '';
+        document.getElementById('buyerPhone').value = currentUser.phone || '';
+        document.getElementById('buyerEmail').value = currentUser.email || '';
+        document.getElementById('buyerGstin').value = currentUser.gstin || '';
+        document.getElementById('buyerState').value = currentUser.state || '';
         document.getElementById('consigneeName').value = currentUser.name || '';
         document.getElementById('consigneeAddress').value = currentUser.address || '';
         document.getElementById('consigneePhone').value = currentUser.phone || '';
@@ -384,7 +495,7 @@
     let valid = new Date(); valid.setDate(valid.getDate() + 15);
     document.getElementById('validUntil').innerText = valid.toLocaleDateString('en-IN');
 
-    // Admin quick select
+    // ========== ADMIN CUSTOMER QUICK SELECT ==========
     if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
         document.getElementById('adminCustomerSelect').style.display = 'flex';
         populateCustomerSelect();
@@ -404,23 +515,23 @@
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const cust = customers.find(c => c.email === email);
         if (cust) {
-            document.getElementById('customerName').value = cust.name || '';
-            document.getElementById('customerAddress').value = cust.address || '';
-            document.getElementById('customerPhone').value = cust.phone || '';
-            document.getElementById('customerEmail').value = cust.email || '';
-            document.getElementById('customerGstin').value = cust.gstin || '';
-            document.getElementById('customerState').value = cust.state || '';
+            document.getElementById('buyerName').value = cust.name || '';
+            document.getElementById('buyerAddress').value = cust.address || '';
+            document.getElementById('buyerPhone').value = cust.phone || '';
+            document.getElementById('buyerEmail').value = cust.email || '';
+            document.getElementById('buyerGstin').value = cust.gstin || '';
+            document.getElementById('buyerState').value = cust.state || '';
+            document.getElementById('customerCode').value = cust.customerCode || '';
             document.getElementById('consigneeName').value = cust.name || '';
             document.getElementById('consigneeAddress').value = cust.address || '';
             document.getElementById('consigneePhone').value = cust.phone || '';
             updateGstDisplay();
-            calculatePackingCharges();
         }
     }
 
-    // GST detection
+    // ========== GST LOGIC ==========
     function isLocalGst() {
-        const gst = document.getElementById('customerGstin').value.trim();
+        const gst = document.getElementById('buyerGstin').value.trim();
         return gst.startsWith('19');
     }
     function updateGstDisplay() {
@@ -436,13 +547,15 @@
         }
         renderItems();
     }
-    document.getElementById('customerGstin').addEventListener('input', updateGstDisplay);
+    document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
+    // ========== CALCULATIONS (same as invoice) ==========
     function calculateTaxableTotals() {
         let sub = 0;
         let taxGroups = {};
         const isLocal = isLocalGst();
         cart.forEach(i => {
+            const hsn = i.hsn || '';
             const taxable = (i.price * i.qty) * (1 - (i.discount || 0) / 100);
             sub += taxable;
             let cgst = 0, sgst = 0, igst = 0;
@@ -452,7 +565,6 @@
             } else {
                 igst = taxable * 0.18;
             }
-            const hsn = i.hsn || '';
             if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
             taxGroups[hsn].taxable += taxable;
             taxGroups[hsn].cgst += cgst;
@@ -465,31 +577,52 @@
             sgstTotal += taxGroups[hsn].sgst;
             igstTotal += taxGroups[hsn].igst;
         }
-        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, isLocal };
+        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, taxGroups, isLocal };
     }
-
     function getGSTApplicableTotal() {
-        const totals = calculateTaxableTotals();
-        const gstTotal = totals.isLocal ? totals.cgstTotal + totals.sgstTotal : totals.igstTotal;
-        return totals.subtotal + gstTotal;
+        const taxableTotals = calculateTaxableTotals();
+        const gstTotal = taxableTotals.isLocal ? taxableTotals.cgstTotal + taxableTotals.sgstTotal : taxableTotals.igstTotal;
+        return taxableTotals.subtotal + gstTotal;
     }
-
-    function updateAllTotals() {
+    function updateTotals() {
         const taxableTotals = calculateTaxableTotals();
         const gstApplicable = getGSTApplicableTotal();
         const packing = getPackingCharge();
-        const roundedGST = Math.round(gstApplicable);
-        const roundOff = roundedGST - gstApplicable;
-        const grandTotal = roundedGST + packing;
+        const roundedGSTApplicable = Math.round(gstApplicable);
+        const roundOff = roundedGSTApplicable - gstApplicable;
+        const grandTotal = roundedGSTApplicable + packing;
         document.getElementById('subtotal').innerText = taxableTotals.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = taxableTotals.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = taxableTotals.sgstTotal.toFixed(2);
-        document.getElementById('roundOff').innerText = roundOff.toFixed(2);
         document.getElementById('packingChargeDisplay').innerText = packing.toFixed(2);
+        document.getElementById('roundOff').innerText = roundOff.toFixed(2);
         document.getElementById('grandTotal').innerText = grandTotal.toFixed(2);
+        // Tax summary
+        let taxHtml = '';
+        for (let hsn in taxableTotals.taxGroups) {
+            const g = taxableTotals.taxGroups[hsn];
+            const totalTax = g.cgst + g.sgst + g.igst;
+            taxHtml += `<tr>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${taxableTotals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
+                ${taxableTotals.isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</strong></td>` : ''}
+                <td style="text-align:right;">${!taxableTotals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
+            </tr>`;
+        }
+        document.getElementById('taxSummaryBody').innerHTML = taxHtml;
     }
 
-    // ----- Rendering editable table with delete -----
+    // ========== EDITABLE ITEMS TABLE ==========
+    function updatePart(idx, val) { cart[idx].part = val; renderItems(); }
+    function updateDesc(idx, val) { cart[idx].desc = val; renderItems(); }
+    function updateUnit(part, val) { const i = cart.find(i => i.part === part); if (i) { i.unit = val; renderItems(); } }
+    function updateQty(part, val) { const i = cart.find(i => i.part === part); if (i) { i.qty = parseFloat(val) || 0; renderItems(); } }
+    function updatePrice(part, val) { const i = cart.find(i => i.part === part); if (i) { i.price = parseFloat(val) || 0; renderItems(); } }
+    function updateDiscount(part, val) { const i = cart.find(i => i.part === part); if (i) { i.discount = parseFloat(val) || 0; renderItems(); } }
+    function updateHsn(part, val) { const i = cart.find(i => i.part === part); if (i) { i.hsn = val; renderItems(); } }
+
     function renderItems() {
         const tbody = document.getElementById('itemsBody');
         tbody.innerHTML = '';
@@ -504,59 +637,70 @@
             } else {
                 igst = taxable * 0.18;
             }
-            const total = taxable + (isLocal ? cgst + sgst : igst);
+            const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             const row = tbody.insertRow();
             row.insertCell(0).innerText = idx + 1;
             // Part No
             const cellPart = row.insertCell(1);
             const partInput = document.createElement('input');
+            partInput.type = 'text';
             partInput.value = item.part || '';
-            partInput.onchange = (i => e => updateItem(i, 'part', e.target.value))(idx);
+            partInput.className = 'editable';
+            partInput.onchange = (function(i) { return function() { updatePart(i, this.value); }; })(idx);
             cellPart.appendChild(partInput);
             // Description
             const cellDesc = row.insertCell(2);
             const descInput = document.createElement('input');
+            descInput.type = 'text';
             descInput.value = item.desc || '';
-            descInput.onchange = (i => e => updateItem(i, 'desc', e.target.value))(idx);
+            descInput.className = 'editable';
+            descInput.onchange = (function(i) { return function() { updateDesc(i, this.value); }; })(idx);
             cellDesc.appendChild(descInput);
             // HSN
             const cellHsn = row.insertCell(3);
             const hsnInput = document.createElement('input');
+            hsnInput.type = 'text';
             hsnInput.value = item.hsn || '';
-            hsnInput.onchange = (i => e => updateItem(i, 'hsn', e.target.value))(idx);
+            hsnInput.className = 'editable';
+            hsnInput.onchange = (function(i) { return function() { updateHsn(item.part, this.value); }; })(idx);
             cellHsn.appendChild(hsnInput);
             // UOM
             const cellUom = row.insertCell(4);
             const uomInput = document.createElement('input');
+            uomInput.type = 'text';
             uomInput.value = item.unit || 'pc';
-            uomInput.onchange = (i => e => updateItem(i, 'unit', e.target.value))(idx);
+            uomInput.className = 'editable';
+            uomInput.onchange = (function(i) { return function() { updateUnit(item.part, this.value); }; })(idx);
             cellUom.appendChild(uomInput);
             // Qty
             const cellQty = row.insertCell(5);
             const qtyInput = document.createElement('input');
             qtyInput.type = 'number';
-            qtyInput.step = 'any';
+            qtyInput.step = '0.01';
             qtyInput.value = item.qty;
+            qtyInput.className = 'editable';
             qtyInput.style.textAlign = 'right';
-            qtyInput.onchange = (i => e => updateItem(i, 'qty', parseFloat(e.target.value) || 0))(idx);
+            qtyInput.onchange = (function(i) { return function() { updateQty(item.part, this.value); }; })(idx);
             cellQty.appendChild(qtyInput);
-            // Price
+            // Unit Price
             const cellPrice = row.insertCell(6);
             const priceInput = document.createElement('input');
             priceInput.type = 'number';
             priceInput.step = '0.01';
             priceInput.value = item.price;
+            priceInput.className = 'editable';
             priceInput.style.textAlign = 'right';
-            priceInput.onchange = (i => e => updateItem(i, 'price', parseFloat(e.target.value) || 0))(idx);
+            priceInput.onchange = (function(i) { return function() { updatePrice(item.part, this.value); }; })(idx);
             cellPrice.appendChild(priceInput);
             // Discount %
             const cellDisc = row.insertCell(7);
             const discInput = document.createElement('input');
             discInput.type = 'number';
             discInput.step = '0.01';
-            discInput.value = item.discount;
+            discInput.value = discount;
+            discInput.className = 'editable';
             discInput.style.textAlign = 'right';
-            discInput.onchange = (i => e => updateItem(i, 'discount', parseFloat(e.target.value) || 0))(idx);
+            discInput.onchange = (function(i) { return function() { updateDiscount(item.part, this.value); }; })(idx);
             cellDisc.appendChild(discInput);
             // Taxable
             const cellTaxable = row.insertCell(8);
@@ -566,7 +710,7 @@
             const cellGstPct = row.insertCell(9);
             cellGstPct.innerText = '18%';
             cellGstPct.style.textAlign = 'center';
-            // CGST / IGST
+            // CGST/IGST
             const cellCgst = row.insertCell(10);
             cellCgst.innerText = isLocal ? `₹${cgst.toFixed(2)}` : `₹${igst.toFixed(2)}`;
             cellCgst.style.textAlign = 'right';
@@ -581,22 +725,17 @@
             }
             // Total
             const cellTotal = row.insertCell(12);
-            cellTotal.innerText = `₹${total.toFixed(2)}`;
+            cellTotal.innerText = `₹${totalItem.toFixed(2)}`;
             cellTotal.style.textAlign = 'right';
             // Delete button
             const cellDel = row.insertCell(13);
             const delBtn = document.createElement('button');
             delBtn.innerText = '🗑️';
             delBtn.className = 'delete-btn';
-            delBtn.onclick = (i => () => removeItem(i))(idx);
+            delBtn.onclick = (function(i) { return function() { removeItem(i); }; })(idx);
             cellDel.appendChild(delBtn);
         });
-        updateAllTotals();
-    }
-
-    function updateItem(idx, field, value) {
-        cart[idx][field] = value;
-        renderItems();
+        updateTotals();
     }
 
     function removeItem(idx) {
@@ -604,13 +743,12 @@
         if (cart.length === 0) addItem();
         renderItems();
     }
-
     function addItem() {
         cart.push({ part: '', desc: '', hsn: '', unit: 'pc', qty: 1, price: 0, discount: 0 });
         renderItems();
     }
 
-    // ----- Save Proforma -----
+    // ========== SAVE PROFORMA ==========
     function saveProforma() {
         if (cart.length === 0 || (cart.length === 1 && !cart[0].part)) {
             alert('Please add at least one item');
@@ -622,12 +760,12 @@
             date: document.getElementById('proformaDate').innerText,
             validUntil: document.getElementById('validUntil').innerText,
             customer: {
-                name: document.getElementById('customerName').value,
-                address: document.getElementById('customerAddress').value,
-                gstin: document.getElementById('customerGstin').value,
-                state: document.getElementById('customerState').value,
-                phone: document.getElementById('customerPhone').value,
-                email: document.getElementById('customerEmail').value
+                name: document.getElementById('buyerName').value,
+                address: document.getElementById('buyerAddress').value,
+                gstin: document.getElementById('buyerGstin').value,
+                state: document.getElementById('buyerState').value,
+                phone: document.getElementById('buyerPhone').value,
+                email: document.getElementById('buyerEmail').value
             },
             consignee: {
                 name: document.getElementById('consigneeName').value,
@@ -644,17 +782,20 @@
             cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
             packingRate: parseFloat(document.getElementById('packingRate').value) || 0
         };
-        let existing = JSON.parse(localStorage.getItem('proformas') || '[]');
-        existing.push(proforma);
-        localStorage.setItem('proformas', JSON.stringify(existing));
+        let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
+        proformas.push(proforma);
+        localStorage.setItem('proformas', JSON.stringify(proformas));
         alert(`Proforma ${proforma.proformaNo} saved successfully`);
         window.close();
     }
 
-    // ----- Convert to Sales Invoice -----
+    // ========== CONVERT TO SALES INVOICE ==========
     function convertToInvoice() {
-        if (cart.length === 0) { alert('No items to convert'); return; }
-        const customerEmail = document.getElementById('customerEmail').value.trim();
+        if (cart.length === 0) {
+            alert('No items to convert');
+            return;
+        }
+        const customerEmail = document.getElementById('buyerEmail').value.trim();
         if (!customerEmail) {
             alert('Customer email is required to convert to invoice');
             return;
@@ -664,17 +805,17 @@
         if (!customer) {
             customer = {
                 id: Date.now(),
-                name: document.getElementById('customerName').value,
+                name: document.getElementById('buyerName').value,
                 email: customerEmail,
-                phone: document.getElementById('customerPhone').value,
-                address: document.getElementById('customerAddress').value,
-                gstin: document.getElementById('customerGstin').value,
-                state: document.getElementById('customerState').value,
+                phone: document.getElementById('buyerPhone').value,
+                address: document.getElementById('buyerAddress').value,
+                gstin: document.getElementById('buyerGstin').value,
+                state: document.getElementById('buyerState').value,
                 creditLimit: 50000,
                 outstanding: 0,
                 totalPurchased: 0,
                 status: 'active',
-                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4,'0'),
+                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
                 createdAt: new Date().toISOString()
             };
             customers.push(customer);
@@ -687,7 +828,7 @@
         }));
         const invoice = {
             id: Date.now(),
-            date: new Date().toISOString().slice(0,10),
+            date: new Date().toISOString().slice(0, 10),
             customerEmail: customerEmail,
             items: invoiceItems,
             total: parseFloat(document.getElementById('grandTotal').innerText),
@@ -702,32 +843,58 @@
             createSalesInvoice(invoice);
             alert('Proforma converted to Sales Invoice! Stock & customer outstanding updated.');
             if (confirm('Delete this proforma after conversion?')) {
-                let all = JSON.parse(localStorage.getItem('proformas') || '[]');
-                all = all.filter(p => p.proformaNo !== document.getElementById('proformaNo').innerText);
-                localStorage.setItem('proformas', JSON.stringify(all));
+                let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
+                proformas = proformas.filter(p => p.proformaNo !== document.getElementById('proformaNo').innerText);
+                localStorage.setItem('proformas', JSON.stringify(proformas));
             }
             window.close();
-        } catch(err) {
+        } catch (err) {
             alert('Error: ' + err.message);
         }
     }
 
-    // ----- PDF Download -----
+    // ========== PDF GENERATION (clone, replace inputs with spans, remove delete column and action buttons) ==========
     function downloadPDF() {
-        const element = document.getElementById('proformaContainer');
+        const originalContainer = document.getElementById('proformaContainer');
+        const clone = originalContainer.cloneNode(true);
+        // Replace all inputs, textareas, selects with plain text spans
+        clone.querySelectorAll('input, textarea, select').forEach(el => {
+            const span = document.createElement('span');
+            span.className = 'info-value-text';
+            span.style.whiteSpace = 'pre-wrap';
+            if (el.tagName === 'TEXTAREA') span.innerText = el.value;
+            else if (el.tagName === 'SELECT') span.innerText = el.options[el.selectedIndex]?.text || '';
+            else span.innerText = el.value;
+            const styles = window.getComputedStyle(el);
+            span.style.fontSize = styles.fontSize;
+            span.style.fontFamily = styles.fontFamily;
+            span.style.color = '#333';
+            span.style.display = 'inline-block';
+            span.style.width = '100%';
+            el.parentNode.replaceChild(span, el);
+        });
+        // Remove the delete column (last th/td) from items table
+        clone.querySelectorAll('.items-table th:last-child, .items-table td:last-child').forEach(el => el.remove());
+        // Hide all action buttons and any .no-print elements
+        clone.querySelectorAll('.actions, .no-print, .actions button, .delete-btn').forEach(el => el.style.display = 'none');
+        originalContainer.style.display = 'none';
+        document.body.appendChild(clone);
         const opt = {
-            margin: [0.2, 0.2, 0.2, 0.2],
+            margin: [0.3, 0.3, 0.3, 0.3],
             filename: `Proforma_${document.getElementById('proformaNo').innerText}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, letterRendering: true, useCORS: true },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
-        html2pdf().set(opt).from(element).save();
+        html2pdf().set(opt).from(clone).save().then(() => {
+            document.body.removeChild(clone);
+            originalContainer.style.display = '';
+        });
     }
 
     function escapeHtml(str) {
         if (!str) return '';
-        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
     }
 
     renderItems();
