@@ -8,7 +8,6 @@
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        /* ======= STYLES – same as before (kept unchanged) ======= */
         * { box-sizing: border-box; }
         body {
             font-family: 'Roboto', sans-serif;
@@ -24,6 +23,13 @@
             padding: 0 15px 15px 15px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             border: 1px solid #dee2e6;
+        }
+        @media print {
+            .no-print, .actions, button, input, textarea, select {
+                display: none !important;
+            }
+            body { background: white; padding: 0; }
+            .proforma-container { box-shadow: none; border: 1px solid #aaa; }
         }
         .company-header {
             background: #0a7c71;
@@ -43,7 +49,7 @@
         .info-box {
             background: #f8f9fa;
             border-radius: 6px;
-            padding: 10px;
+            padding: 8px;
             margin-bottom: 12px;
             border: 1px solid #dee2e6;
         }
@@ -70,13 +76,65 @@
             border: 1px solid #dee2e6;
             padding: 6px 4px;
             text-align: left;
-            vertical-align: top;
+            vertical-align: middle;
             word-wrap: break-word;
         }
         .items-table th { background: #f8f9fa; font-weight: 600; }
+        .items-table input {
+            width: 100%;
+            padding: 2px 4px;
+            margin: -2px 0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            background: #fff9e0;
+        }
+        .items-table input[type="number"] { text-align: right; }
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 11px;
+        }
+        .delete-btn:hover { background: #c82333; }
+        .packing-section {
+            background: #f8f9fa;
+            padding: 8px 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-end;
+            border: 1px solid #dee2e6;
+        }
+        .packing-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .packing-field label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+        }
+        .packing-field input {
+            width: 120px;
+            padding: 6px;
+        }
+        .qr-box {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 8px;
+            margin: 8px 0;
+            border: 1px solid #dee2e6;
+        }
+        .qr-box img { max-width: 120px; height: auto; }
         .totals { text-align: right; margin-top: 15px; }
-        .totals table { width: 280px; margin-left: auto; border-collapse: collapse; }
-        .totals td { padding: 3px; }
+        .totals table { width: 300px; margin-left: auto; border-collapse: collapse; }
+        .totals td { padding: 3px; border: none; }
         .actions {
             margin-top: 30px;
             display: flex;
@@ -111,26 +169,8 @@
             margin-left: auto;
             text-align: center;
         }
-        @media print {
-            .actions, button, input, textarea, select, .no-print {
-                display: none !important;
-            }
-            body { background: white; padding: 0; }
-            .proforma-container { box-shadow: none; border: 1px solid #aaa; }
-        }
-        .item-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 10px;
-            background: #f9f9f9;
-            padding: 10px;
-            border-radius: 6px;
-            align-items: center;
-        }
-        .item-row input { flex: 1; min-width: 80px; }
-        .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
-        .add-item { background: #28a745; margin-bottom: 15px; }
+        .no-print { display: inline-block; }
+        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
@@ -152,9 +192,9 @@
         </div>
     </div>
 
-    <!-- Customer Details -->
+    <!-- Buyer & Consignee -->
     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-        <div style="flex:1;">
+        <div style="flex: 1;">
             <div class="info-box">
                 <h3>Bill To</h3>
                 <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
@@ -165,25 +205,84 @@
                         </select>
                     </div>
                 </div>
-                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="customerName" placeholder="Customer name"></div></div>
-                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="customerAddress" rows="2"></textarea></div></div>
-                <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="customerGstin"></div></div>
-                <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="customerState"></div></div>
-                <div class="info-row"><div class="info-label">Phone:</div><div class="info-value"><input type="text" id="customerPhone"></div></div>
-                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="customerEmail"></div></div>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="customerName" class="editable" placeholder="Customer name"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="customerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="customerGstin" class="editable" placeholder="GSTIN"></div></div>
+                <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="customerState" class="editable" placeholder="State"></div></div>
+                <div class="info-row"><div class="info-label">Phone:</div><div class="info-value"><input type="text" id="customerPhone" class="editable" placeholder="Phone"></div></div>
+                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="customerEmail" class="editable" placeholder="Email"></div></div>
+            </div>
+        </div>
+        <div style="flex: 1;">
+            <div class="info-box">
+                <h3>Ship To</h3>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="consigneeName" class="editable" placeholder="Consignee name"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="consigneeAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                <div class="info-row"><div class="info-label">Phone:</div><div class="info-value"><input type="text" id="consigneePhone" class="editable" placeholder="Phone"></div></div>
             </div>
         </div>
     </div>
 
-    <h3>Items</h3>
-    <div id="itemsContainer"></div>
-    <button class="add-item" onclick="addItemRow()"><i class="fas fa-plus"></i> Add Item</button>
+    <!-- Items Table -->
+    <table class="items-table" id="itemsTable">
+        <thead>
+            <tr>
+                <th style="width:4%">#</th>
+                <th style="width:10%">Part No</th>
+                <th style="width:15%">Description</th>
+                <th style="width:8%">HSN</th>
+                <th style="width:6%">UOM</th>
+                <th style="width:6%">Qty</th>
+                <th style="width:8%">Unit Price (₹)</th>
+                <th style="width:6%">Disc %</th>
+                <th style="width:8%">Taxable (₹)</th>
+                <th style="width:5%">GST%</th>
+                <th style="width:8%">CGST (₹)</th>
+                <th style="width:8%">SGST (₹)</th>
+                <th style="width:8%">Total (₹)</th>
+                <th style="width:4%">Act</th>
+            </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+    </table>
 
+    <!-- Packing & Forwarding Charges Section (No GST) -->
+    <div class="packing-section no-print">
+        <div class="packing-field">
+            <label>📦 Carton Quantity</label>
+            <input type="number" id="packingCartons" value="0" step="1" min="0" onchange="calculatePackingCharges()">
+        </div>
+        <div class="packing-field">
+            <label>💰 Charges per Carton (₹)</label>
+            <input type="number" id="packingRate" value="0" step="0.01" min="0" onchange="calculatePackingCharges()">
+        </div>
+        <div class="packing-field">
+            <label>🧾 Total Packing Charges (₹)</label>
+            <input type="text" id="packingTotal" readonly style="background:#e9ecef; font-weight:bold;">
+        </div>
+        <div class="packing-field">
+            <span style="font-size:11px; color:#6c757d;">(No GST applicable)</span>
+        </div>
+    </div>
+
+    <!-- Payment QR and Bank Details -->
+    <div class="qr-box">
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+            <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;" onerror="this.style.display='none'"></div>
+            <div><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</div>
+        </div>
+    </div>
+
+    <!-- Totals -->
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></table>
-            <tr><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr id="packingRow">
+                <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></td>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr id="roundOffRow">
+                <td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
@@ -194,18 +293,19 @@
             For Auto Spares Solution<br>(Authorised Signatory)
         </div>
     </div>
-</div>
 
-<div class="actions no-print">
-    <button onclick="saveProforma()"><i class="fas fa-save"></i> Save Proforma</button>
-    <button class="btn-success" onclick="convertToInvoice()"><i class="fas fa-exchange-alt"></i> Convert to Sales Invoice</button>
-    <button class="btn-warning" onclick="downloadPDF()"><i class="fas fa-file-pdf"></i> Download PDF</button>
-    <button onclick="window.print()"><i class="fas fa-print"></i> Print</button>
-    <button onclick="window.close()">Close</button>
+    <div class="actions no-print">
+        <button onclick="addItem()"><i class="fas fa-plus"></i> Add Item</button>
+        <button onclick="saveProforma()"><i class="fas fa-save"></i> Save Proforma</button>
+        <button class="btn-success" onclick="convertToInvoice()"><i class="fas fa-exchange-alt"></i> Convert to Sales Invoice</button>
+        <button class="btn-warning" onclick="downloadPDF()"><i class="fas fa-file-pdf"></i> Download PDF</button>
+        <button onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+        <button onclick="window.close()">Close</button>
+    </div>
 </div>
 
 <script>
-    // ---------- Helper: Load all proformas from localStorage (raw, then normalise fields) ----------
+    // ---------- Helper: Load all proformas from localStorage ----------
     function getAllProformas() {
         let raw = localStorage.getItem('proformas');
         if (!raw) return [];
@@ -215,20 +315,18 @@
         } catch(e) {
             return [];
         }
-        // Ensure each proforma has a proformaNo string
         return proformas.map(p => {
             let proformaNo = p.proformaNo || p.invoiceNo || '';
             return { ...p, proformaNo: proformaNo };
         });
     }
 
-    // ---------- Get the next proforma number in the format PROF-YYYY-XXXX ----------
+    // ---------- Get the next proforma number (PROF-YYYY-XXXX) ----------
     function getNextProformaNumber() {
         const now = new Date();
-        const currentYear = now.getFullYear().toString();   // e.g. "2026"
+        const currentYear = now.getFullYear().toString();
         const allProformas = getAllProformas();
         let maxSuffix = 0;
-        // Pattern to match PROF-2026-0001 or PROF-2026-0001 (hyphen separated)
         const regex = new RegExp(`PROF-${currentYear}-(\\d{4})$`);
         for (let p of allProformas) {
             const match = p.proformaNo.match(regex);
@@ -238,27 +336,33 @@
             }
         }
         const nextSuffix = maxSuffix + 1;
-        const nextNo = `PROF-${currentYear}-${nextSuffix.toString().padStart(4, '0')}`;
-        console.log(`Next proforma number: ${nextNo} (from existing max: ${maxSuffix})`);
-        return nextNo;
+        return `PROF-${currentYear}-${nextSuffix.toString().padStart(4, '0')}`;
+    }
+
+    // Packing & Forwarding
+    function calculatePackingCharges() {
+        const cartons = parseFloat(document.getElementById('packingCartons').value) || 0;
+        const rate = parseFloat(document.getElementById('packingRate').value) || 0;
+        const total = cartons * rate;
+        document.getElementById('packingTotal').value = total.toFixed(2);
+        document.getElementById('packingChargeDisplay').innerText = total.toFixed(2);
+        updateAllTotals();
+    }
+    function getPackingCharge() {
+        return parseFloat(document.getElementById('packingTotal').value) || 0;
     }
 
     // Load cart from localStorage
-    let items = [];
-    const cartData = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
-    if (cartData.length > 0) {
-        items = cartData.map(item => ({
-            part: item.part,
-            desc: item.desc,
-            hsn: item.hsn || '',
-            qty: item.qty,
-            price: item.price,
-            discount: item.discount || 0
-        }));
-        console.log('Loaded cart items:', items);
-    } else {
-        addItemRow();
-    }
+    let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    const allProducts = getProducts();
+    cart = cart.map(item => {
+        if (!item.unit) {
+            const prod = allProducts.find(p => p.sku === item.part);
+            item.unit = prod ? (prod.unit || 'pc') : 'pc';
+        }
+        return { ...item, hsn: item.hsn || '', discount: item.discount || 0 };
+    });
+    if (cart.length === 0) addItem();
 
     // Prefill customer data from logged‑in user
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
@@ -269,6 +373,9 @@
         document.getElementById('customerEmail').value = currentUser.email || '';
         document.getElementById('customerGstin').value = currentUser.gstin || '';
         document.getElementById('customerState').value = currentUser.state || '';
+        document.getElementById('consigneeName').value = currentUser.name || '';
+        document.getElementById('consigneeAddress').value = currentUser.address || '';
+        document.getElementById('consigneePhone').value = currentUser.phone || '';
     }
 
     // Set dates
@@ -277,12 +384,11 @@
     let valid = new Date(); valid.setDate(valid.getDate() + 15);
     document.getElementById('validUntil').innerText = valid.toLocaleDateString('en-IN');
 
-    // ---------- Admin Customer Quick Select ----------
+    // Admin quick select
     if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
         document.getElementById('adminCustomerSelect').style.display = 'flex';
         populateCustomerSelect();
     }
-
     function populateCustomerSelect() {
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const select = document.getElementById('quickCustomerSelect');
@@ -291,7 +397,6 @@
             select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
         });
     }
-
     function loadCustomerData() {
         const select = document.getElementById('quickCustomerSelect');
         const email = select.value;
@@ -305,66 +410,209 @@
             document.getElementById('customerEmail').value = cust.email || '';
             document.getElementById('customerGstin').value = cust.gstin || '';
             document.getElementById('customerState').value = cust.state || '';
+            document.getElementById('consigneeName').value = cust.name || '';
+            document.getElementById('consigneeAddress').value = cust.address || '';
+            document.getElementById('consigneePhone').value = cust.phone || '';
+            updateGstDisplay();
+            calculatePackingCharges();
         }
     }
 
-    // ---------- UI Functions ----------
-    function addItemRow() {
-        items.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0 });
+    // GST detection
+    function isLocalGst() {
+        const gst = document.getElementById('customerGstin').value.trim();
+        return gst.startsWith('19');
+    }
+    function updateGstDisplay() {
+        const isLocal = isLocalGst();
+        const cgstLabel = document.getElementById('gstLabel1');
+        const sgstLabel = document.getElementById('gstLabel2');
+        if (!isLocal) {
+            cgstLabel.innerHTML = 'IGST (18%):';
+            sgstLabel.innerHTML = '';
+        } else {
+            cgstLabel.innerHTML = 'CGST (9%):';
+            sgstLabel.innerHTML = 'SGST (9%):';
+        }
         renderItems();
     }
+    document.getElementById('customerGstin').addEventListener('input', updateGstDisplay);
 
-    function removeItemRow(idx) {
-        items.splice(idx, 1);
-        renderItems();
-        recalcTotals();
+    function calculateTaxableTotals() {
+        let sub = 0;
+        let taxGroups = {};
+        const isLocal = isLocalGst();
+        cart.forEach(i => {
+            const taxable = (i.price * i.qty) * (1 - (i.discount || 0) / 100);
+            sub += taxable;
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            const hsn = i.hsn || '';
+            if (!taxGroups[hsn]) taxGroups[hsn] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+            taxGroups[hsn].taxable += taxable;
+            taxGroups[hsn].cgst += cgst;
+            taxGroups[hsn].sgst += sgst;
+            taxGroups[hsn].igst += igst;
+        });
+        let cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
+        for (let hsn in taxGroups) {
+            cgstTotal += taxGroups[hsn].cgst;
+            sgstTotal += taxGroups[hsn].sgst;
+            igstTotal += taxGroups[hsn].igst;
+        }
+        return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, isLocal };
+    }
+
+    function getGSTApplicableTotal() {
+        const totals = calculateTaxableTotals();
+        const gstTotal = totals.isLocal ? totals.cgstTotal + totals.sgstTotal : totals.igstTotal;
+        return totals.subtotal + gstTotal;
+    }
+
+    function updateAllTotals() {
+        const taxableTotals = calculateTaxableTotals();
+        const gstApplicable = getGSTApplicableTotal();
+        const packing = getPackingCharge();
+        const roundedGST = Math.round(gstApplicable);
+        const roundOff = roundedGST - gstApplicable;
+        const grandTotal = roundedGST + packing;
+        document.getElementById('subtotal').innerText = taxableTotals.subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = taxableTotals.cgstTotal.toFixed(2);
+        document.getElementById('sgstTotal').innerText = taxableTotals.sgstTotal.toFixed(2);
+        document.getElementById('roundOff').innerText = roundOff.toFixed(2);
+        document.getElementById('packingChargeDisplay').innerText = packing.toFixed(2);
+        document.getElementById('grandTotal').innerText = grandTotal.toFixed(2);
+    }
+
+    // ----- Rendering editable table with delete -----
+    function renderItems() {
+        const tbody = document.getElementById('itemsBody');
+        tbody.innerHTML = '';
+        const isLocal = isLocalGst();
+        cart.forEach((item, idx) => {
+            const discount = item.discount || 0;
+            const taxable = (item.price * item.qty) * (1 - discount / 100);
+            let cgst = 0, sgst = 0, igst = 0;
+            if (isLocal) {
+                cgst = taxable * 0.09;
+                sgst = taxable * 0.09;
+            } else {
+                igst = taxable * 0.18;
+            }
+            const total = taxable + (isLocal ? cgst + sgst : igst);
+            const row = tbody.insertRow();
+            row.insertCell(0).innerText = idx + 1;
+            // Part No
+            const cellPart = row.insertCell(1);
+            const partInput = document.createElement('input');
+            partInput.value = item.part || '';
+            partInput.onchange = (i => e => updateItem(i, 'part', e.target.value))(idx);
+            cellPart.appendChild(partInput);
+            // Description
+            const cellDesc = row.insertCell(2);
+            const descInput = document.createElement('input');
+            descInput.value = item.desc || '';
+            descInput.onchange = (i => e => updateItem(i, 'desc', e.target.value))(idx);
+            cellDesc.appendChild(descInput);
+            // HSN
+            const cellHsn = row.insertCell(3);
+            const hsnInput = document.createElement('input');
+            hsnInput.value = item.hsn || '';
+            hsnInput.onchange = (i => e => updateItem(i, 'hsn', e.target.value))(idx);
+            cellHsn.appendChild(hsnInput);
+            // UOM
+            const cellUom = row.insertCell(4);
+            const uomInput = document.createElement('input');
+            uomInput.value = item.unit || 'pc';
+            uomInput.onchange = (i => e => updateItem(i, 'unit', e.target.value))(idx);
+            cellUom.appendChild(uomInput);
+            // Qty
+            const cellQty = row.insertCell(5);
+            const qtyInput = document.createElement('input');
+            qtyInput.type = 'number';
+            qtyInput.step = 'any';
+            qtyInput.value = item.qty;
+            qtyInput.style.textAlign = 'right';
+            qtyInput.onchange = (i => e => updateItem(i, 'qty', parseFloat(e.target.value) || 0))(idx);
+            cellQty.appendChild(qtyInput);
+            // Price
+            const cellPrice = row.insertCell(6);
+            const priceInput = document.createElement('input');
+            priceInput.type = 'number';
+            priceInput.step = '0.01';
+            priceInput.value = item.price;
+            priceInput.style.textAlign = 'right';
+            priceInput.onchange = (i => e => updateItem(i, 'price', parseFloat(e.target.value) || 0))(idx);
+            cellPrice.appendChild(priceInput);
+            // Discount %
+            const cellDisc = row.insertCell(7);
+            const discInput = document.createElement('input');
+            discInput.type = 'number';
+            discInput.step = '0.01';
+            discInput.value = item.discount;
+            discInput.style.textAlign = 'right';
+            discInput.onchange = (i => e => updateItem(i, 'discount', parseFloat(e.target.value) || 0))(idx);
+            cellDisc.appendChild(discInput);
+            // Taxable
+            const cellTaxable = row.insertCell(8);
+            cellTaxable.innerText = `₹${taxable.toFixed(2)}`;
+            cellTaxable.style.textAlign = 'right';
+            // GST%
+            const cellGstPct = row.insertCell(9);
+            cellGstPct.innerText = '18%';
+            cellGstPct.style.textAlign = 'center';
+            // CGST / IGST
+            const cellCgst = row.insertCell(10);
+            cellCgst.innerText = isLocal ? `₹${cgst.toFixed(2)}` : `₹${igst.toFixed(2)}`;
+            cellCgst.style.textAlign = 'right';
+            // SGST (if local)
+            const cellSgst = row.insertCell(11);
+            if (isLocal) {
+                cellSgst.innerText = `₹${sgst.toFixed(2)}`;
+                cellSgst.style.textAlign = 'right';
+            } else {
+                cellSgst.innerText = '-';
+                cellSgst.style.textAlign = 'center';
+            }
+            // Total
+            const cellTotal = row.insertCell(12);
+            cellTotal.innerText = `₹${total.toFixed(2)}`;
+            cellTotal.style.textAlign = 'right';
+            // Delete button
+            const cellDel = row.insertCell(13);
+            const delBtn = document.createElement('button');
+            delBtn.innerText = '🗑️';
+            delBtn.className = 'delete-btn';
+            delBtn.onclick = (i => () => removeItem(i))(idx);
+            cellDel.appendChild(delBtn);
+        });
+        updateAllTotals();
     }
 
     function updateItem(idx, field, value) {
-        items[idx][field] = value;
-        recalcTotals();
+        cart[idx][field] = value;
+        renderItems();
     }
 
-    function renderItems() {
-        const container = document.getElementById('itemsContainer');
-        container.innerHTML = '';
-        items.forEach((item, idx) => {
-            const div = document.createElement('div');
-            div.className = 'item-row';
-            div.innerHTML = `
-                <input type="text" placeholder="Part No" value="${escapeHtml(item.part)}" onchange="updateItem(${idx}, 'part', this.value)" style="flex:2;">
-                <input type="text" placeholder="Description" value="${escapeHtml(item.desc)}" onchange="updateItem(${idx}, 'desc', this.value)" style="flex:3;">
-                <input type="text" placeholder="HSN" value="${escapeHtml(item.hsn)}" onchange="updateItem(${idx}, 'hsn', this.value)" style="flex:1;">
-                <input type="number" placeholder="Qty" value="${item.qty}" onchange="updateItem(${idx}, 'qty', parseFloat(this.value))" style="flex:1;">
-                <input type="number" placeholder="Unit Price" value="${item.price}" step="0.01" onchange="updateItem(${idx}, 'price', parseFloat(this.value))" style="flex:1;">
-                <input type="number" placeholder="Disc %" value="${item.discount}" step="0.01" onchange="updateItem(${idx}, 'discount', parseFloat(this.value))" style="flex:1;">
-                <button class="remove-item" onclick="removeItemRow(${idx})">X</button>
-            `;
-            container.appendChild(div);
-        });
-        recalcTotals();
+    function removeItem(idx) {
+        cart.splice(idx, 1);
+        if (cart.length === 0) addItem();
+        renderItems();
     }
 
-    function recalcTotals() {
-        let subtotal = 0;
-        items.forEach(item => {
-            const qty = item.qty || 0;
-            const price = item.price || 0;
-            const disc = item.discount || 0;
-            const taxable = qty * price * (1 - disc / 100);
-            subtotal += taxable;
-        });
-        const cgst = subtotal * 0.09;
-        const sgst = subtotal * 0.09;
-        const grand = subtotal + cgst + sgst;
-        document.getElementById('subtotal').innerText = subtotal.toFixed(2);
-        document.getElementById('cgstTotal').innerText = cgst.toFixed(2);
-        document.getElementById('sgstTotal').innerText = sgst.toFixed(2);
-        document.getElementById('grandTotal').innerText = grand.toFixed(2);
+    function addItem() {
+        cart.push({ part: '', desc: '', hsn: '', unit: 'pc', qty: 1, price: 0, discount: 0 });
+        renderItems();
     }
 
+    // ----- Save Proforma -----
     function saveProforma() {
-        if (items.length === 0 || (items.length === 1 && !items[0].part)) {
+        if (cart.length === 0 || (cart.length === 1 && !cart[0].part)) {
             alert('Please add at least one item');
             return;
         }
@@ -381,11 +629,20 @@
                 phone: document.getElementById('customerPhone').value,
                 email: document.getElementById('customerEmail').value
             },
-            items: items.map(i => ({ ...i })),
+            consignee: {
+                name: document.getElementById('consigneeName').value,
+                address: document.getElementById('consigneeAddress').value,
+                phone: document.getElementById('consigneePhone').value
+            },
+            items: cart.map(i => ({ ...i })),
             subtotal: parseFloat(document.getElementById('subtotal').innerText),
             cgst: parseFloat(document.getElementById('cgstTotal').innerText),
             sgst: parseFloat(document.getElementById('sgstTotal').innerText),
-            grandTotal: parseFloat(document.getElementById('grandTotal').innerText)
+            grandTotal: parseFloat(document.getElementById('grandTotal').innerText),
+            roundOff: parseFloat(document.getElementById('roundOff').innerText),
+            packingCharges: getPackingCharge(),
+            cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
+            packingRate: parseFloat(document.getElementById('packingRate').value) || 0
         };
         let existing = JSON.parse(localStorage.getItem('proformas') || '[]');
         existing.push(proforma);
@@ -394,8 +651,9 @@
         window.close();
     }
 
+    // ----- Convert to Sales Invoice -----
     function convertToInvoice() {
-        if (items.length === 0) { alert('No items to convert'); return; }
+        if (cart.length === 0) { alert('No items to convert'); return; }
         const customerEmail = document.getElementById('customerEmail').value.trim();
         if (!customerEmail) {
             alert('Customer email is required to convert to invoice');
@@ -422,7 +680,7 @@
             customers.push(customer);
             localStorage.setItem('customers', JSON.stringify(customers));
         }
-        const invoiceItems = items.map(item => ({
+        const invoiceItems = cart.map(item => ({
             productId: item.part,
             quantity: item.qty,
             price: item.price
@@ -434,7 +692,11 @@
             items: invoiceItems,
             total: parseFloat(document.getElementById('grandTotal').innerText),
             invoiceNo: 'INV-' + Date.now(),
-            status: 'pending'
+            status: 'pending',
+            packingCharges: getPackingCharge(),
+            cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
+            packingRate: parseFloat(document.getElementById('packingRate').value) || 0,
+            roundOff: parseFloat(document.getElementById('roundOff').innerText)
         };
         try {
             createSalesInvoice(invoice);
@@ -450,6 +712,7 @@
         }
     }
 
+    // ----- PDF Download -----
     function downloadPDF() {
         const element = document.getElementById('proformaContainer');
         const opt = {
@@ -468,6 +731,8 @@
     }
 
     renderItems();
+    updateGstDisplay();
+    calculatePackingCharges();
 </script>
 </body>
     </html>
