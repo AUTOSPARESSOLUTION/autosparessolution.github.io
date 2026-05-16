@@ -1,20 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares Solution | Premium Auto Parts Wholesaler</title>
-    <!-- Fonts & Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
-    <!-- Razorpay & PDF/Excel libraries -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="access-control.js"></script>
-    <!-- Google AdSense (manual) -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389" crossorigin="anonymous"></script>
     <style>
         /* ========== GLOBAL STYLES ========== */
         :root {
@@ -36,12 +31,8 @@
             margin-left: 280px;
             transition: margin-left 0.3s ease;
         }
-        body.sidebar-hidden {
-            margin-left: 0;
-        }
-        body.sidebar-hidden .professional-sidebar {
-            transform: translateX(-100%);
-        }
+        body.sidebar-hidden { margin-left: 0; }
+        body.sidebar-hidden .professional-sidebar { transform: translateX(-100%); }
         header {
             text-align: center;
             padding: 1.5rem 1rem;
@@ -51,777 +42,138 @@
             z-index: 100;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
-        .logo-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-        }
+        .logo-container { display: flex; align-items: center; justify-content: center; gap: 15px; }
         .logo { height: 60px; border-radius: 5px; }
-        header h1 {
-            margin: 0;
-            font-size: 2.2rem;
-            color: var(--accent);
-            font-family: 'Montserrat', sans-serif;
-        }
+        header h1 { margin: 0; font-size: 2.2rem; color: var(--accent); font-family: 'Montserrat', sans-serif; }
         .tagline { color: #a0d9d4; font-size: 1rem; }
-        
         .container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
-        .section {
-            padding: 3rem 1rem;
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-            margin: 1.5rem 0;
-        }
-        .section-title {
-            text-align: center;
-            margin-bottom: 2rem;
-            color: var(--accent);
-            font-family: 'Montserrat', sans-serif;
-            position: relative;
-        }
-        .section-title::after {
-            content: '';
-            display: block;
-            width: 80px;
-            height: 3px;
-            background: var(--primary);
-            margin: 0.5rem auto 0;
-        }
-        /* Brand filter */
-        .brand-filter {
-            background: rgba(255,255,255,0.03);
-            border-radius: 10px;
-            padding: 1rem 1.5rem;
-            margin-bottom: 1rem;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 1rem;
-        }
-        .brand-filter h3 {
-            color: var(--accent);
-            margin-right: 1rem;
-            font-size: 1.2rem;
-        }
-        .brand-logo-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            align-items: center;
-        }
-        .brand-logo-item {
-            width: 80px;
-            height: 60px;
-            background: white;
-            border-radius: 8px;
-            padding: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            border: 2px solid transparent;
-        }
-        .brand-logo-item:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            border-color: var(--primary);
-        }
+        .section { padding: 3rem 1rem; background: rgba(255,255,255,0.05); border-radius: 10px; margin: 1.5rem 0; }
+        .section-title { text-align: center; margin-bottom: 2rem; color: var(--accent); font-family: 'Montserrat', sans-serif; position: relative; }
+        .section-title::after { content: ''; display: block; width: 80px; height: 3px; background: var(--primary); margin: 0.5rem auto 0; }
+        .brand-filter { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 1rem 1.5rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+        .brand-filter h3 { color: var(--accent); margin-right: 1rem; font-size: 1.2rem; }
+        .brand-logo-list { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+        .brand-logo-item { width: 80px; height: 60px; background: white; border-radius: 8px; padding: 5px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border: 2px solid transparent; }
+        .brand-logo-item:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); border-color: var(--primary); }
         .brand-logo-item img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        /* ===== SEARCH BAR (UPDATED PROMINENT COLORS) ===== */
-        .search-container {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: rgba(0,0,0,0.5);
-            border-radius: 60px;
-            padding: 0.5rem 1rem;
-            margin: 1rem 0 2rem;
-            border: 1px solid #ffaa33;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-        .search-icon {
-            color: #ffaa33;
-            margin-left: 1rem;
-            font-size: 1.2rem;
-        }
-        #brand-select {
-            padding: 0.7rem 1rem;
-            border-radius: 40px;
-            border: none;
-            background: #1e2a2f;
-            color: white;
-            min-width: 150px;
-            font-weight: 500;
-        }
-        #search-input {
-            flex: 1;
-            padding: 0.7rem 1rem;
-            border-radius: 40px;
-            border: none;
-            background: #fef9e6;
-            color: #1e2a2f;
-            font-weight: 500;
-        }
-        #search-input:focus, #brand-select:focus {
-            outline: 2px solid var(--accent);
-            background: #ffffff;
-        }
-        #search-button {
-            padding: 0.7rem 1.5rem;
-            background: linear-gradient(135deg, #ff8c00, #e67e22);
-            color: white;
-            border: none;
-            border-radius: 40px;
-            cursor: pointer;
-            font-weight: 700;
-            transition: 0.2s;
-        }
+        .search-container { display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.5); border-radius: 60px; padding: 0.5rem 1rem; margin: 1rem 0 2rem; border: 1px solid #ffaa33; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .search-icon { color: #ffaa33; margin-left: 1rem; font-size: 1.2rem; }
+        #brand-select { padding: 0.7rem 1rem; border-radius: 40px; border: none; background: #1e2a2f; color: white; min-width: 150px; font-weight: 500; }
+        #search-input { flex: 1; padding: 0.7rem 1rem; border-radius: 40px; border: none; background: #fef9e6; color: #1e2a2f; font-weight: 500; }
+        #search-input:focus, #brand-select:focus { outline: 2px solid var(--accent); background: #ffffff; }
+        #search-button { padding: 0.7rem 1.5rem; background: linear-gradient(135deg, #ff8c00, #e67e22); color: white; border: none; border-radius: 40px; cursor: pointer; font-weight: 700; transition: 0.2s; }
         #search-button:hover { background: linear-gradient(135deg, #ffaa33, #ff7700); transform: scale(1.02); }
-        
-        /* Product gallery */
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1.5rem;
-        }
-        .card {
-            background: rgba(255,255,255,0.08);
-            border-radius: 10px;
-            padding: 1.2rem;
-            text-align: center;
-            transition: transform 0.3s;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-            background: rgba(255,255,255,0.12);
-        }
-        .brand-logo-container {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            width: 50px;
-            height: 50px;
-            background: white;
-            border-radius: 50%;
-            padding: 5px;
-            z-index: 3;
-            overflow: hidden;
-        }
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
+        .card { background: rgba(255,255,255,0.08); border-radius: 10px; padding: 1.2rem; text-align: center; transition: transform 0.3s; position: relative; display: flex; flex-direction: column; height: 100%; }
+        .card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.12); }
+        .brand-logo-container { position: absolute; top: 10px; left: 10px; width: 50px; height: 50px; background: white; border-radius: 50%; padding: 5px; z-index: 3; overflow: hidden; }
         .brand-logo-container img { width: 100%; height: 100%; object-fit: contain; display: block; }
-        .card img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            display: block;
-            background: rgba(0,0,0,0.3);
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 1rem;
-        }
-        .part-number {
-            font-weight: bold;
-            color: var(--accent);
-            font-size: 1.1rem;
-        }
+        .card img { width: 100%; height: 100%; object-fit: contain; display: block; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px; margin-bottom: 1rem; }
+        .part-number { font-weight: bold; color: var(--accent); font-size: 1.1rem; }
         .part-desc { font-size: 0.9rem; color: #ddd; min-height: 40px; }
-        .price-container {
-            display: flex;
-            justify-content: space-between;
-            background: rgba(0,0,0,0.2);
-            padding: 0.5rem;
-            border-radius: 5px;
-            margin: 0.5rem 0;
-        }
+        .price-container { display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 5px; margin: 0.5rem 0; }
         .price-label { font-size: 0.85rem; color: #aaa; }
         .price-value { font-weight: 600; }
-        .price {
-            font-size: 1.2rem;
-            color: var(--accent);
-            font-weight: 600;
-            margin: 0.5rem 0;
-        }
-        .stock-info {
-            display: flex;
-            justify-content: space-between;
-            background: rgba(0,0,0,0.2);
-            padding: 0.5rem;
-            border-radius: 5px;
-            font-size: 0.9rem;
-        }
-        .out-of-stock {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(220,53,69,0.85);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 5px;
-            font-size: 0.85rem;
-            z-index: 2;
-        }
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            padding: 0.7rem 1.2rem;
-            border: none;
-            border-radius: 5px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 0.5rem;
-            font-size: 0.95rem;
-        }
+        .price { font-size: 1.2rem; color: var(--accent); font-weight: 600; margin: 0.5rem 0; }
+        .stock-info { display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 5px; font-size: 0.9rem; }
+        .out-of-stock { position: absolute; top: 10px; right: 10px; background: rgba(220,53,69,0.85); color: white; padding: 6px 12px; border-radius: 5px; font-size: 0.85rem; z-index: 2; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.7rem 1.2rem; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; transition: all 0.3s; margin-top: 0.5rem; font-size: 0.95rem; }
         .cart { background: var(--primary); color: white; }
         .cart:hover { background: #09645a; }
         .whatsapp { background: #25D366; color: white; }
         .whatsapp:hover { background: #1ebd5b; }
-        .whatsapp-order-btn {
-            background: #25D366;
-            color: white;
-            margin: 10px 0;
-        }
+        .whatsapp-order-btn { background: #25D366; color: white; margin: 10px 0; }
         .whatsapp-order-btn:disabled { background: #95a5a6; }
-        /* Cart sidebar */
-        #cart-sidebar {
-            position: fixed;
-            top: 0;
-            right: -400px;
-            width: 100%;
-            max-width: 380px;
-            height: 100%;
-            background: #1a1a1a;
-            color: white;
-            box-shadow: -2px 0 15px rgba(0,0,0,0.5);
-            padding: 1.5rem;
-            transition: right 0.4s ease;
-            overflow-y: auto;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-        }
+        #cart-sidebar { position: fixed; top: 0; right: -400px; width: 100%; max-width: 380px; height: 100%; background: #1a1a1a; color: white; box-shadow: -2px 0 15px rgba(0,0,0,0.5); padding: 1.5rem; transition: right 0.4s ease; overflow-y: auto; z-index: 1000; display: flex; flex-direction: column; }
         #cart-sidebar.active { right: 0; }
-        .close-cart {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: none;
-            border: none;
-            color: #aaa;
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
+        .close-cart { position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer; }
         .close-cart:hover { color: white; }
-        .cart-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #333;
-        }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #333; }
         .cart-item-info { flex-grow: 1; }
         .cart-item-title { font-weight: 600; }
         .cart-item-desc { font-size: 0.85rem; color: #aaa; }
         .cart-item-price { color: var(--accent); }
-        .qty-control {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .qty-control button {
-            background: #444;
-            color: white;
-            border: none;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            cursor: pointer;
-            font-weight: bold;
-        }
+        .qty-control { display: flex; align-items: center; gap: 0.5rem; }
+        .qty-control button { background: #444; color: white; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-weight: bold; }
         .qty-control button:hover { background: var(--primary); }
-        .remove-item {
-            color: #ff6b6b;
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            cursor: pointer;
-        }
-        .cart-summary {
-            background: rgba(0,0,0,0.3);
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
+        .remove-item { color: #ff6b6b; background: none; border: none; font-size: 1.2rem; cursor: pointer; }
+        .cart-summary { background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
         .summary-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-        .total-row {
-            font-weight: 700;
-            font-size: 1.2rem;
-            border-top: 2px solid var(--primary);
-            padding-top: 0.8rem;
-            margin-top: 0.5rem;
-        }
-        .terms-agreement {
-            margin: 1rem 0;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+        .total-row { font-weight: 700; font-size: 1.2rem; border-top: 2px solid var(--primary); padding-top: 0.8rem; margin-top: 0.5rem; }
+        .terms-agreement { margin: 1rem 0; display: flex; align-items: center; gap: 0.5rem; }
         .btn-block { width: 100%; }
-        /* Bulk upload section (new) */
-        .bulk-upload-section {
-            background: rgba(0,0,0,0.3);
-            border-radius: 8px;
-            padding: 12px;
-            margin: 15px 0;
-            border: 1px dashed var(--accent);
-        }
-        .bulk-upload-section h4 {
-            color: var(--accent);
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-        }
-        .file-input-label {
-            display: block;
-            background: #2c3e50;
-            padding: 8px;
-            text-align: center;
-            border-radius: 5px;
-            cursor: pointer;
-            margin: 8px 0;
-            font-size: 0.85rem;
-            transition: 0.2s;
-        }
+        .bulk-upload-section { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; margin: 15px 0; border: 1px dashed var(--accent); }
+        .bulk-upload-section h4 { color: var(--accent); margin-bottom: 8px; font-size: 0.9rem; }
+        .file-input-label { display: block; background: #2c3e50; padding: 8px; text-align: center; border-radius: 5px; cursor: pointer; margin: 8px 0; font-size: 0.85rem; transition: 0.2s; }
         .file-input-label:hover { background: var(--primary); }
         #bulk-file { display: none; }
-        .upload-status {
-            font-size: 0.8rem;
-            color: #aaa;
-            margin-top: 8px;
-            word-break: break-word;
-        }
-        .floating-cart {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 300px;
-            background: #1a1a1a;
-            border: 1px solid #444;
-            border-radius: 8px;
-            z-index: 1001;
-            transition: all 0.3s;
-            display: none;
-        }
-        .floating-cart.minimized {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            cursor: pointer;
-        }
-        .floating-cart.minimized .floating-cart-body,
-        .floating-cart.minimized .cart-controls { display: none; }
-        .floating-cart.minimized .floating-cart-header {
-            height: 100%;
-            justify-content: center;
-        }
-        .floating-cart-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            background: rgba(0,0,0,0.3);
-            border-bottom: 1px solid #333;
-        }
+        .upload-status { font-size: 0.8rem; color: #aaa; margin-top: 8px; word-break: break-word; }
+        .debug-info { font-size: 0.75rem; color: #88ff88; margin-top: 5px; text-align: center; }
+        .floating-cart { position: fixed; bottom: 20px; right: 20px; width: 300px; background: #1a1a1a; border: 1px solid #444; border-radius: 8px; z-index: 1001; transition: all 0.3s; display: none; }
+        .floating-cart.minimized { width: 60px; height: 60px; border-radius: 50%; cursor: pointer; }
+        .floating-cart.minimized .floating-cart-body, .floating-cart.minimized .cart-controls { display: none; }
+        .floating-cart.minimized .floating-cart-header { height: 100%; justify-content: center; }
+        .floating-cart-header { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.3); border-bottom: 1px solid #333; }
         .floating-cart-body { padding: 10px; max-height: 300px; overflow-y: auto; }
         #floating-cart-items { max-height: 200px; overflow-y: auto; }
-        .floating-cart-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-        }
-        .floating-cart-total {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #333;
-            font-weight: bold;
-        }
-        .cart-controls button {
-            background: none;
-            border: none;
-            color: #aaa;
-            cursor: pointer;
-        }
+        .floating-cart-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
+        .floating-cart-total { margin-top: 10px; padding-top: 10px; border-top: 1px solid #333; font-weight: bold; }
+        .cart-controls button { background: none; border: none; color: #aaa; cursor: pointer; }
         .cart-controls button:hover { color: white; }
-        .delivery-estimator {
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-            border-left: 3px solid var(--primary);
-        }
+        .delivery-estimator { background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin: 15px 0; border-left: 3px solid var(--primary); }
         .delivery-estimator h4 { color: var(--accent); margin-bottom: 10px; }
         #delivery-details { font-size: 0.9rem; color: #ddd; }
-        .delivery-estimator button {
-            margin-top: 10px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 10000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.9);
-        }
-        .modal-content {
-            position: relative;
-            margin: auto;
-            padding: 20px;
-            width: 90%;
-            max-width: 800px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(0,0,0,0.95);
-            border-radius: 10px;
-        }
-        .close-modal {
-            color: white;
-            position: absolute;
-            right: 20px;
-            top: 10px;
-            font-size: 35px;
-            cursor: pointer;
-        }
-        #gallery-media {
-            width: 100%;
-            height: 0;
-            padding-bottom: 56.25%;
-            position: relative;
-        }
-        #gallery-media iframe, #gallery-media img {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        #gallery-thumbnails {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding: 10px 0;
-            justify-content: center;
-        }
-        .thumbnail-item {
-            width: 70px;
-            height: 70px;
-            border-radius: 5px;
-            overflow: hidden;
-            cursor: pointer;
-            border: 2px solid transparent;
-        }
+        .delivery-estimator button { margin-top: 10px; background: var(--primary); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+        .modal { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); }
+        .modal-content { position: relative; margin: auto; padding: 20px; width: 90%; max-width: 800px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.95); border-radius: 10px; }
+        .close-modal { color: white; position: absolute; right: 20px; top: 10px; font-size: 35px; cursor: pointer; }
+        #gallery-media { width: 100%; height: 0; padding-bottom: 56.25%; position: relative; }
+        #gallery-media iframe, #gallery-media img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+        #gallery-thumbnails { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; justify-content: center; }
+        .thumbnail-item { width: 70px; height: 70px; border-radius: 5px; overflow: hidden; cursor: pointer; border: 2px solid transparent; }
         .thumbnail-item.active { border-color: var(--primary); }
         .thumbnail-item img { width: 100%; height: 100%; object-fit: cover; }
-        .user-panel {
-            position: fixed;
-            top: 150px;
-            left: -300px;
-            width: 300px;
-            height: calc(100% - 80px);
-            background: #1a1a1a;
-            z-index: 999;
-            padding: 20px;
-            transition: left 0.3s;
-            overflow-y: auto;
-        }
+        .user-panel { position: fixed; top: 150px; left: -300px; width: 300px; height: calc(100% - 80px); background: #1a1a1a; z-index: 999; padding: 20px; transition: left 0.3s; overflow-y: auto; }
         .user-panel.active { left: 0; }
-        .user-toggle {
-            position: fixed;
-            top: 150px;
-            left: 10px;
-            z-index: 1000;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            cursor: pointer;
-        }
-        @media (max-width: 768px) {
-            body { margin-left: 0; }
-            .brand-logo-item { width: 60px; height: 45px; }
-            .card-actions {
-                flex-direction: column;
-            }
-            .card-actions .btn {
-                width: 100%;
-            }
-        }
-        .card-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-        }
-        .card-actions .btn {
-            flex: 1;
-            min-width: 100px;
-            text-align: center;
-        }
-        #preloader {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #0f2027, #203a43);
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            transition: opacity 0.8s ease;
-        }
-        .loader {
-            width: 60px;
-            height: 60px;
-            border: 6px solid rgba(255,255,255,0.3);
-            border-top: 6px solid var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
-        }
-        .loader-text {
-            color: var(--accent);
-            font-size: 1.2rem;
-            letter-spacing: 2px;
-            font-weight: 500;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .preloader-logo {
-            width: 120px;
-            height: auto;
-            margin-bottom: 30px;
-            animation: pulse 1.5s ease infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.05); opacity: 1; }
-            100% { transform: scale(1); opacity: 0.8; }
-        }
-        .stock-info-date {
-            text-align:left;
-            font-size: 0.85rem;
-            color: #aaa;
-            margin: 0 0 1rem 0;
-            padding: 0;
-        }
+        .user-toggle { position: fixed; top: 150px; left: 10px; z-index: 1000; background: var(--primary); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; }
+        @media (max-width: 768px) { body { margin-left: 0; } .brand-logo-item { width: 60px; height: 45px; } .card-actions { flex-direction: column; } .card-actions .btn { width: 100%; } }
+        .card-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+        .card-actions .btn { flex: 1; min-width: 100px; text-align: center; }
+        #preloader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0f2027, #203a43); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.8s ease; }
+        .loader { width: 60px; height: 60px; border: 6px solid rgba(255,255,255,0.3); border-top: 6px solid var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        .loader-text { color: var(--accent); font-size: 1.2rem; letter-spacing: 2px; font-weight: 500; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .preloader-logo { width: 120px; height: auto; margin-bottom: 30px; animation: pulse 1.5s ease infinite; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
+        .stock-info-date { text-align:left; font-size: 0.85rem; color: #aaa; margin: 0 0 1rem 0; padding: 0; }
         .card img { cursor: pointer; }
-        .most-selling-badge {
-            position: absolute;
-            top: 70px;
-            left: 10px;
-            background: #f1c40f;
-            color: #2c3e50;
-            font-size: 0.7rem;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 20px;
-            z-index: 4;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
+        .most-selling-badge { position: absolute; top: 70px; left: 10px; background: #f1c40f; color: #2c3e50; font-size: 0.7rem; font-weight: bold; padding: 3px 8px; border-radius: 20px; z-index: 4; display: flex; align-items: center; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
         .info-btn { background: #3498db; color: white; }
         .info-btn:hover { background: #2980b9; }
-        #galleryCloseBtn {
-            z-index: 10002;
-            cursor: pointer;
-            position: absolute;
-            right: 20px;
-            top: 10px;
-            font-size: 35px;
-        }
-        .professional-sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            width: 280px;
-            background: linear-gradient(180deg, #0a2e3a 0%, #0a4b5e 100%);
-            color: #fff;
-            overflow-y: auto;
-            z-index: 10000;
-            box-shadow: 2px 0 12px rgba(0,0,0,0.15);
-            transition: transform 0.3s ease;
-        }
+        #galleryCloseBtn { z-index: 10002; cursor: pointer; position: absolute; right: 20px; top: 10px; font-size: 35px; }
+        .professional-sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 280px; background: linear-gradient(180deg, #0a2e3a 0%, #0a4b5e 100%); color: #fff; overflow-y: auto; z-index: 10000; box-shadow: 2px 0 12px rgba(0,0,0,0.15); transition: transform 0.3s ease; }
         .professional-sidebar::-webkit-scrollbar { width: 5px; }
         .professional-sidebar::-webkit-scrollbar-track { background: #1e5a6b; }
         .professional-sidebar::-webkit-scrollbar-thumb { background: #ffc107; border-radius: 4px; }
-        .sidebar-brand {
-            padding: 24px 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.15);
-            margin-bottom: 16px;
-        }
-        .sidebar-brand h2 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .sidebar-brand { padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.15); margin-bottom: 16px; }
+        .sidebar-brand h2 { font-size: 1.5rem; font-weight: 600; display: flex; align-items: center; gap: 12px; }
         .sidebar-brand h2 i { font-size: 1.8rem; color: #ffc107; }
         .nav-group { margin: 12px 0 20px 0; }
-        .group-title {
-            padding: 8px 24px;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 600;
-            color: #ffc107;
-            background: rgba(0,0,0,0.2);
-            border-left: 3px solid #ffc107;
-        }
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding: 10px 24px;
-            color: #e2e8f0;
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
-        }
+        .group-title { padding: 8px 24px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; color: #ffc107; background: rgba(0,0,0,0.2); border-left: 3px solid #ffc107; }
+        .nav-link { display: flex; align-items: center; gap: 14px; padding: 10px 24px; color: #e2e8f0; text-decoration: none; font-size: 0.9rem; transition: all 0.2s; border-left: 3px solid transparent; }
         .nav-link i { width: 24px; font-size: 1.1rem; text-align: center; }
-        .nav-link:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border-left-color: #ffc107;
-            padding-left: 28px;
-        }
-        .nav-link.btn-quick {
-            background: #ffc107;
-            color: #0a2e3a;
-            margin: 12px 20px;
-            border-radius: 40px;
-            padding: 10px 20px;
-            font-weight: bold;
-        }
-        .badge {
-            background: #e53e3e;
-            color: white;
-            border-radius: 40px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            padding: 2px 8px;
-            margin-left: auto;
-        }
-        .sidebar-footer {
-            padding: 20px 24px;
-            font-size: 0.7rem;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            margin-top: 20px;
-            color: #b0bec5;
-        }
-        .sidebar-toggle-btn {
-            position: fixed;
-            top: 90px;
-            left: 20px;
-            background: var(--accent);
-            color: #0a2e3a;
-            border: none;
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            font-size: 1.3rem;
-            cursor: pointer;
-            z-index: 10020;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: 0.2s;
-        }
-        .sidebar-toggle-btn:hover {
-            background: white;
-            transform: scale(1.05);
-        }
-        /* Header Cart Button */
-        .header-cart-btn {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.7);
-            border-radius: 50px;
-            padding: 8px 16px;
-            cursor: pointer;
-            z-index: 101;
-            border: 1px solid var(--accent);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: 0.2s;
-        }
-        .header-cart-btn:hover {
-            background: var(--primary);
-            transform: scale(1.02);
-        }
-        .header-cart-btn i {
-            font-size: 1.3rem;
-            color: var(--accent);
-        }
-        .cart-badge-number {
-            background: var(--secondary);
-            color: white;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            font-weight: bold;
-        }
-        @media (max-width: 768px) {
-            .sidebar-toggle-btn { top: 80px; left: 10px; }
-        }
-        .card::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image: url('images/ASS.jpg');
-            background-repeat: no-repeat;
-            background-position: center;
-            background-size: 40%;
-            opacity: 0.08;
-            pointer-events: none;
-            z-index: 0;
-        }
+        .nav-link:hover { background: rgba(255,255,255,0.1); color: white; border-left-color: #ffc107; padding-left: 28px; }
+        .nav-link.btn-quick { background: #ffc107; color: #0a2e3a; margin: 12px 20px; border-radius: 40px; padding: 10px 20px; font-weight: bold; }
+        .badge { background: #e53e3e; color: white; border-radius: 40px; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; margin-left: auto; }
+        .sidebar-footer { padding: 20px 24px; font-size: 0.7rem; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 20px; color: #b0bec5; }
+        .sidebar-toggle-btn { position: fixed; top: 90px; left: 20px; background: var(--accent); color: #0a2e3a; border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 1.3rem; cursor: pointer; z-index: 10020; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .sidebar-toggle-btn:hover { background: white; transform: scale(1.05); }
+        .header-cart-btn { position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.7); border-radius: 50px; padding: 8px 16px; cursor: pointer; z-index: 101; border: 1px solid var(--accent); display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .header-cart-btn:hover { background: var(--primary); transform: scale(1.02); }
+        .header-cart-btn i { font-size: 1.3rem; color: var(--accent); }
+        .cart-badge-number { background: var(--secondary); color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; }
+        @media (max-width: 768px) { .sidebar-toggle-btn { top: 80px; left: 10px; } }
+        .card::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('images/ASS.jpg'); background-repeat: no-repeat; background-position: center; background-size: 40%; opacity: 0.08; pointer-events: none; z-index: 0; }
         .card img { position: relative; z-index: 1; background: transparent; }
     </style>
 </head>
@@ -831,31 +183,20 @@
         <div class="loader"></div>
         <div class="loader-text">Loading Auto Spares...</div>
     </div>
-    
-    <!-- Sidebar Toggle Button -->
     <button class="sidebar-toggle-btn" id="sidebarToggleBtn"><i class="fas fa-bars"></i></button>
-    
-    <!-- Header Cart Button -->
     <div class="header-cart-btn" id="headerCartBtn">
         <i class="fas fa-shopping-cart"></i>
         <span class="cart-badge-number" id="headerCartCount">0</span>
     </div>
-    
-    <!-- Professional Sidebar -->
     <div class="professional-sidebar" id="sidebar">
-        <div class="sidebar-brand">
-            <h2><i class="fas fa-cogs"></i> Auto Spares</h2>
-            <p>Complete ERP Solution</p>
-        </div>
-        <div class="nav-group">
-            <div class="group-title"><i class="fas fa-database"></i> Masters</div>
+        <div class="sidebar-brand"><h2><i class="fas fa-cogs"></i> Auto Spares</h2><p>Complete ERP Solution</p></div>
+        <div class="nav-group"><div class="group-title"><i class="fas fa-database"></i> Masters</div>
             <a href="customer-master.html" class="nav-link"><i class="fas fa-address-book"></i><span>Customer Master</span></a>
             <a href="supplier-master.html" class="nav-link"><i class="fas fa-truck"></i><span>Supplier Master</span></a>
             <a href="product-master.html" class="nav-link"><i class="fas fa-boxes"></i><span>Product Master</span></a>
             <a href="merge-products.html" class="nav-link"><i class="fas fa-code-branch"></i><span>Merge Products</span></a>
         </div>
-        <div class="nav-group">
-            <div class="group-title"><i class="fas fa-chart-line"></i> Sales</div>
+        <div class="nav-group"><div class="group-title"><i class="fas fa-chart-line"></i> Sales</div>
             <a href="quotation.html" class="nav-link"><i class="fas fa-file-alt"></i><span>Quotation</span></a>
             <a href="proforma-invoice.html" class="nav-link"><i class="fas fa-file-invoice"></i><span>Proforma Invoice</span></a>
             <a href="sales-order.html" class="nav-link"><i class="fas fa-clipboard-list"></i><span>New Sales Order</span></a>
@@ -863,34 +204,29 @@
             <a href="invoice-stock.html" class="nav-link"><i class="fas fa-file-invoice"></i><span>Invoice (Stock)</span></a>
             <a href="orders.html" class="nav-link"><i class="fas fa-history"></i><span>Order History</span></a>
         </div>
-        <div class="nav-group">
-            <div class="group-title"><i class="fas fa-shopping-cart"></i> Purchase</div>
+        <div class="nav-group"><div class="group-title"><i class="fas fa-shopping-cart"></i> Purchase</div>
             <a href="purchase-invoice.html" class="nav-link"><i class="fas fa-file-invoice"></i><span>Purchase Entry</span></a>
             <a href="purchase-invoice-stock.html" class="nav-link"><i class="fas fa-truck"></i><span>Purchase (Stock)</span></a>
             <a href="purchase-invoice-list.html" class="nav-link"><i class="fas fa-list"></i><span>Purchase Invoices</span></a>
             <a href="purchase-orders.html" class="nav-link"><i class="fas fa-list"></i><span>Purchase List</span></a>
         </div>
-        <div class="nav-group">
-            <div class="group-title"><i class="fas fa-rupee-sign"></i> Finance</div>
+        <div class="nav-group"><div class="group-title"><i class="fas fa-rupee-sign"></i> Finance</div>
             <a href="payment-receipt.html" class="nav-link"><i class="fas fa-receipt"></i><span>Payment Receipt</span></a>
             <a href="payment-receipts-list.html" class="nav-link"><i class="fas fa-receipt"></i><span>Receipts List</span></a>
             <a href="supplier-payment.html" class="nav-link"><i class="fas fa-money-bill-wave"></i><span>Supplier Payment</span></a>
         </div>
-        <div class="nav-group">
-            <div class="group-title"><i class="fas fa-chart-pie"></i> Reports</div>
+        <div class="nav-group"><div class="group-title"><i class="fas fa-chart-pie"></i> Reports</div>
             <a href="customer-ledger.html" class="nav-link"><i class="fas fa-book"></i><span>Customer Ledger</span></a>
             <a href="supplier-ledger.html" class="nav-link"><i class="fas fa-truck"></i><span>Supplier Ledger</span></a>
             <a href="stock-ledger.html" class="nav-link"><i class="fas fa-book"></i><span>Stock Ledger</span></a>
             <a href="stock-report.html" class="nav-link"><i class="fas fa-chart-line"></i><span>Stock Report</span></a>
             <a href="ageing-report.html" class="nav-link"><i class="fas fa-chart-line"></i><span>Ageing Report</span></a>
         </div>
-        <div class="nav-group">
-            <div class="group-title"><i class="fas fa-boxes"></i> Inventory</div>
+        <div class="nav-group"><div class="group-title"><i class="fas fa-boxes"></i> Inventory</div>
             <a href="inventory.html" class="nav-link"><i class="fas fa-boxes"></i><span>Inventory Dashboard</span></a>
             <a href="product-selector.html" class="nav-link btn-quick"><i class="fas fa-bolt"></i><span>Quick Quote / Proforma</span></a>
         </div>
-        <div class="nav-group">
-            <div class="group-title"><i class="fas fa-tools"></i> System</div>
+        <div class="nav-group"><div class="group-title"><i class="fas fa-tools"></i> System</div>
             <a href="delete-invoice.html" class="nav-link"><i class="fas fa-trash-alt"></i><span>Delete Invoice</span></a>
             <a href="backup-restore.html" class="nav-link"><i class="fas fa-database"></i><span>Backup / Restore</span></a>
             <a href="import-system.html" class="nav-link"><i class="fas fa-upload"></i><span>Import Data</span></a>
@@ -898,8 +234,7 @@
             <a href="proforma-list.html" class="nav-link"><i class="fas fa-list"></i><span>Proforma List</span></a>
             <a href="quotation-upload.html" class="nav-link"><i class="fas fa-file-upload"></i><span>Upload Order</span></a>
         </div>
-        <div class="nav-group">
-            <div class="group-title"><i class="fas fa-globe"></i> Info & Support</div>
+        <div class="nav-group"><div class="group-title"><i class="fas fa-globe"></i> Info & Support</div>
             <a href="#" class="nav-link" id="homeLinkSidebar"><i class="fas fa-home"></i><span>Home</span></a>
             <a href="#" class="nav-link"><i class="fas fa-info-circle"></i><span>About</span></a>
             <a href="#" class="nav-link"><i class="fas fa-box-open"></i><span>Products</span></a>
@@ -909,64 +244,25 @@
             <a href="https://razorpay.me/@autosparessolution" target="_blank" class="nav-link"><i class="fas fa-money-bill-wave"></i><span>Pay Online</span></a>
             <a href="#" id="cart-link-sidebar" class="nav-link"><i class="fas fa-shopping-cart"></i><span>Cart</span><span class="badge" id="cart-count-sidebar">0</span></a>
         </div>
-        <div class="sidebar-footer">
-            <i class="fas fa-copyright"></i> Auto Spares ERP v2.0
-        </div>
+        <div class="sidebar-footer"><i class="fas fa-copyright"></i> Auto Spares ERP v2.0</div>
     </div>
-
-    <!-- User Panel Toggle -->
     <button class="user-toggle" id="user-toggle"><i class="fas fa-user"></i></button>
     <div class="user-panel" id="user-panel">
-        <div class="user-form" id="login-form">
-            <h3><i class="fas fa-sign-in-alt"></i> Login</h3>
-            <div class="form-group"><input type="email" id="login-email" class="form-control" placeholder="Email" required></div>
-            <div class="form-group"><input type="password" id="login-password" class="form-control" placeholder="Password" required></div>
-            <button class="btn btn-block" onclick="login()" style="background: var(--primary);">Login</button>
-            <p style="text-align: center; margin-top: 20px;">No account? <a href="#" onclick="showRegisterForm()" style="color: var(--accent);">Register</a></p>
-        </div>
-        <div class="user-form" id="register-form" style="display:none;">
-            <h3><i class="fas fa-user-plus"></i> Register</h3>
-            <input type="text" id="register-name" class="form-control" placeholder="Full Name" required>
-            <input type="email" id="register-email" class="form-control" placeholder="Email" required>
-            <input type="password" id="register-password" class="form-control" placeholder="Password" required>
-            <input type="tel" id="register-phone" class="form-control" placeholder="Phone" required>
-            <input type="text" id="register-address" class="form-control" placeholder="Address" required>
-            <input type="text" id="register-pincode" class="form-control" placeholder="PIN Code" maxlength="6" required>
-            <input type="text" id="register-business" class="form-control" placeholder="Business Name (optional)">
-            <input type="text" id="register-gstin" class="form-control" placeholder="GSTIN (optional)">
-            <button class="btn btn-block" onclick="register()" style="background: var(--primary);">Register</button>
-            <p style="text-align: center; margin-top: 20px;">Already have an account? <a href="#" onclick="showLoginForm()" style="color: var(--accent);">Login</a></p>
-        </div>
-        <div id="user-profile" style="display:none;">
-            <h3><i class="fas fa-user-circle"></i> Profile</h3>
-            <div id="profile-info"></div>
-            <button class="btn btn-block" onclick="logout()" style="background: var(--secondary); margin-top: 20px;">Logout</button>
-        </div>
+        <div class="user-form" id="login-form"><h3><i class="fas fa-sign-in-alt"></i> Login</h3><div class="form-group"><input type="email" id="login-email" class="form-control" placeholder="Email" required></div><div class="form-group"><input type="password" id="login-password" class="form-control" placeholder="Password" required></div><button class="btn btn-block" onclick="login()" style="background: var(--primary);">Login</button><p style="text-align: center; margin-top: 20px;">No account? <a href="#" onclick="showRegisterForm()" style="color: var(--accent);">Register</a></p></div>
+        <div class="user-form" id="register-form" style="display:none;"><h3><i class="fas fa-user-plus"></i> Register</h3><input type="text" id="register-name" class="form-control" placeholder="Full Name" required><input type="email" id="register-email" class="form-control" placeholder="Email" required><input type="password" id="register-password" class="form-control" placeholder="Password" required><input type="tel" id="register-phone" class="form-control" placeholder="Phone" required><input type="text" id="register-address" class="form-control" placeholder="Address" required><input type="text" id="register-pincode" class="form-control" placeholder="PIN Code" maxlength="6" required><input type="text" id="register-business" class="form-control" placeholder="Business Name (optional)"><input type="text" id="register-gstin" class="form-control" placeholder="GSTIN (optional)"><button class="btn btn-block" onclick="register()" style="background: var(--primary);">Register</button><p style="text-align: center; margin-top: 20px;">Already have an account? <a href="#" onclick="showLoginForm()" style="color: var(--accent);">Login</a></p></div>
+        <div id="user-profile" style="display:none;"><h3><i class="fas fa-user-circle"></i> Profile</h3><div id="profile-info"></div><button class="btn btn-block" onclick="logout()" style="background: var(--secondary); margin-top: 20px;">Logout</button></div>
     </div>
-
     <header>
         <div class="logo-container">
             <img src="images/ASS.jpg" alt="Logo" class="logo" onerror="this.src='https://via.placeholder.com/60?text=ASS'">
-            <div>
-                <h1>Auto Spares Solution</h1>
-                <p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p>
-            </div>
+            <div><h1>Auto Spares Solution</h1><p class="tagline">Premium wholesaler of original automobile spare parts since 2020</p></div>
         </div>
     </header>
-
-    <!-- NO DOUBLE NAVIGATION - The original nav section is completely removed -->
-
     <div class="container">
-        <div class="brand-filter">
-            <h3>Shop by Brand</h3>
-            <div class="brand-logo-list" id="brand-logo-list"></div>
-        </div>
-
+        <div class="brand-filter"><h3>Shop by Brand</h3><div class="brand-logo-list" id="brand-logo-list"></div></div>
         <div class="search-container">
             <i class="fas fa-search search-icon"></i>
-            <select id="brand-select">
-                <option value="">All Brands</option>
-            </select>
+            <select id="brand-select"><option value="">All Brands</option></select>
             <input type="text" id="search-input" placeholder="Search by part number or description...">
             <button id="search-button" class="btn"><i class="fas fa-search"></i> Search</button>
             <select id="docTypeSelect" style="padding: 0.7rem; border-radius: 5px; background: rgba(0,0,0,0.3); color: white; border: none;">
@@ -977,12 +273,7 @@
             </select>
         </div>
         <div class="stock-info-date">Stock last updated: <span id="last-updated-date">Loading...</span></div>
-        <section id="products" class="section">
-            <h2 class="section-title">Our Products</h2>
-            <div class="gallery">
-                <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>
-            </div>
-        </section>
+        <section id="products" class="section"><h2 class="section-title">Our Products</h2><div class="gallery"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div></div></section>
         <section id="home" class="hero" style="height:300px; background:linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1542362567-b07e54358753?ixlib=rb-4.0.3') center/cover; border-radius:10px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; margin:2rem 0;">
             <h2 style="font-size:3rem; color:var(--accent);">Premium Auto Parts</h2>
             <p style="max-width:700px;">Supplying high-quality components since 2020.</p>
@@ -999,8 +290,6 @@
         <section id="policies" class="section"><h2 class="section-title">Policies</h2><p>Privacy, shipping, returns.</p></section>
         <section id="contact" class="section"><h2 class="section-title">Contact</h2><p>Email: contact@autosparessolution.com</p></section>
     </div>
-
-    <!-- Cart Sidebar (with bulk upload added) -->
     <div id="cart-sidebar">
         <button class="close-cart"><i class="fas fa-times"></i></button>
         <h2><i class="fas fa-shopping-cart"></i> Your Cart (<span id="cart-type-label">Sales Invoice</span>)</h2>
@@ -1011,79 +300,31 @@
                 <div class="summary-row"><span>GST (18%):</span><span>₹<span id="cart-tax">0.00</span></span></div>
                 <div class="summary-row total-row"><span>Total:</span><span>₹<span id="cart-total">0.00</span></span></div>
             </div>
-            <!-- NEW BULK UPLOAD SECTION -->
             <div class="bulk-upload-section">
                 <h4><i class="fas fa-file-excel"></i> Bulk Order Upload (Excel/CSV)</h4>
                 <label class="file-input-label" for="bulk-file"><i class="fas fa-upload"></i> Select Excel/CSV File</label>
                 <input type="file" id="bulk-file" accept=".xlsx, .xls, .csv, .xlsm">
-                <div class="upload-status" id="upload-status">Upload file with columns: Part Number, Quantity (optional)</div>
-                <button class="btn btn-block" id="process-bulk-btn" style="background:#6c757d; margin-top:5px;">Process File</button>
+                <div class="upload-status" id="upload-status">Ready. Choose file and click Process.</div>
+                <button class="btn btn-block" id="process-bulk-btn" style="background:#ff8c00; color:white; margin-top:5px;">Process File</button>
+                <div class="debug-info" id="product-count-debug">Loading product database...</div>
             </div>
-            <div id="delivery-estimator" class="delivery-estimator" style="display:none;">
-                <h4><i class="fas fa-truck"></i> Delivery Estimate</h4>
-                <div id="delivery-details"></div>
-                <button onclick="updateDeliveryEstimator()">Refresh</button>
-            </div>
-            <div class="terms-agreement">
-                <input type="checkbox" id="agree-terms" required>
-                <label for="agree-terms">I agree to the <a href="#policies" style="color:var(--accent);">Terms & Conditions</a></label>
-            </div>
-            <button class="btn whatsapp-order-btn btn-block" onclick="whatsappOrderConfirmation()" id="whatsapp-order-btn">
-                <i class="fab fa-whatsapp"></i> Confirm via WhatsApp
-            </button>
-            <button class="btn btn-block" onclick="sendOrderEmail()" style="background:#6c757d; margin-top:10px;">
-                <i class="fas fa-envelope"></i> Email Order
-            </button>
-            <button class="btn btn-block" onclick="generateDocument()" style="background:#4CAF50; margin-top:10px;">
-                <i class="fas fa-file-invoice"></i> Generate <span id="generateBtnLabel">Sales Invoice</span>
-            </button>
-            <button class="btn btn-block" onclick="printLastInvoice()" style="background:#17a2b8; margin-top:10px;">
-                <i class="fas fa-print"></i> Print Last Invoice
-            </button>
-            <button class="btn buy btn-block" onclick="checkout()" style="background:var(--secondary); margin-top:10px;">
-                <i class="fas fa-credit-card"></i> Checkout
-            </button>
+            <div id="delivery-estimator" class="delivery-estimator" style="display:none;"><h4><i class="fas fa-truck"></i> Delivery Estimate</h4><div id="delivery-details"></div><button onclick="updateDeliveryEstimator()">Refresh</button></div>
+            <div class="terms-agreement"><input type="checkbox" id="agree-terms" required><label for="agree-terms">I agree to the <a href="#policies" style="color:var(--accent);">Terms & Conditions</a></label></div>
+            <button class="btn whatsapp-order-btn btn-block" onclick="whatsappOrderConfirmation()" id="whatsapp-order-btn"><i class="fab fa-whatsapp"></i> Confirm via WhatsApp</button>
+            <button class="btn btn-block" onclick="sendOrderEmail()" style="background:#6c757d; margin-top:10px;"><i class="fas fa-envelope"></i> Email Order</button>
+            <button class="btn btn-block" onclick="generateDocument()" style="background:#4CAF50; margin-top:10px;"><i class="fas fa-file-invoice"></i> Generate <span id="generateBtnLabel">Sales Invoice</span></button>
+            <button class="btn btn-block" onclick="printLastInvoice()" style="background:#17a2b8; margin-top:10px;"><i class="fas fa-print"></i> Print Last Invoice</button>
+            <button class="btn buy btn-block" onclick="checkout()" style="background:var(--secondary); margin-top:10px;"><i class="fas fa-credit-card"></i> Checkout</button>
         </div>
     </div>
-
-    <!-- Floating Mini Cart -->
     <div id="floating-cart" class="floating-cart minimized">
-        <div class="floating-cart-header">
-            <span class="cart-title"><i class="fas fa-shopping-cart"></i> <span id="floating-cart-count">0</span></span>
-            <div class="cart-controls">
-                <button class="cart-minimize" onclick="toggleFloatingCartMinimize()"><i class="fas fa-window-minimize"></i></button>
-                <button class="cart-close" onclick="closeFloatingCart()"><i class="fas fa-times"></i></button>
-            </div>
-        </div>
-        <div class="floating-cart-body">
-            <div id="floating-cart-items"></div>
-            <div class="floating-cart-total">Total: ₹<span id="floating-cart-total">0.00</span></div>
-            <button class="btn btn-sm btn-block" onclick="document.getElementById('cart-sidebar').classList.add('active'); closeFloatingCart();">View Full Cart</button>
-        </div>
+        <div class="floating-cart-header"><span class="cart-title"><i class="fas fa-shopping-cart"></i> <span id="floating-cart-count">0</span></span><div class="cart-controls"><button class="cart-minimize" onclick="toggleFloatingCartMinimize()"><i class="fas fa-window-minimize"></i></button><button class="cart-close" onclick="closeFloatingCart()"><i class="fas fa-times"></i></button></div></div>
+        <div class="floating-cart-body"><div id="floating-cart-items"></div><div class="floating-cart-total">Total: ₹<span id="floating-cart-total">0.00</span></div><button class="btn btn-sm btn-block" onclick="document.getElementById('cart-sidebar').classList.add('active'); closeFloatingCart();">View Full Cart</button></div>
     </div>
-
-    <!-- Gallery Modal -->
-    <div id="galleryModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" id="galleryCloseBtn" onclick="closeGallery()">&times;</span>
-            <div id="gallery-media"></div>
-            <div id="gallery-thumbnails"></div>
-        </div>
-    </div>
-    <div id="infoModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeInfoModal()">&times;</span>
-            <h3>Product Information</h3>
-            <div id="infoModalBody"></div>
-        </div>
-    </div>
-
+    <div id="galleryModal" class="modal"><div class="modal-content"><span class="close-modal" id="galleryCloseBtn" onclick="closeGallery()">&times;</span><div id="gallery-media"></div><div id="gallery-thumbnails"></div></div></div>
+    <div id="infoModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="closeInfoModal()">&times;</span><h3>Product Information</h3><div id="infoModalBody"></div></div></div>
     <div class="toast" id="toast"><i class="fas fa-check-circle"></i><span id="toast-message"></span></div>
-
-    <footer style="background:rgba(0,0,0,0.9); color:#ccc; padding:2rem; text-align:center; margin-top:3rem;">
-        <p>&copy; 2026 Auto Spares Solution. All Rights Reserved.</p>
-    </footer>
-
+    <footer style="background:rgba(0,0,0,0.9); color:#ccc; padding:2rem; text-align:center; margin-top:3rem;"><p>&copy; 2026 Auto Spares Solution. All Rights Reserved.</p></footer>
     <script>
         // ========== FULL ORIGINAL JAVASCRIPT (All functions preserved) ==========
         let productsData = [];
@@ -1091,17 +332,9 @@
         let carts = { invoice: [], purchase: [], proforma: [], quotation: [] };
         let allProducts = [];
         const SEARCH_LIMIT = 50;
-        const fixedProducts = [
-            "M63241-0200", "M63251-0200", "M64770-0200", "212123040-0200", "212123050-0200",
-            "A40778820-0200", "A40788820-0200", "A05691020-0200", "A04182020-0200",
-            "A04331020-0200", "A04183020-0200", "MA2710-0200", "A04330020-0200",
-            "MA2720-0200", "A04854020-0200", "M73710-0200", "M73720-0200", "A03121020-0200",
-            "M85060-0200", "A0A509020-0200", "M54760-0200", "M87340-0200", "M07500-0200",
-            "M07520-0200"
-        ];
+        const fixedProducts = ["M63241-0200","M63251-0200","M64770-0200","212123040-0200","212123050-0200","A40778820-0200","A40788820-0200","A05691020-0200","A04182020-0200","A04331020-0200","A04183020-0200","MA2710-0200","A04330020-0200","MA2720-0200","A04854020-0200","M73710-0200","M73720-0200","A03121020-0200","M85060-0200","A0A509020-0200","M54760-0200","M87340-0200","M07500-0200","M07520-0200"];
         let currentUser = null;
         let users = JSON.parse(localStorage.getItem('users')) || [];
-        
         const cartSidebar = document.getElementById("cart-sidebar");
         const closeCartBtn = document.querySelector(".close-cart");
         const toast = document.getElementById("toast");
@@ -1135,14 +368,10 @@
             if (!name || !email || !password || !phone || !address || !pincode) { showToast("Please fill all required fields", true); return; }
             if (users.some(u => u.email === email)) { showToast("Email already registered", true); return; }
             const newUser = { name, email, password, phone, business, gstin, address, pincode, registrationDate: new Date().toISOString() };
-            users.push(newUser);
-            localStorage.setItem('users', JSON.stringify(users));
-            currentUser = newUser;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            showUserProfile();
-            showToast("Registration successful!");
-            document.getElementById("register-form").reset();
-            updateDeliveryEstimator();
+            users.push(newUser); localStorage.setItem('users', JSON.stringify(users));
+            currentUser = newUser; localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            showUserProfile(); showToast("Registration successful!");
+            document.getElementById("register-form").reset(); updateDeliveryEstimator();
         }
         function fallbackImage(img, brand) {
             if (img.getAttribute('data-fallback') === 'brand') { img.src = 'images/ASS.jpg'; img.onerror = null; return; }
@@ -1156,15 +385,12 @@
                 currentUser = user;
                 if (email === "dipankar@autosparessolution.com") { currentUser.isAdmin = true; }
                 localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                showUserProfile();
-                showToast("Login successful!");
-                updateDeliveryEstimator();
-                updateCartUI();
+                showUserProfile(); showToast("Login successful!");
+                updateDeliveryEstimator(); updateCartUI();
                 if (typeof updateNavigationByRole === 'function') updateNavigationByRole();
             } else { showToast("Invalid email or password", true); }
         }
         function logout() { currentUser = null; localStorage.removeItem('currentUser'); showLoginForm(); showToast("Logged out"); updateDeliveryEstimator(); }
-        
         function loadProducts() {
             fetch("prices.csv").then(res => {
                 const lastModified = res.headers.get('Last-Modified');
@@ -1189,18 +415,20 @@
                 fixedProducts.forEach(part=>{ if(!productsData.some(p=>p.part===part)) productsData.push({ part, desc:"Auto Spare Part", List:0, Mrp:0, price:0, stock:0, boxQty:1, masterCarton:1, brand:"Unknown", video:"", media:[] }); });
                 productsData.forEach(p=>p.score = (p.price||0)*(p.stock||0));
                 allProducts = productsData;
-                populateBrandDropdown();
-                populateBrandLogos();
+                populateBrandDropdown(); populateBrandLogos();
                 filteredProducts = productsData.filter(p=>p.stock>0).slice(0,21);
                 displayProducts();
+                const debugDiv = document.getElementById('product-count-debug');
+                if (debugDiv) debugDiv.innerHTML = `✅ ${allProducts.length} products loaded from CSV. Ready for bulk upload.`;
                 const preloader = document.getElementById('preloader');
                 if(preloader) { preloader.style.opacity = '0'; setTimeout(()=> preloader.style.display='none', 800); }
             }).catch(err=>{
                 console.error("CSV error", err);
                 document.getElementById('last-updated-date').textContent = 'Error loading date';
                 productsData = fixedProducts.map(part=>({ part, desc:"Auto Spare Part", List:0, Mrp:0, price:0, stock:0, boxQty:1, masterCarton:1, brand:"Unknown", video:"", media:[] }));
-                filteredProducts = productsData;
-                displayProducts();
+                filteredProducts = productsData; displayProducts();
+                const debugDiv = document.getElementById('product-count-debug');
+                if (debugDiv) debugDiv.innerHTML = `⚠️ CSV load failed. Using ${allProducts.length} fallback products.`;
                 const preloader = document.getElementById('preloader');
                 if(preloader) { preloader.style.opacity='0'; setTimeout(()=>preloader.style.display='none',800); }
                 showToast("Error loading product data. Using fallback.", true);
@@ -1296,100 +524,82 @@
             updateCartUI();
             showToast(`${part} added to ${docType} cart`);
         }
-        
-        // ===== FIXED BULK UPLOAD FUNCTION (works with your file) =====
         function processBulkUpload(file) {
-            // 1. Check if products are loaded
+            console.log("=== BULK UPLOAD STARTED ===");
+            console.log("File name:", file.name);
+            console.log("Total products in memory:", allProducts.length);
             if (!allProducts || allProducts.length === 0) {
-                showToast("Products still loading. Please wait a few seconds and try again.", true);
+                showToast("Products not loaded yet. Please wait for the preloader to disappear.", true);
+                console.error("allProducts is empty.");
                 return;
             }
-
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }); // get raw rows
-
-                    if (!rows || rows.length < 2) {
-                        showToast("File is empty or has no data rows", true);
-                        return;
-                    }
-
-                    // Find header row (first row that contains "Part Number" or "Part")
-                    let headerRowIndex = -1;
-                    let partColIndex = -1;
-                    let qtyColIndex = -1;
-                    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+                    const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "" });
+                    console.log("Rows read from file:", rows.length);
+                    if (!rows || rows.length < 2) { showToast("File is empty or has no data rows", true); return; }
+                    let headerRowIndex = -1, partColIndex = -1, qtyColIndex = -1;
+                    for (let i = 0; i < Math.min(rows.length, 15); i++) {
                         const row = rows[i];
                         if (!row || row.length === 0) continue;
                         for (let j = 0; j < row.length; j++) {
-                            const cell = (row[j] || "").toString().trim();
-                            const lowerCell = cell.toLowerCase();
-                            if (lowerCell.includes("part") && (lowerCell.includes("number") || lowerCell === "part" || lowerCell === "partno")) {
-                                partColIndex = j;
-                                headerRowIndex = i;
+                            const cell = (row[j] || "").toString().trim().toLowerCase();
+                            if ((cell.includes("part") && (cell.includes("number") || cell === "part" || cell === "partno"))) {
+                                partColIndex = j; headerRowIndex = i;
+                                console.log("Part column found at index", j, "value:", row[j]);
                             }
-                            if (lowerCell.includes("qty") || lowerCell === "quantity") {
+                            if (cell.includes("qty") || cell === "quantity" || cell === "qty.") {
                                 qtyColIndex = j;
+                                console.log("Qty column found at index", j, "value:", row[j]);
                             }
                         }
                         if (partColIndex !== -1) break;
                     }
-
                     if (partColIndex === -1) {
-                        showToast("No 'Part Number' column found. Expected column name: 'Part Number', 'Part', or 'PartNo'", true);
+                        showToast("Column 'Part Number' not found. Ensure your file has a column with 'Part', 'Part Number', or 'PartNo'.", true);
                         return;
                     }
-
-                    // Now process data rows (from headerRowIndex+1 onward)
                     const docType = getCurrentDocType();
-                    let addedCount = 0;
-                    let notFound = [];
-                    let invalidRows = 0;
-
+                    let addedCount = 0, notFound = [];
+                    const productMap = new Map();
+                    allProducts.forEach(p => { const key = p.part.trim(); productMap.set(key, p); productMap.set(key.toLowerCase(), p); });
                     for (let i = headerRowIndex + 1; i < rows.length; i++) {
                         const row = rows[i];
                         if (!row || row.length === 0) continue;
-                        let partNo = row[partColIndex] ? row[partColIndex].toString().trim() : "";
-                        if (partNo === "") continue;
-
+                        let partNoRaw = row[partColIndex] ? row[partColIndex].toString().trim() : "";
+                        if (partNoRaw === "") continue;
+                        let product = productMap.get(partNoRaw);
+                        if (!product) product = productMap.get(partNoRaw.toLowerCase());
+                        if (!product) { notFound.push(partNoRaw); continue; }
                         let quantity = 1;
-                        if (qtyColIndex !== -1 && row[qtyColIndex]) {
-                            let qtyVal = parseFloat(row[qtyColIndex]);
-                            if (!isNaN(qtyVal) && qtyVal > 0) quantity = Math.floor(qtyVal);
-                        }
-
-                        const product = allProducts.find(p => p.part === partNo);
-                        if (!product) {
-                            notFound.push(partNo);
-                            continue;
-                        }
-
+                        if (qtyColIndex !== -1 && row[qtyColIndex]) { let qtyVal = parseFloat(row[qtyColIndex]); if (!isNaN(qtyVal) && qtyVal > 0) quantity = Math.floor(qtyVal); }
                         const price = product.price;
-                        const existing = carts[docType].find(i => i.part === partNo);
+                        const existing = carts[docType].find(i => i.part === product.part);
                         if (existing) existing.qty += quantity;
-                        else carts[docType].push({ part: partNo, price, qty: quantity, desc: product.desc || partNo, hsn: product.hsn || '', discount: 0 });
+                        else carts[docType].push({ part: product.part, price, qty: quantity, desc: product.desc || product.part, hsn: product.hsn || '', discount: 0 });
                         addedCount++;
                     }
-
                     updateCartUI();
-                    if (addedCount > 0) showToast(`✅ Added ${addedCount} items from file.`);
-                    if (notFound.length > 0) showToast(`❌ Not found: ${notFound.slice(0,5).join(', ')}${notFound.length>5 ? ` and ${notFound.length-5} more` : ''}`, true);
-                    document.getElementById('upload-status').innerHTML = `Last upload: ${addedCount} items added. ${notFound.length>0 ? notFound.length+' not found' : ''}`;
+                    if (addedCount > 0) showToast(`✅ Successfully added ${addedCount} items to your ${docType} cart.`);
+                    if (notFound.length > 0) {
+                        const sample = notFound.slice(0, 5).join('", "');
+                        showToast(`⚠️ ${notFound.length} part numbers not found: "${sample}"${notFound.length>5 ? ` and ${notFound.length-5} more` : ''}. Check console for full list.`, true);
+                        console.log("Full list of unmatched part numbers:", notFound);
+                    }
+                    document.getElementById('upload-status').innerHTML = `✅ Upload completed: ${addedCount} added, ${notFound.length} not found.`;
                 } catch(err) {
                     console.error("Bulk upload error:", err);
-                    showToast("Error reading file. Make sure it's a valid Excel or CSV file.", true);
+                    showToast("Error processing file. Make sure it's a valid Excel or CSV file.", true);
+                    document.getElementById('upload-status').innerHTML = `❌ Error: ${err.message}`;
                 }
             };
-            reader.onerror = function() {
-                showToast("Failed to read file.", true);
-            };
+            reader.onerror = function() { showToast("Failed to read the file. Please try again.", true); document.getElementById('upload-status').innerHTML = `❌ File read error.`; };
             reader.readAsArrayBuffer(file);
         }
-        
         function updateCartUI() {
             const docType = getCurrentDocType();
             const activeCart = carts[docType];
@@ -1528,8 +738,6 @@
                 currentGallery.forEach((u,i)=>{ const thumb = document.createElement('div'); thumb.className = 'thumbnail-item'+(i===currentGalleryIndex?' active':''); thumb.innerHTML = `<img src="${u}" onerror="this.src='images/default.png';">`; thumb.onclick = ()=>{ currentGalleryIndex=i; updateGallery(); }; thumbDiv.appendChild(thumb); });
             }
         }
-        
-        // ========== EVENT LISTENERS ==========
         document.getElementById('headerCartBtn').addEventListener('click', () => cartSidebar.classList.add('active'));
         closeCartBtn.addEventListener('click', () => cartSidebar.classList.remove('active'));
         userToggle.addEventListener('click', () => userPanel.classList.toggle('active'));
@@ -1544,22 +752,14 @@
         if(sidebarCartLink) sidebarCartLink.addEventListener('click', e=>{ e.preventDefault(); cartSidebar.classList.add('active'); });
         const homeLinkSidebar = document.getElementById('homeLinkSidebar');
         if(homeLinkSidebar) homeLinkSidebar.addEventListener('click', e=>{ e.preventDefault(); window.scrollTo({ top:0, behavior:'smooth' }); });
-        
-        // Bulk upload button listener
         const bulkFileInput = document.getElementById('bulk-file');
         const processBtn = document.getElementById('process-bulk-btn');
         if (processBtn) {
             processBtn.addEventListener('click', () => {
-                if (bulkFileInput.files.length === 0) {
-                    showToast("Please select an Excel/CSV file first", true);
-                    return;
-                }
+                if (bulkFileInput.files.length === 0) { showToast("Please select an Excel or CSV file first", true); return; }
                 processBulkUpload(bulkFileInput.files[0]);
-                // Do NOT clear the file input – let user see the file name
             });
         }
-        
-        // INIT
         const savedUser = localStorage.getItem('currentUser');
         if(savedUser) { currentUser = JSON.parse(savedUser); showUserProfile(); updateDeliveryEstimator(); }
         loadProducts();
@@ -1568,4 +768,4 @@
         logout = function() { originalLogout(); if(typeof updateNavigationByRole === 'function') updateNavigationByRole(); };
     </script>
 </body>
-        </html>
+                                                                      </html>
