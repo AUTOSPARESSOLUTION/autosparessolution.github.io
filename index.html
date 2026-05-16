@@ -375,7 +375,7 @@
             gap: 0.5rem;
         }
         .btn-block { width: 100%; }
-        /* Bulk upload section (NEW - added only) */
+        /* Bulk upload section (new) */
         .bulk-upload-section {
             background: rgba(0,0,0,0.3);
             border-radius: 8px;
@@ -1000,7 +1000,7 @@
         <section id="contact" class="section"><h2 class="section-title">Contact</h2><p>Email: contact@autosparessolution.com</p></section>
     </div>
 
-    <!-- Cart Sidebar (Bulk upload added) -->
+    <!-- Cart Sidebar (with bulk upload added) -->
     <div id="cart-sidebar">
         <button class="close-cart"><i class="fas fa-times"></i></button>
         <h2><i class="fas fa-shopping-cart"></i> Your Cart (<span id="cart-type-label">Sales Invoice</span>)</h2>
@@ -1011,7 +1011,7 @@
                 <div class="summary-row"><span>GST (18%):</span><span>₹<span id="cart-tax">0.00</span></span></div>
                 <div class="summary-row total-row"><span>Total:</span><span>₹<span id="cart-total">0.00</span></span></div>
             </div>
-            <!-- NEW BULK UPLOAD SECTION (added only) -->
+            <!-- NEW BULK UPLOAD SECTION -->
             <div class="bulk-upload-section">
                 <h4><i class="fas fa-file-excel"></i> Bulk Order Upload (Excel/CSV)</h4>
                 <label class="file-input-label" for="bulk-file"><i class="fas fa-upload"></i> Select Excel/CSV File</label>
@@ -1297,53 +1297,95 @@
             showToast(`${part} added to ${docType} cart`);
         }
         
-        // ===== NEW BULK UPLOAD FUNCTION =====
+        // ===== FIXED BULK UPLOAD FUNCTION (works with your file) =====
         function processBulkUpload(file) {
+            // 1. Check if products are loaded
+            if (!allProducts || allProducts.length === 0) {
+                showToast("Products still loading. Please wait a few seconds and try again.", true);
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(firstSheet);
-                if (!rows || rows.length === 0) {
-                    showToast("No data found in file", true);
-                    return;
-                }
-                // Detect column headers (case-insensitive)
-                const firstRow = rows[0];
-                let partCol = null, qtyCol = null;
-                for (let key in firstRow) {
-                    const lowerKey = key.toLowerCase();
-                    if (lowerKey.includes('part') || lowerKey === 'partno' || lowerKey === 'part number') partCol = key;
-                    if (lowerKey.includes('qty') || lowerKey === 'quantity') qtyCol = key;
-                }
-                if (!partCol) {
-                    showToast("No 'Part Number' column found. Use column like 'Part Number', 'PartNo', 'Part'", true);
-                    return;
-                }
-                const docType = getCurrentDocType();
-                let addedCount = 0;
-                let notFound = [];
-                for (let row of rows) {
-                    let partNo = row[partCol]?.toString().trim();
-                    if (!partNo) continue;
-                    let quantity = qtyCol ? (parseInt(row[qtyCol]) || 1) : 1;
-                    quantity = Math.max(1, quantity);
-                    const product = allProducts.find(p => p.part === partNo);
-                    if (!product) {
-                        notFound.push(partNo);
-                        continue;
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }); // get raw rows
+
+                    if (!rows || rows.length < 2) {
+                        showToast("File is empty or has no data rows", true);
+                        return;
                     }
-                    const price = product.price;
-                    const existing = carts[docType].find(i => i.part === partNo);
-                    if (existing) existing.qty += quantity;
-                    else carts[docType].push({ part: partNo, price, qty: quantity, desc: product.desc || partNo, hsn: product.hsn || '', discount: 0 });
-                    addedCount++;
+
+                    // Find header row (first row that contains "Part Number" or "Part")
+                    let headerRowIndex = -1;
+                    let partColIndex = -1;
+                    let qtyColIndex = -1;
+                    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+                        const row = rows[i];
+                        if (!row || row.length === 0) continue;
+                        for (let j = 0; j < row.length; j++) {
+                            const cell = (row[j] || "").toString().trim();
+                            const lowerCell = cell.toLowerCase();
+                            if (lowerCell.includes("part") && (lowerCell.includes("number") || lowerCell === "part" || lowerCell === "partno")) {
+                                partColIndex = j;
+                                headerRowIndex = i;
+                            }
+                            if (lowerCell.includes("qty") || lowerCell === "quantity") {
+                                qtyColIndex = j;
+                            }
+                        }
+                        if (partColIndex !== -1) break;
+                    }
+
+                    if (partColIndex === -1) {
+                        showToast("No 'Part Number' column found. Expected column name: 'Part Number', 'Part', or 'PartNo'", true);
+                        return;
+                    }
+
+                    // Now process data rows (from headerRowIndex+1 onward)
+                    const docType = getCurrentDocType();
+                    let addedCount = 0;
+                    let notFound = [];
+                    let invalidRows = 0;
+
+                    for (let i = headerRowIndex + 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (!row || row.length === 0) continue;
+                        let partNo = row[partColIndex] ? row[partColIndex].toString().trim() : "";
+                        if (partNo === "") continue;
+
+                        let quantity = 1;
+                        if (qtyColIndex !== -1 && row[qtyColIndex]) {
+                            let qtyVal = parseFloat(row[qtyColIndex]);
+                            if (!isNaN(qtyVal) && qtyVal > 0) quantity = Math.floor(qtyVal);
+                        }
+
+                        const product = allProducts.find(p => p.part === partNo);
+                        if (!product) {
+                            notFound.push(partNo);
+                            continue;
+                        }
+
+                        const price = product.price;
+                        const existing = carts[docType].find(i => i.part === partNo);
+                        if (existing) existing.qty += quantity;
+                        else carts[docType].push({ part: partNo, price, qty: quantity, desc: product.desc || partNo, hsn: product.hsn || '', discount: 0 });
+                        addedCount++;
+                    }
+
+                    updateCartUI();
+                    if (addedCount > 0) showToast(`✅ Added ${addedCount} items from file.`);
+                    if (notFound.length > 0) showToast(`❌ Not found: ${notFound.slice(0,5).join(', ')}${notFound.length>5 ? ` and ${notFound.length-5} more` : ''}`, true);
+                    document.getElementById('upload-status').innerHTML = `Last upload: ${addedCount} items added. ${notFound.length>0 ? notFound.length+' not found' : ''}`;
+                } catch(err) {
+                    console.error("Bulk upload error:", err);
+                    showToast("Error reading file. Make sure it's a valid Excel or CSV file.", true);
                 }
-                updateCartUI();
-                if (addedCount > 0) showToast(`Added ${addedCount} items from file.`);
-                if (notFound.length > 0) showToast(`Not found: ${notFound.slice(0,5).join(', ')}${notFound.length>5 ? '...' : ''}`, true);
-                document.getElementById('upload-status').innerHTML = `Last upload: ${addedCount} items added.`;
+            };
+            reader.onerror = function() {
+                showToast("Failed to read file.", true);
             };
             reader.readAsArrayBuffer(file);
         }
@@ -1506,14 +1548,16 @@
         // Bulk upload button listener
         const bulkFileInput = document.getElementById('bulk-file');
         const processBtn = document.getElementById('process-bulk-btn');
-        processBtn.addEventListener('click', () => {
-            if (bulkFileInput.files.length === 0) {
-                showToast("Please select an Excel/CSV file first", true);
-                return;
-            }
-            processBulkUpload(bulkFileInput.files[0]);
-            bulkFileInput.value = ''; // allow re-upload same file
-        });
+        if (processBtn) {
+            processBtn.addEventListener('click', () => {
+                if (bulkFileInput.files.length === 0) {
+                    showToast("Please select an Excel/CSV file first", true);
+                    return;
+                }
+                processBulkUpload(bulkFileInput.files[0]);
+                // Do NOT clear the file input – let user see the file name
+            });
+        }
         
         // INIT
         const savedUser = localStorage.getItem('currentUser');
