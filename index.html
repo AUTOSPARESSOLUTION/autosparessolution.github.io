@@ -375,6 +375,38 @@
             gap: 0.5rem;
         }
         .btn-block { width: 100%; }
+        /* Bulk upload section (NEW - added only) */
+        .bulk-upload-section {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            border: 1px dashed var(--accent);
+        }
+        .bulk-upload-section h4 {
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        .file-input-label {
+            display: block;
+            background: #2c3e50;
+            padding: 8px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 8px 0;
+            font-size: 0.85rem;
+            transition: 0.2s;
+        }
+        .file-input-label:hover { background: var(--primary); }
+        #bulk-file { display: none; }
+        .upload-status {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-top: 8px;
+            word-break: break-word;
+        }
         .floating-cart {
             position: fixed;
             bottom: 20px;
@@ -968,7 +1000,7 @@
         <section id="contact" class="section"><h2 class="section-title">Contact</h2><p>Email: contact@autosparessolution.com</p></section>
     </div>
 
-    <!-- Cart Sidebar -->
+    <!-- Cart Sidebar (Bulk upload added) -->
     <div id="cart-sidebar">
         <button class="close-cart"><i class="fas fa-times"></i></button>
         <h2><i class="fas fa-shopping-cart"></i> Your Cart (<span id="cart-type-label">Sales Invoice</span>)</h2>
@@ -978,6 +1010,14 @@
                 <div class="summary-row"><span>Subtotal:</span><span>₹<span id="cart-subtotal">0.00</span></span></div>
                 <div class="summary-row"><span>GST (18%):</span><span>₹<span id="cart-tax">0.00</span></span></div>
                 <div class="summary-row total-row"><span>Total:</span><span>₹<span id="cart-total">0.00</span></span></div>
+            </div>
+            <!-- NEW BULK UPLOAD SECTION (added only) -->
+            <div class="bulk-upload-section">
+                <h4><i class="fas fa-file-excel"></i> Bulk Order Upload (Excel/CSV)</h4>
+                <label class="file-input-label" for="bulk-file"><i class="fas fa-upload"></i> Select Excel/CSV File</label>
+                <input type="file" id="bulk-file" accept=".xlsx, .xls, .csv, .xlsm">
+                <div class="upload-status" id="upload-status">Upload file with columns: Part Number, Quantity (optional)</div>
+                <button class="btn btn-block" id="process-bulk-btn" style="background:#6c757d; margin-top:5px;">Process File</button>
             </div>
             <div id="delivery-estimator" class="delivery-estimator" style="display:none;">
                 <h4><i class="fas fa-truck"></i> Delivery Estimate</h4>
@@ -1256,6 +1296,58 @@
             updateCartUI();
             showToast(`${part} added to ${docType} cart`);
         }
+        
+        // ===== NEW BULK UPLOAD FUNCTION =====
+        function processBulkUpload(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(firstSheet);
+                if (!rows || rows.length === 0) {
+                    showToast("No data found in file", true);
+                    return;
+                }
+                // Detect column headers (case-insensitive)
+                const firstRow = rows[0];
+                let partCol = null, qtyCol = null;
+                for (let key in firstRow) {
+                    const lowerKey = key.toLowerCase();
+                    if (lowerKey.includes('part') || lowerKey === 'partno' || lowerKey === 'part number') partCol = key;
+                    if (lowerKey.includes('qty') || lowerKey === 'quantity') qtyCol = key;
+                }
+                if (!partCol) {
+                    showToast("No 'Part Number' column found. Use column like 'Part Number', 'PartNo', 'Part'", true);
+                    return;
+                }
+                const docType = getCurrentDocType();
+                let addedCount = 0;
+                let notFound = [];
+                for (let row of rows) {
+                    let partNo = row[partCol]?.toString().trim();
+                    if (!partNo) continue;
+                    let quantity = qtyCol ? (parseInt(row[qtyCol]) || 1) : 1;
+                    quantity = Math.max(1, quantity);
+                    const product = allProducts.find(p => p.part === partNo);
+                    if (!product) {
+                        notFound.push(partNo);
+                        continue;
+                    }
+                    const price = product.price;
+                    const existing = carts[docType].find(i => i.part === partNo);
+                    if (existing) existing.qty += quantity;
+                    else carts[docType].push({ part: partNo, price, qty: quantity, desc: product.desc || partNo, hsn: product.hsn || '', discount: 0 });
+                    addedCount++;
+                }
+                updateCartUI();
+                if (addedCount > 0) showToast(`Added ${addedCount} items from file.`);
+                if (notFound.length > 0) showToast(`Not found: ${notFound.slice(0,5).join(', ')}${notFound.length>5 ? '...' : ''}`, true);
+                document.getElementById('upload-status').innerHTML = `Last upload: ${addedCount} items added.`;
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
         function updateCartUI() {
             const docType = getCurrentDocType();
             const activeCart = carts[docType];
@@ -1411,6 +1503,18 @@
         const homeLinkSidebar = document.getElementById('homeLinkSidebar');
         if(homeLinkSidebar) homeLinkSidebar.addEventListener('click', e=>{ e.preventDefault(); window.scrollTo({ top:0, behavior:'smooth' }); });
         
+        // Bulk upload button listener
+        const bulkFileInput = document.getElementById('bulk-file');
+        const processBtn = document.getElementById('process-bulk-btn');
+        processBtn.addEventListener('click', () => {
+            if (bulkFileInput.files.length === 0) {
+                showToast("Please select an Excel/CSV file first", true);
+                return;
+            }
+            processBulkUpload(bulkFileInput.files[0]);
+            bulkFileInput.value = ''; // allow re-upload same file
+        });
+        
         // INIT
         const savedUser = localStorage.getItem('currentUser');
         if(savedUser) { currentUser = JSON.parse(savedUser); showUserProfile(); updateDeliveryEstimator(); }
@@ -1420,4 +1524,4 @@
         logout = function() { originalLogout(); if(typeof updateNavigationByRole === 'function') updateNavigationByRole(); };
     </script>
 </body>
-</html>
+        </html>
