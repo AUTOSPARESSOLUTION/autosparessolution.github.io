@@ -410,12 +410,15 @@
     <!-- Totals -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
-            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
+            <!-- CGST/SGST rows (visible only for local) -->
+            <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <!-- IGST row (visible only for interstate) -->
+            <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></td></tr>
+            <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
@@ -474,7 +477,6 @@
                     const el = document.getElementById(id);
                     if (el) el.value = val || '';
                 }
-                // Auto-fill consignee from buyer
                 document.getElementById('consigneeName').value = data.customer.name || '';
                 document.getElementById('consigneeAddress').value = data.customer.address || '';
                 document.getElementById('consigneePhone').value = data.customer.phone || '';
@@ -527,7 +529,6 @@
         document.getElementById('buyerEmail').value = currentUser.email || '';
         document.getElementById('buyerGstin').value = currentUser.gstin || '';
         document.getElementById('buyerState').value = currentUser.state || '';
-        // Auto-fill consignee from buyer (current user)
         document.getElementById('consigneeName').value = currentUser.name || '';
         document.getElementById('consigneeAddress').value = currentUser.address || '';
         document.getElementById('consigneePhone').value = currentUser.phone || '';
@@ -561,7 +562,6 @@
             document.getElementById('buyerGstin').value = cust.gstin || '';
             document.getElementById('buyerState').value = cust.state || '';
             document.getElementById('customerCode').value = cust.customerCode || '';
-            // Auto-fill consignee from selected buyer
             document.getElementById('consigneeName').value = cust.name || '';
             document.getElementById('consigneeAddress').value = cust.address || '';
             document.getElementById('consigneePhone').value = cust.phone || '';
@@ -586,27 +586,28 @@
     // ========== GST LOGIC BASED ON STATE (West Bengal = Local, else Interstate) ==========
     function isLocalGst() {
         const state = (document.getElementById('buyerState').value || '').trim().toLowerCase();
-        // West Bengal (local) check: common variations
-        const localStates = ['west bengal', 'wb', 'westbengal', 'kolkata', 'howrah', 'siliguri', 'darjeeling', 'asansol'];
+        // West Bengal variations
+        const localStates = ['west bengal', 'wb', 'westbengal', 'kolkata', 'howrah', 'siliguri', 'darjeeling', 'asansol', 'hooghly', 'bardhaman'];
         return localStates.some(ls => state.includes(ls));
     }
 
     function updateGstDisplay() {
         const isLocal = isLocalGst();
-        const cgstLabel = document.getElementById('gstLabel1');
-        const sgstLabel = document.getElementById('gstLabel2');
-        if (!isLocal) {
-            cgstLabel.innerHTML = 'IGST (18%):';
-            sgstLabel.innerHTML = '';
+        const cgstRow = document.getElementById('cgstRow');
+        const sgstRow = document.getElementById('sgstRow');
+        const igstRow = document.getElementById('igstRow');
+        if (isLocal) {
+            cgstRow.style.display = 'table-row';
+            sgstRow.style.display = 'table-row';
+            igstRow.style.display = 'none';
         } else {
-            cgstLabel.innerHTML = 'CGST (9%):';
-            sgstLabel.innerHTML = 'SGST (9%):';
+            cgstRow.style.display = 'none';
+            sgstRow.style.display = 'none';
+            igstRow.style.display = 'table-row';
         }
-        renderItemsAndTaxSummary();
+        renderItemsAndTaxSummary(); // recalculates totals including correct tax amounts
     }
-    // Re-run GST display when state changes
     document.getElementById('buyerState').addEventListener('input', updateGstDisplay);
-    // Also trigger on GSTIN field change (in case it triggers other logic)
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
     // Financial year & invoice numbering
@@ -717,12 +718,12 @@
         document.getElementById('subtotal').innerText = taxableTotals.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = taxableTotals.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = taxableTotals.sgstTotal.toFixed(2);
+        document.getElementById('igstTotal').innerText = taxableTotals.igstTotal.toFixed(2);
         document.getElementById('packingChargeDisplay').innerText = packing.toFixed(2);
         document.getElementById('roundOff').innerText = roundOff.toFixed(2);
         document.getElementById('grandTotal').innerText = grandTotal.toFixed(2);
     }
 
-    // Editable UOM function
     function updateUnit(part, newUnit) {
         const item = cart.find(i => i.part === part);
         if (item) {
@@ -759,7 +760,7 @@
                 <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
-             </tr>`;
+            </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
 
@@ -775,7 +776,7 @@
                 <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
                 <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
-             </tr>`;
+            </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
         updateTotalsWithPackingAndRound();
@@ -839,7 +840,7 @@
             email: document.getElementById('buyerEmail').value.trim(),
             address: document.getElementById('buyerAddress').value,
             phone: document.getElementById('buyerPhone').value.trim(),
-            gstin: document.getElementById('buyerGstin').value.trim(),  // now GSTIN/PAN
+            gstin: document.getElementById('buyerGstin').value.trim(),
             state: document.getElementById('buyerState').value.trim()
         };
 
@@ -1055,4 +1056,4 @@
     })();
 </script>
 </body>
-                    </html>
+</html>
