@@ -157,19 +157,8 @@
             overflow-wrap: break-word;
             white-space: normal;
         }
-        .items-table th:nth-child(1) { width: 4%; }
-        .items-table th:nth-child(2) { width: 10%; }
-        .items-table th:nth-child(3) { width: 12%; }
-        .items-table th:nth-child(4) { width: 8%; }
-        .items-table th:nth-child(5) { width: 5%; }
-        .items-table th:nth-child(6) { width: 4%; }
-        .items-table th:nth-child(7) { width: 7%; }
-        .items-table th:nth-child(8) { width: 6%; }
-        .items-table th:nth-child(9) { width: 8%; }
-        .items-table th:nth-child(10) { width: 6%; }
-        .items-table th:nth-child(11) { width: 8%; }
-        .items-table th:nth-child(12) { width: 8%; }
-        .items-table th:nth-child(13) { width: 8%; }
+        /* Dynamic column widths - will be set by JS, but fallback */
+        .items-table th, .items-table td { word-break: break-word; }
         .items-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .tax-summary-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
@@ -373,11 +362,9 @@
         </div>
     </div>
 
-    <!-- Items Table with editable UOM -->
-    <table class="items-table">
-        <thead>
-            <tr><th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>UOM</th><th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th><th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr>
-        </thead>
+    <!-- Items Table (dynamically rendered) -->
+    <table class="items-table" id="itemsTable">
+        <thead id="itemsTableHead"></thead>
         <tbody id="itemsBody"></tbody>
     </table>
 
@@ -412,10 +399,8 @@
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
-            <!-- CGST & SGST rows (only for local) -->
             <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <!-- IGST row (only for interstate) -->
             <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</strong></td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></td></tr>
             <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
@@ -592,6 +577,7 @@
 
     function updateGstDisplay() {
         const isLocal = isLocalGst();
+        // Show/hide totals rows
         const cgstRow = document.getElementById('cgstRow');
         const sgstRow = document.getElementById('sgstRow');
         const igstRow = document.getElementById('igstRow');
@@ -604,7 +590,7 @@
             sgstRow.style.display = 'none';
             igstRow.style.display = 'table-row';
         }
-        renderItemsAndTaxSummary();
+        renderItemsAndTaxSummary(); // rebuild table with correct columns
     }
     document.getElementById('buyerState').addEventListener('input', updateGstDisplay);
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
@@ -699,7 +685,6 @@
         return { subtotal: sub, cgstTotal, sgstTotal, igstTotal, taxGroups, isLocal };
     }
 
-    // Get the GST‑applicable total (subtotal + GST)
     function getGSTApplicableTotal() {
         const taxableTotals = calculateTaxableTotals();
         const gstTotal = taxableTotals.isLocal ? taxableTotals.cgstTotal + taxableTotals.sgstTotal : taxableTotals.igstTotal;
@@ -731,9 +716,25 @@
         }
     }
 
+    // ========== DYNAMIC TABLE RENDERING (CGST+SGST vs IGST) ==========
     function renderItemsAndTaxSummary() {
-        let itemsHtml = '';
         const isLocal = isLocalGst();
+        const thead = document.getElementById('itemsTableHead');
+        const tbody = document.getElementById('itemsBody');
+        
+        // Define column headers based on GST type
+        let headers = ['#', 'Part No', 'Description', 'HSN/SAC', 'UOM', 'Qty', 'Unit Price (₹)', 'Disc %', 'Taxable (₹)', 'GST%'];
+        if (isLocal) {
+            headers.push('CGST (₹)', 'SGST (₹)', 'Total (₹)');
+        } else {
+            headers.push('IGST (₹)', 'Total (₹)');
+        }
+        
+        // Build thead
+        thead.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+        
+        // Build rows
+        let itemsHtml = '';
         cart.forEach((item, idx) => {
             const discount = item.discount || 0;
             const taxable = (item.price * item.qty) * (1 - discount / 100);
@@ -745,36 +746,45 @@
                 igst = taxable * 0.18;
             }
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
-            itemsHtml += `<tr>
+            
+            // Common cells
+            let row = `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
-                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></strong></td>
-                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></strong></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></strong></td>
-                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></strong></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
-                <td style="text-align:center;">18%</strong></td>
-                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
-            </tr>`;
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></td>
+                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="text-align:center;">18%</td>`;
+            if (isLocal) {
+                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</td>
+                        <td style="text-align:right;">₹${sgst.toFixed(2)}</td>
+                        <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+            } else {
+                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</td>
+                        <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+            }
+            row += `</tr>`;
+            itemsHtml += row;
         });
-        document.getElementById('itemsBody').innerHTML = itemsHtml;
-
+        tbody.innerHTML = itemsHtml;
+        
+        // Render Tax Summary Table (unchanged)
         const totals = calculateTaxableTotals();
         let taxHtml = '';
         for (let hsn in totals.taxGroups) {
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -1055,4 +1065,4 @@
     })();
 </script>
 </body>
-                                          </html>
+                </html>
