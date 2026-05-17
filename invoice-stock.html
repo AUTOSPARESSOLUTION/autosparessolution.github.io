@@ -22,7 +22,7 @@
             border: 1px solid #dee2e6;
         }
         @media print {
-            .no-print, .actions, .invoice-type, button, input, textarea, select {
+            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn {
                 display: none !important;
             }
             body {
@@ -268,6 +268,23 @@
             break-inside: avoid;
             page-break-inside: avoid;
         }
+        .date-edit-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            margin-left: 6px;
+            font-size: 14px;
+            vertical-align: middle;
+            color: #ffc107;
+        }
+        .date-edit-btn:hover {
+            color: #ffaa33;
+        }
+        .invoice-date-wrapper {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
     </style>
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -286,7 +303,7 @@
         <div class="invoice-title">
             <h2>TAX INVOICE</h2>
             <p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p>
-            <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
+            <p><strong>Date:</strong> <span id="invoiceDate"></span> <button class="edit-date-btn no-print" id="editDateBtn" title="Edit Invoice Date">📅</button></p>
             <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
         </div>
     </div>
@@ -318,7 +335,7 @@
                 </div>
                 <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
                 <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
-                <div class="info-row"><div class="info-label">GSTIN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN"></div></div>
+                <div class="info-row"><div class="info-label">GSTIN/PAN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN or PAN"></div></div>
                 <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="buyerState" class="editable" placeholder="State"></div></div>
                 <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="buyerPhone" class="editable" placeholder="Phone"></div></div>
                 <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="buyerEmail" class="editable" placeholder="Email"></div></div>
@@ -385,7 +402,8 @@
 
     <!-- Tax Summary Table -->
     <table class="tax-summary-table">
-        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr>
+        </thead>
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
@@ -393,12 +411,10 @@
     <div class="totals">
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr id="packingRow">
-                <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
+            <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
             <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
             <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr id="roundOffRow">
-                <td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
+            <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
@@ -567,10 +583,12 @@
         return parseFloat(document.getElementById('packingTotal').value) || 0;
     }
 
-    // GST logic
+    // ========== GST LOGIC BASED ON STATE (West Bengal = Local, else Interstate) ==========
     function isLocalGst() {
-        const gst = document.getElementById('buyerGstin').value.trim();
-        return gst.startsWith('19');
+        const state = (document.getElementById('buyerState').value || '').trim().toLowerCase();
+        // West Bengal (local) check: common variations
+        const localStates = ['west bengal', 'wb', 'westbengal', 'kolkata', 'howrah', 'siliguri', 'darjeeling', 'asansol'];
+        return localStates.some(ls => state.includes(ls));
     }
 
     function updateGstDisplay() {
@@ -586,6 +604,9 @@
         }
         renderItemsAndTaxSummary();
     }
+    // Re-run GST display when state changes
+    document.getElementById('buyerState').addEventListener('input', updateGstDisplay);
+    // Also trigger on GSTIN field change (in case it triggers other logic)
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
     // Financial year & invoice numbering
@@ -726,19 +747,19 @@
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             itemsHtml += `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
                 <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
                 <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></td>
                 <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></td>
                 <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
-                <td style="text-align:center;">18%</strong></td>
-                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
-            </tr>`;
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="text-align:center;">18%</td>
+                <td style="text-align:right;">${isLocal ? '₹'+cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${isLocal ? '₹'+sgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>
+             </tr>`;
         });
         document.getElementById('itemsBody').innerHTML = itemsHtml;
 
@@ -748,13 +769,13 @@
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
-            </tr>`;
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
         updateTotalsWithPackingAndRound();
@@ -818,7 +839,7 @@
             email: document.getElementById('buyerEmail').value.trim(),
             address: document.getElementById('buyerAddress').value,
             phone: document.getElementById('buyerPhone').value.trim(),
-            gstin: document.getElementById('buyerGstin').value.trim(),
+            gstin: document.getElementById('buyerGstin').value.trim(),  // now GSTIN/PAN
             state: document.getElementById('buyerState').value.trim()
         };
 
@@ -994,6 +1015,44 @@
     updateInvoiceNumberDisplay();
     updateGstDisplay();
     calculatePackingCharges();
+
+    // ========== DATE EDIT FACILITY ==========
+    (function addDateEdit() {
+        const editBtn = document.getElementById('editDateBtn');
+        if (!editBtn) return;
+        editBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const currentDateStr = document.getElementById('invoiceDate').innerText;
+            const parts = currentDateStr.split('/');
+            const currentDate = new Date(parts[2], parts[1]-1, parts[0]);
+            const input = document.createElement('input');
+            input.type = 'date';
+            const year = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const day = String(currentDate.getDate()).padStart(2, '0');
+            input.value = `${year}-${month}-${day}`;
+            input.style.position = 'absolute';
+            input.style.opacity = '0';
+            input.style.pointerEvents = 'none';
+            document.body.appendChild(input);
+            input.showPicker();
+            input.addEventListener('change', function() {
+                if (input.value) {
+                    const [y, m, d] = input.value.split('-');
+                    const newDate = new Date(y, m-1, d);
+                    if (!isNaN(newDate)) {
+                        const formatted = newDate.toLocaleDateString('en-IN');
+                        document.getElementById('invoiceDate').innerText = formatted;
+                        updateDueDate();
+                    }
+                }
+                document.body.removeChild(input);
+            });
+            input.addEventListener('blur', () => {
+                if (document.body.contains(input)) document.body.removeChild(input);
+            });
+        });
+    })();
 </script>
 </body>
-                </html>
+                    </html>
