@@ -75,8 +75,8 @@
             background: #0a7c71;
             color: white;
         }
-        .qty-input, .disc-input {
-            width: 80px;
+        .qty-input, .disc-input, .hsn-input {
+            width: 100px;
             padding: 4px;
             text-align: center;
         }
@@ -94,7 +94,7 @@
             background-color: #f8d7da;
         }
         @media (max-width: 768px) {
-            .qty-input, .disc-input { width: 60px; }
+            .qty-input, .disc-input, .hsn-input { width: 70px; }
             table { font-size: 12px; }
         }
     </style>
@@ -120,12 +120,13 @@
 
 <script>
     let allProducts = [];
-    let selectedProductRows = new Map(); // key = product id, value = { qty, discount }
+    let selectedProductRows = new Map(); // key = product id, value = { qty, discount, hsn }
+    let productHsnOverrides = new Map();  // key = product id, value = custom HSN (if changed)
     let filteredProducts = [];
 
     function loadProducts() {
         allProducts = getProducts();
-        // Normalise, and keep only products with positive stock
+        // Keep only products with positive stock
         allProducts = allProducts.filter(p => (p.currentStock || 0) > 0);
         allProducts.forEach(p => {
             p.id = String(p.id);
@@ -168,8 +169,8 @@
                 <tr>
                     <th style="width:5%">Select</th>
                     <th style="width:12%">Part No (SKU)</th>
-                    <th style="width:25%">Product Name</th>
-                    <th style="width:10%">HSN</th>
+                    <th style="width:20%">Product Name</th>
+                    <th style="width:10%">HSN <br><span style="font-size:10px;">(editable)</span></th>
                     <th style="width:8%">Unit</th>
                     <th style="width:10%">Price (₹)</th>
                     <th style="width:8%">Stock</th>
@@ -180,18 +181,20 @@
             <tbody>`;
         for (let p of filteredProducts) {
             const selected = selectedProductRows.has(p.id);
-            const qty = selected ? selectedProductRows.get(p.id).qty : 1;
-            const discount = selected ? selectedProductRows.get(p.id).discount : 0;
+            const stored = selectedProductRows.get(p.id);
+            const qty = selected ? stored.qty : 1;
+            const discount = selected ? stored.discount : 0;
+            const hsnValue = productHsnOverrides.get(p.id) !== undefined ? productHsnOverrides.get(p.id) : p.hsn;
             html += `<tr>
                 <td style="text-align:center"><input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)"></td>
                 <td><strong>${escapeHtml(p.sku)}</strong></td>
-                <td class="product-name">${escapeHtml(p.name)}</strong></td>
-                <td>${escapeHtml(p.hsn)}</strong></td>
-                <td>${escapeHtml(p.unit)}</strong></td>
-                <td class="price">₹${(p.price || 0).toLocaleString()}</strong></td>
-                <td>${(p.currentStock || 0).toLocaleString()}</strong></td>
-                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" max="${p.currentStock}" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></strong></td>
-                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></strong></td>
+                <td class="product-name">${escapeHtml(p.name)}</td>
+                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></td>
+                <td>${escapeHtml(p.unit)}</td>
+                <td class="price">₹${(p.price || 0).toLocaleString()}</td>
+                <td>${(p.currentStock || 0).toLocaleString()}</td>
+                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" max="${p.currentStock}" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></td>
+                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></td>
             </tr>`;
         }
         html += `</tbody></table>`;
@@ -203,10 +206,19 @@
     }
 
     function toggleProduct(id, isSelected) {
+        const product = allProducts.find(p => p.id === id);
+        if (!product) return;
         if (isSelected) {
-            selectedProductRows.set(id, { qty: 1, discount: 0 });
+            // Default quantity = available stock (full stock)
+            const defaultQty = product.currentStock;
+            selectedProductRows.set(id, { qty: defaultQty, discount: 0 });
+            // If there's a custom HSN override, preserve it; otherwise use product.hsn
+            if (!productHsnOverrides.has(id)) {
+                productHsnOverrides.set(id, product.hsn);
+            }
         } else {
             selectedProductRows.delete(id);
+            // Optionally keep HSN override for next selection, but we can also delete it (not necessary)
         }
         renderTable();
     }
@@ -235,19 +247,35 @@
         }
     }
 
+    function updateHsn(id, newHsn) {
+        // Store the custom HSN for this row
+        productHsnOverrides.set(id, newHsn);
+        // If product is selected, update the stored hsn in the row data (optional)
+        if (selectedProductRows.has(id)) {
+            const current = selectedProductRows.get(id);
+            selectedProductRows.set(id, { ...current }); // just trigger re-render? Actually we store HSN separately, so OK
+        }
+        // No need to re-render immediately; the value is already updated in the input field.
+        // However, to be consistent, we can re-render but it's not necessary.
+    }
+
     function toggleSelectAll() {
         const checkAll = document.getElementById('selectAllCheckbox').checked;
         if (checkAll) {
-            // Select all currently filtered products
+            // Select all currently filtered products with default qty = stock
             for (let p of filteredProducts) {
                 if (!selectedProductRows.has(p.id)) {
-                    selectedProductRows.set(p.id, { qty: 1, discount: 0 });
+                    selectedProductRows.set(p.id, { qty: p.currentStock, discount: 0 });
+                    if (!productHsnOverrides.has(p.id)) {
+                        productHsnOverrides.set(p.id, p.hsn);
+                    }
                 }
             }
         } else {
             // Deselect all currently filtered products
             for (let p of filteredProducts) {
                 selectedProductRows.delete(p.id);
+                // HSN overrides can be left or cleared; we'll leave them
             }
         }
         renderTable();
@@ -267,10 +295,12 @@
                 alert(`Cannot add ${product.sku}: requested quantity (${qty}) exceeds available stock (${product.currentStock})`);
                 return;
             }
+            // Use custom HSN if present, else product's HSN
+            const finalHsn = productHsnOverrides.get(prodId) !== undefined ? productHsnOverrides.get(prodId) : product.hsn;
             cart.push({
                 part: product.sku,
                 desc: product.name,
-                hsn: product.hsn || '',
+                hsn: finalHsn || '',
                 qty: qty,
                 price: product.price,
                 discount: discount
@@ -299,4 +329,4 @@
     loadProducts();
 </script>
 </body>
-    </html>
+        </html>
