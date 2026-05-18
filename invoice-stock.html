@@ -22,7 +22,7 @@
             border: 1px solid #dee2e6;
         }
         @media print {
-            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn {
+            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp {
                 display: none !important;
             }
             body {
@@ -157,8 +157,6 @@
             overflow-wrap: break-word;
             white-space: normal;
         }
-        /* Dynamic column widths - will be set by JS, but fallback */
-        .items-table th, .items-table td { word-break: break-word; }
         .items-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .tax-summary-table th { background: #f8f9fa; font-weight: 600; font-size: 11px; }
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
@@ -257,7 +255,7 @@
             break-inside: avoid;
             page-break-inside: avoid;
         }
-        .date-edit-btn {
+        .edit-date-btn {
             background: none;
             border: none;
             cursor: pointer;
@@ -266,13 +264,27 @@
             vertical-align: middle;
             color: #ffc107;
         }
-        .date-edit-btn:hover {
+        .edit-date-btn:hover {
             color: #ffaa33;
         }
         .invoice-date-wrapper {
             display: inline-flex;
             align-items: center;
             gap: 4px;
+        }
+        .date-picker-temp {
+            position: absolute;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .date-picker-temp input {
+            border: 1px solid #aaa;
+            padding: 4px 6px;
+            border-radius: 4px;
         }
     </style>
     <script src="data-manager.js"></script>
@@ -577,7 +589,6 @@
 
     function updateGstDisplay() {
         const isLocal = isLocalGst();
-        // Show/hide totals rows
         const cgstRow = document.getElementById('cgstRow');
         const sgstRow = document.getElementById('sgstRow');
         const igstRow = document.getElementById('igstRow');
@@ -590,7 +601,7 @@
             sgstRow.style.display = 'none';
             igstRow.style.display = 'table-row';
         }
-        renderItemsAndTaxSummary(); // rebuild table with correct columns
+        renderItemsAndTaxSummary();
     }
     document.getElementById('buyerState').addEventListener('input', updateGstDisplay);
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
@@ -654,7 +665,7 @@
         updateDueDate();
     }
 
-    // Calculate GST‑applicable totals (subtotal + tax) WITHOUT packing
+    // Calculate GST‑applicable totals
     function calculateTaxableTotals() {
         let sub = 0;
         let taxGroups = {};
@@ -716,13 +727,12 @@
         }
     }
 
-    // ========== DYNAMIC TABLE RENDERING (CGST+SGST vs IGST) ==========
+    // Dynamic table rendering (CGST+SGST vs IGST)
     function renderItemsAndTaxSummary() {
         const isLocal = isLocalGst();
         const thead = document.getElementById('itemsTableHead');
         const tbody = document.getElementById('itemsBody');
         
-        // Define column headers based on GST type
         let headers = ['#', 'Part No', 'Description', 'HSN/SAC', 'UOM', 'Qty', 'Unit Price (₹)', 'Disc %', 'Taxable (₹)', 'GST%'];
         if (isLocal) {
             headers.push('CGST (₹)', 'SGST (₹)', 'Total (₹)');
@@ -730,10 +740,8 @@
             headers.push('IGST (₹)', 'Total (₹)');
         }
         
-        // Build thead
-        thead.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+        thead.innerHTML = '</tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
         
-        // Build rows
         let itemsHtml = '';
         cart.forEach((item, idx) => {
             const discount = item.discount || 0;
@@ -747,44 +755,39 @@
             }
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             
-            // Common cells
             let row = `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
-                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></td>
-                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="text-align:center;">18%</td>`;
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></strong></td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></strong></td>
+                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="text-align:center;">18%</strong></td>`;
             if (isLocal) {
-                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</td>
-                        <td style="text-align:right;">₹${sgst.toFixed(2)}</td>
-                        <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${sgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             } else {
-                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</td>
-                        <td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             }
             row += `</tr>`;
             itemsHtml += row;
         });
         tbody.innerHTML = itemsHtml;
         
-        // Render Tax Summary Table (unchanged)
         const totals = calculateTaxableTotals();
         let taxHtml = '';
         for (let hsn in totals.taxGroups) {
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -1026,43 +1029,60 @@
     updateGstDisplay();
     calculatePackingCharges();
 
-    // ========== DATE EDIT FACILITY ==========
+    // ========== RELIABLE DATE EDIT FACILITY (works for back‑dates) ==========
     (function addDateEdit() {
         const editBtn = document.getElementById('editDateBtn');
         if (!editBtn) return;
         editBtn.addEventListener('click', function(e) {
             e.preventDefault();
+            // Get current date from displayed text
             const currentDateStr = document.getElementById('invoiceDate').innerText;
             const parts = currentDateStr.split('/');
-            const currentDate = new Date(parts[2], parts[1]-1, parts[0]);
-            const input = document.createElement('input');
-            input.type = 'date';
-            const year = currentDate.getFullYear();
-            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-            const day = String(currentDate.getDate()).padStart(2, '0');
-            input.value = `${year}-${month}-${day}`;
-            input.style.position = 'absolute';
-            input.style.opacity = '0';
-            input.style.pointerEvents = 'none';
-            document.body.appendChild(input);
-            input.showPicker();
-            input.addEventListener('change', function() {
-                if (input.value) {
-                    const [y, m, d] = input.value.split('-');
-                    const newDate = new Date(y, m-1, d);
-                    if (!isNaN(newDate)) {
+            let currentDate = new Date(parts[2], parts[1]-1, parts[0]);
+            if (isNaN(currentDate.getTime())) {
+                currentDate = new Date();
+            }
+            // Create a temporary date input
+            const tempDiv = document.createElement('div');
+            tempDiv.className = 'date-picker-temp';
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.top = (editBtn.offsetTop + 30) + 'px';
+            tempDiv.style.left = editBtn.offsetLeft + 'px';
+            const dateInput = document.createElement('input');
+            dateInput.type = 'date';
+            const yyyy = currentDate.getFullYear();
+            const mm = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(currentDate.getDate()).padStart(2, '0');
+            dateInput.value = `${yyyy}-${mm}-${dd}`;
+            tempDiv.appendChild(dateInput);
+            document.body.appendChild(tempDiv);
+            dateInput.focus();
+            dateInput.addEventListener('change', function() {
+                if (dateInput.value) {
+                    const [y, m, d] = dateInput.value.split('-');
+                    const newDate = new Date(parseInt(y), parseInt(m)-1, parseInt(d));
+                    if (!isNaN(newDate.getTime())) {
                         const formatted = newDate.toLocaleDateString('en-IN');
                         document.getElementById('invoiceDate').innerText = formatted;
-                        updateDueDate();
+                        updateDueDate(); // recalc due date
                     }
                 }
-                document.body.removeChild(input);
+                document.body.removeChild(tempDiv);
             });
-            input.addEventListener('blur', () => {
-                if (document.body.contains(input)) document.body.removeChild(input);
+            // Close picker on blur
+            dateInput.addEventListener('blur', function() {
+                if (document.body.contains(tempDiv)) document.body.removeChild(tempDiv);
             });
+            // Also close if click outside
+            const outsideClickHandler = function(ev) {
+                if (!tempDiv.contains(ev.target) && ev.target !== editBtn) {
+                    if (document.body.contains(tempDiv)) document.body.removeChild(tempDiv);
+                    document.removeEventListener('click', outsideClickHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', outsideClickHandler), 100);
         });
     })();
 </script>
 </body>
-                </html>
+    </html>
