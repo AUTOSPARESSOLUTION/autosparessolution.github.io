@@ -411,11 +411,11 @@
         <table>
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
-            <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</strong></td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></td></tr>
-            <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</strong>NonNull<td style="text-align:right;">₹<span id="cgstTotal">0.00</span>NonNull
+            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</strong>NonNull<td style="text-align:right;">₹<span id="sgstTotal">0.00</span>NonNull
+            <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</strong>NonNull<td style="text-align:right;">₹<span id="igstTotal">0.00</span>NonNull
+            <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong>NonNull<td style="text-align:right;">₹<span id="roundOff">0.00</span>NonNull
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong>NonNull<td style="text-align:right;">₹<span id="grandTotal">0.00</span>NonNull
         </table>
     </div>
 
@@ -444,6 +444,23 @@
 </div>
 
 <script>
+    // ========== ONE-TIME MIGRATION: Merge existing salesInvoices into allInvoices ==========
+    (function migrateInvoices() {
+        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+        let changed = false;
+        for (let inv of salesInvoices) {
+            if (!allInvoices.some(ai => ai.id === inv.id)) {
+                allInvoices.push(inv);
+                changed = true;
+            }
+        }
+        if (changed) {
+            localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+            console.log(`Migrated ${allInvoices.length - (allInvoices.length - salesInvoices.length)} missing invoices to allInvoices.`);
+        }
+    })();
+
     // ========== LOAD FROM QUOTATION OR PROFORMA CONVERSION ==========
     (function loadConversionData() {
         const pending = localStorage.getItem('pendingQuotationConversion');
@@ -757,21 +774,21 @@
             
             let row = `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
-                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></td>
-                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="text-align:center;">18%</td>`;
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></strong></td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></strong></td>
+                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="text-align:center;">18%</strong></td>`;
             if (isLocal) {
-                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</td><td style="text-align:right;">₹${sgst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${sgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             } else {
-                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             }
-            row += `</tr>`;
+            row += `</table>`;
             itemsHtml += row;
         });
         tbody.innerHTML = itemsHtml;
@@ -782,12 +799,12 @@
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -831,16 +848,21 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    // ========== RELIABLE SAVE TO LOCALSTORAGE (FIXES ORDER HISTORY & INVOICE NUMBER) ==========
+    // ========== HELPER: SAVE INVOICE TO BOTH STORAGE KEYS ==========
     function saveInvoiceToLocalStorage(invoice) {
-        // Get existing invoices
+        // 1. Save to allInvoices (used by Order History)
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        // Remove any duplicate (by id) – shouldn't happen
         allInvoices = allInvoices.filter(inv => inv.id !== invoice.id);
         allInvoices.push(invoice);
         localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
         
-        // Update customer outstanding
+        // 2. Also save to salesInvoices (used by Delete Invoice, etc.)
+        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+        salesInvoices = salesInvoices.filter(inv => inv.id !== invoice.id);
+        salesInvoices.push(invoice);
+        localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
+        
+        // 3. Update customer outstanding
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const custIndex = customers.findIndex(c => c.email === invoice.customerEmail);
         if (custIndex !== -1) {
@@ -849,12 +871,13 @@
             localStorage.setItem('customers', JSON.stringify(customers));
         }
         
-        // Also call original createSalesInvoice if it exists (for stock update)
+        // 4. Also call original createSalesInvoice if exists (for stock updates)
         if (typeof createSalesInvoice === 'function') {
             try { createSalesInvoice(invoice); } catch(e) { console.warn(e); }
         }
     }
 
+    // ========== SAVE INVOICE (FIXED) ==========
     function saveInvoice() {
         if (cart.length === 0) {
             alert('Cart empty. Please add items first.');
@@ -880,7 +903,6 @@
             state: document.getElementById('buyerState').value.trim()
         };
 
-        // Auto-register customer if new
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         let existingCustomer = customers.find(c => c.email === buyer.email);
         if (!existingCustomer && buyer.email) {
@@ -955,10 +977,9 @@
             }))
         };
 
-        // Save invoice using our reliable function
+        // Save using the dual‑storage function
         saveInvoiceToLocalStorage(invoice);
 
-        // Clear cart and close
         alert(`Invoice ${finalNo} saved successfully!\n\nPacking charges: ₹${packing.toFixed(2)} (no GST).\nRound Off: ₹${roundOff.toFixed(2)}`);
         localStorage.setItem('invoiceCart', '[]');
         setTimeout(() => window.close(), 1000);
@@ -1097,4 +1118,4 @@
     })();
 </script>
 </body>
-</html>
+                </html>
