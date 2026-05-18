@@ -78,7 +78,6 @@
     <div class="form-row">
         <div class="form-group">
             <label>Supplier *</label>
-            <!-- Admin quick select (visible only to admin) -->
             <div id="adminSupplierSelect" style="display:none;">
                 <select id="quickSupplierSelect" onchange="loadSupplierDataFromQuick()" style="margin-bottom:5px;">
                     <option value="">-- Quick Select (Admin only) --</option>
@@ -104,7 +103,7 @@
         <div class="form-group"><label>Payment Terms (days)</label><input type="number" id="paymentTerms" value="30"></div>
     </div>
 
-    <!-- Items Table (fully manual entry, part number is the product ID) -->
+    <!-- Items Table -->
     <h3>Items Purchased</h3>
     <div id="itemsContainer"></div>
     <button class="add-item" onclick="addItemRow()"><i class="fas fa-plus"></i> Add Item</button>
@@ -124,25 +123,55 @@
         <button class="btn-danger" onclick="window.close()">Cancel</button>
     </div>
 
-    <!-- Credit Note Entry Section -->
+    <!-- Credit Note Section -->
     <div class="credit-note-section">
         <h3>Record Credit Note (Supplier Return)</h3>
         <div class="form-row">
             <div class="form-group"><label>Credit Note Date</label><input type="date" id="creditDate"></div>
             <div class="form-group"><label>Amount (₹)</label><input type="number" id="creditAmount" step="0.01" placeholder="Enter amount"></div>
-            <div class="form-group"><label>Against Invoice (optional)</label><select id="creditInvoiceSelect"><option value="">All outstanding</option></select></div>
-            <div class="form-group"><label>Reason / Remarks</label><input type="text" id="creditRemarks" placeholder="Return reason"></div>
+            <div class="form-group"><label>Against Invoice</label><select id="creditInvoiceSelect"><option value="">All outstanding</option></select></div>
+            <div class="form-group"><label>Reason</label><input type="text" id="creditRemarks" placeholder="Return reason"></div>
             <div class="form-group"><button onclick="recordCreditNote()">Record Credit Note</button></div>
         </div>
     </div>
 </div>
 
 <script>
-    let items = [];           // each item: { part, desc, hsn, qty, cost, discount }
+    let items = [];
     let suppliers = [];
     let purchaseInvoices = [];
 
-    // ---------- Load cart from localStorage (set by index.html) ----------
+    // Helper: update product master with HSN (create or update)
+    function updateProductHsn(partNumber, hsn, desc, price) {
+        let products = getProducts();
+        let existing = products.find(p => p.sku === partNumber);
+        if (!existing) {
+            // Create new product
+            products.push({
+                id: Date.now() + Math.random(),
+                name: desc || partNumber,
+                sku: partNumber,
+                unit: 'pc',
+                price: price || 0,
+                currentStock: 0,
+                reorderLevel: 10,
+                hsn: hsn || '',
+                createdAt: new Date().toISOString()
+            });
+        } else {
+            // Update HSN if provided and not already set, or overwrite if empty
+            if (hsn && (!existing.hsn || existing.hsn === '')) {
+                existing.hsn = hsn;
+            }
+            // Optionally update description if missing
+            if (desc && (!existing.name || existing.name === '')) {
+                existing.name = desc;
+            }
+        }
+        saveProducts(products);
+    }
+
+    // Load cart from localStorage
     function loadCartItems() {
         const cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
         if (cart.length > 0) {
@@ -156,13 +185,12 @@
             }));
             console.log('Loaded purchase cart:', items);
         } else {
-            addItemRow(); // start with one empty row
+            addItemRow();
         }
         renderItems();
         recalcTotals();
     }
 
-    // ---------- Load suppliers & populate dropdowns ----------
     function loadSupplierData() {
         suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
         const supplierSelect = document.getElementById('supplierSelect');
@@ -186,7 +214,6 @@
             populateInvoiceDropdown();
         });
 
-        // Admin quick-select
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
         if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
             document.getElementById('adminSupplierSelect').style.display = 'block';
@@ -207,13 +234,11 @@
             document.getElementById('supplierGstin').value = sup.gstin || '';
             document.getElementById('supplierPhone').value = sup.phone || '';
             document.getElementById('supplierAddress').value = sup.address || '';
-            // Also set the main select to match
             const mainSelect = document.getElementById('supplierSelect');
             mainSelect.value = email;
         }
     }
 
-    // ---------- Items UI ----------
     function addItemRow() {
         items.push({ part: '', desc: '', hsn: '', qty: 1, cost: 0, discount: 0 });
         renderItems();
@@ -268,7 +293,6 @@
         document.getElementById('grandTotal').innerText = grand.toFixed(2);
     }
 
-    // ---------- Save Purchase Invoice ----------
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -333,12 +357,14 @@
             localStorage.setItem('suppliers', JSON.stringify(suppliers));
         }
 
-        // Build purchase items – use part string as productId
+        // Prepare purchase items and ALSO update product master with HSN
         const purchaseItems = [];
         for (let item of items) {
             if (!item.part) continue;
+            // Update product master (create or update HSN)
+            updateProductHsn(item.part, item.hsn, item.desc, item.cost);
             purchaseItems.push({
-                productId: item.part,   // exact part number as productId
+                productId: item.part,
                 quantity: item.qty,
                 cost: item.cost,
                 discount: item.discount,
@@ -364,7 +390,7 @@
 
         try {
             createPurchaseInvoice(purchase);
-            alert(`Purchase invoice ${invoiceNo} saved! Stock increased, supplier outstanding updated.`);
+            alert(`Purchase invoice ${invoiceNo} saved! Stock increased, supplier outstanding updated, HSN saved to product master.`);
             localStorage.setItem('invoiceCart', '[]');
             window.close();
         } catch (err) {
@@ -372,7 +398,6 @@
         }
     }
 
-    // ---------- Credit Note ----------
     function recordCreditNote() {
         const supplierName = document.getElementById('supplierName').value.trim();
         if (!supplierName) { alert('Select a supplier first'); return; }
@@ -417,7 +442,7 @@
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
-    // ---------- Initialisation ----------
+    // Initialisation
     document.getElementById('purchaseDate').valueAsDate = new Date();
     const due = new Date(); due.setDate(due.getDate() + 30);
     document.getElementById('purchaseDueDate').valueAsDate = due;
@@ -428,4 +453,4 @@
     purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
 </script>
 </body>
-    </html>
+                                                               </html>
