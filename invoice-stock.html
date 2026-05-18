@@ -213,15 +213,21 @@
 </div>
 
 <script>
-    // ========== FIX 1: SYNC allInvoices WITH salesInvoices (remove deleted invoices) ==========
-    (function syncAllInvoices() {
+    // ========== SAFE SYNC: only add missing invoices, never remove ==========
+    (function syncInvoices() {
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        // Keep only invoices that exist in salesInvoices
-        let filtered = allInvoices.filter(inv => salesInvoices.some(si => si.id === inv.id));
-        if (filtered.length !== allInvoices.length) {
-            localStorage.setItem('allInvoices', JSON.stringify(filtered));
-            console.log(`Cleaned allInvoices: removed ${allInvoices.length - filtered.length} deleted invoices.`);
+        let changed = false;
+        // Add any invoice from salesInvoices that is missing in allInvoices
+        for (let inv of salesInvoices) {
+            if (!allInvoices.some(ai => ai.id === inv.id)) {
+                allInvoices.push(inv);
+                changed = true;
+            }
+        }
+        if (changed) {
+            localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+            console.log("Synced allInvoices: added missing invoices from salesInvoices.");
         }
     })();
 
@@ -442,7 +448,7 @@
         updateDueDate();
     }
 
-    // ========== FIX 2: SAFE NUMBER FORMATTING TO PREVENT "NOT NULL" ==========
+    // ========== SAFE NUMBER FORMATTING (prevents "not null") ==========
     function calculateTaxableTotals() {
         let sub = 0;
         let taxGroups = {};
@@ -601,7 +607,7 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    // ========== HELPER: SAVE INVOICE TO BOTH STORAGE KEYS ==========
+    // ========== SAVE INVOICE TO BOTH STORAGE KEYS (NO DELETION) ==========
     function saveInvoiceToLocalStorage(invoice) {
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         allInvoices = allInvoices.filter(inv => inv.id !== invoice.id);
@@ -860,4 +866,4 @@
     })();
 </script>
 </body>
-                                                                       </html>
+    </html>
