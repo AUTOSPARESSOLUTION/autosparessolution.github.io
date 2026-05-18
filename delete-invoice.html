@@ -72,14 +72,14 @@
             document.getElementById('salesTable').innerHTML = '<p>No sales invoices found.</p>';
             return;
         }
-        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        let html = '</table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
         invoices.forEach(inv => {
             html += `<tr>
-                <td>${escapeHtml(inv.invoiceNo)}</td>
-                <td>${inv.date}</td>
-                <td>${escapeHtml(inv.customerEmail)}</td>
-                <td>₹${inv.total.toLocaleString()}</td>
-                <td><button class="delete-btn" onclick="deleteSalesInvoiceHandler('${inv.id}')">Delete & Reverse</button></td>
+                <td>${escapeHtml(inv.invoiceNo || inv.id)}</strong></td>
+                <td>${inv.date || '-'}</strong></td>
+                <td>${escapeHtml(inv.customerEmail || 'N/A')}</strong></td>
+                <td>₹${(inv.total || inv.grandTotal || 0).toLocaleString()}</strong></td>
+                <td><button class="delete-btn" onclick="deleteSalesInvoiceHandler('${inv.id}')">Delete & Reverse</button></strong></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -147,21 +147,25 @@
         }
     };
 
-    // ======================== Purchase Invoices ========================
+    // ======================== Purchase Invoices (FIXED) ========================
     function loadPurchaseInvoices() {
         const invoices = getPurchaseInvoices();
         if (invoices.length === 0) {
             document.getElementById('purchaseTable').innerHTML = '<p>No purchase invoices found.</p>';
             return;
         }
-        let html = '<td><thead><tr><th>PO No</th><th>Date</th><th>Supplier Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Invoice/PO No</th><th>Date</th><th>Supplier Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
         invoices.forEach(inv => {
+            // Use invoiceNo or poNo – most likely invoiceNo is used
+            let docNo = inv.invoiceNo || inv.poNo || 'N/A';
+            let supplierEmail = inv.supplierEmail || (inv.supplier?.email) || 'Not recorded';
+            let total = inv.total || inv.grandTotal || 0;
             html += `<tr>
-                <td>${escapeHtml(inv.poNo)}</td>
-                <td>${inv.date}</td>
-                <td>${escapeHtml(inv.supplierEmail)}</td>
-                <td>₹${inv.total.toLocaleString()}</td>
-                <td><button class="delete-btn" onclick="deletePurchaseInvoiceHandler('${inv.id}')">Delete & Reverse</button></td>
+                <td>${escapeHtml(docNo)}</strong></td>
+                <td>${inv.date || '-'}</strong></td>
+                <td>${escapeHtml(supplierEmail)}</strong></td>
+                <td>₹${total.toLocaleString()}</strong></td>
+                <td><button class="delete-btn" onclick="deletePurchaseInvoiceHandler('${inv.id}')">Delete & Reverse</button></strong></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -188,9 +192,10 @@
 
             // Update supplier outstanding
             let suppliers = getSuppliers();
-            let supplier = suppliers.find(s => s.email === invoice.supplierEmail);
+            let supplierEmail = invoice.supplierEmail || (invoice.supplier?.email);
+            let supplier = suppliers.find(s => s.email === supplierEmail);
             if (supplier) {
-                supplier.outstanding = (supplier.outstanding || 0) - invoice.total;
+                supplier.outstanding = (supplier.outstanding || 0) - (invoice.total || invoice.grandTotal || 0);
                 if (supplier.outstanding < 0) supplier.outstanding = 0;
                 saveSuppliers(suppliers);
             }
