@@ -297,7 +297,7 @@
         </div>
     </div>
 
-    <!-- Buyer and Consignee (exactly as invoice) -->
+    <!-- Buyer and Consignee -->
     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 240px;">
             <div class="info-box">
@@ -350,7 +350,7 @@
         </div>
     </div>
 
-    <!-- Items Table (editable, includes delete column) -->
+    <!-- Items Table -->
     <table class="items-table">
         <thead>
             <tr>
@@ -428,7 +428,7 @@
 </div>
 
 <script>
-    // ========== PROFORMA NUMBERING (PROF-YYYY-XXXX) ==========
+    // ========== PROFORMA NUMBERING ==========
     function getAllProformas() {
         let raw = localStorage.getItem('proformas');
         if (!raw) return [];
@@ -450,7 +450,7 @@
         return `PROF-${currentYear}-${nextSuffix.toString().padStart(4, '0')}`;
     }
 
-    // ========== PACKING & FORWARDING (same as invoice) ==========
+    // ========== PACKING & FORWARDING ==========
     function calculatePackingCharges() {
         const cartons = parseFloat(document.getElementById('packingCartons').value) || 0;
         const rate = parseFloat(document.getElementById('packingRate').value) || 0;
@@ -475,7 +475,6 @@
     });
     if (cart.length === 0) addItem();
 
-    // Prefill customer data from logged‑in user
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
@@ -489,13 +488,12 @@
         document.getElementById('consigneePhone').value = currentUser.phone || '';
     }
 
-    // Set dates
     document.getElementById('proformaNo').innerText = getNextProformaNumber();
     document.getElementById('proformaDate').innerText = new Date().toLocaleDateString('en-IN');
     let valid = new Date(); valid.setDate(valid.getDate() + 15);
     document.getElementById('validUntil').innerText = valid.toLocaleDateString('en-IN');
 
-    // ========== ADMIN CUSTOMER QUICK SELECT ==========
+    // Admin quick select
     if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
         document.getElementById('adminCustomerSelect').style.display = 'flex';
         populateCustomerSelect();
@@ -549,7 +547,7 @@
     }
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
-    // ========== CALCULATIONS (same as invoice) ==========
+    // ========== CALCULATIONS ==========
     function calculateTaxableTotals() {
         let sub = 0;
         let taxGroups = {};
@@ -597,7 +595,6 @@
         document.getElementById('packingChargeDisplay').innerText = packing.toFixed(2);
         document.getElementById('roundOff').innerText = roundOff.toFixed(2);
         document.getElementById('grandTotal').innerText = grandTotal.toFixed(2);
-        // Tax summary
         let taxHtml = '';
         for (let hsn in taxableTotals.taxGroups) {
             const g = taxableTotals.taxGroups[hsn];
@@ -640,7 +637,6 @@
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             const row = tbody.insertRow();
             row.insertCell(0).innerText = idx + 1;
-            // Part No
             const cellPart = row.insertCell(1);
             const partInput = document.createElement('input');
             partInput.type = 'text';
@@ -648,7 +644,6 @@
             partInput.className = 'editable';
             partInput.onchange = (function(i) { return function() { updatePart(i, this.value); }; })(idx);
             cellPart.appendChild(partInput);
-            // Description
             const cellDesc = row.insertCell(2);
             const descInput = document.createElement('input');
             descInput.type = 'text';
@@ -656,7 +651,6 @@
             descInput.className = 'editable';
             descInput.onchange = (function(i) { return function() { updateDesc(i, this.value); }; })(idx);
             cellDesc.appendChild(descInput);
-            // HSN
             const cellHsn = row.insertCell(3);
             const hsnInput = document.createElement('input');
             hsnInput.type = 'text';
@@ -664,7 +658,6 @@
             hsnInput.className = 'editable';
             hsnInput.onchange = (function(i) { return function() { updateHsn(item.part, this.value); }; })(idx);
             cellHsn.appendChild(hsnInput);
-            // UOM
             const cellUom = row.insertCell(4);
             const uomInput = document.createElement('input');
             uomInput.type = 'text';
@@ -672,7 +665,6 @@
             uomInput.className = 'editable';
             uomInput.onchange = (function(i) { return function() { updateUnit(item.part, this.value); }; })(idx);
             cellUom.appendChild(uomInput);
-            // Qty
             const cellQty = row.insertCell(5);
             const qtyInput = document.createElement('input');
             qtyInput.type = 'number';
@@ -682,7 +674,6 @@
             qtyInput.style.textAlign = 'right';
             qtyInput.onchange = (function(i) { return function() { updateQty(item.part, this.value); }; })(idx);
             cellQty.appendChild(qtyInput);
-            // Unit Price
             const cellPrice = row.insertCell(6);
             const priceInput = document.createElement('input');
             priceInput.type = 'number';
@@ -692,7 +683,6 @@
             priceInput.style.textAlign = 'right';
             priceInput.onchange = (function(i) { return function() { updatePrice(item.part, this.value); }; })(idx);
             cellPrice.appendChild(priceInput);
-            // Discount %
             const cellDisc = row.insertCell(7);
             const discInput = document.createElement('input');
             discInput.type = 'number';
@@ -702,19 +692,15 @@
             discInput.style.textAlign = 'right';
             discInput.onchange = (function(i) { return function() { updateDiscount(item.part, this.value); }; })(idx);
             cellDisc.appendChild(discInput);
-            // Taxable
             const cellTaxable = row.insertCell(8);
             cellTaxable.innerText = `₹${taxable.toFixed(2)}`;
             cellTaxable.style.textAlign = 'right';
-            // GST%
             const cellGstPct = row.insertCell(9);
             cellGstPct.innerText = '18%';
             cellGstPct.style.textAlign = 'center';
-            // CGST/IGST
             const cellCgst = row.insertCell(10);
             cellCgst.innerText = isLocal ? `₹${cgst.toFixed(2)}` : `₹${igst.toFixed(2)}`;
             cellCgst.style.textAlign = 'right';
-            // SGST (if local)
             const cellSgst = row.insertCell(11);
             if (isLocal) {
                 cellSgst.innerText = `₹${sgst.toFixed(2)}`;
@@ -723,11 +709,9 @@
                 cellSgst.innerText = '-';
                 cellSgst.style.textAlign = 'center';
             }
-            // Total
             const cellTotal = row.insertCell(12);
             cellTotal.innerText = `₹${totalItem.toFixed(2)}`;
             cellTotal.style.textAlign = 'right';
-            // Delete button
             const cellDel = row.insertCell(13);
             const delBtn = document.createElement('button');
             delBtn.innerText = '🗑️';
@@ -746,6 +730,114 @@
     function addItem() {
         cart.push({ part: '', desc: '', hsn: '', unit: 'pc', qty: 1, price: 0, discount: 0 });
         renderItems();
+    }
+
+    // ========== HELPER: ENSURE PRODUCT EXISTS IN MASTER (PREVENTS UNKNOWN PRODUCTS) ==========
+    function ensureProductInMaster(sku, name, hsn, price) {
+        let products = getProducts();
+        let existing = products.find(p => p.sku === sku);
+        if (!existing) {
+            products.push({
+                id: sku,   // use SKU as ID for consistency
+                sku: sku,
+                name: name || sku,
+                hsn: hsn || '',
+                unit: 'pc',
+                price: price || 0,
+                currentStock: 0,
+                reorderLevel: 10,
+                createdAt: new Date().toISOString()
+            });
+            saveProducts(products);
+        } else {
+            // Update HSN if missing
+            if (hsn && (!existing.hsn || existing.hsn === '')) {
+                existing.hsn = hsn;
+                saveProducts(products);
+            }
+            // Update name if missing
+            if (name && (!existing.name || existing.name === '')) {
+                existing.name = name;
+                saveProducts(products);
+            }
+        }
+        return true;
+    }
+
+    // ========== CONVERT TO SALES INVOICE (FIXED) ==========
+    function convertToInvoice() {
+        if (cart.length === 0) {
+            alert('No items to convert');
+            return;
+        }
+        const customerEmail = document.getElementById('buyerEmail').value.trim();
+        if (!customerEmail) {
+            alert('Customer email is required to convert to invoice');
+            return;
+        }
+
+        // 1. Ensure all products exist in product master
+        for (let item of cart) {
+            if (!item.part) continue;
+            ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
+        }
+
+        // 2. Ensure customer exists
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        let customer = customers.find(c => c.email === customerEmail);
+        if (!customer) {
+            customer = {
+                id: Date.now(),
+                name: document.getElementById('buyerName').value,
+                email: customerEmail,
+                phone: document.getElementById('buyerPhone').value,
+                address: document.getElementById('buyerAddress').value,
+                gstin: document.getElementById('buyerGstin').value,
+                state: document.getElementById('buyerState').value,
+                creditLimit: 50000,
+                outstanding: 0,
+                totalPurchased: 0,
+                status: 'active',
+                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
+                createdAt: new Date().toISOString()
+            };
+            customers.push(customer);
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+
+        // 3. Build invoice items (use productId = sku)
+        const invoiceItems = cart.filter(item => item.part).map(item => ({
+            productId: item.part,
+            quantity: item.qty,
+            price: item.price
+        }));
+
+        const invoice = {
+            id: Date.now(),
+            date: new Date().toISOString().slice(0, 10),
+            customerEmail: customerEmail,
+            items: invoiceItems,
+            total: parseFloat(document.getElementById('grandTotal').innerText),
+            invoiceNo: 'INV-' + Date.now(),
+            status: 'pending',
+            packingCharges: getPackingCharge(),
+            cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
+            packingRate: parseFloat(document.getElementById('packingRate').value) || 0,
+            roundOff: parseFloat(document.getElementById('roundOff').innerText)
+        };
+
+        try {
+            createSalesInvoice(invoice);
+            alert('Proforma converted to Sales Invoice! Stock & customer outstanding updated.');
+            if (confirm('Delete this proforma after conversion?')) {
+                let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
+                proformas = proformas.filter(p => p.proformaNo !== document.getElementById('proformaNo').innerText);
+                localStorage.setItem('proformas', JSON.stringify(proformas));
+            }
+            window.close();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
     }
 
     // ========== SAVE PROFORMA ==========
@@ -789,75 +881,10 @@
         window.close();
     }
 
-    // ========== CONVERT TO SALES INVOICE ==========
-    function convertToInvoice() {
-        if (cart.length === 0) {
-            alert('No items to convert');
-            return;
-        }
-        const customerEmail = document.getElementById('buyerEmail').value.trim();
-        if (!customerEmail) {
-            alert('Customer email is required to convert to invoice');
-            return;
-        }
-        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        let customer = customers.find(c => c.email === customerEmail);
-        if (!customer) {
-            customer = {
-                id: Date.now(),
-                name: document.getElementById('buyerName').value,
-                email: customerEmail,
-                phone: document.getElementById('buyerPhone').value,
-                address: document.getElementById('buyerAddress').value,
-                gstin: document.getElementById('buyerGstin').value,
-                state: document.getElementById('buyerState').value,
-                creditLimit: 50000,
-                outstanding: 0,
-                totalPurchased: 0,
-                status: 'active',
-                customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
-                createdAt: new Date().toISOString()
-            };
-            customers.push(customer);
-            localStorage.setItem('customers', JSON.stringify(customers));
-        }
-        const invoiceItems = cart.map(item => ({
-            productId: item.part,
-            quantity: item.qty,
-            price: item.price
-        }));
-        const invoice = {
-            id: Date.now(),
-            date: new Date().toISOString().slice(0, 10),
-            customerEmail: customerEmail,
-            items: invoiceItems,
-            total: parseFloat(document.getElementById('grandTotal').innerText),
-            invoiceNo: 'INV-' + Date.now(),
-            status: 'pending',
-            packingCharges: getPackingCharge(),
-            cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
-            packingRate: parseFloat(document.getElementById('packingRate').value) || 0,
-            roundOff: parseFloat(document.getElementById('roundOff').innerText)
-        };
-        try {
-            createSalesInvoice(invoice);
-            alert('Proforma converted to Sales Invoice! Stock & customer outstanding updated.');
-            if (confirm('Delete this proforma after conversion?')) {
-                let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
-                proformas = proformas.filter(p => p.proformaNo !== document.getElementById('proformaNo').innerText);
-                localStorage.setItem('proformas', JSON.stringify(proformas));
-            }
-            window.close();
-        } catch (err) {
-            alert('Error: ' + err.message);
-        }
-    }
-
-    // ========== PDF GENERATION (clone, replace inputs with spans, remove delete column and action buttons) ==========
+    // ========== PDF GENERATION ==========
     function downloadPDF() {
         const originalContainer = document.getElementById('proformaContainer');
         const clone = originalContainer.cloneNode(true);
-        // Replace all inputs, textareas, selects with plain text spans
         clone.querySelectorAll('input, textarea, select').forEach(el => {
             const span = document.createElement('span');
             span.className = 'info-value-text';
@@ -873,9 +900,7 @@
             span.style.width = '100%';
             el.parentNode.replaceChild(span, el);
         });
-        // Remove the delete column (last th/td) from items table
         clone.querySelectorAll('.items-table th:last-child, .items-table td:last-child').forEach(el => el.remove());
-        // Hide all action buttons and any .no-print elements
         clone.querySelectorAll('.actions, .no-print, .actions button, .delete-btn').forEach(el => el.style.display = 'none');
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
@@ -902,4 +927,4 @@
     calculatePackingCharges();
 </script>
 </body>
-    </html>
+                                                                                                               </html>
