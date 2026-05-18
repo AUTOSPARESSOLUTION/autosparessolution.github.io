@@ -22,12 +22,15 @@
         .btn-warning:hover { background: #e0a800; }
         .btn-danger { background: #dc3545; }
         .btn-danger:hover { background: #c82333; }
-        .search-box { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        .btn-secondary { background: #6c757d; }
+        .search-box { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
         .low-stock { background-color: #fff3cd; }
         .action-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
+        .computed-stock { font-weight: normal; color: #0a7c71; font-size: 0.9em; }
+        .sync-note { margin-left: 15px; font-size: 0.85em; color: #666; }
         @media (max-width: 768px) { .form-row { flex-direction: column; } table { font-size: 12px; } }
     </style>
 </head>
@@ -37,6 +40,7 @@
         <h1>Product Master</h1>
         <div>
             <a href="dashboard.html" style="background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">Dashboard</a>
+            <button onclick="syncStockFromLedger()" style="background: #17a2b8;"><i class="fas fa-sync-alt"></i> Sync Stock from Ledger</button>
             <button onclick="importFromCSV()" style="background: #28a745;"><i class="fas fa-file-csv"></i> Import CSV</button>
             <a href="invoice-stock.html" style="background: #0a7c71; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">+ New Invoice</a>
         </div>
@@ -52,12 +56,13 @@
         </div>
         <div class="form-row">
             <div class="form-group"><label>Selling Price (₹)</label><input type="number" id="prodPrice" step="0.01" value="0"></div>
-            <div class="form-group"><label>Current Stock</label><input type="number" id="prodStock" step="1" value="0"></div>
+            <div class="form-group"><label>Current Stock (Stored)</label><input type="number" id="prodStock" step="1" value="0"></div>
             <div class="form-group"><label>Reorder Level</label><input type="number" id="prodReorder" step="1" value="10"></div>
         </div>
         <div class="form-row">
             <div class="form-group"><label>HSN / SAC</label><input type="text" id="prodHsn" placeholder="HSN code"></div>
             <div class="form-group"><label>Cost Price (optional)</label><input type="number" id="prodCost" step="0.01" value="0"></div>
+            <div class="form-group"><label>Computed Stock (from ledger)</label><input type="text" id="computedStockDisplay" readonly style="background:#e9ecef;"></div>
         </div>
         <div class="form-row">
             <button onclick="saveProduct()">💾 Save Product</button>
@@ -78,15 +83,102 @@
 <script>
     let products = [];
     let editId = null;
+    let computedStockMap = new Map(); // store computed stock for each product ID
+
+    // Compute current stock for all products from transactions (same as inventory.html)
+    function computeStockFromTransactions() {
+        let productsList = getProducts();
+        productsList.forEach(p => {
+            if (p.id !== undefined) p.id = String(p.id);
+            if (p.sku !== undefined) p.sku = String(p.sku);
+        });
+        let stockMap = new Map();
+        
+        // Purchase invoices (IN)
+        const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        purchaseInvoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                let productId = item.productId || item.part;
+                if (!productId) return;
+                productId = String(productId);
+                const qty = parseFloat(item.quantity) || 0;
+                if (qty === 0) return;
+                const current = stockMap.get(productId) || 0;
+                stockMap.set(productId, current + qty);
+            });
+        });
+        
+        // Sales invoices (OUT)
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        allInvoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                let productId = item.part || item.productId;
+                if (!productId) return;
+                productId = String(productId);
+                const qty = parseFloat(item.qty) || 0;
+                if (qty === 0) return;
+                const current = stockMap.get(productId) || 0;
+                stockMap.set(productId, current - qty);
+            });
+        });
+        
+        // Adjustments (from inventoryTransactions)
+        const transactions = getInventoryTransactions();
+        transactions.forEach(t => {
+            if (t.type === 'adjustment') {
+                let productId = String(t.productId);
+                let qty = parseFloat(t.quantity) || 0;
+                const current = stockMap.get(productId) || 0;
+                stockMap.set(productId, current + qty);
+            }
+        });
+        
+        // Also include products that have no transactions (use product.currentStock as fallback)
+        productsList.forEach(p => {
+            let idKey = p.id;
+            let skuKey = p.sku;
+            let computed = stockMap.get(idKey);
+            if (computed === undefined && skuKey) computed = stockMap.get(skuKey);
+            if (computed === undefined) computed = p.currentStock || 0;
+            computedStockMap.set(p.id, computed);
+        });
+        return computedStockMap;
+    }
+
+    // Update product master's currentStock to match computed stock
+    function syncStockFromLedger() {
+        computeStockFromTransactions();
+        let productsList = getProducts();
+        let updated = 0;
+        for (let p of productsList) {
+            let computed = computedStockMap.get(p.id);
+            if (computed !== undefined && p.currentStock !== computed) {
+                p.currentStock = computed;
+                updated++;
+            }
+        }
+        if (updated > 0) {
+            saveProducts(productsList);
+            alert(`Stock synchronized for ${updated} product(s).`);
+            loadProducts();
+        } else {
+            alert('All products already have correct stock.');
+        }
+    }
 
     function refreshProducts() {
         products = getProducts();
+        computeStockFromTransactions(); // updates computedStockMap
         return products;
     }
 
     function loadProducts() {
         refreshProducts();
         displayProducts();
+    }
+
+    function getComputedStock(productId) {
+        return computedStockMap.get(String(productId)) || 0;
     }
 
     function displayProducts() {
@@ -103,9 +195,26 @@
             document.getElementById('productsTable').innerHTML = '<p>No products found. Click "Import CSV" to load from prices.csv.</p>';
             return;
         }
-        let html = '<table><thead>运转<th>SKU</th><th>Name</th><th>HSN</th><th>Unit</th><th>Price</th><th>Stock</th><th>Reorder</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        let html = `<table>
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Name</th>
+                    <th>HSN</th>
+                    <th>Unit</th>
+                    <th>Price</th>
+                    <th>Stored Stock</th>
+                    <th>Computed Stock</th>
+                    <th>Reorder</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>`;
         filtered.forEach(p => {
-            const lowStock = (p.currentStock || 0) <= (p.reorderLevel || 0);
+            const storedStock = p.currentStock || 0;
+            const computed = getComputedStock(p.id);
+            const lowStock = (computed <= (p.reorderLevel || 0));
             const productId = String(p.id);
             html += `<tr class="${lowStock ? 'low-stock' : ''}">
                 <td>${escapeHtml(p.sku)}</strong></td>
@@ -113,7 +222,8 @@
                 <td>${escapeHtml(p.hsn || '')}</strong></td>
                 <td>${escapeHtml(p.unit || 'pc')}</strong></td>
                 <td>₹${(p.price || 0).toLocaleString()}</strong></td>
-                <td>${(p.currentStock || 0).toLocaleString()}</strong></td>
+                <td>${storedStock.toLocaleString()}</strong> <span class="computed-stock">(stored)</span></td>
+                <td>${computed.toLocaleString()}</strong> <span class="computed-stock">(actual)</span></td>
                 <td>${(p.reorderLevel || 0)}</strong></td>
                 <td>${lowStock ? '⚠️ Low Stock' : 'OK'}</strong></td>
                 <td class="action-buttons">
@@ -133,16 +243,14 @@
 
         refreshProducts();
 
-        // Check for duplicate SKU (except when editing the same product)
         const existing = products.find(p => p.sku === sku && (editId === null || p.id !== editId));
         if (existing) {
             alert(`Product with SKU "${sku}" already exists. Please use a unique SKU.`);
             return;
         }
 
-        // Use SKU as the permanent ID
         const productData = {
-            id: sku,
+            id: sku,   // Use SKU as ID for consistency
             name: name,
             sku: sku,
             hsn: document.getElementById('prodHsn').value.trim(),
@@ -187,6 +295,9 @@
         document.getElementById('prodStock').value = product.currentStock || 0;
         document.getElementById('prodReorder').value = product.reorderLevel || 0;
         document.getElementById('prodCost').value = product.costPrice || 0;
+        // Show computed stock
+        const computed = getComputedStock(id);
+        document.getElementById('computedStockDisplay').value = computed;
         document.getElementById('cancelEditBtn').style.display = 'inline-block';
     }
 
@@ -216,6 +327,7 @@
         document.getElementById('prodStock').value = '0';
         document.getElementById('prodReorder').value = '10';
         document.getElementById('prodCost').value = '0';
+        document.getElementById('computedStockDisplay').value = '';
         document.getElementById('cancelEditBtn').style.display = 'none';
     }
 
@@ -246,7 +358,7 @@
                 const stock = stockIdx !== -1 ? parseInt(cols[stockIdx]) || 0 : 0;
                 if (!products.find(p => p.sku === part)) {
                     products.push({
-                        id: part,   // Use SKU as ID
+                        id: part,
                         name: name,
                         sku: part,
                         hsn: hsn,
@@ -274,9 +386,10 @@
 
     function exportToCSV() {
         refreshProducts();
-        let csv = "SKU,Name,HSN,Unit,Price,Current Stock,Reorder Level\n";
+        let csv = "SKU,Name,HSN,Unit,Price,Current Stock (Stored),Computed Stock (Actual),Reorder Level\n";
         products.forEach(p => {
-            csv += `"${p.sku}","${p.name}","${p.hsn || ''}","${p.unit || 'pc'}",${p.price || 0},${p.currentStock || 0},${p.reorderLevel || 0}\n`;
+            const computed = getComputedStock(p.id);
+            csv += `"${p.sku}","${p.name}","${p.hsn || ''}","${p.unit || 'pc'}",${p.price || 0},${p.currentStock || 0},${computed},${p.reorderLevel || 0}\n`;
         });
         const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
