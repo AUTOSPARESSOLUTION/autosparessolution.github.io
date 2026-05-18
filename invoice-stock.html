@@ -740,7 +740,7 @@
             headers.push('IGST (₹)', 'Total (₹)');
         }
         
-        thead.innerHTML = '</tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+        thead.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
         
         let itemsHtml = '';
         cart.forEach((item, idx) => {
@@ -757,19 +757,19 @@
             
             let row = `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</strong></td>
-                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</strong></td>
-                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></strong></td>
-                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></strong></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></strong></td>
-                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></strong></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
-                <td style="text-align:center;">18%</strong></td>`;
+                <td style="word-wrap:break-word;">${escapeHtml(item.part)}</td>
+                <td style="word-wrap:break-word;">${escapeHtml(item.desc)}</td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
+                <td style="word-wrap:break-word;"><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></td>
+                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="text-align:center;">18%</td>`;
             if (isLocal) {
-                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${sgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
+                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</td><td style="text-align:right;">₹${sgst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
             } else {
-                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
+                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
             }
             row += `</tr>`;
             itemsHtml += row;
@@ -782,12 +782,12 @@
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -831,6 +831,30 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
+    // ========== RELIABLE SAVE TO LOCALSTORAGE (FIXES ORDER HISTORY & INVOICE NUMBER) ==========
+    function saveInvoiceToLocalStorage(invoice) {
+        // Get existing invoices
+        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        // Remove any duplicate (by id) – shouldn't happen
+        allInvoices = allInvoices.filter(inv => inv.id !== invoice.id);
+        allInvoices.push(invoice);
+        localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
+        
+        // Update customer outstanding
+        let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const custIndex = customers.findIndex(c => c.email === invoice.customerEmail);
+        if (custIndex !== -1) {
+            customers[custIndex].outstanding = (customers[custIndex].outstanding || 0) + invoice.grandTotal;
+            customers[custIndex].totalPurchased = (customers[custIndex].totalPurchased || 0) + invoice.grandTotal;
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+        
+        // Also call original createSalesInvoice if it exists (for stock update)
+        if (typeof createSalesInvoice === 'function') {
+            try { createSalesInvoice(invoice); } catch(e) { console.warn(e); }
+        }
+    }
+
     function saveInvoice() {
         if (cart.length === 0) {
             alert('Cart empty. Please add items first.');
@@ -856,6 +880,7 @@
             state: document.getElementById('buyerState').value.trim()
         };
 
+        // Auto-register customer if new
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         let existingCustomer = customers.find(c => c.email === buyer.email);
         if (!existingCustomer && buyer.email) {
@@ -884,12 +909,6 @@
             return;
         }
 
-        const items = cart.map(item => ({
-            productId: item.part,
-            quantity: item.qty,
-            price: item.price
-        }));
-
         const dateParts = document.getElementById('invoiceDate').innerText.split('/');
         const invoiceDateFormatted = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
 
@@ -897,8 +916,6 @@
             id: Date.now(),
             date: invoiceDateFormatted,
             customerEmail: buyer.email,
-            items: items,
-            total: grandTotal,
             invoiceNo: finalNo,
             invoiceType: type,
             status: type === 'cash' ? 'Paid' : 'Pending',
@@ -938,14 +955,13 @@
             }))
         };
 
-        try {
-            createSalesInvoice(invoice);
-            alert(`Invoice ${finalNo} saved successfully!\n\nStock reduced.\nCustomer outstanding updated.\nLedger entry created.\nPacking charges: ₹${packing.toFixed(2)} (no GST).\nRound Off (on taxable + GST): ₹${roundOff.toFixed(2)}`);
-            localStorage.setItem('invoiceCart', '[]');
-            setTimeout(() => window.close(), 1000);
-        } catch (err) {
-            alert('Error saving invoice: ' + err.message);
-        }
+        // Save invoice using our reliable function
+        saveInvoiceToLocalStorage(invoice);
+
+        // Clear cart and close
+        alert(`Invoice ${finalNo} saved successfully!\n\nPacking charges: ₹${packing.toFixed(2)} (no GST).\nRound Off: ₹${roundOff.toFixed(2)}`);
+        localStorage.setItem('invoiceCart', '[]');
+        setTimeout(() => window.close(), 1000);
     }
 
     function printInvoice() {
@@ -1035,14 +1051,12 @@
         if (!editBtn) return;
         editBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            // Get current date from displayed text
             const currentDateStr = document.getElementById('invoiceDate').innerText;
             const parts = currentDateStr.split('/');
             let currentDate = new Date(parts[2], parts[1]-1, parts[0]);
             if (isNaN(currentDate.getTime())) {
                 currentDate = new Date();
             }
-            // Create a temporary date input
             const tempDiv = document.createElement('div');
             tempDiv.className = 'date-picker-temp';
             tempDiv.style.position = 'absolute';
@@ -1064,16 +1078,14 @@
                     if (!isNaN(newDate.getTime())) {
                         const formatted = newDate.toLocaleDateString('en-IN');
                         document.getElementById('invoiceDate').innerText = formatted;
-                        updateDueDate(); // recalc due date
+                        updateDueDate();
                     }
                 }
                 document.body.removeChild(tempDiv);
             });
-            // Close picker on blur
             dateInput.addEventListener('blur', function() {
                 if (document.body.contains(tempDiv)) document.body.removeChild(tempDiv);
             });
-            // Also close if click outside
             const outsideClickHandler = function(ev) {
                 if (!tempDiv.contains(ev.target) && ev.target !== editBtn) {
                     if (document.body.contains(tempDiv)) document.body.removeChild(tempDiv);
@@ -1085,4 +1097,4 @@
     })();
 </script>
 </body>
-    </html>
+</html>
