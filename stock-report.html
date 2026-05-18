@@ -41,8 +41,85 @@
 </div>
 
 <script>
-    function refreshReport() {
+    // Helper to convert date to YYYY-MM-DD for sorting
+    function toISODate(dateStr) {
+        if (!dateStr) return '';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+        const parts = dateStr.split('/');
+        if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+        return dateStr;
+    }
+
+    // Compute current stock for all products based on purchase and sales invoices
+    function computeCurrentStock() {
+        // Get all products
         let products = getProducts();
+        // Normalise IDs to strings for matching
+        products.forEach(p => {
+            if (p.id !== undefined) p.id = String(p.id);
+            if (p.sku !== undefined) p.sku = String(p.sku);
+        });
+
+        // Map to store stock changes: key = productId (or sku)
+        let stockMap = new Map();
+
+        // 1. Purchase invoices (stock IN)
+        const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        purchaseInvoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                let productId = item.productId || item.part;
+                if (!productId) return;
+                productId = String(productId);
+                const qty = parseFloat(item.quantity) || 0;
+                if (qty === 0) return;
+                const current = stockMap.get(productId) || 0;
+                stockMap.set(productId, current + qty);
+            });
+        });
+
+        // 2. Sales invoices (stock OUT)
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        allInvoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                let productId = item.part || item.productId;
+                if (!productId) return;
+                productId = String(productId);
+                const qty = parseFloat(item.qty) || 0;
+                if (qty === 0) return;
+                const current = stockMap.get(productId) || 0;
+                stockMap.set(productId, current - qty);
+            });
+        });
+
+        // Also consider stock adjustments and transfers if they affect total stock (adjustment does, transfer does not)
+        const transactions = JSON.parse(localStorage.getItem('inventoryTransactions') || '[]');
+        transactions.forEach(t => {
+            let productId = String(t.productId);
+            let qty = parseFloat(t.quantity) || 0;
+            if (t.type === 'adjustment') {
+                const current = stockMap.get(productId) || 0;
+                stockMap.set(productId, current + qty);
+            }
+            // Transfer does not change total stock – ignore
+        });
+
+        // Attach computed stock to product objects (or return map)
+        products.forEach(p => {
+            let idKey = p.id;
+            let skuKey = p.sku;
+            let computed = stockMap.get(idKey);
+            if (computed === undefined && skuKey) computed = stockMap.get(skuKey);
+            p.computedStock = computed !== undefined ? computed : 0;
+        });
+        return products;
+    }
+
+    function refreshReport() {
+        let products = computeCurrentStock(); // products with .computedStock
         const brand = document.getElementById('brandFilter').value;
         const make = document.getElementById('makeFilter').value;
         const group = document.getElementById('groupFilter').value;
@@ -80,7 +157,8 @@
         `;
 
         filtered.forEach(p => {
-            const low = (p.currentStock || 0) <= (p.reorderLevel || 0);
+            const stock = p.computedStock;
+            const low = stock <= (p.reorderLevel || 0);
             html += `
             <tr class="${low ? 'low-stock' : ''}">
                 <td>${escapeHtml(p.sku)}</strong></td>
@@ -89,7 +167,7 @@
                 <td>${escapeHtml(p.make || '-')}</td>
                 <td>${escapeHtml(p.group || '-')}</td>
                 <td>${p.lineCode || '-'}</td>
-                <td>${p.currentStock || 0}</td>
+                <td>${stock}</strong></td>
                 <td>₹${(p.price || 0).toFixed(2)}</strong></td>
                 <td>${low ? '<i class="fas fa-exclamation-triangle"></i> Low' : 'OK'}</td>
             </tr>`;
@@ -100,7 +178,7 @@
     }
 
     function populateFilters() {
-        const products = getProducts();
+        const products = computeCurrentStock(); // use computed stock for filters as well
         const brands = [...new Set(products.map(p => p.brand).filter(b => b))].sort();
         const makes = [...new Set(products.map(p => p.make).filter(m => m))].sort();
         const groups = [...new Set(products.map(p => p.group).filter(g => g))].sort();
