@@ -37,7 +37,7 @@
 </div>
 
 <script>
-    // ======================== Helper functions (no external dependencies) ========================
+    // Helper functions
     function getSalesInvoices() { return JSON.parse(localStorage.getItem('salesInvoices') || '[]'); }
     function saveSalesInvoices(inv) { localStorage.setItem('salesInvoices', JSON.stringify(inv)); }
     function getAllInvoices() { return JSON.parse(localStorage.getItem('allInvoices') || '[]'); }
@@ -55,7 +55,6 @@
     function getSuppliers() { return JSON.parse(localStorage.getItem('suppliers') || '[]'); }
     function saveSuppliers(sup) { localStorage.setItem('suppliers', JSON.stringify(sup)); }
 
-    // ======================== Tab switching ========================
     function openTab(evt, tabName) {
         document.querySelectorAll('.tabcontent').forEach(div => div.style.display = 'none');
         document.querySelectorAll('.tablinks').forEach(btn => btn.classList.remove('active'));
@@ -65,21 +64,28 @@
         else loadPurchaseInvoices();
     }
 
-    // ======================== Sales Invoices ========================
+    // Sales Invoices
     function loadSalesInvoices() {
         const invoices = getSalesInvoices();
         if (invoices.length === 0) {
             document.getElementById('salesTable').innerHTML = '<p>No sales invoices found.</p>';
             return;
         }
-        let html = '</table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
         invoices.forEach(inv => {
+            let invoiceNo = inv.invoiceNo || `INV-${inv.id}`;
+            let date = inv.date || (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN') : '-');
+            let customerEmail = inv.customerEmail || inv.buyer?.email || 'Unknown';
+            let total = inv.total || inv.grandTotal || 0;
+            if (total === 0 && inv.items && inv.items.length) {
+                total = inv.items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            }
             html += `<tr>
-                <td>${escapeHtml(inv.invoiceNo || inv.id)}</strong></td>
-                <td>${inv.date || '-'}</strong></td>
-                <td>${escapeHtml(inv.customerEmail || 'N/A')}</strong></td>
-                <td>₹${(inv.total || inv.grandTotal || 0).toLocaleString()}</strong></td>
-                <td><button class="delete-btn" onclick="deleteSalesInvoiceHandler('${inv.id}')">Delete & Reverse</button></strong></td>
+                <td>${escapeHtml(invoiceNo)}</td>
+                <td>${escapeHtml(date)}</td>
+                <td>${escapeHtml(customerEmail)}</td>
+                <td>₹${total.toLocaleString()}</td>
+                <td><button class="delete-btn" onclick="deleteSalesInvoiceHandler('${inv.id}')">Delete & Reverse</button></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -93,7 +99,11 @@
             const invoice = invoices.find(inv => inv.id == invoiceId);
             if (!invoice) { alert('Invoice not found.'); return; }
 
-            // 1. Reverse stock: add quantities back
+            let total = invoice.total || invoice.grandTotal || 0;
+            if (total === 0 && invoice.items && invoice.items.length) {
+                total = invoice.items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            }
+
             let products = getProducts();
             for (let item of invoice.items) {
                 let prod = products.find(p => p.id == item.productId || p.sku == item.productId);
@@ -103,36 +113,33 @@
             }
             saveProducts(products);
 
-            // 2. Remove inventory transactions linked to this invoice
             let invTransactions = getInventoryTransactions();
             invTransactions = invTransactions.filter(t => t.ref !== invoice.invoiceNo && t.ref !== `INV-${invoice.id}`);
             saveInventoryTransactions(invTransactions);
 
-            // 3. Update customer outstanding
+            let customerEmail = invoice.customerEmail || invoice.buyer?.email;
             let customers = getCustomers();
-            const customer = customers.find(c => c.email === invoice.customerEmail);
+            const customer = customers.find(c => c.email === customerEmail);
             if (customer) {
-                customer.outstanding = (customer.outstanding || 0) - invoice.total;
+                customer.outstanding = (customer.outstanding || 0) - total;
                 if (customer.outstanding < 0) customer.outstanding = 0;
                 saveCustomers(customers);
 
-                // 4. Add ledger reversal entry
                 let ledger = getCustomerLedger();
                 ledger.push({
                     id: Date.now(),
-                    customerEmail: invoice.customerEmail,
+                    customerEmail: customerEmail,
                     date: new Date().toISOString().slice(0,10),
                     type: 'reversal',
                     ref: `DEL-${invoice.invoiceNo}`,
                     debit: 0,
-                    credit: invoice.total,
+                    credit: total,
                     balance: customer.outstanding,
                     note: `Reversal of invoice ${invoice.invoiceNo}`
                 });
                 saveCustomerLedger(ledger);
             }
 
-            // 5. Remove from salesInvoices and allInvoices
             const remaining = invoices.filter(inv => inv.id != invoiceId);
             saveSalesInvoices(remaining);
             let allInv = getAllInvoices();
@@ -147,7 +154,7 @@
         }
     };
 
-    // ======================== Purchase Invoices (FIXED) ========================
+    // Purchase Invoices
     function loadPurchaseInvoices() {
         const invoices = getPurchaseInvoices();
         if (invoices.length === 0) {
@@ -156,16 +163,15 @@
         }
         let html = '<table><thead><tr><th>Invoice/PO No</th><th>Date</th><th>Supplier Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
         invoices.forEach(inv => {
-            // Use invoiceNo or poNo – most likely invoiceNo is used
             let docNo = inv.invoiceNo || inv.poNo || 'N/A';
             let supplierEmail = inv.supplierEmail || (inv.supplier?.email) || 'Not recorded';
             let total = inv.total || inv.grandTotal || 0;
             html += `<tr>
-                <td>${escapeHtml(docNo)}</strong></td>
-                <td>${inv.date || '-'}</strong></td>
-                <td>${escapeHtml(supplierEmail)}</strong></td>
-                <td>₹${total.toLocaleString()}</strong></td>
-                <td><button class="delete-btn" onclick="deletePurchaseInvoiceHandler('${inv.id}')">Delete & Reverse</button></strong></td>
+                <td>${escapeHtml(docNo)}</td>
+                <td>${inv.date || '-'}</td>
+                <td>${escapeHtml(supplierEmail)}</td>
+                <td>₹${total.toLocaleString()}</td>
+                <td><button class="delete-btn" onclick="deletePurchaseInvoiceHandler('${inv.id}')">Delete & Reverse</button></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -179,7 +185,7 @@
             const invoice = invoices.find(inv => inv.id == invoiceId);
             if (!invoice) { alert('Invoice not found'); return; }
 
-            // Reverse stock: subtract quantities (because purchase originally added stock)
+            let total = invoice.total || invoice.grandTotal || 0;
             let products = getProducts();
             for (let item of invoice.items) {
                 let prod = products.find(p => p.id == item.productId || p.sku == item.productId);
@@ -190,17 +196,15 @@
             }
             saveProducts(products);
 
-            // Update supplier outstanding
-            let suppliers = getSuppliers();
             let supplierEmail = invoice.supplierEmail || (invoice.supplier?.email);
+            let suppliers = getSuppliers();
             let supplier = suppliers.find(s => s.email === supplierEmail);
             if (supplier) {
-                supplier.outstanding = (supplier.outstanding || 0) - (invoice.total || invoice.grandTotal || 0);
+                supplier.outstanding = (supplier.outstanding || 0) - total;
                 if (supplier.outstanding < 0) supplier.outstanding = 0;
                 saveSuppliers(suppliers);
             }
 
-            // Remove the purchase invoice
             const remaining = invoices.filter(inv => inv.id != invoiceId);
             savePurchaseInvoices(remaining);
 
@@ -216,7 +220,6 @@
         return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
     }
 
-    // Load initial view
     loadSalesInvoices();
 </script>
 </body>
