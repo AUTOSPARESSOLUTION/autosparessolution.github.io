@@ -91,7 +91,7 @@
     let allProducts = [];
     let computedStockMap = new Map(); // store computed stock for display
 
-    // Helper to convert date to YYYY-MM-DD
+    // Helper to convert date to YYYY-MM-DD (for sorting, not directly used here but kept)
     function toISODate(dateStr) {
         if (!dateStr) return '';
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
@@ -107,12 +107,14 @@
     // Compute current stock for all products based on purchase, sales, and adjustments
     function computeStockFromTransactions() {
         let products = getProducts();
+        // Ensure IDs are strings for consistent matching
         products.forEach(p => {
             if (p.id !== undefined) p.id = String(p.id);
             if (p.sku !== undefined) p.sku = String(p.sku);
         });
         let stockMap = new Map();
-        // Purchase invoices (IN)
+        
+        // 1. Purchase invoices (stock IN)
         const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         purchaseInvoices.forEach(inv => {
             (inv.items || []).forEach(item => {
@@ -125,7 +127,8 @@
                 stockMap.set(productId, current + qty);
             });
         });
-        // Sales invoices (OUT)
+        
+        // 2. Sales invoices (stock OUT)
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         allInvoices.forEach(inv => {
             (inv.items || []).forEach(item => {
@@ -138,8 +141,9 @@
                 stockMap.set(productId, current - qty);
             });
         });
-        // Adjustments (IN or OUT)
-        const transactions = JSON.parse(localStorage.getItem('inventoryTransactions') || '[]');
+        
+        // 3. Adjustments (from inventoryTransactions)
+        const transactions = getInventoryTransactions();
         transactions.forEach(t => {
             if (t.type === 'adjustment') {
                 let productId = String(t.productId);
@@ -148,7 +152,8 @@
                 stockMap.set(productId, current + qty);
             }
         });
-        // Also consider currentStock from product master as fallback (but only if no transactions)
+        
+        // 4. Fallback to product.currentStock if no transactions
         products.forEach(p => {
             let idKey = p.id;
             let skuKey = p.sku;
@@ -161,10 +166,10 @@
     }
 
     function loadData() {
-        allProducts = computeStockFromTransactions(); // allProducts now has currentStock? No, we store computed separately.
-        displayInventory();
-        populateProductSelects();
-        displayTransactionLog();
+        allProducts = computeStockFromTransactions(); // populates computedStockMap
+        displayInventory();          // render table
+        populateProductSelects();    // populate dropdowns
+        displayTransactionLog();     // show log
     }
 
     function getComputedStock(productId) {
@@ -174,36 +179,58 @@
     function displayInventory() {
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         let filtered = allProducts.filter(p => 
-            p.name?.toLowerCase().includes(searchTerm) || 
-            p.sku?.toLowerCase().includes(searchTerm)
+            (p.name && p.name.toLowerCase().includes(searchTerm)) || 
+            (p.sku && p.sku.toLowerCase().includes(searchTerm))
         );
         // Add computed stock to each product for display
         filtered.forEach(p => p.displayStock = getComputedStock(p.id));
-        let totalValue = filtered.reduce((sum, p) => sum + (p.displayStock * (p.price||0)), 0);
-        let lowStockCount = filtered.filter(p => p.displayStock <= (p.reorderLevel||0)).length;
+        
+        const totalValue = filtered.reduce((sum, p) => sum + (p.displayStock * (p.price || 0)), 0);
+        const lowStockCount = filtered.filter(p => p.displayStock <= (p.reorderLevel || 0)).length;
+        const totalUnits = filtered.reduce((s, p) => s + p.displayStock, 0);
+        
         document.getElementById('stats').innerHTML = `
             <div class="stat-card"><h3>Total Products</h3><div class="number">${filtered.length}</div></div>
             <div class="stat-card"><h3>Low Stock (≤ Reorder)</h3><div class="number">${lowStockCount}</div></div>
-            <div class="stat-card"><h3>Total Stock Units</h3><div class="number">${filtered.reduce((s,p)=>s+p.displayStock,0)}</div></div>
+            <div class="stat-card"><h3>Total Stock Units</h3><div class="number">${totalUnits}</div></div>
             <div class="stat-card"><h3>Total Stock Value</h3><div class="number">₹${totalValue.toLocaleString()}</div></div>
         `;
-        let html = '</table><thead><tr><th>SKU</th><th>Product Name</th><th>Current Stock</th><th>Unit</th><th>Reorder Level</th><th>Price (₹)</th><th>Actions</th></tr></thead><tbody>';
+        
+        if (filtered.length === 0) {
+            document.getElementById('inventoryTable').innerHTML = '<p>No products found. Use "Import from CSV" or add products in Product Master.</p>';
+            return;
+        }
+        
+        let html = `<table>
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Product Name</th>
+                    <th>Current Stock</th>
+                    <th>Unit</th>
+                    <th>Reorder Level</th>
+                    <th>Price (₹)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
         filtered.forEach(p => {
-            const isLow = p.displayStock <= (p.reorderLevel||0);
+            const isLow = p.displayStock <= (p.reorderLevel || 0);
             html += `<tr class="${isLow ? 'low-stock-row' : ''}">
                 <td>${escapeHtml(p.sku)}</strong></td>
-                <td>${escapeHtml(p.name)}</strong></td>
+                <td><strong>${escapeHtml(p.name)}</strong></td>
                 <td><strong>${p.displayStock}</strong></td>
                 <td>${escapeHtml(p.unit)}</strong></td>
                 <td>${p.reorderLevel || 0}</strong></td>
-                <td>₹${(p.price||0).toFixed(2)}</strong></td>
+                <td>₹${(p.price || 0).toFixed(2)}</strong></td>
                 <td>
                     <button class="btn-adjust" onclick="quickAdjust('${p.id}')"><i class="fas fa-edit"></i> Adjust</button>
                 </strong></td>
             </tr>`;
         });
-        html += '</tbody></table>';
-        document.getElementById('inventoryTable').innerHTML = html || '<p>No products. Use "Import from CSV" or add products in Product Master.</p>';
+        html += `</tbody></table>`;
+        document.getElementById('inventoryTable').innerHTML = html;
     }
 
     function populateProductSelects() {
@@ -213,8 +240,8 @@
         transSelect.innerHTML = '<option value="">-- Select --</option>';
         allProducts.forEach(p => {
             const stock = getComputedStock(p.id);
-            adjSelect.innerHTML += `<option value="${p.id}">${p.name} (${p.sku}) - Stock: ${stock}</option>`;
-            transSelect.innerHTML += `<option value="${p.id}">${p.name} (${p.sku}) - Stock: ${stock}</option>`;
+            adjSelect.innerHTML += `<option value="${p.id}">${escapeHtml(p.name)} (${p.sku}) - Stock: ${stock}</option>`;
+            transSelect.innerHTML += `<option value="${p.id}">${escapeHtml(p.name)} (${p.sku}) - Stock: ${stock}</option>`;
         });
     }
 
@@ -257,7 +284,9 @@
         const product = allProducts.find(p => p.id == productId);
         if (product) {
             document.getElementById('adjProduct').value = productId;
-            document.querySelector('.tablinks[onclick*="Adjust"]').click();
+            // Switch to Adjust tab
+            const adjustTab = document.querySelector('.tablinks[onclick*="Adjust"]');
+            if (adjustTab) adjustTab.click();
             document.getElementById('adjQty').focus();
         }
     }
@@ -271,9 +300,6 @@
         let qty = parseInt(document.getElementById('transQty').value);
         if (isNaN(qty) || qty <= 0) { showMessage('Enter valid positive quantity', 'error'); return; }
 
-        let products = getProducts();
-        let product = products.find(p => p.id == productId);
-        if (!product) { showMessage('Product not found', 'error'); return; }
         let currentStock = getComputedStock(productId);
         if (currentStock < qty) { showMessage(`Insufficient stock: only ${currentStock} available`, 'error'); return; }
 
@@ -290,7 +316,7 @@
             toLocation: toLoc
         });
         saveInventoryTransactions(invTransactions);
-        showMessage(`Stock transfer recorded: ${qty} x ${product.name} from ${fromLoc} → ${toLoc}`, 'success');
+        showMessage(`Stock transfer recorded: ${qty} x ${escapeHtml(productId)} from ${fromLoc} → ${toLoc}`, 'success');
         document.getElementById('transQty').value = '';
         displayTransactionLog();
         loadData(); // refresh view
@@ -301,6 +327,7 @@
         if (transactions.length === 0) { document.getElementById('transactionLog').innerHTML = '<p>No transactions yet.</p>'; return; }
         let html = '<table><thead><tr><th>Date</th><th>Product</th><th>Type</th><th>Quantity</th><th>Reference</th><th>Balance After</th></tr></thead><tbody>';
         const products = getProducts();
+        // Show last 30, most recent first
         transactions.slice(-30).reverse().forEach(t => {
             const product = products.find(p => p.id == t.productId);
             const productName = product ? product.name : t.productId;
@@ -310,7 +337,7 @@
                 <td>${t.type}</strong></td>
                 <td>${t.quantity}</strong></td>
                 <td>${escapeHtml(t.ref || '-')}</strong></td>
-                <td>${t.balanceAfter}</strong></td>
+                <td>${t.balanceAfter !== undefined ? t.balanceAfter : '-'}</strong></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -352,8 +379,6 @@
                         createdAt: new Date().toISOString()
                     });
                     importedCount++;
-                } else {
-                    // Optionally update existing product's price/stock? We'll skip to avoid overwriting.
                 }
             }
             saveProducts(products);
@@ -385,6 +410,7 @@
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
+    // Initial load
     loadData();
 </script>
 </body>
