@@ -708,14 +708,50 @@
         function toggleFloatingCartMinimize() { document.getElementById('floating-cart').classList.toggle('minimized'); }
         function closeFloatingCart() { document.getElementById('floating-cart').style.display = 'none'; }
         function openGalleryFromCard(btn) { const card = btn.closest('.card'); const media = card.getAttribute('data-media'); if(!media) return; try{ const arr = JSON.parse(media.replace(/&apos;/g,"'")); openGallery(arr,0); } catch(e){ console.error(e); } }
+        
+        // ========== DYNAMIC SHOW PRODUCT INFO (RESTORED FROM ORIGINAL CODE) ==========
         function showProductInfo(part) {
-            const product = allProducts.find(p=>p.part===part);
-            if(!product) return;
-            let html = `<p><strong>Part Number:</strong> ${product.part}</p><p><strong>Description:</strong> ${product.desc}</p><p><strong>Brand:</strong> ${product.brand}</p><p><strong>Stock:</strong> ${product.stock}</p><p><strong>Price:</strong> ₹${product.price.toFixed(2)}</p>`;
-            html += `<p><strong>Application info available upon request.</strong></p><p>Contact us for more details:</p><div style="display: flex; gap: 1rem; margin-top: 1rem;"><a href="https://wa.me/9830300193?text=Enquiry about ${encodeURIComponent(product.part)}" target="_blank" class="btn whatsapp">WhatsApp</a><a href="https://www.google.com/search?q=auto+part+${encodeURIComponent(product.part)}+${encodeURIComponent(product.brand)}" target="_blank" class="btn" style="background:#4285f4;">Search Google</a></div>`;
+            const product = allProducts.find(p => p.part === part);
+            if (!product) return;
+            
+            // Check if there is any application-specific info beyond basic fields
+            const hasLocalInfo = (product.make && product.make !== '') ||
+                                 (product.model && product.model !== '') ||
+                                 (product.year_start && product.year_start !== '') ||
+                                 (product.segment && product.segment !== '');
+            
+            let html = `<p><strong>Part Number:</strong> ${product.part}</p>`;
+            html += `<p><strong>Description:</strong> ${product.desc}</p>`;
+            html += `<p><strong>Brand:</strong> ${product.brand}</p>`;
+            html += `<p><strong>Stock:</strong> ${product.stock}</p>`;
+            html += `<p><strong>Price:</strong> ₹${product.price.toFixed(2)}</p>`;
+            
+            // Dynamically display all extra properties (except a skip list)
+            const skipProps = ['part', 'desc', 'brand', 'stock', 'price', 'score', 'media', 'rawData', 'video', 'boxQty', 'masterCarton', 'mostSelling', 'sales_volume', 'sales_value', 'zone', 'region'];
+            for (let [key, value] of Object.entries(product)) {
+                if (skipProps.includes(key)) continue;
+                if (value && value.toString().trim() !== "" && typeof value !== 'object') {
+                    const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    html += `<p><strong>${displayKey}:</strong> ${value}</p>`;
+                }
+            }
+            
+            if (!hasLocalInfo) {
+                html += `<p><strong>Application info not available in our database.</strong></p>`;
+                html += `<p>You can search online using the part number:</p>`;
+                html += `<div style="display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">`;
+                html += `<a href="https://www.google.com/search?q=auto+part+${encodeURIComponent(product.part)}+${encodeURIComponent(product.brand)}" target="_blank" class="btn" style="background:#4285f4;">Search Google</a>`;
+                html += `<a href="https://boodmo.com/search/?q=${encodeURIComponent(product.part)}" target="_blank" class="btn" style="background:#ff6b6b;">Search Boodmo</a>`;
+                html += `<a href="https://wa.me/9830300193?text=Enquiry%20about%20${encodeURIComponent(product.part)}" target="_blank" class="btn whatsapp">WhatsApp Enquiry</a>`;
+                html += `</div>`;
+            } else {
+                html += `<div style="margin-top: 1rem;"><a href="https://wa.me/9830300193?text=Enquiry%20about%20${encodeURIComponent(product.part)}" target="_blank" class="btn whatsapp">Need more details? WhatsApp Us</a></div>`;
+            }
+            
             document.getElementById('infoModalBody').innerHTML = html;
             document.getElementById('infoModal').style.display = 'block';
         }
+        
         function openVideoModal(url, part) { const mediaArray = [url]; openGallery(mediaArray,0); }
         function openProductImage(part, imgElement) { const product = allProducts.find(p=>p.part===part); if(!product) return; let mediaList = [imgElement.src]; if(product.media && product.media.length) mediaList = mediaList.concat(product.media.filter(url=>url!==imgElement.src)); openGallery(mediaList,0); }
         let currentGallery = [], currentGalleryIndex = 0;
@@ -768,4 +804,4 @@
         logout = function() { originalLogout(); if(typeof updateNavigationByRole === 'function') updateNavigationByRole(); };
     </script>
 </body>
-                                                                      </html>
+</html>
