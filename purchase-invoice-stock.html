@@ -93,6 +93,7 @@
     </div>
     <div class="form-row">
         <div class="form-group"><label>Supplier Address</label><textarea id="supplierAddress" rows="2"></textarea></div>
+        <div class="form-group"><label>Supplier State</label><input type="text" id="supplierState" placeholder="e.g., West Bengal, Delhi, Maharashtra"></div>
     </div>
 
     <!-- Bill Details -->
@@ -108,13 +109,14 @@
     <div id="itemsContainer"></div>
     <button class="add-item" onclick="addItemRow()"><i class="fas fa-plus"></i> Add Item</button>
 
-    <!-- Totals -->
+    <!-- Totals (dynamic GST) -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal: </td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%): </td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%): </td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total: </td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal: </strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></strong></td>
+            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):  </strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></strong></td>
+            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):  </strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></strong></td>
+            <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):  </strong></td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></strong></td>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:  </strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></strong></td>
         </table>
     </div>
 
@@ -146,7 +148,6 @@
         let products = getProducts();
         let existing = products.find(p => p.sku === partNumber);
         if (!existing) {
-            // Create new product
             products.push({
                 id: Date.now() + Math.random(),
                 name: desc || partNumber,
@@ -158,17 +159,65 @@
                 hsn: hsn || '',
                 createdAt: new Date().toISOString()
             });
+            saveProducts(products);
         } else {
-            // Update HSN if provided and not already set, or overwrite if empty
-            if (hsn && (!existing.hsn || existing.hsn === '')) {
-                existing.hsn = hsn;
-            }
-            // Optionally update description if missing
-            if (desc && (!existing.name || existing.name === '')) {
-                existing.name = desc;
-            }
+            if (hsn && (!existing.hsn || existing.hsn === '')) existing.hsn = hsn;
+            if (desc && (!existing.name || existing.name === '')) existing.name = desc;
+            if (price > 0 && existing.price === 0) existing.price = price;
+            saveProducts(products);
         }
-        saveProducts(products);
+    }
+
+    // ========== DYNAMIC GST (same logic as invoice-stock.html) ==========
+    function isLocalGst() {
+        const state = (document.getElementById('supplierState').value || '').trim().toLowerCase();
+        const localStates = ['west bengal', 'wb', 'westbengal', 'kolkata', 'howrah', 'siliguri', 'darjeeling', 'asansol', 'hooghly', 'bardhaman'];
+        return localStates.some(ls => state.includes(ls));
+    }
+
+    function updateGstDisplay() {
+        const isLocal = isLocalGst();
+        const cgstLabel = document.getElementById('gstLabel1');
+        const sgstRow = document.getElementById('sgstRow');
+        const igstRow = document.getElementById('igstRow');
+        if (isLocal) {
+            cgstLabel.innerHTML = 'CGST (9%):';
+            sgstRow.style.display = 'table-row';
+            igstRow.style.display = 'none';
+        } else {
+            cgstLabel.innerHTML = 'IGST (18%):';
+            sgstRow.style.display = 'none';
+            igstRow.style.display = 'table-row';
+        }
+        recalcTotals();
+    }
+    document.getElementById('supplierState').addEventListener('input', updateGstDisplay);
+    document.getElementById('supplierGstin').addEventListener('input', updateGstDisplay); // optional
+
+    // Recalculate totals with dynamic GST
+    function recalcTotals() {
+        let subtotal = 0;
+        items.forEach(item => {
+            const qty = item.qty || 0;
+            const cost = item.cost || 0;
+            const disc = item.discount || 0;
+            const taxable = qty * cost * (1 - disc / 100);
+            subtotal += taxable;
+        });
+        const isLocal = isLocalGst();
+        let cgst = 0, sgst = 0, igst = 0;
+        if (isLocal) {
+            cgst = subtotal * 0.09;
+            sgst = subtotal * 0.09;
+        } else {
+            igst = subtotal * 0.18;
+        }
+        const grand = Math.round(subtotal + cgst + sgst + igst);
+        document.getElementById('subtotal').innerText = subtotal.toFixed(2);
+        document.getElementById('cgstTotal').innerText = (isLocal ? cgst : igst).toFixed(2);
+        document.getElementById('sgstTotal').innerText = sgst.toFixed(2);
+        document.getElementById('igstTotal').innerText = igst.toFixed(2);
+        document.getElementById('grandTotal').innerText = grand.toFixed(2);
     }
 
     // Load cart from localStorage
@@ -183,7 +232,6 @@
                 cost: item.price,
                 discount: item.discount || 0
             }));
-            console.log('Loaded purchase cart:', items);
         } else {
             addItemRow();
         }
@@ -196,7 +244,7 @@
         const supplierSelect = document.getElementById('supplierSelect');
         supplierSelect.innerHTML = '<option value="">-- Select existing supplier --</option>';
         suppliers.forEach(sup => {
-            supplierSelect.innerHTML += `<option value="${sup.email}" data-name="${sup.name}" data-gstin="${sup.gstin || ''}" data-phone="${sup.phone || ''}" data-address="${sup.address || ''}">${sup.name} (${sup.email})</option>`;
+            supplierSelect.innerHTML += `<option value="${sup.email}" data-name="${sup.name}" data-gstin="${sup.gstin || ''}" data-phone="${sup.phone || ''}" data-address="${sup.address || ''}" data-state="${sup.state || ''}">${sup.name} (${sup.email})</option>`;
         });
         supplierSelect.addEventListener('change', function() {
             const selected = supplierSelect.options[supplierSelect.selectedIndex];
@@ -205,13 +253,16 @@
                 document.getElementById('supplierGstin').value = selected.dataset.gstin || '';
                 document.getElementById('supplierPhone').value = selected.dataset.phone || '';
                 document.getElementById('supplierAddress').value = selected.dataset.address || '';
+                document.getElementById('supplierState').value = selected.dataset.state || '';
             } else {
                 document.getElementById('supplierName').value = '';
                 document.getElementById('supplierGstin').value = '';
                 document.getElementById('supplierPhone').value = '';
                 document.getElementById('supplierAddress').value = '';
+                document.getElementById('supplierState').value = '';
             }
             populateInvoiceDropdown();
+            updateGstDisplay();
         });
 
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
@@ -220,7 +271,7 @@
             const quickSelect = document.getElementById('quickSupplierSelect');
             quickSelect.innerHTML = '<option value="">-- Quick Select (Admin only) --</option>';
             suppliers.forEach(sup => {
-                quickSelect.innerHTML += `<option value="${sup.email}" data-name="${sup.name}" data-gstin="${sup.gstin || ''}" data-phone="${sup.phone || ''}" data-address="${sup.address || ''}">${sup.name} (${sup.email})</option>`;
+                quickSelect.innerHTML += `<option value="${sup.email}" data-name="${sup.name}" data-gstin="${sup.gstin || ''}" data-phone="${sup.phone || ''}" data-address="${sup.address || ''}" data-state="${sup.state || ''}">${sup.name} (${sup.email})</option>`;
             });
         }
     }
@@ -234,8 +285,10 @@
             document.getElementById('supplierGstin').value = sup.gstin || '';
             document.getElementById('supplierPhone').value = sup.phone || '';
             document.getElementById('supplierAddress').value = sup.address || '';
+            document.getElementById('supplierState').value = sup.state || '';
             const mainSelect = document.getElementById('supplierSelect');
             mainSelect.value = email;
+            updateGstDisplay();
         }
     }
 
@@ -273,24 +326,6 @@
             `;
             container.appendChild(div);
         });
-    }
-
-    function recalcTotals() {
-        let subtotal = 0;
-        items.forEach(item => {
-            const qty = item.qty || 0;
-            const cost = item.cost || 0;
-            const disc = item.discount || 0;
-            const taxable = qty * cost * (1 - disc / 100);
-            subtotal += taxable;
-        });
-        const cgst = subtotal * 0.09;
-        const sgst = subtotal * 0.09;
-        const grand = Math.round(subtotal + cgst + sgst);
-        document.getElementById('subtotal').innerText = subtotal.toFixed(2);
-        document.getElementById('cgstTotal').innerText = cgst.toFixed(2);
-        document.getElementById('sgstTotal').innerText = sgst.toFixed(2);
-        document.getElementById('grandTotal').innerText = grand.toFixed(2);
     }
 
     function getFinancialYear() {
@@ -345,7 +380,7 @@
                 phone: document.getElementById('supplierPhone').value,
                 gstin: document.getElementById('supplierGstin').value,
                 address: document.getElementById('supplierAddress').value,
-                state: '',
+                state: document.getElementById('supplierState').value,
                 creditLimit: 50000,
                 openingBalance: 0,
                 outstanding: 0,
@@ -355,13 +390,19 @@
             };
             suppliers.push(supplier);
             localStorage.setItem('suppliers', JSON.stringify(suppliers));
+        } else {
+            // Update supplier state if changed
+            const newState = document.getElementById('supplierState').value;
+            if (newState && supplier.state !== newState) {
+                supplier.state = newState;
+                localStorage.setItem('suppliers', JSON.stringify(suppliers));
+            }
         }
 
-        // Prepare purchase items and ALSO update product master with HSN
+        // Prepare purchase items and update product master with HSN
         const purchaseItems = [];
         for (let item of items) {
             if (!item.part) continue;
-            // Update product master (create or update HSN)
             updateProductHsn(item.part, item.hsn, item.desc, item.cost);
             purchaseItems.push({
                 productId: item.part,
@@ -451,6 +492,7 @@
     loadSupplierData();
     loadCartItems();
     purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+    updateGstDisplay(); // initial GST display
 </script>
 </body>
-                                                               </html>
+    </html>
