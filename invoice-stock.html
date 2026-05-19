@@ -173,19 +173,19 @@
     </div>
 
     <table class="tax-summary-table">
-        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></td></thead>
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
-            <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></td></tr>
-            <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
+            <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</strong></td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></td></tr>
+            <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
@@ -540,19 +540,19 @@
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             let row = `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td>${escapeHtml(item.part)}</td>
-                <td>${escapeHtml(item.desc)}</td>
-                <td><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></td>
-                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="text-align:center;">18%</td>`;
+                <td>${escapeHtml(item.part)}</strong></td>
+                <td>${escapeHtml(item.desc)}</strong></td>
+                <td><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></strong></td>
+                <td><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:80px; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:70px;" onchange="updateQty('${item.part}', this.value)"></strong></td>
+                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</strong></td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="text-align:center;">18%</strong></td>`;
             if (isLocal) {
-                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</td><td style="text-align:right;">₹${sgst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${sgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             } else {
-                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             }
             row += `</tr>`;
             itemsHtml += row;
@@ -564,7 +564,14 @@
         for (let hsn in totals.taxGroups) {
             const g = totals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
-            taxHtml += `<tr><td>${hsn || 'N/A'}</td><td style="text-align:right;">₹${g.taxable.toFixed(2)}</td><td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td><td style="text-align:right;">${totals.isLocal ? '₹'+g.sgst.toFixed(2) : '-'}</td><td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td><td style="text-align:right;">₹${totalTax.toFixed(2)}</td></tr>`;
+            taxHtml += `<tr>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
+                ${totals.isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</strong></td>` : ''}
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
+            </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
         updateTotalsWithPackingAndRound();
@@ -607,6 +614,43 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
+    // ========== HELPER: ENSURE PRODUCT EXISTS IN MASTER (prevent "product undefined") ==========
+    function ensureProductInMaster(sku, name, hsn, price) {
+        let products = getProducts();
+        let existing = products.find(p => p.sku === sku);
+        if (!existing) {
+            products.push({
+                id: sku,   // use SKU as ID for consistency
+                sku: sku,
+                name: name || sku,
+                hsn: hsn || '',
+                unit: 'pc',
+                price: price || 0,
+                currentStock: 0,
+                reorderLevel: 10,
+                createdAt: new Date().toISOString()
+            });
+            saveProducts(products);
+            console.log(`Product created in master: ${sku} (${name || sku})`);
+        } else {
+            // Update name/HSN if missing
+            let updated = false;
+            if (hsn && (!existing.hsn || existing.hsn === '')) {
+                existing.hsn = hsn;
+                updated = true;
+            }
+            if (name && (!existing.name || existing.name === '')) {
+                existing.name = name;
+                updated = true;
+            }
+            if (updated) {
+                saveProducts(products);
+                console.log(`Product updated in master: ${sku}`);
+            }
+        }
+        return true;
+    }
+
     // ========== SAVE INVOICE TO BOTH STORAGE KEYS (NO DELETION) ==========
     function saveInvoiceToLocalStorage(invoice) {
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
@@ -636,6 +680,12 @@
         if (cart.length === 0) {
             alert('Cart empty. Please add items first.');
             return;
+        }
+
+        // ====== ENSURE ALL PRODUCTS EXIST IN MASTER BEFORE SAVING ======
+        for (let item of cart) {
+            if (!item.part) continue;
+            ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
         }
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
@@ -866,4 +916,4 @@
     })();
 </script>
 </body>
-    </html>
+                                                                                                      </html>
