@@ -14,6 +14,7 @@
         button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
         .btn-quote { background: #28a745; }
         .btn-proforma { background: #e67e22; }
+        .btn-sync { background: #6c757d; margin-bottom: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
         th { background: #0a7c71; color: white; }
@@ -31,6 +32,9 @@
             <button class="btn-proforma" onclick="createDocument('proforma')">Proforma</button>
             <button onclick="window.location.href='index.html'">Back</button>
         </div>
+    </div>
+    <div style="margin: 10px 0;">
+        <button class="btn-sync" onclick="syncHsnFromInvoices()"><i class="fas fa-sync-alt"></i> Sync HSN from Invoices</button>
     </div>
     <div class="search-box" style="margin: 10px 0;">
         <input type="text" id="searchInput" placeholder="Search...">
@@ -52,7 +56,7 @@
             allProducts = JSON.parse(localStorage.getItem('products') || '[]');
         }
         if (!allProducts || allProducts.length === 0) {
-            document.getElementById('productsTableContainer').innerHTML = '<p>No products found. Please add products.</p>';
+            document.getElementById('productsTableContainer').innerHTML = '<p>No products found. Click "Sync HSN from Invoices" to recover.</p>';
             return;
         }
         allProducts.forEach(p => {
@@ -62,7 +66,7 @@
             p.price = p.price || 0;
             p.currentStock = p.currentStock || 0;
             p.unit = p.unit || 'pc';
-            p.hsn = p.hsn || '';  // ensure hsn field exists
+            p.hsn = p.hsn || '';
         });
         filterProducts();
     }
@@ -89,9 +93,9 @@
             const rowClass = (p.currentStock === 0) ? 'stock-zero' : '';
             html += `<tr class="${rowClass}">
                 <td><input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)"></td>
-                <td>${escapeHtml(p.sku)}</strong></td>
+                <td><strong>${escapeHtml(p.sku)}</strong></td>
                 <td>${escapeHtml(p.name)}</strong></td>
-                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></strong></td>
+                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></td>
                 <td>${escapeHtml(p.unit)}</strong></td>
                 <td>₹${p.price.toLocaleString()}</strong></td>
                 <td>${p.currentStock.toLocaleString()}</strong></td>
@@ -125,18 +129,13 @@
         let product = allProducts.find(p => p.id === id);
         if (product) {
             product.hsn = newHsn;
-            // Save the updated product list to localStorage
             let allProds = JSON.parse(localStorage.getItem('products') || '[]');
             let index = allProds.findIndex(p => p.id == id);
             if (index !== -1) {
                 allProds[index].hsn = newHsn;
                 localStorage.setItem('products', JSON.stringify(allProds));
-                // Also update the local allProducts array
-                let localProd = allProducts.find(p => p.id === id);
-                if (localProd) localProd.hsn = newHsn;
             }
         }
-        // No need to re-render, the input already shows the new value.
     }
 
     function toggleSelectAll() {
@@ -165,6 +164,33 @@
         }
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
         window.location.href = type === 'quotation' ? 'quotation.html' : 'proforma-invoice.html';
+    }
+
+    function syncHsnFromInvoices() {
+        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        let products = JSON.parse(localStorage.getItem('products') || '[]');
+        let updated = 0;
+        products.forEach(prod => {
+            let sku = prod.sku;
+            for (let inv of allInvoices) {
+                let item = (inv.items || []).find(i => (i.productId === sku || i.part === sku || i.sku === sku));
+                if (item) {
+                    let newHsn = item.hsn || item.hsnCode || item.gstHsn || item.taxCode || item.gst || '';
+                    if (newHsn && prod.hsn !== newHsn) {
+                        prod.hsn = newHsn;
+                        updated++;
+                        break;
+                    }
+                }
+            }
+        });
+        if (updated > 0) {
+            localStorage.setItem('products', JSON.stringify(products));
+            alert(`Updated HSN for ${updated} products. Page will reload.`);
+            location.reload();
+        } else {
+            alert("No HSN found in invoices. Ensure invoices have 'hsn' field (or hsnCode/gstHsn) in items.");
+        }
     }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
