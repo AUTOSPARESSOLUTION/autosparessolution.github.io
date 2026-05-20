@@ -1,34 +1,62 @@
-// ========== CENTRAL DATA STORE – COMPLETE ==========
-// All modules must use these functions to read/write data.
-// This ensures every operation affects related data.
+// ========== CENTRAL DATA STORE – DYNAMIC STOCK FROM LEDGER ==========
+// All stock values are computed on‑the‑fly from inventoryTransactions.
+// This ensures product selector always shows accurate stock.
 
 // ----- Helper: get / save data -----
-function getProducts() { return JSON.parse(localStorage.getItem('products') || '[]'); }
-function saveProducts(products) { localStorage.setItem('products', JSON.stringify(products)); }
+function getProducts() {
+    let products = JSON.parse(localStorage.getItem('products') || '[]');
+    let invTransactions = getInventoryTransactions();
+    
+    // Compute current stock for each product using inventory ledger
+    return products.map(p => {
+        let stock = 0;
+        invTransactions.forEach(t => {
+            if (t.productId == p.id || t.productId == p.sku) {
+                stock += t.quantity;   // quantity is positive for purchase, negative for sales
+            }
+        });
+        // Also add any manual opening stock stored in product's currentStock? 
+        // But we trust ledger. Optionally include initialStock field.
+        p.currentStock = stock;
+        return p;
+    });
+}
 
-function getInventoryTransactions() { return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]'); }
-function saveInventoryTransactions(trans) { localStorage.setItem('inventoryTransactions', JSON.stringify(trans)); }
+function saveProducts(products) {
+    localStorage.setItem('products', JSON.stringify(products));
+}
 
-function getSalesInvoices() { return JSON.parse(localStorage.getItem('salesInvoices') || '[]'); }
-function saveSalesInvoices(invoices) { localStorage.setItem('salesInvoices', JSON.stringify(invoices)); }
+function getInventoryTransactions() {
+    return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]');
+}
+function saveInventoryTransactions(trans) {
+    localStorage.setItem('inventoryTransactions', JSON.stringify(trans));
+}
 
-function getPurchaseInvoices() { return JSON.parse(localStorage.getItem('purchaseInvoices') || '[]'); }
-function savePurchaseInvoices(invoices) { localStorage.setItem('purchaseInvoices', JSON.stringify(invoices)); }
+function getSalesInvoices() {
+    return JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+}
+function saveSalesInvoices(invoices) {
+    localStorage.setItem('salesInvoices', JSON.stringify(invoices));
+}
+
+function getPurchaseInvoices() {
+    return JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+}
+function savePurchaseInvoices(invoices) {
+    localStorage.setItem('purchaseInvoices', JSON.stringify(invoices));
+}
 
 // ----- Helper: find product by SKU or ID (SKU first) -----
 function findProduct(productId) {
-    const products = getProducts();
-    // 1. Try by SKU (most reliable, matches part number)
-    let product = products.find(p => p.sku === productId);
-    // 2. Fallback to ID
-    if (!product) product = products.find(p => p.id == productId);
-    return product;
+    const products = getProducts(); // already dynamic stock
+    return products.find(p => p.sku === productId) || products.find(p => p.id == productId);
 }
 
 // ----- 1. Sales Invoice – reduces stock, increases customer outstanding -----
 function createSalesInvoice(invoice) {
     // invoice: { id, date, customerEmail, items: [{productId, quantity, price}], total, invoiceNo, status }
-    let products = getProducts();
+    let products = getProducts(); // dynamic products (stock not used directly)
     let invTransactions = getInventoryTransactions();
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
     
@@ -47,14 +75,12 @@ function createSalesInvoice(invoice) {
                 createdAt: new Date().toISOString()
             };
             products.push(product);
+            // We'll need to save products after the loop
         }
-        let oldStock = product.currentStock || 0;
-        let newStock = oldStock - item.quantity;
-        if (newStock < 0) {
-            // Allow negative stock? You can comment out this check if needed
-            console.warn(`Negative stock for ${product.name}: ${newStock}`);
-        }
-        product.currentStock = newStock;
+        // Log a negative stock warning (but allow)
+        let currentStock = product.currentStock; // dynamic
+        let newStock = currentStock - item.quantity;
+        if (newStock < 0) console.warn(`Negative stock for ${product.name}: ${newStock}`);
         
         invTransactions.push({
             id: Date.now() + Math.random(),
@@ -63,9 +89,10 @@ function createSalesInvoice(invoice) {
             quantity: -item.quantity,
             date: invoice.date,
             ref: invoice.invoiceNo || `INV-${invoice.id}`,
-            balanceAfter: newStock
+            balanceAfter: newStock  // This is just for reference; actual balance computed on read
         });
     }
+    // Save products (if any new ones were added)
     saveProducts(products);
     saveInventoryTransactions(invTransactions);
     
@@ -104,7 +131,6 @@ function createPurchaseInvoice(purchase) {
     for (let item of purchase.items) {
         let product = findProduct(item.productId);
         if (!product) {
-            // Auto-create product using SKU as ID
             product = {
                 id: item.productId,
                 sku: item.productId,
@@ -117,9 +143,8 @@ function createPurchaseInvoice(purchase) {
             };
             products.push(product);
         }
-        let oldStock = product.currentStock || 0;
-        let newStock = oldStock + item.quantity;
-        product.currentStock = newStock;
+        let currentStock = product.currentStock;
+        let newStock = currentStock + item.quantity;
         
         invTransactions.push({
             id: Date.now() + Math.random(),
@@ -161,7 +186,6 @@ function createPurchaseInvoice(purchase) {
 
 // ----- 3. Customer Payment – reduces customer outstanding -----
 function receiveCustomerPayment(payment) {
-    // payment: { id, date, customerEmail, amount, reference, mode }
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
     let customer = customers.find(c => c.email === payment.customerEmail);
     if (!customer) throw new Error('Customer not found');
@@ -192,7 +216,6 @@ function receiveCustomerPayment(payment) {
 
 // ----- 4. Supplier Payment – reduces supplier outstanding -----
 function paySupplier(payment) {
-    // payment: { id, date, supplierEmail, amount, reference }
     let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
     let supplier = suppliers.find(s => s.email === payment.supplierEmail);
     if (!supplier) throw new Error('Supplier not found');
@@ -221,14 +244,14 @@ function paySupplier(payment) {
     return true;
 }
 
-// ----- 5. Stock Report – current stock levels -----
+// ----- 5. Stock Report – current stock levels (dynamic) -----
 function getCurrentStock() {
-    let products = getProducts();
+    let products = getProducts(); // already computed from ledger
     return products.map(p => ({
         id: p.id,
         name: p.name,
         sku: p.sku,
-        currentStock: p.currentStock || 0,
+        currentStock: p.currentStock,
         reorderLevel: p.reorderLevel || 0,
         unit: p.unit
     }));
@@ -240,24 +263,24 @@ function deleteSalesInvoice(invoiceId) {
     let invoice = salesInvoices.find(i => i.id == invoiceId);
     if (!invoice) return false;
     
-    let products = getProducts();
     let invTransactions = getInventoryTransactions();
+    // Add reversal entries for stock
     for (let item of invoice.items) {
         let product = findProduct(item.productId);
         if (product) {
-            product.currentStock += item.quantity;
+            let currentStock = product.currentStock;
+            let newStock = currentStock + item.quantity;
             invTransactions.push({
                 id: Date.now(),
                 productId: product.id,
                 type: 'sales_return',
-                quantity: item.quantity,
+                quantity: item.quantity,    // positive
                 date: new Date().toISOString(),
                 ref: `RET-${invoiceId}`,
-                balanceAfter: product.currentStock
+                balanceAfter: newStock
             });
         }
     }
-    saveProducts(products);
     saveInventoryTransactions(invTransactions);
     
     let remaining = salesInvoices.filter(i => i.id != invoiceId);
@@ -269,6 +292,37 @@ function deleteSalesInvoice(invoiceId) {
         customer.outstanding -= invoice.total;
         if (customer.outstanding < 0) customer.outstanding = 0;
         localStorage.setItem('customers', JSON.stringify(customers));
+        
+        // Add reversal in customer ledger
+        let customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
+        customerLedger.push({
+            id: Date.now(),
+            customerEmail: invoice.customerEmail,
+            date: new Date().toISOString().slice(0,10),
+            type: 'reversal',
+            ref: `DEL-${invoice.invoiceNo}`,
+            debit: 0,
+            credit: invoice.total,
+            balance: customer.outstanding,
+            note: `Invoice ${invoice.invoiceNo} deleted`
+        });
+        localStorage.setItem('customerLedger', JSON.stringify(customerLedger));
     }
     return true;
 }
+
+// ----- 7. (Optional) Rebuild all product currentStock from inventoryTransactions -----
+// This can be used after data migration or to fix inconsistencies.
+function rebuildAllStock() {
+    let products = JSON.parse(localStorage.getItem('products') || '[]');
+    let invTransactions = getInventoryTransactions();
+    for (let p of products) {
+        let stock = 0;
+        invTransactions.forEach(t => {
+            if (t.productId == p.id || t.productId == p.sku) stock += t.quantity;
+        });
+        p.currentStock = stock;
+    }
+    saveProducts(products);
+    console.log('Stock rebuilt from inventory transactions');
+                             }
