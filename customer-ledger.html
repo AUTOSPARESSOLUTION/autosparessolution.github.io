@@ -60,6 +60,8 @@
             cursor: pointer;
         }
         button:hover { background: #09645a; }
+        .btn-sync { background: #28a745; }
+        .btn-sync:hover { background: #218838; }
         input, select {
             padding: 8px;
             border: 1px solid #ccc;
@@ -95,6 +97,7 @@
         <button onclick="loadLedger()"><i class="fas fa-chart-line"></i> Load Ledger</button>
         <button onclick="refreshDropdown()"><i class="fas fa-sync-alt"></i> Refresh List</button>
         <button onclick="refreshLedger()" style="background:#17a2b8;"><i class="fas fa-undo-alt"></i> Refresh</button>
+        <button onclick="syncOutstanding()" class="btn-sync"><i class="fas fa-balance-scale"></i> Sync Outstanding</button>
     </div>
 
     <div class="search-box no-print">
@@ -125,17 +128,14 @@
     // ---------- DATE NORMALIZATION: convert DD/MM/YYYY or YYYY-MM-DD to YYYY-MM-DD ----------
     function toISODate(dateStr) {
         if (!dateStr) return '';
-        // If already YYYY-MM-DD, return as is
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-        // If DD/MM/YYYY
         const parts = dateStr.split('/');
         if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
             return `${parts[2]}-${parts[1]}-${parts[0]}`;
         }
-        // If MM/DD/YYYY? Unlikely, but try to parse
         const d = new Date(dateStr);
         if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
-        return dateStr; // fallback
+        return dateStr;
     }
 
     function refreshDropdown() {
@@ -143,7 +143,7 @@
         const select = document.getElementById('customerSelect');
         select.innerHTML = '<option value="">-- Select Customer --</option>';
         customers.forEach(c => {
-            select.innerHTML += `<option value="${c.email}">${escapeHtml(c.name)} (${c.email})</option>`;
+            select.innerHTML += `<option value="${escapeHtml(c.email)}">${escapeHtml(c.name)} (${escapeHtml(c.email)})</option>`;
         });
         const viewEmail = localStorage.getItem('viewCustomerEmail');
         if (viewEmail) {
@@ -225,6 +225,21 @@
                 debit: 0,
                 credit: p.amount,
                 narration: `Payment via ${p.mode || 'cash'}`
+            });
+        });
+
+        // Also include reversal entries from ledger (if any)
+        const customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
+        const reversalEntries = customerLedger.filter(e => e.customerEmail === currentCustomer.email && e.type === 'reversal');
+        reversalEntries.forEach(e => {
+            transactions.push({
+                originalDate: e.date,
+                date: toISODate(e.date),
+                type: 'Reversal',
+                ref: e.ref,
+                debit: e.debit || 0,
+                credit: e.credit || 0,
+                narration: e.note || 'Reversal entry'
             });
         });
 
@@ -314,7 +329,6 @@
 
         for (let t of filteredTransactions) {
             running += t.debit - t.credit;
-            // Display original date for readability
             const displayDate = t.originalDate || t.date;
             html += `<tr>
                 <td>${displayDate}</td>
@@ -334,7 +348,7 @@
         if (Math.abs(finalBalance - masterOutstanding) > 1) {
             const warning = `<div style="background:#fff3cd; padding:10px; margin-top:10px; border:1px solid #ffeeba;">
                 ⚠️ Ledger closing balance (₹${finalBalance.toLocaleString()}) differs from Master outstanding (₹${masterOutstanding.toLocaleString()}).
-                Click "Refresh" after editing invoices to reload.
+                Click "Sync Outstanding" button to update master.
             </div>`;
             document.getElementById('ledgerTable').innerHTML += warning;
         }
@@ -411,6 +425,42 @@
         pdfDiv.prepend(header);
         const filename = `Customer_Ledger_${currentCustomer.name}_${fromDate}_to_${toDate}.pdf`;
         html2pdf().set({ margin: 0.3, filename: filename, image: { quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' } }).from(pdfDiv).save();
+    }
+
+    // NEW: Sync outstanding from ledger to customer master
+    function syncOutstanding() {
+        if (!currentCustomer) {
+            alert('Please load a customer first.');
+            return;
+        }
+
+        // Calculate correct closing balance from ALL transactions (no date filter)
+        let balance = 0;
+        for (let t of allTransactions) {
+            balance += t.debit - t.credit;
+        }
+
+        // Update the customer object in localStorage
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const customerIndex = customers.findIndex(c => normalizeEmail(c.email) === normalizeEmail(currentCustomer.email));
+        if (customerIndex !== -1) {
+            customers[customerIndex].outstanding = balance;
+            localStorage.setItem('customers', JSON.stringify(customers));
+
+            // Update currentCustomer and the displayed info
+            currentCustomer.outstanding = balance;
+            document.getElementById('customerInfo').innerHTML = `
+                <strong>${escapeHtml(currentCustomer.name)}</strong><br>
+                Email: ${escapeHtml(currentCustomer.email)} | Phone: ${escapeHtml(currentCustomer.phone)}<br>
+                Outstanding in Master: <strong>₹${(currentCustomer.outstanding || 0).toLocaleString()}</strong>
+            `;
+
+            // Refresh the ledger display to remove the warning
+            displayLedger();
+            alert(`Outstanding synced to ₹${balance.toLocaleString()}`);
+        } else {
+            alert('Customer not found in master data.');
+        }
     }
 
     function escapeHtml(str) {
