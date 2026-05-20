@@ -15,6 +15,7 @@
         .btn-quote { background: #28a745; }
         .btn-proforma { background: #e67e22; }
         .btn-sync { background: #6c757d; margin-bottom: 10px; }
+        .btn-purchase-sync { background: #17a2b8; margin-bottom: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
         th { background: #0a7c71; color: white; }
@@ -34,7 +35,8 @@
         </div>
     </div>
     <div style="margin: 10px 0;">
-        <button class="btn-sync" onclick="syncHsnFromInvoices()"><i class="fas fa-sync-alt"></i> Sync HSN from Invoices</button>
+        <button class="btn-sync" onclick="syncHsnFromInvoices()"><i class="fas fa-sync-alt"></i> Sync HSN from Sales Invoices</button>
+        <button class="btn-purchase-sync" onclick="syncFromPurchaseInvoices()"><i class="fas fa-truck"></i> Sync Products from Purchase Invoices</button>
     </div>
     <div class="search-box" style="margin: 10px 0;">
         <input type="text" id="searchInput" placeholder="Search...">
@@ -56,7 +58,7 @@
             allProducts = JSON.parse(localStorage.getItem('products') || '[]');
         }
         if (!allProducts || allProducts.length === 0) {
-            document.getElementById('productsTableContainer').innerHTML = '<p>No products found. Click "Sync HSN from Invoices" to recover.</p>';
+            document.getElementById('productsTableContainer').innerHTML = '<p>No products found. Click sync buttons to recover.</p>';
             return;
         }
         allProducts.forEach(p => {
@@ -83,7 +85,7 @@
             document.getElementById('productsTableContainer').innerHTML = '<p>No matching products.</p>';
             return;
         }
-        let html = `<table><thead><tr><th>Select</th><th>SKU</th><th>Name</th><th>HSN</th><th>Unit</th><th>Price</th><th>Stock</th><th>Qty</th><th>Disc%</th></tr></thead><tbody>`;
+        let html = `<tr><thead>汽<th>Select</th><th>SKU</th><th>Name</th><th>HSN</th><th>Unit</th><th>Price</th><th>Stock</th><th>Qty</th><th>Disc%</th></tr></thead><tbody>`;
         for (let p of filteredProducts) {
             const selected = selectedProductRows.has(p.id);
             const stored = selectedProductRows.get(p.id);
@@ -95,7 +97,7 @@
                 <td><input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)"></td>
                 <td><strong>${escapeHtml(p.sku)}</strong></td>
                 <td>${escapeHtml(p.name)}</strong></td>
-                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></td>
+                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></strong></td>
                 <td>${escapeHtml(p.unit)}</strong></td>
                 <td>₹${p.price.toLocaleString()}</strong></td>
                 <td>${p.currentStock.toLocaleString()}</strong></td>
@@ -125,7 +127,6 @@
     function updateDiscount(id, disc) { let d = parseFloat(disc); if (isNaN(d) || d < 0) return; if (selectedProductRows.has(id)) { const cur = selectedProductRows.get(id); selectedProductRows.set(id, { ...cur, discount: d }); } }
 
     function updateHsn(id, newHsn) {
-        // Save HSN directly to the product master (permanent)
         let product = allProducts.find(p => p.id === id);
         if (product) {
             product.hsn = newHsn;
@@ -166,6 +167,7 @@
         window.location.href = type === 'quotation' ? 'quotation.html' : 'proforma-invoice.html';
     }
 
+    // Sync HSN from sales invoices only
     function syncHsnFromInvoices() {
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         let products = JSON.parse(localStorage.getItem('products') || '[]');
@@ -175,7 +177,7 @@
             for (let inv of allInvoices) {
                 let item = (inv.items || []).find(i => (i.productId === sku || i.part === sku || i.sku === sku));
                 if (item) {
-                    let newHsn = item.hsn || item.hsnCode || item.gstHsn || item.taxCode || item.gst || '';
+                    let newHsn = item.hsn || item.hsnCode || item.gstHsn || '';
                     if (newHsn && prod.hsn !== newHsn) {
                         prod.hsn = newHsn;
                         updated++;
@@ -189,7 +191,62 @@
             alert(`Updated HSN for ${updated} products. Page will reload.`);
             location.reload();
         } else {
-            alert("No HSN found in invoices. Ensure invoices have 'hsn' field (or hsnCode/gstHsn) in items.");
+            alert("No HSN found in sales invoices.");
+        }
+    }
+
+    // Sync products from purchase invoices (add missing, update prices/HSN)
+    function syncFromPurchaseInvoices() {
+        let purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        if (purchaseInvoices.length === 0) {
+            alert("No purchase invoices found.");
+            return;
+        }
+        let products = JSON.parse(localStorage.getItem('products') || '[]');
+        let productMap = new Map();
+        products.forEach(p => { if(p.sku) productMap.set(p.sku, p); if(p.id) productMap.set(p.id, p); });
+        let added = 0, updated = 0;
+
+        purchaseInvoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                let sku = item.productId || item.part || item.sku;
+                if (!sku) return;
+                let name = item.desc || item.name || `Product ${sku}`;
+                let price = item.cost || item.price || 0;
+                let hsn = item.hsn || item.hsnCode || item.gstHsn || '';
+
+                if (!productMap.has(sku)) {
+                    let newProd = {
+                        id: sku,
+                        sku: sku,
+                        name: name,
+                        price: price,
+                        hsn: hsn,
+                        unit: 'pc',
+                        currentStock: 0,
+                        reorderLevel: 10,
+                        createdAt: new Date().toISOString()
+                    };
+                    productMap.set(sku, newProd);
+                    added++;
+                } else {
+                    let existing = productMap.get(sku);
+                    let changed = false;
+                    if (price && existing.price !== price) { existing.price = price; changed = true; }
+                    if (hsn && !existing.hsn) { existing.hsn = hsn; changed = true; }
+                    if (name && existing.name === `Product ${sku}`) { existing.name = name; changed = true; }
+                    if (changed) updated++;
+                }
+            });
+        });
+
+        if (added > 0 || updated > 0) {
+            let merged = Array.from(productMap.values());
+            localStorage.setItem('products', JSON.stringify(merged));
+            alert(`✅ Synced: ${added} new products added, ${updated} existing products updated. Page will reload.`);
+            location.reload();
+        } else {
+            alert("No new or updated products found in purchase invoices.");
         }
     }
 
