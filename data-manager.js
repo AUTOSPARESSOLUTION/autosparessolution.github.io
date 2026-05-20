@@ -1,12 +1,15 @@
-// ========== COMPLETE DATA MANAGER WITH AUTO-RECOVERY ==========
-// If products are missing, they are automatically restored from invoices.
+// ========== SAFE DATA MANAGER – NEVER DELETES PRODUCTS ==========
+// - Only reads products; never removes them.
+// - If products are missing, recovers from invoices (append only).
+// - All save operations are additive (no overwrite of existing arrays).
 
-// ----- Helpers -----
+// ----- Core get/set (no deletion) -----
 function getProducts() {
     let products = JSON.parse(localStorage.getItem('products') || '[]');
     if (products.length === 0) {
         products = recoverProductsFromInvoices();
     }
+    // Compute live stock from inventoryTransactions
     let transactions = getInventoryTransactions();
     return products.map(p => {
         let stock = 0;
@@ -18,18 +21,52 @@ function getProducts() {
     });
 }
 
+function saveProducts(products) {
+    // Never delete – just overwrite with the new array (which includes all existing)
+    localStorage.setItem('products', JSON.stringify(products));
+}
+
+function getInventoryTransactions() {
+    return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]');
+}
+function saveInventoryTransactions(trans) {
+    localStorage.setItem('inventoryTransactions', JSON.stringify(trans));
+}
+
+function getSalesInvoices() {
+    return JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+}
+function saveSalesInvoices(invoices) {
+    localStorage.setItem('salesInvoices', JSON.stringify(invoices));
+}
+
+function getPurchaseInvoices() {
+    return JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+}
+function savePurchaseInvoices(invoices) {
+    localStorage.setItem('purchaseInvoices', JSON.stringify(invoices));
+}
+
+// ----- Safe recovery from invoices (adds missing products) -----
 function recoverProductsFromInvoices() {
-    let map = new Map();
+    let existing = JSON.parse(localStorage.getItem('products') || '[]');
+    let existingMap = new Map();
+    existing.forEach(p => {
+        if (p.sku) existingMap.set(p.sku, p);
+        if (p.id) existingMap.set(p.id, p);
+    });
+
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-    let purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-    
+    let purchaseInvoices = getPurchaseInvoices();
+    let added = false;
+
     // From sales invoices
     allInvoices.forEach(inv => {
         (inv.items || []).forEach(item => {
             let sku = item.productId || item.part || item.sku;
             if (!sku) return;
-            if (!map.has(sku)) {
-                map.set(sku, {
+            if (!existingMap.has(sku)) {
+                existingMap.set(sku, {
                     id: sku,
                     sku: sku,
                     name: item.desc || item.name || `Product ${sku}`,
@@ -39,17 +76,18 @@ function recoverProductsFromInvoices() {
                     reorderLevel: 10,
                     createdAt: new Date().toISOString()
                 });
+                added = true;
             }
         });
     });
-    
+
     // From purchase invoices
     purchaseInvoices.forEach(inv => {
         (inv.items || []).forEach(item => {
             let sku = item.productId || item.part || item.sku;
             if (!sku) return;
-            if (!map.has(sku)) {
-                map.set(sku, {
+            if (!existingMap.has(sku)) {
+                existingMap.set(sku, {
                     id: sku,
                     sku: sku,
                     name: item.desc || item.name || `Product ${sku}`,
@@ -59,15 +97,17 @@ function recoverProductsFromInvoices() {
                     reorderLevel: 10,
                     createdAt: new Date().toISOString()
                 });
+                added = true;
             }
         });
     });
-    
-    let recovered = Array.from(map.values());
-    if (recovered.length) {
+
+    let recovered = Array.from(existingMap.values());
+    if (added) {
         localStorage.setItem('products', JSON.stringify(recovered));
-        console.log(`Auto-recovered ${recovered.length} products from invoices`);
-    } else {
+        console.log("Recovered missing products from invoices");
+    } else if (recovered.length === 0) {
+        // No invoices, no products – create samples
         recovered = [
             { id: "P001", sku: "P001", name: "Brake Pad", price: 1200, unit: "pair", currentStock: 0, reorderLevel: 10, createdAt: new Date().toISOString() },
             { id: "P002", sku: "P002", name: "Engine Oil", price: 450, unit: "Ltr", currentStock: 0, reorderLevel: 10, createdAt: new Date().toISOString() }
@@ -77,28 +117,22 @@ function recoverProductsFromInvoices() {
     return recovered;
 }
 
-function saveProducts(products) { localStorage.setItem('products', JSON.stringify(products)); }
-function getInventoryTransactions() { return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]'); }
-function saveInventoryTransactions(trans) { localStorage.setItem('inventoryTransactions', JSON.stringify(trans)); }
-function getSalesInvoices() { return JSON.parse(localStorage.getItem('salesInvoices') || '[]'); }
-function saveSalesInvoices(invoices) { localStorage.setItem('salesInvoices', JSON.stringify(invoices)); }
-function getPurchaseInvoices() { return JSON.parse(localStorage.getItem('purchaseInvoices') || '[]'); }
-function savePurchaseInvoices(invoices) { localStorage.setItem('purchaseInvoices', JSON.stringify(invoices)); }
-
+// ----- Helper to find product -----
 function findProduct(productId) {
     let products = getProducts();
     return products.find(p => p.sku === productId) || products.find(p => p.id == productId);
 }
 
-// ----- 1. Create Sales Invoice -----
+// ----- Create Sales Invoice (reduces stock, adds customer outstanding) -----
 function createSalesInvoice(invoice) {
     let transactions = getInventoryTransactions();
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-    let products = JSON.parse(localStorage.getItem('products') || '[]'); // raw
-    
+    let products = JSON.parse(localStorage.getItem('products') || '[]'); // raw for adding new products
+
     for (let item of invoice.items) {
         let product = findProduct(item.productId);
         if (!product) {
+            // Auto-create product if missing (safe, append-only)
             product = {
                 id: item.productId,
                 sku: item.productId,
@@ -121,14 +155,14 @@ function createSalesInvoice(invoice) {
         });
     }
     saveInventoryTransactions(transactions);
-    
+
     let salesInvoices = getSalesInvoices();
     salesInvoices.push(invoice);
     saveSalesInvoices(salesInvoices);
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     allInvoices.push(invoice);
     localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-    
+
     let customer = customers.find(c => c.email === invoice.customerEmail);
     if (customer) {
         customer.outstanding = (customer.outstanding || 0) + invoice.total;
@@ -149,12 +183,12 @@ function createSalesInvoice(invoice) {
     return true;
 }
 
-// ----- 2. Create Purchase Invoice -----
+// ----- Create Purchase Invoice (increases stock) -----
 function createPurchaseInvoice(purchase) {
     let transactions = getInventoryTransactions();
     let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
     let products = JSON.parse(localStorage.getItem('products') || '[]');
-    
+
     for (let item of purchase.items) {
         let product = findProduct(item.productId);
         if (!product) {
@@ -180,11 +214,11 @@ function createPurchaseInvoice(purchase) {
         });
     }
     saveInventoryTransactions(transactions);
-    
+
     let purchaseInvoices = getPurchaseInvoices();
     purchaseInvoices.push(purchase);
     savePurchaseInvoices(purchaseInvoices);
-    
+
     let supplier = suppliers.find(s => s.email === purchase.supplierEmail);
     if (supplier) {
         supplier.outstanding = (supplier.outstanding || 0) + purchase.total;
@@ -205,7 +239,7 @@ function createPurchaseInvoice(purchase) {
     return true;
 }
 
-// ----- 3. Customer Payment -----
+// ----- Customer Payment -----
 function receiveCustomerPayment(payment) {
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
     let customer = customers.find(c => c.email === payment.customerEmail);
@@ -230,7 +264,7 @@ function receiveCustomerPayment(payment) {
     return true;
 }
 
-// ----- 4. Supplier Payment -----
+// ----- Supplier Payment -----
 function paySupplier(payment) {
     let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
     let supplier = suppliers.find(s => s.email === payment.supplierEmail);
@@ -255,7 +289,7 @@ function paySupplier(payment) {
     return true;
 }
 
-// ----- 5. Delete Sales Invoice (reverse effects) -----
+// ----- Delete Sales Invoice (reverses stock & outstanding) -----
 function deleteSalesInvoice(invoiceId) {
     let salesInvoices = getSalesInvoices();
     let invoice = salesInvoices.find(i => i.id == invoiceId);
@@ -301,7 +335,7 @@ function deleteSalesInvoice(invoiceId) {
     return true;
 }
 
-// ----- 6. Stock Report -----
+// ----- Stock Report -----
 function getCurrentStock() {
     let products = getProducts();
     return products.map(p => ({
@@ -312,4 +346,4 @@ function getCurrentStock() {
         reorderLevel: p.reorderLevel || 0,
         unit: p.unit
     }));
-                                                    }
+                    }
