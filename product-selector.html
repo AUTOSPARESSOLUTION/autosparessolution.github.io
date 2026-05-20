@@ -14,7 +14,6 @@
         button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
         .btn-quote { background: #28a745; }
         .btn-proforma { background: #e67e22; }
-        .recover-btn { background: #dc3545; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
         th { background: #0a7c71; color: white; }
@@ -33,7 +32,6 @@
             <button onclick="window.location.href='index.html'">Back</button>
         </div>
     </div>
-    <button id="recoverBtn" class="recover-btn" onclick="recoverProductsFromInvoices()"><i class="fas fa-database"></i> Restore Products from Invoices</button>
     <div class="search-box" style="margin: 10px 0;">
         <input type="text" id="searchInput" placeholder="Search...">
         <button onclick="filterProducts()">Search</button>
@@ -45,60 +43,16 @@
 <script>
     let allProducts = [];
     let selectedProductRows = new Map();
-    let productHsnOverrides = new Map();
     let filteredProducts = [];
 
-    // Force recovery from sales invoices (allInvoices)
-    function recoverProductsFromInvoices() {
-        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        if (allInvoices.length === 0) {
-            alert("No sales invoices found. Cannot recover products.");
-            return;
-        }
-        let productMap = new Map();
-        allInvoices.forEach(inv => {
-            (inv.items || []).forEach(item => {
-                let sku = item.productId || item.part || item.sku;
-                if (!sku) return;
-                if (!productMap.has(sku)) {
-                    productMap.set(sku, {
-                        id: sku,
-                        sku: sku,
-                        name: item.desc || item.name || `Product ${sku}`,
-                        price: item.price || 0,
-                        unit: 'pc',
-                        currentStock: 0,
-                        reorderLevel: 10,
-                        createdAt: new Date().toISOString()
-                    });
-                }
-            });
-        });
-        let recovered = Array.from(productMap.values());
-        if (recovered.length === 0) {
-            alert("No products found in invoices.");
-            return;
-        }
-        localStorage.setItem('products', JSON.stringify(recovered));
-        alert(`Recovered ${recovered.length} products. Page will now reload.`);
-        location.reload();
-    }
-
     function loadProducts() {
-        // Try to get products from data-manager.js first
         if (typeof window.getProducts === 'function') {
             allProducts = window.getProducts();
         } else {
-            // Fallback: read directly from localStorage
             allProducts = JSON.parse(localStorage.getItem('products') || '[]');
         }
         if (!allProducts || allProducts.length === 0) {
-            // Show recovery prompt
-            document.getElementById('productsTableContainer').innerHTML = `
-                <div style="text-align:center; padding:40px;">
-                    <p>No products found.</p>
-                    <button onclick="recoverProductsFromInvoices()" style="background:#dc3545;">Click here to restore from invoices</button>
-                </div>`;
+            document.getElementById('productsTableContainer').innerHTML = '<p>No products found. Please add products.</p>';
             return;
         }
         allProducts.forEach(p => {
@@ -108,6 +62,7 @@
             p.price = p.price || 0;
             p.currentStock = p.currentStock || 0;
             p.unit = p.unit || 'pc';
+            p.hsn = p.hsn || '';  // ensure hsn field exists
         });
         filterProducts();
     }
@@ -130,18 +85,18 @@
             const stored = selectedProductRows.get(p.id);
             const qty = selected ? stored.qty : (p.currentStock > 0 ? p.currentStock : 1);
             const discount = selected ? stored.discount : 0;
-            const hsnValue = productHsnOverrides.get(p.id) || p.hsn || '';
+            const hsnValue = p.hsn || '';
             const rowClass = (p.currentStock === 0) ? 'stock-zero' : '';
             html += `<tr class="${rowClass}">
                 <td><input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)"></td>
-                <td>${escapeHtml(p.sku)}</td>
-                <td>${escapeHtml(p.name)}</td>
-                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></td>
-                <td>${escapeHtml(p.unit)}</td>
-                <td>₹${p.price.toLocaleString()}</td>
-                <td>${p.currentStock.toLocaleString()}</td>
-                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></td>
-                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></td>
+                <td>${escapeHtml(p.sku)}</strong></td>
+                <td>${escapeHtml(p.name)}</strong></td>
+                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></strong></td>
+                <td>${escapeHtml(p.unit)}</strong></td>
+                <td>₹${p.price.toLocaleString()}</strong></td>
+                <td>${p.currentStock.toLocaleString()}</strong></td>
+                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></strong></td>
+                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></strong></td>
             </tr>`;
         }
         html += `</tbody></table>`;
@@ -156,7 +111,6 @@
         if (isSelected) {
             let defaultQty = product.currentStock > 0 ? product.currentStock : 1;
             selectedProductRows.set(id, { qty: defaultQty, discount: 0 });
-            if (!productHsnOverrides.has(id)) productHsnOverrides.set(id, product.hsn || '');
         } else {
             selectedProductRows.delete(id);
         }
@@ -165,7 +119,25 @@
 
     function updateQty(id, newQty) { let qty = parseFloat(newQty); if (isNaN(qty) || qty <= 0) return; if (selectedProductRows.has(id)) { const cur = selectedProductRows.get(id); selectedProductRows.set(id, { ...cur, qty }); } }
     function updateDiscount(id, disc) { let d = parseFloat(disc); if (isNaN(d) || d < 0) return; if (selectedProductRows.has(id)) { const cur = selectedProductRows.get(id); selectedProductRows.set(id, { ...cur, discount: d }); } }
-    function updateHsn(id, hsn) { productHsnOverrides.set(id, hsn); if (selectedProductRows.has(id)) { const cur = selectedProductRows.get(id); selectedProductRows.set(id, { ...cur }); } }
+
+    function updateHsn(id, newHsn) {
+        // Save HSN directly to the product master (permanent)
+        let product = allProducts.find(p => p.id === id);
+        if (product) {
+            product.hsn = newHsn;
+            // Save the updated product list to localStorage
+            let allProds = JSON.parse(localStorage.getItem('products') || '[]');
+            let index = allProds.findIndex(p => p.id == id);
+            if (index !== -1) {
+                allProds[index].hsn = newHsn;
+                localStorage.setItem('products', JSON.stringify(allProds));
+                // Also update the local allProducts array
+                let localProd = allProducts.find(p => p.id === id);
+                if (localProd) localProd.hsn = newHsn;
+            }
+        }
+        // No need to re-render, the input already shows the new value.
+    }
 
     function toggleSelectAll() {
         const check = document.getElementById('selectAllCheckbox').checked;
@@ -174,7 +146,6 @@
                 if (!selectedProductRows.has(p.id)) {
                     let qty = p.currentStock > 0 ? p.currentStock : 1;
                     selectedProductRows.set(p.id, { qty, discount: 0 });
-                    if (!productHsnOverrides.has(p.id)) productHsnOverrides.set(p.id, p.hsn || '');
                 }
             }
         } else {
@@ -189,7 +160,7 @@
         for (let [id, { qty, discount }] of selectedProductRows.entries()) {
             let product = allProducts.find(p => p.id === id);
             if (!product) continue;
-            let hsn = productHsnOverrides.get(id) !== undefined ? productHsnOverrides.get(id) : (product.hsn || '');
+            let hsn = product.hsn || '';
             cart.push({ part: product.sku, desc: product.name, hsn, qty, price: product.price, discount });
         }
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
