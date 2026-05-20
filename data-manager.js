@@ -1,7 +1,8 @@
-// ========== SAFE DATA MANAGER – NEVER DELETES PRODUCTS ==========
+// ========== SAFE DATA MANAGER WITH HSN SUPPORT – NEVER DELETES PRODUCTS ==========
 // - Only reads products; never removes them.
-// - If products are missing, recovers from invoices (append only).
+// - If products are missing, recovers from invoices (including HSN).
 // - All save operations are additive (no overwrite of existing arrays).
+// - HSN edits are saved permanently to product master.
 
 // ----- Core get/set (no deletion) -----
 function getProducts() {
@@ -47,7 +48,7 @@ function savePurchaseInvoices(invoices) {
     localStorage.setItem('purchaseInvoices', JSON.stringify(invoices));
 }
 
-// ----- Safe recovery from invoices (adds missing products) -----
+// ----- Safe recovery from invoices (adds missing products, includes HSN) -----
 function recoverProductsFromInvoices() {
     let existing = JSON.parse(localStorage.getItem('products') || '[]');
     let existingMap = new Map();
@@ -71,12 +72,20 @@ function recoverProductsFromInvoices() {
                     sku: sku,
                     name: item.desc || item.name || `Product ${sku}`,
                     price: item.price || 0,
+                    hsn: item.hsn || '',           // HSN captured from invoice
                     unit: 'pc',
                     currentStock: 0,
                     reorderLevel: 10,
                     createdAt: new Date().toISOString()
                 });
                 added = true;
+            } else {
+                // If product exists but HSN missing, update from invoice if available
+                let prod = existingMap.get(sku);
+                if (item.hsn && !prod.hsn) {
+                    prod.hsn = item.hsn;
+                    added = true;
+                }
             }
         });
     });
@@ -92,12 +101,19 @@ function recoverProductsFromInvoices() {
                     sku: sku,
                     name: item.desc || item.name || `Product ${sku}`,
                     price: item.cost || 0,
+                    hsn: item.hsn || '',           // HSN captured from purchase invoice
                     unit: 'pc',
                     currentStock: 0,
                     reorderLevel: 10,
                     createdAt: new Date().toISOString()
                 });
                 added = true;
+            } else {
+                let prod = existingMap.get(sku);
+                if (item.hsn && !prod.hsn) {
+                    prod.hsn = item.hsn;
+                    added = true;
+                }
             }
         });
     });
@@ -105,12 +121,12 @@ function recoverProductsFromInvoices() {
     let recovered = Array.from(existingMap.values());
     if (added) {
         localStorage.setItem('products', JSON.stringify(recovered));
-        console.log("Recovered missing products from invoices");
+        console.log("Recovered missing products (with HSN) from invoices");
     } else if (recovered.length === 0) {
-        // No invoices, no products – create samples
+        // No invoices, no products – create samples with dummy HSN
         recovered = [
-            { id: "P001", sku: "P001", name: "Brake Pad", price: 1200, unit: "pair", currentStock: 0, reorderLevel: 10, createdAt: new Date().toISOString() },
-            { id: "P002", sku: "P002", name: "Engine Oil", price: 450, unit: "Ltr", currentStock: 0, reorderLevel: 10, createdAt: new Date().toISOString() }
+            { id: "P001", sku: "P001", name: "Brake Pad", price: 1200, hsn: "8708", unit: "pair", currentStock: 0, reorderLevel: 10, createdAt: new Date().toISOString() },
+            { id: "P002", sku: "P002", name: "Engine Oil", price: 450, hsn: "2710", unit: "Ltr", currentStock: 0, reorderLevel: 10, createdAt: new Date().toISOString() }
         ];
         localStorage.setItem('products', JSON.stringify(recovered));
     }
@@ -123,7 +139,7 @@ function findProduct(productId) {
     return products.find(p => p.sku === productId) || products.find(p => p.id == productId);
 }
 
-// ----- Create Sales Invoice (reduces stock, adds customer outstanding) -----
+// ----- Create Sales Invoice (reduces stock, adds customer outstanding, keeps HSN) -----
 function createSalesInvoice(invoice) {
     let transactions = getInventoryTransactions();
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
@@ -137,8 +153,10 @@ function createSalesInvoice(invoice) {
                 id: item.productId,
                 sku: item.productId,
                 name: `Product ${item.productId}`,
-                unit: 'pc',
                 price: item.price,
+                hsn: item.hsn || '',
+                unit: 'pc',
+                currentStock: 0,
                 reorderLevel: 10,
                 createdAt: new Date().toISOString()
             };
@@ -183,7 +201,7 @@ function createSalesInvoice(invoice) {
     return true;
 }
 
-// ----- Create Purchase Invoice (increases stock) -----
+// ----- Create Purchase Invoice (increases stock, includes HSN) -----
 function createPurchaseInvoice(purchase) {
     let transactions = getInventoryTransactions();
     let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
@@ -196,8 +214,10 @@ function createPurchaseInvoice(purchase) {
                 id: item.productId,
                 sku: item.productId,
                 name: item.desc || `Product ${item.productId}`,
-                unit: 'pc',
                 price: item.cost,
+                hsn: item.hsn || '',
+                unit: 'pc',
+                currentStock: 0,
                 reorderLevel: 10,
                 createdAt: new Date().toISOString()
             };
@@ -346,4 +366,4 @@ function getCurrentStock() {
         reorderLevel: p.reorderLevel || 0,
         unit: p.unit
     }));
-                    }
+                }
