@@ -2,48 +2,204 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Quick Select Products</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="data-manager.js"></script>
     <style>
-        * { box-sizing: border-box; }
-        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
-        h1 { color: #0a7c71; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
-        .btn-quote { background: #28a745; }
-        .btn-proforma { background: #e67e22; }
-        .btn-sync { background: #6c757d; margin-bottom: 10px; }
-        .btn-purchase-sync { background: #17a2b8; margin-bottom: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
-        th { background: #0a7c71; color: white; }
-        .qty-input, .disc-input, .hsn-input { width: 100px; padding: 4px; text-align: center; }
-        .stock-zero { background-color: #f8d7da; }
-        @media (max-width: 768px) { .qty-input, .disc-input, .hsn-input { width: 70px; } table { font-size: 12px; } }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0a7c71;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background: #0a7c71;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #09645a;
+        }
+        .btn-quote {
+            background: #28a745;
+        }
+        .btn-quote:hover {
+            background: #218838;
+        }
+        .btn-proforma {
+            background: #e67e22;
+        }
+        .btn-proforma:hover {
+            background: #d35400;
+        }
+        .btn-sync {
+            background: #6c757d;
+        }
+        .btn-sync:hover {
+            background: #5a6268;
+        }
+        .btn-purchase-sync {
+            background: #17a2b8;
+        }
+        .btn-purchase-sync:hover {
+            background: #138496;
+        }
+        .search-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .search-box input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            flex: 1;
+            min-width: 200px;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th {
+            background: #0a7c71;
+            color: white;
+            padding: 12px 8px;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            white-space: nowrap;
+        }
+        td {
+            border-bottom: 1px solid #dee2e6;
+            padding: 10px 8px;
+            vertical-align: middle;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .stock-zero {
+            background-color: #fff3cd;
+        }
+        .product-name {
+            font-weight: 500;
+        }
+        .price {
+            font-weight: bold;
+            color: #0a7c71;
+        }
+        .qty-input, .disc-input, .hsn-input {
+            width: 100px;
+            padding: 6px;
+            text-align: center;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        .product-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .select-all-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        @media (max-width: 768px) {
+            .qty-input, .disc-input, .hsn-input {
+                width: 70px;
+            }
+            table {
+                font-size: 12px;
+            }
+            th, td {
+                padding: 6px 4px;
+            }
+        }
+        @media (max-width: 600px) {
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .actions {
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
 <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="toolbar">
         <h1><i class="fas fa-boxes"></i> Select Products</h1>
-        <div>
-            <button class="btn-quote" onclick="createDocument('quotation')">Quotation</button>
-            <button class="btn-proforma" onclick="createDocument('proforma')">Proforma</button>
-            <button onclick="window.location.href='index.html'">Back</button>
+        <div class="actions">
+            <button class="btn-quote" onclick="createDocument('quotation')"><i class="fas fa-file-alt"></i> Quotation</button>
+            <button class="btn-proforma" onclick="createDocument('proforma')"><i class="fas fa-file-invoice"></i> Proforma</button>
+            <button onclick="window.location.href='index.html'"><i class="fas fa-home"></i> Back</button>
         </div>
     </div>
-    <div style="margin: 10px 0;">
-        <button class="btn-sync" onclick="syncHsnFromInvoices()"><i class="fas fa-sync-alt"></i> Sync HSN from Sales Invoices</button>
-        <button class="btn-purchase-sync" onclick="syncFromPurchaseInvoices()"><i class="fas fa-truck"></i> Sync Products from Purchase Invoices</button>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+        <button class="btn-sync" onclick="syncHsnFromInvoices()"><i class="fas fa-sync-alt"></i> Sync HSN from Sales</button>
+        <button class="btn-purchase-sync" onclick="syncFromPurchaseInvoices()"><i class="fas fa-truck"></i> Sync from Purchase</button>
     </div>
-    <div class="search-box" style="margin: 10px 0;">
-        <input type="text" id="searchInput" placeholder="Search...">
-        <button onclick="filterProducts()">Search</button>
-        <label><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"> Select All</label>
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by SKU, Name, HSN...">
+        <button onclick="filterProducts()"><i class="fas fa-search"></i> Search</button>
+        <button onclick="clearSearch()"><i class="fas fa-eraser"></i> Clear</button>
+        <label class="select-all-label">
+            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"> Select All (visible)
+        </label>
     </div>
-    <div id="productsTableContainer"></div>
+
+    <div class="table-wrapper">
+        <div id="productsTableContainer"></div>
+    </div>
 </div>
 
 <script>
@@ -58,7 +214,12 @@
             allProducts = JSON.parse(localStorage.getItem('products') || '[]');
         }
         if (!allProducts || allProducts.length === 0) {
-            document.getElementById('productsTableContainer').innerHTML = '<p>No products found. Click sync buttons to recover.</p>';
+            document.getElementById('productsTableContainer').innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <p>No products found.</p>
+                    <button onclick="syncFromPurchaseInvoices()" style="background:#17a2b8;">Sync from Purchase Invoices</button>
+                    <button onclick="syncHsnFromInvoices()" style="background:#6c757d;">Sync HSN from Sales</button>
+                </div>`;
             return;
         }
         allProducts.forEach(p => {
@@ -75,17 +236,46 @@
 
     function filterProducts() {
         const term = document.getElementById('searchInput').value.trim().toLowerCase();
-        if (!term) filteredProducts = [...allProducts];
-        else filteredProducts = allProducts.filter(p => p.sku.toLowerCase().includes(term) || p.name.toLowerCase().includes(term));
+        if (!term) {
+            filteredProducts = [...allProducts];
+        } else {
+            filteredProducts = allProducts.filter(p => 
+                p.sku.toLowerCase().includes(term) ||
+                p.name.toLowerCase().includes(term) ||
+                (p.hsn && p.hsn.toLowerCase().includes(term))
+            );
+        }
         renderTable();
+    }
+
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        filterProducts();
     }
 
     function renderTable() {
         if (filteredProducts.length === 0) {
-            document.getElementById('productsTableContainer').innerHTML = '<p>No matching products.</p>';
+            document.getElementById('productsTableContainer').innerHTML = '<p style="padding:20px; text-align:center;">No matching products.</p>';
             return;
         }
-        let html = `<tr><thead>汽<th>Select</th><th>SKU</th><th>Name</th><th>HSN</th><th>Unit</th><th>Price</th><th>Stock</th><th>Qty</th><th>Disc%</th></tr></thead><tbody>`;
+
+        let html = `<table>
+            <thead>
+                <tr>
+                    <th style="width:5%">Select</th>
+                    <th style="width:12%">SKU</th>
+                    <th style="width:20%">Product Name</th>
+                    <th style="width:10%">HSN</th>
+                    <th style="width:8%">Unit</th>
+                    <th style="width:10%">Price (₹)</th>
+                    <th style="width:8%">Stock</th>
+                    <th style="width:8%">Qty</th>
+                    <th style="width:8%">Disc %</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
+
         for (let p of filteredProducts) {
             const selected = selectedProductRows.has(p.id);
             const stored = selectedProductRows.get(p.id);
@@ -93,22 +283,28 @@
             const discount = selected ? stored.discount : 0;
             const hsnValue = p.hsn || '';
             const rowClass = (p.currentStock === 0) ? 'stock-zero' : '';
+
             html += `<tr class="${rowClass}">
-                <td><input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)"></td>
+                <td style="text-align:center">
+                    <input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)">
+                </td>
                 <td><strong>${escapeHtml(p.sku)}</strong></td>
-                <td>${escapeHtml(p.name)}</strong></td>
-                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></strong></td>
-                <td>${escapeHtml(p.unit)}</strong></td>
-                <td>₹${p.price.toLocaleString()}</strong></td>
-                <td>${p.currentStock.toLocaleString()}</strong></td>
-                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></strong></td>
-                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></strong></td>
+                <td class="product-name">${escapeHtml(p.name)}</td>
+                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></td>
+                <td>${escapeHtml(p.unit)}</td>
+                <td class="price">₹${(p.price || 0).toLocaleString()}</td>
+                <td>${(p.currentStock || 0).toLocaleString()}</td>
+                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></td>
+                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></td>
             </tr>`;
         }
         html += `</tbody></table>`;
         document.getElementById('productsTableContainer').innerHTML = html;
+
+        // Update "Select All" checkbox state
         const allCheckboxes = document.querySelectorAll('.product-checkbox');
-        document.getElementById('selectAllCheckbox').checked = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.checked);
+        const allChecked = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.checked);
+        document.getElementById('selectAllCheckbox').checked = allChecked;
     }
 
     function toggleProduct(id, isSelected) {
@@ -123,15 +319,30 @@
         renderTable();
     }
 
-    function updateQty(id, newQty) { let qty = parseFloat(newQty); if (isNaN(qty) || qty <= 0) return; if (selectedProductRows.has(id)) { const cur = selectedProductRows.get(id); selectedProductRows.set(id, { ...cur, qty }); } }
-    function updateDiscount(id, disc) { let d = parseFloat(disc); if (isNaN(d) || d < 0) return; if (selectedProductRows.has(id)) { const cur = selectedProductRows.get(id); selectedProductRows.set(id, { ...cur, discount: d }); } }
+    function updateQty(id, newQty) {
+        let qty = parseFloat(newQty);
+        if (isNaN(qty) || qty <= 0) return;
+        if (selectedProductRows.has(id)) {
+            const cur = selectedProductRows.get(id);
+            selectedProductRows.set(id, { ...cur, qty });
+        }
+    }
+
+    function updateDiscount(id, disc) {
+        let d = parseFloat(disc);
+        if (isNaN(d) || d < 0) return;
+        if (selectedProductRows.has(id)) {
+            const cur = selectedProductRows.get(id);
+            selectedProductRows.set(id, { ...cur, discount: d });
+        }
+    }
 
     function updateHsn(id, newHsn) {
-        let product = allProducts.find(p => p.id === id);
+        const product = allProducts.find(p => p.id === id);
         if (product) {
             product.hsn = newHsn;
-            let allProds = JSON.parse(localStorage.getItem('products') || '[]');
-            let index = allProds.findIndex(p => p.id == id);
+            const allProds = JSON.parse(localStorage.getItem('products') || '[]');
+            const index = allProds.findIndex(p => p.id == id);
             if (index !== -1) {
                 allProds[index].hsn = newHsn;
                 localStorage.setItem('products', JSON.stringify(allProds));
@@ -140,8 +351,8 @@
     }
 
     function toggleSelectAll() {
-        const check = document.getElementById('selectAllCheckbox').checked;
-        if (check) {
+        const checkAll = document.getElementById('selectAllCheckbox').checked;
+        if (checkAll) {
             for (let p of filteredProducts) {
                 if (!selectedProductRows.has(p.id)) {
                     let qty = p.currentStock > 0 ? p.currentStock : 1;
@@ -149,35 +360,55 @@
                 }
             }
         } else {
-            for (let p of filteredProducts) selectedProductRows.delete(p.id);
+            for (let p of filteredProducts) {
+                selectedProductRows.delete(p.id);
+            }
         }
         renderTable();
     }
 
     function createDocument(type) {
-        if (selectedProductRows.size === 0) { alert('Select at least one product.'); return; }
-        let cart = [];
+        if (selectedProductRows.size === 0) {
+            alert('Please select at least one product.');
+            return;
+        }
+        const cart = [];
         for (let [id, { qty, discount }] of selectedProductRows.entries()) {
-            let product = allProducts.find(p => p.id === id);
+            const product = allProducts.find(p => p.id === id);
             if (!product) continue;
-            let hsn = product.hsn || '';
-            cart.push({ part: product.sku, desc: product.name, hsn, qty, price: product.price, discount });
+            const hsn = product.hsn || '';
+            cart.push({
+                part: product.sku,
+                desc: product.name,
+                hsn: hsn,
+                qty: qty,
+                price: product.price,
+                discount: discount
+            });
         }
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
-        window.location.href = type === 'quotation' ? 'quotation.html' : 'proforma-invoice.html';
+        if (type === 'quotation') {
+            window.location.href = 'quotation.html';
+        } else {
+            window.location.href = 'proforma-invoice.html';
+        }
     }
 
     // Sync HSN from sales invoices only
     function syncHsnFromInvoices() {
-        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        if (allInvoices.length === 0) {
+            alert("No sales invoices found.");
+            return;
+        }
         let products = JSON.parse(localStorage.getItem('products') || '[]');
         let updated = 0;
         products.forEach(prod => {
-            let sku = prod.sku;
+            const sku = prod.sku;
             for (let inv of allInvoices) {
-                let item = (inv.items || []).find(i => (i.productId === sku || i.part === sku || i.sku === sku));
+                const item = (inv.items || []).find(i => (i.productId === sku || i.part === sku || i.sku === sku));
                 if (item) {
-                    let newHsn = item.hsn || item.hsnCode || item.gstHsn || '';
+                    const newHsn = item.hsn || item.hsnCode || item.gstHsn || '';
                     if (newHsn && prod.hsn !== newHsn) {
                         prod.hsn = newHsn;
                         updated++;
@@ -191,32 +422,35 @@
             alert(`Updated HSN for ${updated} products. Page will reload.`);
             location.reload();
         } else {
-            alert("No HSN found in sales invoices.");
+            alert("No new HSN found in sales invoices.");
         }
     }
 
     // Sync products from purchase invoices (add missing, update prices/HSN)
     function syncFromPurchaseInvoices() {
-        let purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         if (purchaseInvoices.length === 0) {
             alert("No purchase invoices found.");
             return;
         }
         let products = JSON.parse(localStorage.getItem('products') || '[]');
-        let productMap = new Map();
-        products.forEach(p => { if(p.sku) productMap.set(p.sku, p); if(p.id) productMap.set(p.id, p); });
+        const productMap = new Map();
+        products.forEach(p => {
+            if (p.sku) productMap.set(p.sku, p);
+            if (p.id) productMap.set(p.id, p);
+        });
         let added = 0, updated = 0;
 
         purchaseInvoices.forEach(inv => {
             (inv.items || []).forEach(item => {
-                let sku = item.productId || item.part || item.sku;
+                const sku = item.productId || item.part || item.sku;
                 if (!sku) return;
-                let name = item.desc || item.name || `Product ${sku}`;
-                let price = item.cost || item.price || 0;
-                let hsn = item.hsn || item.hsnCode || item.gstHsn || '';
+                const name = item.desc || item.name || `Product ${sku}`;
+                const price = item.cost || item.price || 0;
+                const hsn = item.hsn || item.hsnCode || item.gstHsn || '';
 
                 if (!productMap.has(sku)) {
-                    let newProd = {
+                    const newProd = {
                         id: sku,
                         sku: sku,
                         name: name,
@@ -230,29 +464,41 @@
                     productMap.set(sku, newProd);
                     added++;
                 } else {
-                    let existing = productMap.get(sku);
+                    const existing = productMap.get(sku);
                     let changed = false;
-                    if (price && existing.price !== price) { existing.price = price; changed = true; }
-                    if (hsn && !existing.hsn) { existing.hsn = hsn; changed = true; }
-                    if (name && existing.name === `Product ${sku}`) { existing.name = name; changed = true; }
+                    if (price && existing.price !== price) {
+                        existing.price = price;
+                        changed = true;
+                    }
+                    if (hsn && !existing.hsn) {
+                        existing.hsn = hsn;
+                        changed = true;
+                    }
+                    if (name && existing.name === `Product ${sku}`) {
+                        existing.name = name;
+                        changed = true;
+                    }
                     if (changed) updated++;
                 }
             });
         });
 
         if (added > 0 || updated > 0) {
-            let merged = Array.from(productMap.values());
+            const merged = Array.from(productMap.values());
             localStorage.setItem('products', JSON.stringify(merged));
-            alert(`✅ Synced: ${added} new products added, ${updated} existing products updated. Page will reload.`);
+            alert(`✅ Synced: ${added} new products added, ${updated} updated. Page will reload.`);
             location.reload();
         } else {
             alert("No new or updated products found in purchase invoices.");
         }
     }
 
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+    }
 
     loadProducts();
 </script>
 </body>
-</html>
+                                                                               </html>
