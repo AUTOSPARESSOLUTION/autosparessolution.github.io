@@ -228,20 +228,7 @@
             });
         });
 
-        // Also include reversal entries from ledger (if any)
-        const customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
-        const reversalEntries = customerLedger.filter(e => e.customerEmail === currentCustomer.email && e.type === 'reversal');
-        reversalEntries.forEach(e => {
-            transactions.push({
-                originalDate: e.date,
-                date: toISODate(e.date),
-                type: 'Reversal',
-                ref: e.ref,
-                debit: e.debit || 0,
-                credit: e.credit || 0,
-                narration: e.note || 'Reversal entry'
-            });
-        });
+        // NO reversal entries – removed as requested
 
         // Sort using ISO date strings
         transactions.sort((a,b) => a.date.localeCompare(b.date));
@@ -427,7 +414,7 @@
         html2pdf().set({ margin: 0.3, filename: filename, image: { quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' } }).from(pdfDiv).save();
     }
 
-    // NEW: Sync outstanding from ledger to customer master
+    // Sync outstanding from ledger to customer master
     function syncOutstanding() {
         if (!currentCustomer) {
             alert('Please load a customer first.');
