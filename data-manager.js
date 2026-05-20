@@ -1,139 +1,153 @@
-// ========== CENTRAL DATA STORE – AUTOMATIC STOCK REBUILD ==========
-// This version checks for missing inventoryTransactions and rebuilds them
-// from existing invoices. Then getProducts() always returns correct stock.
+// ========== CENTRAL DATA STORE – FORCED REBUILD ON VERSION MISMATCH ==========
+// Version 2 – ensures stock correctly subtracts sold items.
 
-// ----- Helper: get / save data -----
-function getProducts() {
-    ensureInventoryTransactions();  // rebuild if missing
-    let products = JSON.parse(localStorage.getItem('products') || '[]');
-    let invTransactions = getInventoryTransactions();
-    
-    // Compute current stock for each product using inventory ledger
-    return products.map(p => {
-        let stock = 0;
-        invTransactions.forEach(t => {
-            if (t.productId == p.id || t.productId == p.sku) {
-                stock += t.quantity;
-            }
-        });
-        p.currentStock = stock;
-        return p;
-    });
-}
+const STOCK_VERSION_KEY = "inventoryTransactions_v2";
 
-function saveProducts(products) {
-    localStorage.setItem('products', JSON.stringify(products));
-}
+// ----- Helpers -----
+function getProducts() { return JSON.parse(localStorage.getItem('products') || '[]'); }
+function saveProducts(products) { localStorage.setItem('products', JSON.stringify(products)); }
 
-function getInventoryTransactions() {
-    return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]');
-}
-function saveInventoryTransactions(trans) {
-    localStorage.setItem('inventoryTransactions', JSON.stringify(trans));
-}
+function getInventoryTransactions() { return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]'); }
+function saveInventoryTransactions(trans) { localStorage.setItem('inventoryTransactions', JSON.stringify(trans)); }
 
-function getSalesInvoices() {
-    return JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-}
-function saveSalesInvoices(invoices) {
-    localStorage.setItem('salesInvoices', JSON.stringify(invoices));
-}
+function getSalesInvoices() { return JSON.parse(localStorage.getItem('salesInvoices') || '[]'); }
+function saveSalesInvoices(invoices) { localStorage.setItem('salesInvoices', JSON.stringify(invoices)); }
 
-function getPurchaseInvoices() {
-    return JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-}
-function savePurchaseInvoices(invoices) {
-    localStorage.setItem('purchaseInvoices', JSON.stringify(invoices));
-}
+function getPurchaseInvoices() { return JSON.parse(localStorage.getItem('purchaseInvoices') || '[]'); }
+function savePurchaseInvoices(invoices) { localStorage.setItem('purchaseInvoices', JSON.stringify(invoices)); }
 
-// ----- Auto‑rebuild inventoryTransactions from invoices if needed -----
+// ----- Force rebuild if version changed or no transactions -----
 function ensureInventoryTransactions() {
+    let savedVersion = localStorage.getItem(STOCK_VERSION_KEY);
     let invTransactions = getInventoryTransactions();
-    if (invTransactions.length > 0) return; // already exists
     
-    console.log("Rebuilding inventoryTransactions from invoices...");
+    // If version matches and transactions exist, assume correct
+    if (savedVersion === "2" && invTransactions.length > 0) return;
+    
+    console.log("Rebuilding inventory transactions from invoices (version 2)");
     invTransactions = [];
-    let productsMap = new Map();
+    let products = getProducts();
     
-    // Load all products for ID mapping
-    let products = JSON.parse(localStorage.getItem('products') || '[]');
+    // Build map: both SKU and ID map to product ID
+    let productIdMap = new Map();
     products.forEach(p => {
-        productsMap.set(p.sku, p.id);
-        productsMap.set(p.id, p.id);
+        if (p.sku) productIdMap.set(p.sku, p.id);
+        if (p.id) productIdMap.set(p.id, p.id);
     });
     
-    // 1. Purchase invoices (stock IN)
-    let purchases = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-    purchases.forEach(pur => {
-        (pur.items || []).forEach(item => {
-            let productId = item.productId || item.part;
-            if (!productId) return;
-            let qty = parseFloat(item.quantity) || 0;
-            if (qty === 0) return;
-            // Use product ID from map if available, else keep as string
-            let realId = productsMap.get(productId) || String(productId);
+    // ----- 1. Purchase invoices (stock IN) -----
+    let purchases = getPurchaseInvoices();
+    purchases.forEach(inv => {
+        let items = inv.items || [];
+        items.forEach(item => {
+            let productRef = item.productId || item.part || item.sku;
+            if (!productRef) return;
+            let qty = parseFloat(item.quantity) || parseFloat(item.qty) || 0;
+            if (qty <= 0) return;
+            let productId = productIdMap.get(productRef);
+            if (!productId) {
+                // Unknown product – create placeholder
+                productId = String(productRef);
+                if (!productIdMap.has(productRef)) productIdMap.set(productRef, productId);
+            }
             invTransactions.push({
                 id: Date.now() + Math.random(),
-                productId: realId,
+                productId: productId,
                 type: 'purchase',
                 quantity: qty,
-                date: pur.date,
-                ref: pur.invoiceNo || pur.poNo
+                date: inv.date,
+                ref: inv.invoiceNo || inv.poNo
             });
         });
     });
     
-    // 2. Sales invoices (stock OUT)
-    let sales = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-    sales.forEach(sale => {
-        (sale.items || []).forEach(item => {
-            let productId = item.productId || item.part;
-            if (!productId) return;
-            let qty = parseFloat(item.qty) || 0;
-            if (qty === 0) return;
-            let realId = productsMap.get(productId) || String(productId);
+    // ----- 2. Sales invoices (stock OUT) – read from BOTH allInvoices and salesInvoices -----
+    let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+    let salesInvoices = getSalesInvoices();
+    let combinedSales = [...allInvoices, ...salesInvoices];
+    // Remove duplicates by invoiceNo/id (simple: use Set of stringified)
+    let unique = new Map();
+    combinedSales.forEach(inv => {
+        let key = inv.id || inv.invoiceNo;
+        if (key && !unique.has(key)) unique.set(key, inv);
+    });
+    let salesList = Array.from(unique.values());
+    
+    salesList.forEach(inv => {
+        let items = inv.items || [];
+        items.forEach(item => {
+            let productRef = item.productId || item.part || item.sku;
+            if (!productRef) return;
+            let qty = parseFloat(item.qty) || parseFloat(item.quantity) || 0;
+            if (qty <= 0) return;
+            let productId = productIdMap.get(productRef);
+            if (!productId) {
+                productId = String(productRef);
+                if (!productIdMap.has(productRef)) productIdMap.set(productRef, productId);
+            }
             invTransactions.push({
                 id: Date.now() + Math.random(),
-                productId: realId,
+                productId: productId,
                 type: 'sales',
                 quantity: -qty,
-                date: sale.date,
-                ref: sale.invoiceNo
+                date: inv.date,
+                ref: inv.invoiceNo
             });
         });
     });
     
+    // Save rebuilt transactions
     saveInventoryTransactions(invTransactions);
     
-    // Update product currentStock for direct usage (optional)
-    let allProducts = JSON.parse(localStorage.getItem('products') || '[]');
-    allProducts.forEach(p => {
+    // Update each product's currentStock
+    products.forEach(p => {
         let stock = 0;
         invTransactions.forEach(t => {
             if (t.productId == p.id || t.productId == p.sku) stock += t.quantity;
         });
         p.currentStock = stock;
     });
-    saveProducts(allProducts);
-    console.log("InventoryTransactions rebuilt. Total entries:", invTransactions.length);
+    saveProducts(products);
+    
+    // Store version flag
+    localStorage.setItem(STOCK_VERSION_KEY, "2");
+    console.log(`Rebuilt ${invTransactions.length} inventory transactions.`);
 }
 
-// ----- Helper: find product by SKU or ID (SKU first) -----
+// ----- getProducts with dynamic stock (always from ledger) -----
+function getProductsWithStock() {
+    ensureInventoryTransactions();
+    let products = getProducts();
+    let invTransactions = getInventoryTransactions();
+    return products.map(p => {
+        let stock = 0;
+        invTransactions.forEach(t => {
+            if (t.productId == p.id || t.productId == p.sku) stock += t.quantity;
+        });
+        p.currentStock = stock;
+        return p;
+    });
+}
+// Override the old getProducts to use this dynamic version
+window.getProducts = getProductsWithStock;
+
+// ----- Helper: find product (using dynamic stock) -----
 function findProduct(productId) {
-    const products = getProducts(); // already dynamic
+    let products = getProductsWithStock();
     return products.find(p => p.sku === productId) || products.find(p => p.id == productId);
 }
 
-// ----- 1. Sales Invoice – reduces stock, increases customer outstanding -----
+// ----- 1. Create Sales Invoice (updates stock & customer) -----
 function createSalesInvoice(invoice) {
+    ensureInventoryTransactions();
     let invTransactions = getInventoryTransactions();
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-    let products = getProducts();  // dynamic stock, but we only need for product existence
+    let products = getProducts(); // raw products without stock (we'll add transactions)
     
     for (let item of invoice.items) {
         let product = findProduct(item.productId);
         if (!product) {
-            // Auto-create product
+            // Auto-create
             product = {
                 id: item.productId,
                 sku: item.productId,
@@ -143,9 +157,8 @@ function createSalesInvoice(invoice) {
                 reorderLevel: 10,
                 createdAt: new Date().toISOString()
             };
-            let allProducts = JSON.parse(localStorage.getItem('products') || '[]');
-            allProducts.push(product);
-            saveProducts(allProducts);
+            products.push(product);
+            saveProducts(products);
         }
         invTransactions.push({
             id: Date.now() + Math.random(),
@@ -153,32 +166,31 @@ function createSalesInvoice(invoice) {
             type: 'sales',
             quantity: -item.quantity,
             date: invoice.date,
-            ref: invoice.invoiceNo || `INV-${invoice.id}`,
+            ref: invoice.invoiceNo || `INV-${invoice.id}`
         });
     }
     saveInventoryTransactions(invTransactions);
     
+    // Save invoice
     let salesInvoices = getSalesInvoices();
     salesInvoices.push(invoice);
     saveSalesInvoices(salesInvoices);
-    
-    // Also store in allInvoices for backward compatibility
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     allInvoices.push(invoice);
     localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
     
+    // Customer outstanding
     let customer = customers.find(c => c.email === invoice.customerEmail);
     if (customer) {
         customer.outstanding = (customer.outstanding || 0) + invoice.total;
         localStorage.setItem('customers', JSON.stringify(customers));
-        
         let customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
         customerLedger.push({
             id: Date.now(),
             customerEmail: invoice.customerEmail,
             date: invoice.date,
             type: 'invoice',
-            ref: invoice.invoiceNo || `INV-${invoice.id}`,
+            ref: invoice.invoiceNo,
             debit: invoice.total,
             credit: 0,
             balance: customer.outstanding
@@ -188,10 +200,12 @@ function createSalesInvoice(invoice) {
     return true;
 }
 
-// ----- 2. Purchase Invoice – increases stock, increases supplier outstanding -----
+// ----- 2. Create Purchase Invoice (increases stock) -----
 function createPurchaseInvoice(purchase) {
+    ensureInventoryTransactions();
     let invTransactions = getInventoryTransactions();
     let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+    let products = getProducts();
     
     for (let item of purchase.items) {
         let product = findProduct(item.productId);
@@ -205,9 +219,8 @@ function createPurchaseInvoice(purchase) {
                 reorderLevel: 10,
                 createdAt: new Date().toISOString()
             };
-            let allProducts = JSON.parse(localStorage.getItem('products') || '[]');
-            allProducts.push(product);
-            saveProducts(allProducts);
+            products.push(product);
+            saveProducts(products);
         }
         invTransactions.push({
             id: Date.now() + Math.random(),
@@ -215,7 +228,7 @@ function createPurchaseInvoice(purchase) {
             type: 'purchase',
             quantity: item.quantity,
             date: purchase.date,
-            ref: purchase.poNo || `PO-${purchase.id}`,
+            ref: purchase.poNo || `PO-${purchase.id}`
         });
     }
     saveInventoryTransactions(invTransactions);
@@ -228,14 +241,13 @@ function createPurchaseInvoice(purchase) {
     if (supplier) {
         supplier.outstanding = (supplier.outstanding || 0) + purchase.total;
         localStorage.setItem('suppliers', JSON.stringify(suppliers));
-        
         let supplierLedger = JSON.parse(localStorage.getItem('supplierLedger') || '[]');
         supplierLedger.push({
             id: Date.now(),
             supplierEmail: purchase.supplierEmail,
             date: purchase.date,
             type: 'purchase',
-            ref: purchase.poNo || `PO-${purchase.id}`,
+            ref: purchase.poNo,
             debit: purchase.total,
             credit: 0,
             balance: supplier.outstanding
@@ -245,15 +257,12 @@ function createPurchaseInvoice(purchase) {
     return true;
 }
 
-// ----- 3. Customer Payment – reduces outstanding -----
+// ----- 3. Customer Payment -----
 function receiveCustomerPayment(payment) {
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
     let customer = customers.find(c => c.email === payment.customerEmail);
     if (!customer) throw new Error('Customer not found');
-    
-    let oldOutstanding = customer.outstanding || 0;
-    let newOutstanding = Math.max(0, oldOutstanding - payment.amount);
-    customer.outstanding = newOutstanding;
+    customer.outstanding = Math.max(0, (customer.outstanding || 0) - payment.amount);
     localStorage.setItem('customers', JSON.stringify(customers));
     
     let customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
@@ -265,7 +274,7 @@ function receiveCustomerPayment(payment) {
         ref: payment.reference,
         debit: 0,
         credit: payment.amount,
-        balance: newOutstanding
+        balance: customer.outstanding
     });
     localStorage.setItem('customerLedger', JSON.stringify(customerLedger));
     
@@ -275,15 +284,12 @@ function receiveCustomerPayment(payment) {
     return true;
 }
 
-// ----- 4. Supplier Payment – reduces outstanding -----
+// ----- 4. Supplier Payment -----
 function paySupplier(payment) {
     let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
     let supplier = suppliers.find(s => s.email === payment.supplierEmail);
     if (!supplier) throw new Error('Supplier not found');
-    
-    let oldOutstanding = supplier.outstanding || 0;
-    let newOutstanding = Math.max(0, oldOutstanding - payment.amount);
-    supplier.outstanding = newOutstanding;
+    supplier.outstanding = Math.max(0, (supplier.outstanding || 0) - payment.amount);
     localStorage.setItem('suppliers', JSON.stringify(suppliers));
     
     let supplierLedger = JSON.parse(localStorage.getItem('supplierLedger') || '[]');
@@ -295,7 +301,7 @@ function paySupplier(payment) {
         ref: payment.reference,
         debit: 0,
         credit: payment.amount,
-        balance: newOutstanding
+        balance: supplier.outstanding
     });
     localStorage.setItem('supplierLedger', JSON.stringify(supplierLedger));
     
@@ -305,20 +311,7 @@ function paySupplier(payment) {
     return true;
 }
 
-// ----- 5. Stock Report – current stock levels -----
-function getCurrentStock() {
-    let products = getProducts();
-    return products.map(p => ({
-        id: p.id,
-        name: p.name,
-        sku: p.sku,
-        currentStock: p.currentStock,
-        reorderLevel: p.reorderLevel || 0,
-        unit: p.unit
-    }));
-}
-
-// ----- 6. Delete Sales Invoice (reverse effects) -----
+// ----- 5. Delete Sales Invoice (reverse stock & outstanding) -----
 function deleteSalesInvoice(invoiceId) {
     let salesInvoices = getSalesInvoices();
     let invoice = salesInvoices.find(i => i.id == invoiceId);
@@ -342,8 +335,6 @@ function deleteSalesInvoice(invoiceId) {
     
     let remaining = salesInvoices.filter(i => i.id != invoiceId);
     saveSalesInvoices(remaining);
-    
-    // Also remove from allInvoices
     let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     allInvoices = allInvoices.filter(i => i.id != invoiceId);
     localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
@@ -351,10 +342,8 @@ function deleteSalesInvoice(invoiceId) {
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
     let customer = customers.find(c => c.email === invoice.customerEmail);
     if (customer) {
-        customer.outstanding -= invoice.total;
-        if (customer.outstanding < 0) customer.outstanding = 0;
+        customer.outstanding = Math.max(0, (customer.outstanding || 0) - invoice.total);
         localStorage.setItem('customers', JSON.stringify(customers));
-        
         let customerLedger = JSON.parse(localStorage.getItem('customerLedger') || '[]');
         customerLedger.push({
             id: Date.now(),
@@ -364,74 +353,32 @@ function deleteSalesInvoice(invoiceId) {
             ref: `DEL-${invoice.invoiceNo}`,
             debit: 0,
             credit: invoice.total,
-            balance: customer.outstanding,
-            note: `Invoice ${invoice.invoiceNo} deleted`
+            balance: customer.outstanding
         });
         localStorage.setItem('customerLedger', JSON.stringify(customerLedger));
     }
     return true;
 }
 
-// ----- 7. Public rebuild function (if needed manually) -----
-function rebuildAllStock() {
-    let invTransactions = [];
-    let productsMap = new Map();
-    let products = JSON.parse(localStorage.getItem('products') || '[]');
-    products.forEach(p => {
-        productsMap.set(p.sku, p.id);
-        productsMap.set(p.id, p.id);
-    });
-    
-    let purchases = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-    purchases.forEach(pur => {
-        (pur.items || []).forEach(item => {
-            let pid = item.productId || item.part;
-            if (!pid) return;
-            let qty = parseFloat(item.quantity) || 0;
-            if (qty === 0) return;
-            let realId = productsMap.get(pid) || String(pid);
-            invTransactions.push({
-                id: Date.now() + Math.random(),
-                productId: realId,
-                type: 'purchase',
-                quantity: qty,
-                date: pur.date,
-                ref: pur.invoiceNo || pur.poNo
-            });
-        });
-    });
-    
-    let sales = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-    sales.forEach(sale => {
-        (sale.items || []).forEach(item => {
-            let pid = item.productId || item.part;
-            if (!pid) return;
-            let qty = parseFloat(item.qty) || 0;
-            if (qty === 0) return;
-            let realId = productsMap.get(pid) || String(pid);
-            invTransactions.push({
-                id: Date.now() + Math.random(),
-                productId: realId,
-                type: 'sales',
-                quantity: -qty,
-                date: sale.date,
-                ref: sale.invoiceNo
-            });
-        });
-    });
-    
-    saveInventoryTransactions(invTransactions);
-    
-    products.forEach(p => {
-        let stock = 0;
-        invTransactions.forEach(t => {
-            if (t.productId == p.id || t.productId == p.sku) stock += t.quantity;
-        });
-        p.currentStock = stock;
-    });
-    saveProducts(products);
-    console.log("Stock rebuilt. Transactions:", invTransactions.length);
+// ----- 6. Stock Report -----
+function getCurrentStock() {
+    let products = getProductsWithStock();
+    return products.map(p => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        currentStock: p.currentStock,
+        reorderLevel: p.reorderLevel || 0,
+        unit: p.unit
+    }));
 }
 
-// Ensure inventoryTransactions exist immediately on script load
+// ----- Manual rebuild (if needed) -----
+function rebuildAllStock() {
+    localStorage.removeItem(STOCK_VERSION_KEY);
+    ensureInventoryTransactions();
+    console.log("Manual stock rebuild complete");
+}
+
+// Run once on load
 ensureInventoryTransactions();
