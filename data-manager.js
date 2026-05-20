@@ -1,16 +1,12 @@
-// ========== SAFE DATA MANAGER WITH HSN SUPPORT – NEVER DELETES PRODUCTS ==========
-// - Only reads products; never removes them.
-// - If products are missing, recovers from invoices (including HSN).
-// - All save operations are additive (no overwrite of existing arrays).
-// - HSN edits are saved permanently to product master.
+// ========== COMPLETE DATA MANAGER – SAFE, WITH HSN SUPPORT ==========
+// Never deletes products. Auto‑recovers from invoices. Supports multiple HSN field names.
 
-// ----- Core get/set (no deletion) -----
+// ----- Core helpers -----
 function getProducts() {
     let products = JSON.parse(localStorage.getItem('products') || '[]');
     if (products.length === 0) {
         products = recoverProductsFromInvoices();
     }
-    // Compute live stock from inventoryTransactions
     let transactions = getInventoryTransactions();
     return products.map(p => {
         let stock = 0;
@@ -23,7 +19,6 @@ function getProducts() {
 }
 
 function saveProducts(products) {
-    // Never delete – just overwrite with the new array (which includes all existing)
     localStorage.setItem('products', JSON.stringify(products));
 }
 
@@ -48,7 +43,12 @@ function savePurchaseInvoices(invoices) {
     localStorage.setItem('purchaseInvoices', JSON.stringify(invoices));
 }
 
-// ----- Safe recovery from invoices (adds missing products, includes HSN) -----
+// ----- Helper to extract HSN from invoice item (multiple possible keys) -----
+function getItemHsn(item) {
+    return item.hsn || item.hsnCode || item.gstHsn || item.taxCode || item.gst || '';
+}
+
+// ----- Auto‑recovery from invoices (adds missing products, includes HSN) -----
 function recoverProductsFromInvoices() {
     let existing = JSON.parse(localStorage.getItem('products') || '[]');
     let existingMap = new Map();
@@ -61,18 +61,19 @@ function recoverProductsFromInvoices() {
     let purchaseInvoices = getPurchaseInvoices();
     let added = false;
 
-    // From sales invoices
+    // Sales invoices
     allInvoices.forEach(inv => {
         (inv.items || []).forEach(item => {
             let sku = item.productId || item.part || item.sku;
             if (!sku) return;
+            let hsn = getItemHsn(item);
             if (!existingMap.has(sku)) {
                 existingMap.set(sku, {
                     id: sku,
                     sku: sku,
                     name: item.desc || item.name || `Product ${sku}`,
                     price: item.price || 0,
-                    hsn: item.hsn || '',           // HSN captured from invoice
+                    hsn: hsn,
                     unit: 'pc',
                     currentStock: 0,
                     reorderLevel: 10,
@@ -80,28 +81,28 @@ function recoverProductsFromInvoices() {
                 });
                 added = true;
             } else {
-                // If product exists but HSN missing, update from invoice if available
                 let prod = existingMap.get(sku);
-                if (item.hsn && !prod.hsn) {
-                    prod.hsn = item.hsn;
+                if (hsn && !prod.hsn) {
+                    prod.hsn = hsn;
                     added = true;
                 }
             }
         });
     });
 
-    // From purchase invoices
+    // Purchase invoices
     purchaseInvoices.forEach(inv => {
         (inv.items || []).forEach(item => {
             let sku = item.productId || item.part || item.sku;
             if (!sku) return;
+            let hsn = getItemHsn(item);
             if (!existingMap.has(sku)) {
                 existingMap.set(sku, {
                     id: sku,
                     sku: sku,
                     name: item.desc || item.name || `Product ${sku}`,
                     price: item.cost || 0,
-                    hsn: item.hsn || '',           // HSN captured from purchase invoice
+                    hsn: hsn,
                     unit: 'pc',
                     currentStock: 0,
                     reorderLevel: 10,
@@ -110,8 +111,8 @@ function recoverProductsFromInvoices() {
                 added = true;
             } else {
                 let prod = existingMap.get(sku);
-                if (item.hsn && !prod.hsn) {
-                    prod.hsn = item.hsn;
+                if (hsn && !prod.hsn) {
+                    prod.hsn = hsn;
                     added = true;
                 }
             }
@@ -121,9 +122,8 @@ function recoverProductsFromInvoices() {
     let recovered = Array.from(existingMap.values());
     if (added) {
         localStorage.setItem('products', JSON.stringify(recovered));
-        console.log("Recovered missing products (with HSN) from invoices");
+        console.log("Recovered products with HSN from invoices");
     } else if (recovered.length === 0) {
-        // No invoices, no products – create samples with dummy HSN
         recovered = [
             { id: "P001", sku: "P001", name: "Brake Pad", price: 1200, hsn: "8708", unit: "pair", currentStock: 0, reorderLevel: 10, createdAt: new Date().toISOString() },
             { id: "P002", sku: "P002", name: "Engine Oil", price: 450, hsn: "2710", unit: "Ltr", currentStock: 0, reorderLevel: 10, createdAt: new Date().toISOString() }
@@ -133,28 +133,27 @@ function recoverProductsFromInvoices() {
     return recovered;
 }
 
-// ----- Helper to find product -----
+// ----- Find product (by SKU or ID) -----
 function findProduct(productId) {
     let products = getProducts();
     return products.find(p => p.sku === productId) || products.find(p => p.id == productId);
 }
 
-// ----- Create Sales Invoice (reduces stock, adds customer outstanding, keeps HSN) -----
+// ----- 1. Create Sales Invoice (reduces stock, adds to customer outstanding) -----
 function createSalesInvoice(invoice) {
     let transactions = getInventoryTransactions();
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-    let products = JSON.parse(localStorage.getItem('products') || '[]'); // raw for adding new products
+    let products = JSON.parse(localStorage.getItem('products') || '[]');
 
     for (let item of invoice.items) {
         let product = findProduct(item.productId);
         if (!product) {
-            // Auto-create product if missing (safe, append-only)
             product = {
                 id: item.productId,
                 sku: item.productId,
                 name: `Product ${item.productId}`,
                 price: item.price,
-                hsn: item.hsn || '',
+                hsn: getItemHsn(item),
                 unit: 'pc',
                 currentStock: 0,
                 reorderLevel: 10,
@@ -201,7 +200,7 @@ function createSalesInvoice(invoice) {
     return true;
 }
 
-// ----- Create Purchase Invoice (increases stock, includes HSN) -----
+// ----- 2. Create Purchase Invoice (increases stock) -----
 function createPurchaseInvoice(purchase) {
     let transactions = getInventoryTransactions();
     let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
@@ -215,7 +214,7 @@ function createPurchaseInvoice(purchase) {
                 sku: item.productId,
                 name: item.desc || `Product ${item.productId}`,
                 price: item.cost,
-                hsn: item.hsn || '',
+                hsn: getItemHsn(item),
                 unit: 'pc',
                 currentStock: 0,
                 reorderLevel: 10,
@@ -259,7 +258,7 @@ function createPurchaseInvoice(purchase) {
     return true;
 }
 
-// ----- Customer Payment -----
+// ----- 3. Customer Payment -----
 function receiveCustomerPayment(payment) {
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
     let customer = customers.find(c => c.email === payment.customerEmail);
@@ -284,7 +283,7 @@ function receiveCustomerPayment(payment) {
     return true;
 }
 
-// ----- Supplier Payment -----
+// ----- 4. Supplier Payment -----
 function paySupplier(payment) {
     let suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
     let supplier = suppliers.find(s => s.email === payment.supplierEmail);
@@ -309,7 +308,7 @@ function paySupplier(payment) {
     return true;
 }
 
-// ----- Delete Sales Invoice (reverses stock & outstanding) -----
+// ----- 5. Delete Sales Invoice (reverse effects) -----
 function deleteSalesInvoice(invoiceId) {
     let salesInvoices = getSalesInvoices();
     let invoice = salesInvoices.find(i => i.id == invoiceId);
@@ -355,7 +354,7 @@ function deleteSalesInvoice(invoiceId) {
     return true;
 }
 
-// ----- Stock Report -----
+// ----- 6. Stock Report -----
 function getCurrentStock() {
     let products = getProducts();
     return products.map(p => ({
@@ -366,4 +365,4 @@ function getCurrentStock() {
         reorderLevel: p.reorderLevel || 0,
         unit: p.unit
     }));
-                }
+                    }
