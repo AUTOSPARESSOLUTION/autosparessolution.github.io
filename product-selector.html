@@ -3,330 +3,202 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quick Quote / Proforma – Select Products (In Stock Only)</title>
+    <title>Quick Select Products</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="data-manager.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: auto;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
         h1 { color: #0a7c71; }
-        .toolbar {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .actions {
-            display: flex;
-            gap: 10px;
-        }
-        button {
-            background: #0a7c71;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        button:hover { background: #09645a; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
         .btn-quote { background: #28a745; }
-        .btn-quote:hover { background: #218838; }
         .btn-proforma { background: #e67e22; }
-        .btn-proforma:hover { background: #d35400; }
-        .search-box {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .search-box input {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            width: 250px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #dee2e6;
-            padding: 10px;
-            text-align: left;
-            vertical-align: middle;
-        }
-        th {
-            background: #0a7c71;
-            color: white;
-        }
-        .qty-input, .disc-input, .hsn-input {
-            width: 100px;
-            padding: 4px;
-            text-align: center;
-        }
-        .select-all {
-            margin-right: 5px;
-        }
-        .product-name {
-            font-weight: 500;
-        }
-        .price {
-            font-weight: bold;
-            color: #0a7c71;
-        }
-        .stock-zero {
-            background-color: #f8d7da;
-        }
-        @media (max-width: 768px) {
-            .qty-input, .disc-input, .hsn-input { width: 70px; }
-            table { font-size: 12px; }
-        }
+        .recover-btn { background: #dc3545; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .qty-input, .disc-input, .hsn-input { width: 100px; padding: 4px; text-align: center; }
+        .stock-zero { background-color: #f8d7da; }
+        @media (max-width: 768px) { .qty-input, .disc-input, .hsn-input { width: 70px; } table { font-size: 12px; } }
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="toolbar">
-        <h1><i class="fas fa-boxes"></i> Select Products (In Stock Only)</h1>
-        <div class="actions">
-            <button class="btn-quote" onclick="createDocument('quotation')"><i class="fas fa-file-alt"></i> Create Quotation</button>
-            <button class="btn-proforma" onclick="createDocument('proforma')"><i class="fas fa-file-invoice"></i> Create Proforma Invoice</button>
-            <button onclick="window.location.href='index.html'"><i class="fas fa-home"></i> Back to Dashboard</button>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1><i class="fas fa-boxes"></i> Select Products</h1>
+        <div>
+            <button class="btn-quote" onclick="createDocument('quotation')">Quotation</button>
+            <button class="btn-proforma" onclick="createDocument('proforma')">Proforma</button>
+            <button onclick="window.location.href='index.html'">Back</button>
         </div>
     </div>
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by Part No, Name, HSN...">
-        <button onclick="filterProducts()"><i class="fas fa-search"></i> Search</button>
-        <button onclick="clearSearch()"><i class="fas fa-eraser"></i> Clear</button>
-        <label style="margin-left: auto;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"> Select All (visible)</label>
+    <button id="recoverBtn" class="recover-btn" onclick="recoverProductsFromInvoices()"><i class="fas fa-database"></i> Restore Products from Invoices</button>
+    <div class="search-box" style="margin: 10px 0;">
+        <input type="text" id="searchInput" placeholder="Search...">
+        <button onclick="filterProducts()">Search</button>
+        <label><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"> Select All</label>
     </div>
     <div id="productsTableContainer"></div>
 </div>
 
 <script>
     let allProducts = [];
-    let selectedProductRows = new Map(); // key = product id, value = { qty, discount, hsn }
-    let productHsnOverrides = new Map();  // key = product id, value = custom HSN (if changed)
+    let selectedProductRows = new Map();
+    let productHsnOverrides = new Map();
     let filteredProducts = [];
 
+    // Force recovery from sales invoices (allInvoices)
+    function recoverProductsFromInvoices() {
+        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        if (allInvoices.length === 0) {
+            alert("No sales invoices found. Cannot recover products.");
+            return;
+        }
+        let productMap = new Map();
+        allInvoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                let sku = item.productId || item.part || item.sku;
+                if (!sku) return;
+                if (!productMap.has(sku)) {
+                    productMap.set(sku, {
+                        id: sku,
+                        sku: sku,
+                        name: item.desc || item.name || `Product ${sku}`,
+                        price: item.price || 0,
+                        unit: 'pc',
+                        currentStock: 0,
+                        reorderLevel: 10,
+                        createdAt: new Date().toISOString()
+                    });
+                }
+            });
+        });
+        let recovered = Array.from(productMap.values());
+        if (recovered.length === 0) {
+            alert("No products found in invoices.");
+            return;
+        }
+        localStorage.setItem('products', JSON.stringify(recovered));
+        alert(`Recovered ${recovered.length} products. Page will now reload.`);
+        location.reload();
+    }
+
     function loadProducts() {
-        allProducts = getProducts();
-        // Keep only products with positive stock
-        allProducts = allProducts.filter(p => (p.currentStock || 0) > 0);
+        // Try to get products from data-manager.js first
+        if (typeof window.getProducts === 'function') {
+            allProducts = window.getProducts();
+        } else {
+            // Fallback: read directly from localStorage
+            allProducts = JSON.parse(localStorage.getItem('products') || '[]');
+        }
+        if (!allProducts || allProducts.length === 0) {
+            // Show recovery prompt
+            document.getElementById('productsTableContainer').innerHTML = `
+                <div style="text-align:center; padding:40px;">
+                    <p>No products found.</p>
+                    <button onclick="recoverProductsFromInvoices()" style="background:#dc3545;">Click here to restore from invoices</button>
+                </div>`;
+            return;
+        }
         allProducts.forEach(p => {
             p.id = String(p.id);
             p.sku = p.sku || '';
             p.name = p.name || '';
-            p.hsn = p.hsn || '';
             p.price = p.price || 0;
             p.currentStock = p.currentStock || 0;
             p.unit = p.unit || 'pc';
         });
-        filterProducts(); // initial display
+        filterProducts();
     }
 
     function filterProducts() {
         const term = document.getElementById('searchInput').value.trim().toLowerCase();
-        if (!term) {
-            filteredProducts = [...allProducts];
-        } else {
-            filteredProducts = allProducts.filter(p => 
-                p.sku.toLowerCase().includes(term) ||
-                p.name.toLowerCase().includes(term) ||
-                (p.hsn && p.hsn.toLowerCase().includes(term))
-            );
-        }
+        if (!term) filteredProducts = [...allProducts];
+        else filteredProducts = allProducts.filter(p => p.sku.toLowerCase().includes(term) || p.name.toLowerCase().includes(term));
         renderTable();
-    }
-
-    function clearSearch() {
-        document.getElementById('searchInput').value = '';
-        filterProducts();
     }
 
     function renderTable() {
         if (filteredProducts.length === 0) {
-            document.getElementById('productsTableContainer').innerHTML = '<p>No products with positive stock found. Please add stock via Purchase Entry.</p>';
+            document.getElementById('productsTableContainer').innerHTML = '<p>No matching products.</p>';
             return;
         }
-        let html = `<table>
-            <thead>
-                <tr>
-                    <th style="width:5%">Select</th>
-                    <th style="width:12%">Part No (SKU)</th>
-                    <th style="width:20%">Product Name</th>
-                    <th style="width:10%">HSN <br><span style="font-size:10px;">(editable)</span></th>
-                    <th style="width:8%">Unit</th>
-                    <th style="width:10%">Price (₹)</th>
-                    <th style="width:8%">Stock</th>
-                    <th style="width:8%">Qty</th>
-                    <th style="width:8%">Disc %</th>
-                 </tr>
-            </thead>
-            <tbody>`;
+        let html = `<table><thead><tr><th>Select</th><th>SKU</th><th>Name</th><th>HSN</th><th>Unit</th><th>Price</th><th>Stock</th><th>Qty</th><th>Disc%</th></tr></thead><tbody>`;
         for (let p of filteredProducts) {
             const selected = selectedProductRows.has(p.id);
             const stored = selectedProductRows.get(p.id);
-            const qty = selected ? stored.qty : 1;
+            const qty = selected ? stored.qty : (p.currentStock > 0 ? p.currentStock : 1);
             const discount = selected ? stored.discount : 0;
-            const hsnValue = productHsnOverrides.get(p.id) !== undefined ? productHsnOverrides.get(p.id) : p.hsn;
-            html += `<tr>
-                <td style="text-align:center"><input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)"></td>
-                <td><strong>${escapeHtml(p.sku)}</strong></td>
-                <td class="product-name">${escapeHtml(p.name)}</td>
+            const hsnValue = productHsnOverrides.get(p.id) || p.hsn || '';
+            const rowClass = (p.currentStock === 0) ? 'stock-zero' : '';
+            html += `<tr class="${rowClass}">
+                <td><input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)"></td>
+                <td>${escapeHtml(p.sku)}</td>
+                <td>${escapeHtml(p.name)}</td>
                 <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></td>
                 <td>${escapeHtml(p.unit)}</td>
-                <td class="price">₹${(p.price || 0).toLocaleString()}</td>
-                <td>${(p.currentStock || 0).toLocaleString()}</td>
-                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" max="${p.currentStock}" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></td>
+                <td>₹${p.price.toLocaleString()}</td>
+                <td>${p.currentStock.toLocaleString()}</td>
+                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></td>
                 <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></td>
             </tr>`;
         }
         html += `</tbody></table>`;
         document.getElementById('productsTableContainer').innerHTML = html;
-        // Update "Select All" checkbox state
         const allCheckboxes = document.querySelectorAll('.product-checkbox');
-        const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
-        document.getElementById('selectAllCheckbox').checked = allChecked && allCheckboxes.length > 0;
+        document.getElementById('selectAllCheckbox').checked = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.checked);
     }
 
     function toggleProduct(id, isSelected) {
         const product = allProducts.find(p => p.id === id);
         if (!product) return;
         if (isSelected) {
-            // Default quantity = available stock (full stock)
-            const defaultQty = product.currentStock;
+            let defaultQty = product.currentStock > 0 ? product.currentStock : 1;
             selectedProductRows.set(id, { qty: defaultQty, discount: 0 });
-            // If there's a custom HSN override, preserve it; otherwise use product.hsn
-            if (!productHsnOverrides.has(id)) {
-                productHsnOverrides.set(id, product.hsn);
-            }
+            if (!productHsnOverrides.has(id)) productHsnOverrides.set(id, product.hsn || '');
         } else {
             selectedProductRows.delete(id);
-            // Optionally keep HSN override for next selection, but we can also delete it (not necessary)
         }
         renderTable();
     }
 
-    function updateQty(id, newQty) {
-        const qty = parseFloat(newQty);
-        if (isNaN(qty) || qty <= 0) return;
-        const product = allProducts.find(p => p.id === id);
-        if (product && qty > product.currentStock) {
-            alert(`Quantity cannot exceed available stock (${product.currentStock})`);
-            renderTable(); // reset to previous value
-            return;
-        }
-        if (selectedProductRows.has(id)) {
-            const current = selectedProductRows.get(id);
-            selectedProductRows.set(id, { ...current, qty: qty });
-        }
-    }
-
-    function updateDiscount(id, newDisc) {
-        const disc = parseFloat(newDisc);
-        if (isNaN(disc) || disc < 0) return;
-        if (selectedProductRows.has(id)) {
-            const current = selectedProductRows.get(id);
-            selectedProductRows.set(id, { ...current, discount: disc });
-        }
-    }
-
-    function updateHsn(id, newHsn) {
-        // Store the custom HSN for this row
-        productHsnOverrides.set(id, newHsn);
-        // If product is selected, update the stored hsn in the row data (optional)
-        if (selectedProductRows.has(id)) {
-            const current = selectedProductRows.get(id);
-            selectedProductRows.set(id, { ...current }); // just trigger re-render? Actually we store HSN separately, so OK
-        }
-        // No need to re-render immediately; the value is already updated in the input field.
-        // However, to be consistent, we can re-render but it's not necessary.
-    }
+    function updateQty(id, newQty) { let qty = parseFloat(newQty); if (isNaN(qty) || qty <= 0) return; if (selectedProductRows.has(id)) { const cur = selectedProductRows.get(id); selectedProductRows.set(id, { ...cur, qty }); } }
+    function updateDiscount(id, disc) { let d = parseFloat(disc); if (isNaN(d) || d < 0) return; if (selectedProductRows.has(id)) { const cur = selectedProductRows.get(id); selectedProductRows.set(id, { ...cur, discount: d }); } }
+    function updateHsn(id, hsn) { productHsnOverrides.set(id, hsn); if (selectedProductRows.has(id)) { const cur = selectedProductRows.get(id); selectedProductRows.set(id, { ...cur }); } }
 
     function toggleSelectAll() {
-        const checkAll = document.getElementById('selectAllCheckbox').checked;
-        if (checkAll) {
-            // Select all currently filtered products with default qty = stock
+        const check = document.getElementById('selectAllCheckbox').checked;
+        if (check) {
             for (let p of filteredProducts) {
                 if (!selectedProductRows.has(p.id)) {
-                    selectedProductRows.set(p.id, { qty: p.currentStock, discount: 0 });
-                    if (!productHsnOverrides.has(p.id)) {
-                        productHsnOverrides.set(p.id, p.hsn);
-                    }
+                    let qty = p.currentStock > 0 ? p.currentStock : 1;
+                    selectedProductRows.set(p.id, { qty, discount: 0 });
+                    if (!productHsnOverrides.has(p.id)) productHsnOverrides.set(p.id, p.hsn || '');
                 }
             }
         } else {
-            // Deselect all currently filtered products
-            for (let p of filteredProducts) {
-                selectedProductRows.delete(p.id);
-                // HSN overrides can be left or cleared; we'll leave them
-            }
+            for (let p of filteredProducts) selectedProductRows.delete(p.id);
         }
         renderTable();
     }
 
     function createDocument(type) {
-        if (selectedProductRows.size === 0) {
-            alert('Please select at least one product.');
-            return;
-        }
-        // Build cart array from selected products
-        const cart = [];
-        for (let [prodId, { qty, discount }] of selectedProductRows.entries()) {
-            const product = allProducts.find(p => p.id === prodId);
+        if (selectedProductRows.size === 0) { alert('Select at least one product.'); return; }
+        let cart = [];
+        for (let [id, { qty, discount }] of selectedProductRows.entries()) {
+            let product = allProducts.find(p => p.id === id);
             if (!product) continue;
-            if (qty > product.currentStock) {
-                alert(`Cannot add ${product.sku}: requested quantity (${qty}) exceeds available stock (${product.currentStock})`);
-                return;
-            }
-            // Use custom HSN if present, else product's HSN
-            const finalHsn = productHsnOverrides.get(prodId) !== undefined ? productHsnOverrides.get(prodId) : product.hsn;
-            cart.push({
-                part: product.sku,
-                desc: product.name,
-                hsn: finalHsn || '',
-                qty: qty,
-                price: product.price,
-                discount: discount
-            });
+            let hsn = productHsnOverrides.get(id) !== undefined ? productHsnOverrides.get(id) : (product.hsn || '');
+            cart.push({ part: product.sku, desc: product.name, hsn, qty, price: product.price, discount });
         }
-        if (cart.length === 0) {
-            alert('Selected products could not be processed.');
-            return;
-        }
-        // Save to localStorage
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
-        // Redirect based on type
-        if (type === 'quotation') {
-            window.location.href = 'quotation.html';
-        } else {
-            window.location.href = 'proforma-invoice.html';
-        }
+        window.location.href = type === 'quotation' ? 'quotation.html' : 'proforma-invoice.html';
     }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
-    }
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
 
-    // Load products on page load
     loadProducts();
 </script>
 </body>
-        </html>
+</html>
