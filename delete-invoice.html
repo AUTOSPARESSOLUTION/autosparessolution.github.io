@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delete Invoice – Reverse Stock & Outstanding</title>
     <style>
-        /* Your existing styles – unchanged */
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
         .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
@@ -38,7 +37,7 @@
 </div>
 
 <script>
-    // Helper functions (same as before)
+    // Helper functions
     function getSalesInvoices() { return JSON.parse(localStorage.getItem('salesInvoices') || '[]'); }
     function saveSalesInvoices(inv) { localStorage.setItem('salesInvoices', JSON.stringify(inv)); }
     function getAllInvoices() { return JSON.parse(localStorage.getItem('allInvoices') || '[]'); }
@@ -63,6 +62,12 @@
         else loadPurchaseInvoices();
     }
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+    }
+
+    // ========== SALES INVOICES ==========
     function loadSalesInvoices() {
         const invoices = getSalesInvoices();
         if (invoices.length === 0) {
@@ -94,7 +99,6 @@
         if (!confirm('Delete this sales invoice? Stock will be added back, customer outstanding reduced.')) return;
         try {
             let invoices = getSalesInvoices();
-            // Find by ID (string or number)
             const invoice = invoices.find(inv => String(inv.id) === String(invoiceId));
             if (!invoice) { alert('Invoice not found.'); return; }
 
@@ -103,7 +107,7 @@
                 total = invoice.items.reduce((sum, i) => sum + (i.price * i.qty), 0);
             }
 
-            // Restore stock
+            // Restore stock (add quantities back)
             let products = getProducts();
             for (let item of invoice.items) {
                 let prod = products.find(p => p.id == item.productId || p.sku == item.productId);
@@ -128,7 +132,7 @@
                 saveCustomers(customers);
             }
 
-            // Remove invoice from storage – ONLY by ID, never by number
+            // Remove invoice from storage – ONLY by ID
             const remaining = invoices.filter(inv => String(inv.id) !== String(invoiceId));
             saveSalesInvoices(remaining);
             let allInv = getAllInvoices();
@@ -143,11 +147,89 @@
         }
     };
 
-    // Purchase invoices – similarly only by ID
-    function loadPurchaseInvoices() { /* same as before */ }
-    window.deletePurchaseInvoiceHandler = function(invoiceId) { /* same as before with ID filter */ }
+    // ========== PURCHASE INVOICES ==========
+    function loadPurchaseInvoices() {
+        const invoices = getPurchaseInvoices();
+        if (invoices.length === 0) {
+            document.getElementById('purchaseTable').innerHTML = '<p>No purchase invoices found.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>PO/Invoice No</th><th>Date</th><th>Supplier Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        invoices.forEach(inv => {
+            let docNo = inv.invoiceNo || inv.poNo || `PO-${inv.id}`;
+            let date = inv.date || (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN') : '-');
+            let supplierEmail = inv.supplierEmail || inv.supplier?.email || 'Unknown';
+            let total = inv.total || inv.grandTotal || 0;
+            if (total === 0 && inv.items && inv.items.length) {
+                total = inv.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+            }
+            html += `<tr>
+                <td>${escapeHtml(docNo)}</td>
+                <td>${escapeHtml(date)}</td>
+                <td>${escapeHtml(supplierEmail)}</td>
+                <td>₹${total.toLocaleString()}</td>
+                <td><button class="delete-btn" onclick="deletePurchaseInvoiceHandler('${inv.id}')">Delete & Reverse</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('purchaseTable').innerHTML = html;
+    }
 
-    function escapeHtml(str) { /* same */ }
+    window.deletePurchaseInvoiceHandler = function(invoiceId) {
+        if (!confirm('Delete this purchase invoice? Stock will be reduced, supplier outstanding reduced.')) return;
+        try {
+            let invoices = getPurchaseInvoices();
+            const invoice = invoices.find(inv => String(inv.id) === String(invoiceId));
+            if (!invoice) { alert('Invoice not found.'); return; }
+
+            let total = invoice.total || invoice.grandTotal || 0;
+            if (total === 0 && invoice.items && invoice.items.length) {
+                total = invoice.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+            }
+
+            // Reduce stock (subtract quantities because purchase added stock)
+            let products = getProducts();
+            for (let item of invoice.items) {
+                let prod = products.find(p => p.id == item.productId || p.sku == item.productId);
+                if (prod) {
+                    prod.currentStock = (prod.currentStock || 0) - item.quantity;
+                    if (prod.currentStock < 0) prod.currentStock = 0;
+                }
+            }
+            saveProducts(products);
+
+            // Remove inventory transactions linked to this invoice
+            let invTransactions = getInventoryTransactions();
+            invTransactions = invTransactions.filter(t => t.ref !== invoice.invoiceNo && t.ref !== invoice.poNo);
+            saveInventoryTransactions(invTransactions);
+
+            // Update supplier outstanding (reduce)
+            let supplierEmail = invoice.supplierEmail || invoice.supplier?.email;
+            let suppliers = getSuppliers();
+            const supplier = suppliers.find(s => s.email === supplierEmail);
+            if (supplier) {
+                supplier.outstanding = (supplier.outstanding || 0) - total;
+                if (supplier.outstanding < 0) supplier.outstanding = 0;
+                saveSuppliers(suppliers);
+            }
+
+            // Remove invoice from storage – ONLY by ID
+            const remaining = invoices.filter(inv => String(inv.id) !== String(invoiceId));
+            savePurchaseInvoices(remaining);
+            // Also remove from allInvoices if purchase invoices are stored there (optional)
+            let allInv = getAllInvoices();
+            allInv = allInv.filter(inv => String(inv.id) !== String(invoiceId));
+            saveAllInvoices(allInv);
+
+            alert('Purchase invoice deleted successfully.');
+            loadPurchaseInvoices();
+        } catch (err) {
+            console.error(err);
+            alert('Error: ' + err.message);
+        }
+    };
+
+    // Initial load
     loadSalesInvoices();
 </script>
 </body>
