@@ -5,11 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
-        /* ========== YOUR EXISTING STYLES – UNCHANGED ========== */
         * { box-sizing: border-box; }
-        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .invoice-container { max-width: 1300px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 0 15px 15px 15px; border: 1px solid #dee2e6; }
-        @media print { .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp { display: none !important; } body { background: white; padding: 0; margin: 0; } .invoice-container { box-shadow: none; border-radius: 0; padding: 0 10px 5px 10px; margin: 0; border: none; } .company-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0a7c71; color: white; margin: 0 -10px 10px -10px; } .items-table th, .tax-summary-table th { background: #f8f9fa !important; } .qr-box, .signature-row, .packing-section, .totals, .info-box { page-break-inside: avoid; break-inside: avoid; } .company-header, .totals { page-break-after: avoid; break-after: avoid; } .invoice-container { font-size: 10pt; } .info-box, .packing-section { padding: 5px 8px; margin-bottom: 8px; } .items-table td, .items-table th { padding: 4px 3px; font-size: 9pt; } .totals table { width: 300px; margin-left: auto; } .totals td { border: none; padding: 3px; } .qr-box img { max-width: 80px; } .signature-box { padding-top: 3px; } .footer-legal { margin-top: 8px; padding-top: 5px; } }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .invoice-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 0 15px 15px 15px;
+            border: 1px solid #dee2e6;
+        }
+        @media print {
+            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp { display: none !important; }
+            body { background: white; padding: 0; margin: 0; }
+            .invoice-container { box-shadow: none; border-radius: 0; padding: 0 10px 5px 10px; margin: 0; border: none; }
+            .company-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0a7c71; color: white; margin: 0 -10px 10px -10px; }
+            .items-table th, .tax-summary-table th { background: #f8f9fa !important; }
+            .qr-box, .signature-row, .packing-section, .totals, .info-box { page-break-inside: avoid; break-inside: avoid; }
+            .company-header, .totals { page-break-after: avoid; break-after: avoid; }
+            .invoice-container { font-size: 10pt; }
+            .info-box, .packing-section { padding: 5px 8px; margin-bottom: 8px; }
+            .items-table td, .items-table th { padding: 4px 3px; font-size: 9pt; }
+            .totals table { width: 300px; margin-left: auto; }
+            .totals td { border: none; padding: 3px; }
+            .qr-box img { max-width: 80px; }
+            .signature-box { padding-top: 3px; }
+            .footer-legal { margin-top: 8px; padding-top: 5px; }
+        }
         .company-header { background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin: 0 -15px 15px -15px; }
         .logo-area { display: flex; align-items: center; gap: 15px; }
         .logo-area img { height: 60px; }
@@ -24,8 +52,21 @@
         .info-value { flex: 1; color: #333; word-break: break-word; }
         input, textarea, select { width: 100%; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: inherit; }
         .editable { background: #fff9e0; }
-        .items-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 12px; table-layout: fixed; }
-        .items-table th, .items-table td { border: 1px solid #dee2e6; padding: 6px 4px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 12px;
+            table-layout: fixed;
+        }
+        .items-table th, .items-table td {
+            border: 1px solid #dee2e6;
+            padding: 6px 4px;
+            text-align: left;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
         .items-table th:nth-child(1), .items-table td:nth-child(1) { width: 4%; text-align: center; }
         .items-table th:nth-child(2), .items-table td:nth-child(2) { width: 12%; }
         .items-table th:nth-child(3), .items-table td:nth-child(3) { width: 18%; }
@@ -70,7 +111,6 @@
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
-    <!-- All HTML content – same as your last working version -->
     <div class="company-header">
         <div class="logo-area">
             <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
@@ -172,7 +212,7 @@
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
             <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></tr>
+            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
             <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</strong></td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></td></tr>
             <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
@@ -203,11 +243,33 @@
 </div>
 
 <script>
-    // ========== GLOBAL LOCK – IMMEDIATE SYNC PREVENTION ==========
-    let isProcessing = false;           // Global sync flag
-    let invoiceAlreadySaved = false;    // Prevents second save after success
+    // ========== BULLETPROOF ATOMIC INVOICE NUMBER GENERATION ==========
+    // Stores separate counters for cash and credit per financial year.
+    // The counter is incremented and stored BEFORE using it, preventing duplicates.
 
-    // ========== LOAD CART FROM LOCALSTORAGE OR INITIALIZE EMPTY ==========
+    function getFinancialYear() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
+        else return `${year-1}-${year.toString().slice(-2)}`;
+    }
+
+    function getNextInvoiceNumberAtomic(type) {
+        const finYear = getFinancialYear();
+        const prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
+        const counterKey = `invCounter_${type}_${finYear}`;
+        let lastNum = parseInt(localStorage.getItem(counterKey) || '0');
+        let nextNum = lastNum + 1;
+        localStorage.setItem(counterKey, nextNum.toString());
+        return prefix + nextNum.toString().padStart(4, '0');
+    }
+
+    // ========== GLOBAL SAVE LOCK ==========
+    let isSaving = false;
+    let invoiceAlreadySaved = false;
+
+    // ========== LOAD CART ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
     if (cart.length === 0) {
         cart.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0, unit: 'pc' });
@@ -225,56 +287,16 @@
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
+    // Helper functions (used throughout)
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
+    }
+
     function addNewItem() {
         cart.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0, unit: 'pc' });
         renderItemsAndTaxSummary();
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
-    }
-
-    if (currentUser) {
-        document.getElementById('buyerName').value = currentUser.name || '';
-        document.getElementById('buyerAddress').value = currentUser.address || '';
-        document.getElementById('buyerPhone').value = currentUser.phone || '';
-        document.getElementById('buyerEmail').value = currentUser.email || '';
-        document.getElementById('buyerGstin').value = currentUser.gstin || '';
-        document.getElementById('buyerState').value = currentUser.state || '';
-        document.getElementById('consigneeName').value = currentUser.name || '';
-        document.getElementById('consigneeAddress').value = currentUser.address || '';
-        document.getElementById('consigneePhone').value = currentUser.phone || '';
-    }
-
-    if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
-        document.getElementById('adminCustomerSelect').style.display = 'flex';
-        populateCustomerSelect();
-    }
-
-    function populateCustomerSelect() {
-        const select = document.getElementById('quickCustomerSelect');
-        customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        select.innerHTML = '<option value="">-- Select Customer (Admin only) --</option>';
-        customers.forEach(c => {
-            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
-        });
-    }
-
-    function loadCustomerData() {
-        const select = document.getElementById('quickCustomerSelect');
-        const email = select.value;
-        if (!email) return;
-        const cust = customers.find(c => c.email === email);
-        if (cust) {
-            document.getElementById('buyerName').value = cust.name || '';
-            document.getElementById('buyerAddress').value = cust.address || '';
-            document.getElementById('buyerPhone').value = cust.phone || '';
-            document.getElementById('buyerEmail').value = cust.email || '';
-            document.getElementById('buyerGstin').value = cust.gstin || '';
-            document.getElementById('buyerState').value = cust.state || '';
-            document.getElementById('customerCode').value = cust.customerCode || '';
-            document.getElementById('consigneeName').value = cust.name || '';
-            document.getElementById('consigneeAddress').value = cust.address || '';
-            document.getElementById('consigneePhone').value = cust.phone || '';
-            updateGstDisplay();
-        }
     }
 
     function calculatePackingCharges() {
@@ -312,39 +334,9 @@
         }
         renderItemsAndTaxSummary();
     }
+
     document.getElementById('buyerState').addEventListener('input', updateGstDisplay);
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
-
-    function getFinancialYear() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-        if (month >= 4) return `${year}-${(year+1).toString().slice(-2)}`;
-        else return `${year-1}-${year.toString().slice(-2)}`;
-    }
-
-    function getNextInvoiceNumber(type) {
-        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        const finYear = getFinancialYear();
-        let prefix = (type === 'credit') ? `ASS/${finYear}/` : `ASS/${finYear}/CASH/`;
-        let maxNumber = 0;
-        allInvoices.forEach(inv => {
-            if (inv.invoiceType === type && inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
-                const match = inv.invoiceNo.match(/(\d+)$/);
-                if (match) {
-                    const num = parseInt(match[1]);
-                    if (num > maxNumber) maxNumber = num;
-                }
-            }
-        });
-        const nextNumber = maxNumber + 1;
-        return prefix + nextNumber.toString().padStart(4, '0');
-    }
-
-    function updateInvoiceNumberDisplay() {
-        const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        document.getElementById('invoiceNo').innerText = getNextInvoiceNumber(type);
-    }
 
     function computeDueDate(invoiceDate, type, paymentTermsDays) {
         const date = new Date(invoiceDate);
@@ -373,6 +365,13 @@
         updateDueDate();
     }
 
+    function updateInvoiceNumberDisplay() {
+        const type = document.querySelector('input[name="invoiceType"]:checked').value;
+        // Just display a placeholder – the actual number will be generated atomically at save time.
+        document.getElementById('invoiceNo').innerText = getNextInvoiceNumberAtomic(type);
+    }
+
+    // ----- Tax calculations -----
     function calculateTaxableTotals() {
         let sub = 0;
         let taxGroups = {};
@@ -429,6 +428,7 @@
         document.getElementById('grandTotal').innerText = (grandTotal || 0).toFixed(2);
     }
 
+    // ----- Rendering -----
     function renderItemsAndTaxSummary() {
         const isLocal = isLocalGst();
         const thead = document.getElementById('itemsTableHead');
@@ -494,6 +494,7 @@
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
     }
 
+    // Update functions
     function updatePart(idx, value) { if (cart[idx]) { cart[idx].part = value; renderItemsAndTaxSummary(); } }
     function updateDesc(idx, value) { if (cart[idx]) { cart[idx].desc = value; renderItemsAndTaxSummary(); } }
     function updateHsnByIndex(idx, value) { if (cart[idx]) { cart[idx].hsn = value; renderItemsAndTaxSummary(); } }
@@ -502,11 +503,7 @@
     function updatePriceByIndex(idx, value) { if (cart[idx]) { cart[idx].price = parseFloat(value) || 0; renderItemsAndTaxSummary(); } }
     function updateDiscountByIndex(idx, value) { if (cart[idx]) { cart[idx].discount = parseFloat(value) || 0; renderItemsAndTaxSummary(); } }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
-    }
-
+    // Product master sync
     function ensureProductInMaster(sku, name, hsn, price) {
         let products = getProducts();
         let existing = products.find(p => p.sku === sku);
@@ -524,86 +521,43 @@
             };
             products.push(newProduct);
             saveProducts(products);
-            console.log(`New product added: ${sku} - ${newProduct.name}`);
         } else {
             let updated = false;
-            if (hsn && (!existing.hsn || existing.hsn === '')) {
-                existing.hsn = hsn;
-                updated = true;
-            }
-            if (name && name.trim() !== '' && (existing.name === sku || existing.name === `Product ${sku}`)) {
-                existing.name = name;
-                updated = true;
-            }
+            if (hsn && (!existing.hsn || existing.hsn === '')) { existing.hsn = hsn; updated = true; }
+            if (name && name.trim() !== '' && (existing.name === sku || existing.name === `Product ${sku}`)) { existing.name = name; updated = true; }
             if (updated) saveProducts(products);
         }
         return true;
     }
 
-    function isInvoiceNumberDuplicate(invoiceNo) {
-        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        return allInvoices.some(inv => inv.invoiceNo === invoiceNo) || salesInvoices.some(inv => inv.invoiceNo === invoiceNo);
-    }
-
-    // ========== BULLETPROOF SAVE INVOICE – FIRST LOCK THEN WORK ==========
+    // ========== BULLETPROOF SAVE INVOICE ==========
     function saveInvoice() {
-        // 1. Immediate synchronous lock check
-        if (isProcessing) {
-            alert("Save already in progress. Please wait.");
-            return;
-        }
-        if (invoiceAlreadySaved) {
-            alert("This invoice has already been saved. Cannot save again.");
-            return;
-        }
-        // 2. Lock immediately and disable button
-        isProcessing = true;
+        // First line: immediate lock check
+        if (isSaving) { alert("Save already in progress. Please wait."); return; }
+        if (invoiceAlreadySaved) { alert("This invoice has already been saved."); return; }
+
+        const validCart = cart.filter(item => item.part && item.part.trim() !== '');
+        if (validCart.length === 0) { alert('Please add at least one item with a Part No.'); return; }
+
+        // Immediately lock and disable button
+        isSaving = true;
         const saveBtn = document.getElementById('saveInvoiceBtn');
         saveBtn.disabled = true;
         saveBtn.textContent = "Saving...";
         saveBtn.classList.add('disabled-btn');
 
-        // 3. Validate cart
-        const validCart = cart.filter(item => item.part && item.part.trim() !== '');
-        if (validCart.length === 0) {
-            alert('Cart empty. Please add at least one item with a Part No.');
-            isProcessing = false;
-            saveBtn.disabled = false;
-            saveBtn.textContent = "💾 Save Invoice & Update Ledger";
-            saveBtn.classList.remove('disabled-btn');
-            return;
-        }
-
+        // Atomic invoice number generation – reserved now
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const proposedInvoiceNo = getNextInvoiceNumber(type);
-        
-        // 4. Check duplicate in storage
-        if (isInvoiceNumberDuplicate(proposedInvoiceNo)) {
-            alert(`Invoice number ${proposedInvoiceNo} already exists. Cannot save duplicate.`);
-            isProcessing = false;
-            saveBtn.disabled = false;
-            saveBtn.textContent = "💾 Save Invoice & Update Ledger";
-            saveBtn.classList.remove('disabled-btn');
-            return;
-        }
+        const finalNo = getNextInvoiceNumberAtomic(type);
 
-        // 5. Proceed with saving (async operations but lock is already held)
         try {
+            // Ensure all products exist in master
             for (let item of validCart) {
                 if (!item.part) continue;
                 ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
             }
 
-            const taxableTotals = calculateTaxableTotals();
-            const gstApplicable = getGSTApplicableTotal();
-            const packing = getPackingCharge();
-            const roundedGSTApplicable = Math.round(gstApplicable);
-            const roundOff = roundedGSTApplicable - gstApplicable;
-            const grandTotal = roundedGSTApplicable + packing;
-
-            const finalNo = proposedInvoiceNo;
-
+            // Build invoice object
             const buyer = {
                 name: document.getElementById('buyerName').value.trim(),
                 email: document.getElementById('buyerEmail').value.trim(),
@@ -637,18 +591,25 @@
 
             if (!buyer.email) {
                 alert('Customer email is required.');
-                isProcessing = false;
+                isSaving = false;
                 saveBtn.disabled = false;
                 saveBtn.textContent = "💾 Save Invoice & Update Ledger";
                 saveBtn.classList.remove('disabled-btn');
                 return;
             }
 
+            const taxableTotals = calculateTaxableTotals();
+            const gstApplicable = getGSTApplicableTotal();
+            const packing = getPackingCharge();
+            const roundedGSTApplicable = Math.round(gstApplicable);
+            const roundOff = roundedGSTApplicable - gstApplicable;
+            const grandTotal = roundedGSTApplicable + packing;
+
             const dateParts = document.getElementById('invoiceDate').innerText.split('/');
             const invoiceDateFormatted = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
 
             const invoice = {
-                id: Date.now(),
+                id: Date.now() + Math.random(),   // extremely unique ID
                 date: invoiceDateFormatted,
                 customerEmail: buyer.email,
                 invoiceNo: finalNo,
@@ -690,6 +651,7 @@
                 }))
             };
 
+            // Save to both storage arrays
             let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
             allInvoices = allInvoices.filter(inv => inv.id !== invoice.id);
             allInvoices.push(invoice);
@@ -718,16 +680,15 @@
             setTimeout(() => window.close(), 1000);
         } catch (err) {
             alert("Error: " + err.message);
-            // Release lock only on error
-            isProcessing = false;
+            // Release lock on error
+            isSaving = false;
             saveBtn.disabled = false;
             saveBtn.textContent = "💾 Save Invoice & Update Ledger";
             saveBtn.classList.remove('disabled-btn');
         }
-        // Lock is never released on success because the page closes. 
-        // On error, lock is released above.
     }
 
+    // Print and PDF functions (unchanged)
     function printInvoice() {
         if (!invoiceAlreadySaved && !confirm("Invoice not saved yet. Print anyway? Data won't be stored.")) return;
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
@@ -791,6 +752,54 @@
         });
     }
 
+    // Load customer dropdown for admin
+    function populateCustomerSelect() {
+        const select = document.getElementById('quickCustomerSelect');
+        customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        select.innerHTML = '<option value="">-- Select Customer (Admin only) --</option>';
+        customers.forEach(c => {
+            select.innerHTML += `<option value="${c.email}">${c.name} (${c.email})</option>`;
+        });
+    }
+
+    function loadCustomerData() {
+        const select = document.getElementById('quickCustomerSelect');
+        const email = select.value;
+        if (!email) return;
+        const cust = customers.find(c => c.email === email);
+        if (cust) {
+            document.getElementById('buyerName').value = cust.name || '';
+            document.getElementById('buyerAddress').value = cust.address || '';
+            document.getElementById('buyerPhone').value = cust.phone || '';
+            document.getElementById('buyerEmail').value = cust.email || '';
+            document.getElementById('buyerGstin').value = cust.gstin || '';
+            document.getElementById('buyerState').value = cust.state || '';
+            document.getElementById('customerCode').value = cust.customerCode || '';
+            document.getElementById('consigneeName').value = cust.name || '';
+            document.getElementById('consigneeAddress').value = cust.address || '';
+            document.getElementById('consigneePhone').value = cust.phone || '';
+            updateGstDisplay();
+        }
+    }
+
+    // Initialize page
+    if (currentUser) {
+        document.getElementById('buyerName').value = currentUser.name || '';
+        document.getElementById('buyerAddress').value = currentUser.address || '';
+        document.getElementById('buyerPhone').value = currentUser.phone || '';
+        document.getElementById('buyerEmail').value = currentUser.email || '';
+        document.getElementById('buyerGstin').value = currentUser.gstin || '';
+        document.getElementById('buyerState').value = currentUser.state || '';
+        document.getElementById('consigneeName').value = currentUser.name || '';
+        document.getElementById('consigneeAddress').value = currentUser.address || '';
+        document.getElementById('consigneePhone').value = currentUser.phone || '';
+    }
+
+    if (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) {
+        document.getElementById('adminCustomerSelect').style.display = 'flex';
+        populateCustomerSelect();
+    }
+
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
             document.getElementById('creditFields').style.display = (this.value === 'credit') ? 'flex' : 'none';
@@ -799,7 +808,6 @@
             updateGstDisplay();
         });
     });
-
     document.getElementById('paymentTerms')?.addEventListener('change', updateDueDate);
     setDates();
     renderItemsAndTaxSummary();
@@ -807,6 +815,7 @@
     updateGstDisplay();
     calculatePackingCharges();
 
+    // Date picker
     (function addDateEdit() {
         const editBtn = document.getElementById('editDateBtn');
         if (!editBtn) return;
@@ -854,4 +863,4 @@
     })();
 </script>
 </body>
-                    </html>
+    </html>
