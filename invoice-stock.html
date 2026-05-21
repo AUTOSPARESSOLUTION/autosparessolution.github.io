@@ -103,6 +103,8 @@
         .date-picker-temp { position: absolute; z-index: 1000; background: white; border: 1px solid #ccc; border-radius: 4px; padding: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
         .add-item-btn { background: #28a745; margin-right: 10px; }
         .add-item-btn:hover { background: #218838; }
+        .disabled-btn { background: #6c757d; cursor: not-allowed; opacity: 0.6; }
+        .disabled-btn:hover { background: #6c757d; }
     </style>
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -241,22 +243,14 @@
 </div>
 
 <script>
-    // ========== FLAG TO PREVENT DOUBLE SUBMISSION ==========
+    // ========== FLAG TO PREVENT DOUBLE SUBMISSION & SESSION DUPLICATE ==========
     let isSaving = false;
+    let invoiceAlreadySaved = false;  // prevents second save after success
 
     // ========== LOAD CART FROM LOCALSTORAGE OR INITIALIZE EMPTY ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
-    // If cart is empty, add one empty row to start
     if (cart.length === 0) {
-        cart.push({
-            part: '',
-            desc: '',
-            hsn: '',
-            qty: 1,
-            price: 0,
-            discount: 0,
-            unit: 'pc'
-        });
+        cart.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0, unit: 'pc' });
     }
 
     const allProducts = getProducts();
@@ -271,19 +265,9 @@
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
-    // ========== HELPER: ADD NEW EMPTY ROW ==========
     function addNewItem() {
-        cart.push({
-            part: '',
-            desc: '',
-            hsn: '',
-            qty: 1,
-            price: 0,
-            discount: 0,
-            unit: 'pc'
-        });
+        cart.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0, unit: 'pc' });
         renderItemsAndTaxSummary();
-        // Save updated cart to localStorage so it persists on refresh
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
     }
 
@@ -485,14 +469,6 @@
         document.getElementById('grandTotal').innerText = (grandTotal || 0).toFixed(2);
     }
 
-    function updateUnit(part, newUnit) {
-        const item = cart.find(i => i.part === part);
-        if (item) {
-            item.unit = newUnit;
-            renderItemsAndTaxSummary();
-        }
-    }
-
     function renderItemsAndTaxSummary() {
         const isLocal = isLocalGst();
         const thead = document.getElementById('itemsTableHead');
@@ -520,19 +496,19 @@
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             let row = `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td><input type="text" value="${escapeHtml(item.part)}" style="width:100%; background:#fff9e0;" onchange="updatePart('${idx}', this.value)"></strong></td>
-                <td><input type="text" value="${escapeHtml(item.desc)}" style="width:100%; background:#fff9e0;" onchange="updateDesc('${idx}', this.value)"></strong></td>
-                <td><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsnByIndex('${idx}', this.value)"></strong></td>
-                <td><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:100%; background:#fff9e0;" onchange="updateUnitByIndex('${idx}', this.value)"></strong></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:80px;" onchange="updateQtyByIndex('${idx}', this.value)"></strong></td>
-                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePriceByIndex('${idx}', this.value)"></strong></td>
+                <td><input type="text" value="${escapeHtml(item.part)}" style="width:100%; background:#fff9e0;" onchange="updatePart('${idx}', this.value)"></td>
+                <td><input type="text" value="${escapeHtml(item.desc)}" style="width:100%; background:#fff9e0;" onchange="updateDesc('${idx}', this.value)"></td>
+                <td><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsnByIndex('${idx}', this.value)"></td>
+                <td><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:100%; background:#fff9e0;" onchange="updateUnitByIndex('${idx}', this.value)"></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:80px;" onchange="updateQtyByIndex('${idx}', this.value)"></td>
+                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePriceByIndex('${idx}', this.value)"></td>
                 <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscountByIndex('${idx}', this.value)">%</strong></td>
                 <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
                 <td style="text-align:center;">18%</strong></td>`;
             if (isLocal) {
                 row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</strong><td style="text-align:right;">₹${sgst.toFixed(2)}</strong><td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             } else {
-                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong><td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></tr>`;
+                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong><td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             }
             row += `</tr>`;
             itemsHtml += row;
@@ -555,11 +531,9 @@
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
         updateTotalsWithPackingAndRound();
-        // Save cart to localStorage after any modification
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
     }
 
-    // Update functions by index (to handle dynamic rows)
     function updatePart(idx, value) { if (cart[idx]) { cart[idx].part = value; renderItemsAndTaxSummary(); } }
     function updateDesc(idx, value) { if (cart[idx]) { cart[idx].desc = value; renderItemsAndTaxSummary(); } }
     function updateHsnByIndex(idx, value) { if (cart[idx]) { cart[idx].hsn = value; renderItemsAndTaxSummary(); } }
@@ -573,7 +547,6 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
-    // ========== ENSURE PRODUCT EXISTS IN MASTER (with proper name, no "undefined") ==========
     function ensureProductInMaster(sku, name, hsn, price) {
         let products = getProducts();
         let existing = products.find(p => p.sku === sku);
@@ -602,27 +575,26 @@
                 existing.name = name;
                 updated = true;
             }
-            if (updated) {
-                saveProducts(products);
-                console.log(`Product updated: ${sku}`);
-            }
+            if (updated) saveProducts(products);
         }
         return true;
     }
 
-    // ========== CHECK FOR DUPLICATE INVOICE NUMBER ==========
     function isInvoiceNumberDuplicate(invoiceNo) {
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        return allInvoices.some(inv => inv.invoiceNo === invoiceNo);
+        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
+        return allInvoices.some(inv => inv.invoiceNo === invoiceNo) || salesInvoices.some(inv => inv.invoiceNo === invoiceNo);
     }
 
-    // ========== SAVE INVOICE (NO DUPLICATE, NO DOUBLE SUBMISSION) ==========
     function saveInvoice() {
         if (isSaving) {
             alert("Please wait, invoice is already being saved.");
             return;
         }
-        // Filter out rows that have empty part number
+        if (invoiceAlreadySaved) {
+            alert("This invoice has already been saved. Cannot save again.");
+            return;
+        }
         const validCart = cart.filter(item => item.part && item.part.trim() !== '');
         if (validCart.length === 0) {
             alert('Cart empty. Please add at least one item with a Part No.');
@@ -642,14 +614,12 @@
         saveBtn.textContent = "Saving...";
 
         try {
-            // Ensure all products in validCart exist in product master (with correct name)
             for (let item of validCart) {
                 if (!item.part) continue;
                 ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
             }
 
-            // Use validCart for calculations and saving
-            const taxableTotals = calculateTaxableTotals(); // uses cart (all items)
+            const taxableTotals = calculateTaxableTotals();
             const gstApplicable = getGSTApplicableTotal();
             const packing = getPackingCharge();
             const roundedGSTApplicable = Math.round(gstApplicable);
@@ -667,8 +637,8 @@
                 state: document.getElementById('buyerState').value.trim()
             };
 
-            let customers = JSON.parse(localStorage.getItem('customers') || '[]');
-            let existingCustomer = customers.find(c => c.email === buyer.email);
+            let customersList = JSON.parse(localStorage.getItem('customers') || '[]');
+            let existingCustomer = customersList.find(c => c.email === buyer.email);
             if (!existingCustomer && buyer.email) {
                 const newCust = {
                     id: Date.now(),
@@ -682,16 +652,15 @@
                     totalPurchased: 0,
                     creditLimit: 50000,
                     status: 'active',
-                    customerCode: 'CUST' + (customers.length + 1).toString().padStart(4, '0'),
+                    customerCode: 'CUST' + (customersList.length + 1).toString().padStart(4, '0'),
                     createdAt: new Date().toISOString()
                 };
-                customers.push(newCust);
-                localStorage.setItem('customers', JSON.stringify(customers));
-                existingCustomer = newCust;
+                customersList.push(newCust);
+                localStorage.setItem('customers', JSON.stringify(customersList));
             }
 
             if (!buyer.email) {
-                alert('Customer email is required to link invoice.');
+                alert('Customer email is required.');
                 isSaving = false;
                 saveBtn.disabled = false;
                 saveBtn.textContent = "💾 Save Invoice & Update Ledger";
@@ -744,7 +713,6 @@
                 }))
             };
 
-            // Save invoice to both storages
             let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
             allInvoices = allInvoices.filter(inv => inv.id !== invoice.id);
             allInvoices.push(invoice);
@@ -755,7 +723,6 @@
             salesInvoices.push(invoice);
             localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
             
-            let customersList = JSON.parse(localStorage.getItem('customers') || '[]');
             const custIndex = customersList.findIndex(c => c.email === buyer.email);
             if (custIndex !== -1) {
                 customersList[custIndex].outstanding = (customersList[custIndex].outstanding || 0) + invoice.grandTotal;
@@ -767,20 +734,23 @@
                 try { createSalesInvoice(invoice); } catch(e) { console.warn(e); }
             }
 
-            alert(`Invoice ${finalNo} saved successfully!\n\nPacking charges: ₹${packing.toFixed(2)} (no GST).\nRound Off: ₹${roundOff.toFixed(2)}`);
-            // Clear cart after saving
+            alert(`Invoice ${finalNo} saved successfully!\n\nPacking: ₹${packing.toFixed(2)}\nRound Off: ₹${roundOff.toFixed(2)}`);
             localStorage.setItem('invoiceCart', '[]');
+            invoiceAlreadySaved = true;
+            saveBtn.classList.add('disabled-btn');
             setTimeout(() => window.close(), 1000);
         } catch (err) {
-            alert("Error saving invoice: " + err.message);
+            alert("Error: " + err.message);
         } finally {
             isSaving = false;
             saveBtn.disabled = false;
             saveBtn.textContent = "💾 Save Invoice & Update Ledger";
+            if (invoiceAlreadySaved) saveBtn.classList.add('disabled-btn');
         }
     }
 
     function printInvoice() {
+        if (!invoiceAlreadySaved && !confirm("Invoice not saved yet. Print anyway? Data won't be stored.")) return;
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
         const replacements = [];
         inputs.forEach(el => {
@@ -807,6 +777,7 @@
     }
 
     function generatePDF() {
+        if (!invoiceAlreadySaved && !confirm("Invoice not saved yet. Generate PDF anyway? Data won't be stored.")) return;
         const originalContainer = document.getElementById('invoiceContainer');
         const clone = originalContainer.cloneNode(true);
         clone.querySelectorAll('input, textarea, select').forEach(el => {
@@ -843,18 +814,14 @@
 
     document.querySelectorAll('input[name="invoiceType"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            const creditDiv = document.getElementById('creditFields');
-            if (this.value === 'credit') creditDiv.style.display = 'flex';
-            else creditDiv.style.display = 'none';
+            document.getElementById('creditFields').style.display = (this.value === 'credit') ? 'flex' : 'none';
             updateInvoiceNumberDisplay();
             updateDueDate();
             updateGstDisplay();
         });
     });
 
-    const paymentTermsInput = document.getElementById('paymentTerms');
-    if (paymentTermsInput) paymentTermsInput.addEventListener('change', updateDueDate);
-
+    document.getElementById('paymentTerms')?.addEventListener('change', updateDueDate);
     setDates();
     renderItemsAndTaxSummary();
     updateInvoiceNumberDisplay();
