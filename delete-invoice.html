@@ -44,8 +44,6 @@
     function saveAllInvoices(inv) { localStorage.setItem('allInvoices', JSON.stringify(inv)); }
     function getCustomers() { return JSON.parse(localStorage.getItem('customers') || '[]'); }
     function saveCustomers(cust) { localStorage.setItem('customers', JSON.stringify(cust)); }
-    function getCustomerLedger() { return JSON.parse(localStorage.getItem('customerLedger') || '[]'); }
-    function saveCustomerLedger(ledger) { localStorage.setItem('customerLedger', JSON.stringify(ledger)); }
     function getInventoryTransactions() { return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]'); }
     function saveInventoryTransactions(trans) { localStorage.setItem('inventoryTransactions', JSON.stringify(trans)); }
     function getProducts() { return JSON.parse(localStorage.getItem('products') || '[]'); }
@@ -130,11 +128,10 @@
                 // No reversal ledger entry added
             }
 
-            // Remove invoice from storage arrays
+            // Remove invoice from storage arrays – ONLY BY ID, not invoice number
             const remaining = invoices.filter(inv => inv.id != invoiceId);
             saveSalesInvoices(remaining);
             let allInv = getAllInvoices();
-            // FIX: Only remove by ID, not by invoice number (so duplicates with same number but different ID stay)
             allInv = allInv.filter(inv => inv.id != invoiceId);
             saveAllInvoices(allInv);
 
@@ -146,14 +143,14 @@
         }
     };
 
-    // Purchase Invoices
+    // Purchase Invoices (same logic, no ledger reversal)
     function loadPurchaseInvoices() {
         const invoices = getPurchaseInvoices();
         if (invoices.length === 0) {
             document.getElementById('purchaseTable').innerHTML = '<p>No purchase invoices found.</p>';
             return;
         }
-        let html = '<table><thead><tr><th>Invoice/PO No</th><th>Date</th><th>Supplier Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        let html = '<td><thead><tr><th>Invoice/PO No</th><th>Date</th><th>Supplier Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
         invoices.forEach(inv => {
             let docNo = inv.invoiceNo || inv.poNo || 'N/A';
             let supplierEmail = inv.supplierEmail || (inv.supplier?.email) || 'Not recorded';
@@ -166,7 +163,7 @@
                 <td><button class="delete-btn" onclick="deletePurchaseInvoiceHandler('${inv.id}')">Delete & Reverse</button></td>
             </tr>`;
         });
-        html += '</tbody><table>';
+        html += '</tbody></table>';
         document.getElementById('purchaseTable').innerHTML = html;
     }
 
