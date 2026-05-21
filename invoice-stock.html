@@ -5,39 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
+        /* Your existing styles – unchanged */
         * { box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: #e9ecef;
-            margin: 0;
-            padding: 20px;
-        }
-        .invoice-container {
-            max-width: 1300px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            padding: 0 15px 15px 15px;
-            border: 1px solid #dee2e6;
-        }
-        @media print {
-            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp { display: none !important; }
-            body { background: white; padding: 0; margin: 0; }
-            .invoice-container { box-shadow: none; border-radius: 0; padding: 0 10px 5px 10px; margin: 0; border: none; }
-            .company-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0a7c71; color: white; margin: 0 -10px 10px -10px; }
-            .items-table th, .tax-summary-table th { background: #f8f9fa !important; }
-            .qr-box, .signature-row, .packing-section, .totals, .info-box { page-break-inside: avoid; break-inside: avoid; }
-            .company-header, .totals { page-break-after: avoid; break-after: avoid; }
-            .invoice-container { font-size: 10pt; }
-            .info-box, .packing-section { padding: 5px 8px; margin-bottom: 8px; }
-            .items-table td, .items-table th { padding: 4px 3px; font-size: 9pt; }
-            .totals table { width: 300px; margin-left: auto; }
-            .totals td { border: none; padding: 3px; }
-            .qr-box img { max-width: 80px; }
-            .signature-box { padding-top: 3px; }
-            .footer-legal { margin-top: 8px; padding-top: 5px; }
-        }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .invoice-container { max-width: 1300px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 0 15px 15px 15px; border: 1px solid #dee2e6; }
+        @media print { .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp { display: none !important; } body { background: white; padding: 0; margin: 0; } .invoice-container { box-shadow: none; border-radius: 0; padding: 0 10px 5px 10px; margin: 0; border: none; } .company-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0a7c71; color: white; margin: 0 -10px 10px -10px; } .items-table th, .tax-summary-table th { background: #f8f9fa !important; } .qr-box, .signature-row, .packing-section, .totals, .info-box { page-break-inside: avoid; break-inside: avoid; } .company-header, .totals { page-break-after: avoid; break-after: avoid; } .invoice-container { font-size: 10pt; } .info-box, .packing-section { padding: 5px 8px; margin-bottom: 8px; } .items-table td, .items-table th { padding: 4px 3px; font-size: 9pt; } .totals table { width: 300px; margin-left: auto; } .totals td { border: none; padding: 3px; } .qr-box img { max-width: 80px; } .signature-box { padding-top: 3px; } .footer-legal { margin-top: 8px; padding-top: 5px; } }
         .company-header { background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin: 0 -15px 15px -15px; }
         .logo-area { display: flex; align-items: center; gap: 15px; }
         .logo-area img { height: 60px; }
@@ -52,21 +24,8 @@
         .info-value { flex: 1; color: #333; word-break: break-word; }
         input, textarea, select { width: 100%; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: inherit; }
         .editable { background: #fff9e0; }
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            font-size: 12px;
-            table-layout: fixed;
-        }
-        .items-table th, .items-table td {
-            border: 1px solid #dee2e6;
-            padding: 6px 4px;
-            text-align: left;
-            vertical-align: top;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-        }
+        .items-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 12px; table-layout: fixed; }
+        .items-table th, .items-table td { border: 1px solid #dee2e6; padding: 6px 4px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
         .items-table th:nth-child(1), .items-table td:nth-child(1) { width: 4%; text-align: center; }
         .items-table th:nth-child(2), .items-table td:nth-child(2) { width: 12%; }
         .items-table th:nth-child(3), .items-table td:nth-child(3) { width: 18%; }
@@ -111,6 +70,7 @@
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
+    <!-- All HTML content same as your last working version – keeping exactly as you had -->
     <div class="company-header">
         <div class="logo-area">
             <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
@@ -243,9 +203,10 @@
 </div>
 
 <script>
-    // ========== FLAG TO PREVENT DOUBLE SUBMISSION & SESSION DUPLICATE ==========
+    // ========== GLOBAL LOCK TO PREVENT CONCURRENT SAVES OF SAME INVOICE NUMBER ==========
     let isSaving = false;
-    let invoiceAlreadySaved = false;  // prevents second save after success
+    let invoiceAlreadySaved = false;
+    let processingNumbers = new Set();  // stores invoice numbers currently being processed
 
     // ========== LOAD CART FROM LOCALSTORAGE OR INITIALIZE EMPTY ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
@@ -586,6 +547,7 @@
         return allInvoices.some(inv => inv.invoiceNo === invoiceNo) || salesInvoices.some(inv => inv.invoiceNo === invoiceNo);
     }
 
+    // ========== SAVE INVOICE WITH INVOICE NUMBER LOCK ==========
     function saveInvoice() {
         if (isSaving) {
             alert("Please wait, invoice is already being saved.");
@@ -603,11 +565,19 @@
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const proposedInvoiceNo = getNextInvoiceNumber(type);
+        
+        // Check if this invoice number is already being processed
+        if (processingNumbers.has(proposedInvoiceNo)) {
+            alert(`Invoice number ${proposedInvoiceNo} is currently being saved. Please wait.`);
+            return;
+        }
         if (isInvoiceNumberDuplicate(proposedInvoiceNo)) {
-            alert(`Invoice number ${proposedInvoiceNo} already exists. Cannot save duplicate. Please refresh and try again.`);
+            alert(`Invoice number ${proposedInvoiceNo} already exists. Cannot save duplicate.`);
             return;
         }
 
+        // Lock this invoice number
+        processingNumbers.add(proposedInvoiceNo);
         isSaving = true;
         const saveBtn = document.getElementById('saveInvoiceBtn');
         saveBtn.disabled = true;
@@ -661,6 +631,7 @@
 
             if (!buyer.email) {
                 alert('Customer email is required.');
+                processingNumbers.delete(proposedInvoiceNo);
                 isSaving = false;
                 saveBtn.disabled = false;
                 saveBtn.textContent = "💾 Save Invoice & Update Ledger";
@@ -743,6 +714,7 @@
             alert("Error: " + err.message);
         } finally {
             isSaving = false;
+            processingNumbers.delete(proposedInvoiceNo);
             saveBtn.disabled = false;
             saveBtn.textContent = "💾 Save Invoice & Update Ledger";
             if (invoiceAlreadySaved) saveBtn.classList.add('disabled-btn');
@@ -875,4 +847,4 @@
     })();
 </script>
 </body>
-    </html>
+                                       </html>
