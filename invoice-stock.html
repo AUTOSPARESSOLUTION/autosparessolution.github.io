@@ -52,7 +52,6 @@
         .info-value { flex: 1; color: #333; word-break: break-word; }
         input, textarea, select { width: 100%; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: inherit; }
         .editable { background: #fff9e0; }
-        /* IMPROVED TABLE LAYOUT – fixed columns with better spacing */
         .items-table {
             width: 100%;
             border-collapse: collapse;
@@ -68,20 +67,19 @@
             word-wrap: break-word;
             overflow-wrap: break-word;
         }
-        /* Column widths – SL No minimal, Part No & Description wider */
-        .items-table th:nth-child(1), .items-table td:nth-child(1) { width: 4%; text-align: center; }   /* # */
-        .items-table th:nth-child(2), .items-table td:nth-child(2) { width: 12%; } /* Part No */
-        .items-table th:nth-child(3), .items-table td:nth-child(3) { width: 18%; } /* Description */
-        .items-table th:nth-child(4), .items-table td:nth-child(4) { width: 8%; }  /* HSN */
-        .items-table th:nth-child(5), .items-table td:nth-child(5) { width: 5%; }  /* UOM */
-        .items-table th:nth-child(6), .items-table td:nth-child(6) { width: 6%; }  /* Qty */
-        .items-table th:nth-child(7), .items-table td:nth-child(7) { width: 8%; }  /* Unit Price */
-        .items-table th:nth-child(8), .items-table td:nth-child(8) { width: 6%; }  /* Disc % */
-        .items-table th:nth-child(9), .items-table td:nth-child(9) { width: 8%; }  /* Taxable */
-        .items-table th:nth-child(10), .items-table td:nth-child(10) { width: 5%; } /* GST% */
-        .items-table th:nth-child(11), .items-table td:nth-child(11) { width: 6%; } /* CGST/IGST */
-        .items-table th:nth-child(12), .items-table td:nth-child(12) { width: 6%; } /* SGST */
-        .items-table th:nth-child(13), .items-table td:nth-child(13) { width: 8%; } /* Total */
+        .items-table th:nth-child(1), .items-table td:nth-child(1) { width: 4%; text-align: center; }
+        .items-table th:nth-child(2), .items-table td:nth-child(2) { width: 12%; }
+        .items-table th:nth-child(3), .items-table td:nth-child(3) { width: 18%; }
+        .items-table th:nth-child(4), .items-table td:nth-child(4) { width: 8%; }
+        .items-table th:nth-child(5), .items-table td:nth-child(5) { width: 5%; }
+        .items-table th:nth-child(6), .items-table td:nth-child(6) { width: 6%; }
+        .items-table th:nth-child(7), .items-table td:nth-child(7) { width: 8%; }
+        .items-table th:nth-child(8), .items-table td:nth-child(8) { width: 6%; }
+        .items-table th:nth-child(9), .items-table td:nth-child(9) { width: 8%; }
+        .items-table th:nth-child(10), .items-table td:nth-child(10) { width: 5%; }
+        .items-table th:nth-child(11), .items-table td:nth-child(11) { width: 6%; }
+        .items-table th:nth-child(12), .items-table td:nth-child(12) { width: 6%; }
+        .items-table th:nth-child(13), .items-table td:nth-child(13) { width: 8%; }
         .tax-summary-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; }
         .tax-summary-table th, .tax-summary-table td { border: 1px solid #dee2e6; padding: 6px 4px; text-align: left; }
         .totals { text-align: right; margin-top: 15px; font-size: 12px; }
@@ -103,7 +101,8 @@
         .packing-field input { width: 120px; padding: 6px; }
         .edit-date-btn { background: none; border: none; cursor: pointer; margin-left: 6px; font-size: 14px; vertical-align: middle; color: #ffc107; }
         .date-picker-temp { position: absolute; z-index: 1000; background: white; border: 1px solid #ccc; border-radius: 4px; padding: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
-        .loading { opacity: 0.6; pointer-events: none; }
+        .add-item-btn { background: #28a745; margin-right: 10px; }
+        .add-item-btn:hover { background: #218838; }
     </style>
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -185,6 +184,10 @@
         </div>
     </div>
 
+    <div style="margin-bottom: 10px;">
+        <button type="button" class="add-item-btn" onclick="addNewItem()"><i class="fas fa-plus"></i> ➕ Add New Item</button>
+    </div>
+
     <table class="items-table" id="itemsTable">
         <thead id="itemsTableHead"></thead>
         <tbody id="itemsBody"></tbody>
@@ -241,87 +244,21 @@
     // ========== FLAG TO PREVENT DOUBLE SUBMISSION ==========
     let isSaving = false;
 
-    // ========== SAFE SYNC: only add missing invoices, never remove ==========
-    (function syncInvoices() {
-        let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-        let changed = false;
-        for (let inv of salesInvoices) {
-            if (!allInvoices.some(ai => ai.id === inv.id)) {
-                allInvoices.push(inv);
-                changed = true;
-            }
-        }
-        if (changed) {
-            localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
-            console.log("Synced allInvoices: added missing invoices from salesInvoices.");
-        }
-    })();
-
-    // ========== LOAD FROM QUOTATION OR PROFORMA CONVERSION ==========
-    (function loadConversionData() {
-        const pending = localStorage.getItem('pendingQuotationConversion');
-        if (!pending) return;
-        try {
-            const data = JSON.parse(pending);
-            if (data.source !== 'quotation' && data.source !== 'proforma') return;
-            function fillData() {
-                const cashRadio = document.querySelector('input[name="invoiceType"][value="cash"]');
-                const creditRadio = document.querySelector('input[name="invoiceType"][value="credit"]');
-                const creditDiv = document.getElementById('creditFields');
-                if (data.invoiceType === 'credit') {
-                    if (creditRadio) creditRadio.checked = true;
-                    if (creditDiv) creditDiv.style.display = 'flex';
-                } else {
-                    if (cashRadio) cashRadio.checked = true;
-                    if (creditDiv) creditDiv.style.display = 'none';
-                }
-                const customerMap = {
-                    buyerName: data.customer.name,
-                    buyerEmail: data.customer.email,
-                    buyerPhone: data.customer.phone,
-                    buyerAddress: data.customer.address,
-                    buyerGstin: data.customer.gstin,
-                    buyerState: data.customer.state
-                };
-                for (const [id, val] of Object.entries(customerMap)) {
-                    const el = document.getElementById(id);
-                    if (el) el.value = val || '';
-                }
-                document.getElementById('consigneeName').value = data.customer.name || '';
-                document.getElementById('consigneeAddress').value = data.customer.address || '';
-                document.getElementById('consigneePhone').value = data.customer.phone || '';
-
-                const allProds = getProducts();
-                const cartItems = data.items.map(item => {
-                    const prod = allProds.find(p => p.sku === item.part);
-                    const unit = prod ? (prod.unit || 'pc') : 'pc';
-                    return {
-                        part: item.part,
-                        desc: item.desc,
-                        hsn: item.hsn || '',
-                        qty: item.qty,
-                        price: item.price,
-                        discount: item.discount || 0,
-                        unit: unit
-                    };
-                });
-                localStorage.setItem('invoiceCart', JSON.stringify(cartItems));
-                localStorage.removeItem('pendingQuotationConversion');
-                const sourceName = data.source === 'quotation' ? 'Quotation' : 'Proforma';
-                alert(`${sourceName} ${data.proformaNo || data.quotationNo} loaded. Please review and click "Save Invoice".`);
-                window.location.reload();
-            }
-            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillData);
-            else fillData();
-        } catch(e) {
-            console.error('Conversion loader error:', e);
-            localStorage.removeItem('pendingQuotationConversion');
-        }
-    })();
-
-    // ========== NORMAL INVOICE SCRIPT ==========
+    // ========== LOAD CART FROM LOCALSTORAGE OR INITIALIZE EMPTY ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
+    // If cart is empty, add one empty row to start
+    if (cart.length === 0) {
+        cart.push({
+            part: '',
+            desc: '',
+            hsn: '',
+            qty: 1,
+            price: 0,
+            discount: 0,
+            unit: 'pc'
+        });
+    }
+
     const allProducts = getProducts();
     cart = cart.map(item => {
         if (!item.unit) {
@@ -330,8 +267,27 @@
         }
         return { ...item, hsn: item.hsn || '' };
     });
+
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
+
+    // ========== HELPER: ADD NEW EMPTY ROW ==========
+    function addNewItem() {
+        cart.push({
+            part: '',
+            desc: '',
+            hsn: '',
+            qty: 1,
+            price: 0,
+            discount: 0,
+            unit: 'pc'
+        });
+        renderItemsAndTaxSummary();
+        // Save updated cart to localStorage so it persists on refresh
+        localStorage.setItem('invoiceCart', JSON.stringify(cart));
+    }
+
+    // ========== REMOVE ROW (optional, can add a delete button) – not implemented for simplicity but can be added ==========
 
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
@@ -566,19 +522,19 @@
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             let row = `<tr>
                 <td style="text-align:center;">${idx+1}</td>
-                <td><strong>${escapeHtml(item.part)}</strong></td>
-                <td>${escapeHtml(item.desc)}</td>
-                <td><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsn('${item.part}', this.value)"></td>
-                <td><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:100%; background:#fff9e0;" onchange="updateUnit('${item.part}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:80px;" onchange="updateQty('${item.part}', this.value)"></td>
-                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePrice('${item.part}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscount('${item.part}', this.value)">%</td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="text-align:center;">18%</td>`;
+                <td><input type="text" value="${escapeHtml(item.part)}" style="width:100%; background:#fff9e0;" onchange="updatePart('${idx}', this.value)"></strong></td>
+                <td><input type="text" value="${escapeHtml(item.desc)}" style="width:100%; background:#fff9e0;" onchange="updateDesc('${idx}', this.value)"></strong></td>
+                <td><input type="text" value="${escapeHtml(item.hsn || '')}" style="width:100%; background:#fff9e0;" onchange="updateHsnByIndex('${idx}', this.value)"></strong></td>
+                <td><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:100%; background:#fff9e0;" onchange="updateUnitByIndex('${idx}', this.value)"></strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:80px;" onchange="updateQtyByIndex('${idx}', this.value)"></strong></td>
+                <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePriceByIndex('${idx}', this.value)"></strong></td>
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscountByIndex('${idx}', this.value)">%</strong></td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="text-align:center;">18%</strong></td>`;
             if (isLocal) {
-                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</td><td style="text-align:right;">₹${sgst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${sgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             } else {
-                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
+                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             }
             row += `</tr>`;
             itemsHtml += row;
@@ -592,48 +548,27 @@
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
                 <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
-                ${totals.isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>` : ''}
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
+                ${totals.isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</strong></td>` : ''}
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
         updateTotalsWithPackingAndRound();
+        // Save cart to localStorage after any modification
+        localStorage.setItem('invoiceCart', JSON.stringify(cart));
     }
 
-    function updateDiscount(part, discPercent) {
-        const item = cart.find(i => i.part === part);
-        if (item) {
-            item.discount = parseFloat(discPercent) || 0;
-            renderItemsAndTaxSummary();
-        }
-    }
-
-    function updateHsn(part, hsnValue) {
-        const item = cart.find(i => i.part === part);
-        if (item) {
-            item.hsn = hsnValue;
-            renderItemsAndTaxSummary();
-        }
-    }
-
-    function updateQty(part, newQty) {
-        const item = cart.find(i => i.part === part);
-        if (item) {
-            item.qty = parseFloat(newQty) || 0;
-            renderItemsAndTaxSummary();
-        }
-    }
-
-    function updatePrice(part, newPrice) {
-        const item = cart.find(i => i.part === part);
-        if (item) {
-            item.price = parseFloat(newPrice) || 0;
-            renderItemsAndTaxSummary();
-        }
-    }
+    // Update functions by index (to handle dynamic rows)
+    function updatePart(idx, value) { if (cart[idx]) { cart[idx].part = value; renderItemsAndTaxSummary(); } }
+    function updateDesc(idx, value) { if (cart[idx]) { cart[idx].desc = value; renderItemsAndTaxSummary(); } }
+    function updateHsnByIndex(idx, value) { if (cart[idx]) { cart[idx].hsn = value; renderItemsAndTaxSummary(); } }
+    function updateUnitByIndex(idx, value) { if (cart[idx]) { cart[idx].unit = value; renderItemsAndTaxSummary(); } }
+    function updateQtyByIndex(idx, value) { if (cart[idx]) { cart[idx].qty = parseFloat(value) || 0; renderItemsAndTaxSummary(); } }
+    function updatePriceByIndex(idx, value) { if (cart[idx]) { cart[idx].price = parseFloat(value) || 0; renderItemsAndTaxSummary(); } }
+    function updateDiscountByIndex(idx, value) { if (cart[idx]) { cart[idx].discount = parseFloat(value) || 0; renderItemsAndTaxSummary(); } }
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -645,7 +580,6 @@
         let products = getProducts();
         let existing = products.find(p => p.sku === sku);
         if (!existing) {
-            // Create product with the actual description from invoice
             const newProduct = {
                 id: sku,
                 sku: sku,
@@ -661,7 +595,6 @@
             saveProducts(products);
             console.log(`New product added: ${sku} - ${newProduct.name}`);
         } else {
-            // Update missing fields (but never overwrite existing name if already meaningful)
             let updated = false;
             if (hsn && (!existing.hsn || existing.hsn === '')) {
                 existing.hsn = hsn;
@@ -691,12 +624,13 @@
             alert("Please wait, invoice is already being saved.");
             return;
         }
-        if (cart.length === 0) {
-            alert('Cart empty. Please add items first.');
+        // Filter out rows that have empty part number
+        const validCart = cart.filter(item => item.part && item.part.trim() !== '');
+        if (validCart.length === 0) {
+            alert('Cart empty. Please add at least one item with a Part No.');
             return;
         }
 
-        // ====== PREVENT DUPLICATE INVOICE NUMBER ======
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const proposedInvoiceNo = getNextInvoiceNumber(type);
         if (isInvoiceNumberDuplicate(proposedInvoiceNo)) {
@@ -710,13 +644,14 @@
         saveBtn.textContent = "Saving...";
 
         try {
-            // Ensure all products in cart exist in product master (with correct name)
-            for (let item of cart) {
+            // Ensure all products in validCart exist in product master (with correct name)
+            for (let item of validCart) {
                 if (!item.part) continue;
                 ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
             }
 
-            const taxableTotals = calculateTaxableTotals();
+            // Use validCart for calculations and saving
+            const taxableTotals = calculateTaxableTotals(); // uses cart (all items)
             const gstApplicable = getGSTApplicableTotal();
             const packing = getPackingCharge();
             const roundedGSTApplicable = Math.round(gstApplicable);
@@ -800,7 +735,7 @@
                 },
                 dueDate: document.getElementById('dueDate').innerText,
                 finYear: getFinancialYear(),
-                items: cart.map(item => ({
+                items: validCart.map(item => ({
                     part: item.part,
                     desc: item.desc,
                     hsn: item.hsn || '',
@@ -835,6 +770,7 @@
             }
 
             alert(`Invoice ${finalNo} saved successfully!\n\nPacking charges: ₹${packing.toFixed(2)} (no GST).\nRound Off: ₹${roundOff.toFixed(2)}`);
+            // Clear cart after saving
             localStorage.setItem('invoiceCart', '[]');
             setTimeout(() => window.close(), 1000);
         } catch (err) {
@@ -974,4 +910,4 @@
     })();
 </script>
 </body>
-                                                                                                                                                 </html>
+                   </html>
