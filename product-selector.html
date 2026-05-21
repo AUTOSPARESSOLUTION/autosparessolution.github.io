@@ -80,6 +80,12 @@
         .btn-purchase-sync:hover {
             background: #138496;
         }
+        .btn-refresh-stock {
+            background: #0a7c71;
+        }
+        .btn-refresh-stock:hover {
+            background: #09645a;
+        }
         .search-box {
             display: flex;
             flex-wrap: wrap;
@@ -235,6 +241,7 @@
     <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
         <button class="btn-sync" onclick="syncHsnFromInvoices()"><i class="fas fa-sync-alt"></i> Sync HSN from Sales</button>
         <button class="btn-purchase-sync" onclick="syncFromPurchaseInvoices()"><i class="fas fa-truck"></i> Sync from Purchase</button>
+        <button class="btn-refresh-stock" onclick="refreshStockFromMaster()"><i class="fas fa-database"></i> Refresh Stock from Master</button>
     </div>
 
     <div class="search-box">
@@ -256,11 +263,15 @@
     let selectedProductRows = new Map();
     let filteredProducts = [];
 
+    // MODIFIED: Load products directly from product master (localStorage.products)
     function loadProducts() {
-        if (typeof window.getProducts === 'function') {
-            allProducts = window.getProducts();
-        } else {
-            allProducts = JSON.parse(localStorage.getItem('products') || '[]');
+        // Force read from localStorage product master (no dynamic calculation)
+        allProducts = JSON.parse(localStorage.getItem('products') || '[]');
+        if (!allProducts || allProducts.length === 0) {
+            // Fallback to getProducts() from data-manager.js if available
+            if (typeof window.getProducts === 'function') {
+                allProducts = window.getProducts();
+            }
         }
         if (!allProducts || allProducts.length === 0) {
             document.getElementById('productsTableContainer').innerHTML = `
@@ -281,6 +292,25 @@
             p.hsn = p.hsn || '';
         });
         filterProducts();
+    }
+
+    // NEW: Refresh stock directly from product master, clear selection
+    function refreshStockFromMaster() {
+        // Clear current selection
+        selectedProductRows.clear();
+        // Reload products directly from localStorage product master
+        allProducts = JSON.parse(localStorage.getItem('products') || '[]');
+        allProducts.forEach(p => {
+            p.id = String(p.id);
+            p.sku = p.sku || '';
+            p.name = p.name || '';
+            p.price = p.price || 0;
+            p.currentStock = p.currentStock || 0;
+            p.unit = p.unit || 'pc';
+            p.hsn = p.hsn || '';
+        });
+        filterProducts();
+        alert('Stock refreshed from product master.');
     }
 
     function filterProducts() {
@@ -443,7 +473,7 @@
         }
     }
 
-    // ========== NEW FEATURE 1: AUTO SELECT PRODUCTS BASED ON TARGET AMOUNT ==========
+    // ========== AUTO SELECT PRODUCTS (uses product master stock) ==========
     function autoSelectProducts() {
         const target = parseFloat(document.getElementById('targetAmount').value);
         if (isNaN(target) || target <= 0) {
@@ -454,7 +484,7 @@
         // Clear any existing selection
         selectedProductRows.clear();
 
-        // Consider only products with positive stock
+        // Consider only products with positive stock (from product master)
         let available = allProducts.filter(p => p.currentStock > 0).map(p => ({
             id: p.id,
             sku: p.sku,
@@ -469,7 +499,7 @@
         }
 
         // Greedy algorithm: repeatedly pick the product whose unit price is closest to remaining amount,
-        // respecting stock limit. We'll try up to 100 iterations to avoid infinite loops.
+        // respecting stock limit.
         let remaining = target;
         let selected = new Map(); // id -> qty
         let maxAttempts = 100;
@@ -483,7 +513,6 @@
             for (let i = 0; i < available.length; i++) {
                 let p = available[i];
                 if (p.remainingStock <= 0) continue;
-                // Price per unit (no discount applied during selection)
                 let unitPrice = p.price;
                 let distance = Math.abs(unitPrice - remaining);
                 if (distance < bestDistance) {
@@ -492,27 +521,21 @@
                 }
             }
 
-            if (bestIdx === -1) break; // no more available stock
+            if (bestIdx === -1) break;
 
             let best = available[bestIdx];
             let unitPrice = best.price;
-            // Determine how many units to take: at least 1, not exceeding remaining stock, and not exceeding amount needed
             let maxUnits = Math.min(best.remainingStock, Math.ceil(remaining / unitPrice));
             if (maxUnits <= 0) maxUnits = 1;
             let qty = maxUnits;
             let totalValue = qty * unitPrice;
-            if (totalValue > remaining) {
-                // Try smaller quantity if it overshoots too much? We'll keep as is for simplicity.
-                // Optionally we could check if qty-1 gives a total closer.
-                if (qty > 1) {
-                    let altTotal = (qty - 1) * unitPrice;
-                    if (Math.abs(altTotal - remaining) < Math.abs(totalValue - remaining)) {
-                        qty--;
-                        totalValue = altTotal;
-                    }
+            if (totalValue > remaining && qty > 1) {
+                let altTotal = (qty - 1) * unitPrice;
+                if (Math.abs(altTotal - remaining) < Math.abs(totalValue - remaining)) {
+                    qty--;
+                    totalValue = altTotal;
                 }
             }
-            // Ensure we don't exceed stock
             qty = Math.min(qty, best.remainingStock);
             if (qty <= 0) continue;
 
@@ -520,10 +543,8 @@
             remaining -= qty * unitPrice;
             best.remainingStock -= qty;
 
-            // If remaining is very small (less than smallest unit price), stop
             let minPrice = Math.min(...available.filter(p => p.remainingStock > 0).map(p => p.price));
             if (remaining < minPrice && remaining > 0) {
-                // Try to add one more of the closest product to minimize difference
                 let bestAdjustIdx = -1;
                 let bestAdjustDiff = Infinity;
                 for (let i = 0; i < available.length; i++) {
@@ -546,17 +567,15 @@
             }
         }
 
-        // Now populate selectedProductRows with the selected quantities and default discount 0
         for (let [id, qty] of selected.entries()) {
             selectedProductRows.set(id, { qty: qty, discount: 0 });
         }
 
-        // Re-render the table to reflect new selection
         renderTable();
         alert(`Auto-selection complete. Total selected value: ₹${(target - remaining).toFixed(2)} (difference: ₹${Math.abs(remaining).toFixed(2)})`);
     }
 
-    // ========== NEW FEATURE 2: APPLY GLOBAL DISCOUNT TO ALL SELECTED PRODUCTS ==========
+    // ========== GLOBAL DISCOUNT ==========
     function applyGlobalDiscount() {
         let globalDisc = parseFloat(document.getElementById('globalDiscount').value);
         if (isNaN(globalDisc)) globalDisc = 0;
@@ -685,4 +704,4 @@
     loadProducts();
 </script>
 </body>
-</html>
+    </html>
