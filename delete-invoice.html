@@ -1,21 +1,217 @@
 <!DOCTYPE html>
-<html>
-<head><title>Delete Invoice</title></head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Invoice – Reverse Stock & Outstanding</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .delete-btn { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .tab { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
+        .tab button { background-color: #f1f1f1; float: left; border: none; outline: none; cursor: pointer; padding: 10px 16px; margin-right: 5px; }
+        .tab button.active { background-color: #0a7c71; color: white; }
+        .tabcontent { display: none; }
+    </style>
+</head>
 <body>
-<h2>Delete Invoice by Number</h2>
-<input type="text" id="invNo" placeholder="Invoice Number">
-<button onclick="del()">Delete</button>
+<div class="container">
+    <h1>Delete Invoice (Reverse Stock & Outstanding)</h1>
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'Sales')">Sales Invoices</button>
+        <button class="tablinks" onclick="openTab(event, 'Purchase')">Purchase Invoices</button>
+    </div>
+    <div id="Sales" class="tabcontent" style="display:block;">
+        <h2>Sales Invoices</h2>
+        <div id="salesTable"></div>
+    </div>
+    <div id="Purchase" class="tabcontent">
+        <h2>Purchase Invoices</h2>
+        <div id="purchaseTable"></div>
+    </div>
+</div>
+
 <script>
-function del() {
-    let invNo = document.getElementById('invNo').value;
-    let all = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-    let sales = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-    let newAll = all.filter(i => i.invoiceNo !== invNo);
-    let newSales = sales.filter(i => i.invoiceNo !== invNo);
-    localStorage.setItem('allInvoices', JSON.stringify(newAll));
-    localStorage.setItem('salesInvoices', JSON.stringify(newSales));
-    alert(`Deleted invoice ${invNo}. Remaining: ${newAll.length} invoices.`);
-}
+    // Helper functions
+    function getSalesInvoices() { return JSON.parse(localStorage.getItem('salesInvoices') || '[]'); }
+    function saveSalesInvoices(inv) { localStorage.setItem('salesInvoices', JSON.stringify(inv)); }
+    function getAllInvoices() { return JSON.parse(localStorage.getItem('allInvoices') || '[]'); }
+    function saveAllInvoices(inv) { localStorage.setItem('allInvoices', JSON.stringify(inv)); }
+    function getCustomers() { return JSON.parse(localStorage.getItem('customers') || '[]'); }
+    function saveCustomers(cust) { localStorage.setItem('customers', JSON.stringify(cust)); }
+    function getCustomerLedger() { return JSON.parse(localStorage.getItem('customerLedger') || '[]'); }
+    function saveCustomerLedger(ledger) { localStorage.setItem('customerLedger', JSON.stringify(ledger)); }
+    function getInventoryTransactions() { return JSON.parse(localStorage.getItem('inventoryTransactions') || '[]'); }
+    function saveInventoryTransactions(trans) { localStorage.setItem('inventoryTransactions', JSON.stringify(trans)); }
+    function getProducts() { return JSON.parse(localStorage.getItem('products') || '[]'); }
+    function saveProducts(prod) { localStorage.setItem('products', JSON.stringify(prod)); }
+    function getPurchaseInvoices() { return JSON.parse(localStorage.getItem('purchaseInvoices') || '[]'); }
+    function savePurchaseInvoices(inv) { localStorage.setItem('purchaseInvoices', JSON.stringify(inv)); }
+    function getSuppliers() { return JSON.parse(localStorage.getItem('suppliers') || '[]'); }
+    function saveSuppliers(sup) { localStorage.setItem('suppliers', JSON.stringify(sup)); }
+
+    function openTab(evt, tabName) {
+        document.querySelectorAll('.tabcontent').forEach(div => div.style.display = 'none');
+        document.querySelectorAll('.tablinks').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        evt.currentTarget.classList.add('active');
+        if (tabName === 'Sales') loadSalesInvoices();
+        else loadPurchaseInvoices();
+    }
+
+    // Sales Invoices
+    function loadSalesInvoices() {
+        const invoices = getSalesInvoices();
+        if (invoices.length === 0) {
+            document.getElementById('salesTable').innerHTML = '<p>No sales invoices found.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>Invoice No</th><th>Date</th><th>Customer Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        invoices.forEach(inv => {
+            let invoiceNo = inv.invoiceNo || `INV-${inv.id}`;
+            let date = inv.date || (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN') : '-');
+            let customerEmail = inv.customerEmail || inv.buyer?.email || 'Unknown';
+            let total = inv.total || inv.grandTotal || 0;
+            if (total === 0 && inv.items && inv.items.length) {
+                total = inv.items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            }
+            html += `<tr>
+                <td>${escapeHtml(invoiceNo)}</td>
+                <td>${escapeHtml(date)}</td>
+                <td>${escapeHtml(customerEmail)}</td>
+                <td>₹${total.toLocaleString()}</td>
+                <td><button class="delete-btn" onclick="deleteSalesInvoiceHandler('${inv.id}')">Delete & Reverse</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('salesTable').innerHTML = html;
+    }
+
+    window.deleteSalesInvoiceHandler = async function(invoiceId) {
+        if (!confirm('Delete this sales invoice? Stock will be added back, customer outstanding reduced.')) return;
+        try {
+            let invoices = getSalesInvoices();
+            const invoice = invoices.find(inv => inv.id == invoiceId);
+            if (!invoice) { alert('Invoice not found.'); return; }
+
+            let total = invoice.total || invoice.grandTotal || 0;
+            if (total === 0 && invoice.items && invoice.items.length) {
+                total = invoice.items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            }
+
+            // Restore stock
+            let products = getProducts();
+            for (let item of invoice.items) {
+                let prod = products.find(p => p.id == item.productId || p.sku == item.productId);
+                if (prod) {
+                    prod.currentStock = (prod.currentStock || 0) + item.quantity;
+                }
+            }
+            saveProducts(products);
+
+            // Remove inventory transactions linked to this invoice
+            let invTransactions = getInventoryTransactions();
+            invTransactions = invTransactions.filter(t => t.ref !== invoice.invoiceNo && t.ref !== `INV-${invoice.id}`);
+            saveInventoryTransactions(invTransactions);
+
+            // Update customer outstanding (reduce)
+            let customerEmail = invoice.customerEmail || invoice.buyer?.email;
+            let customers = getCustomers();
+            const customer = customers.find(c => c.email === customerEmail);
+            if (customer) {
+                customer.outstanding = (customer.outstanding || 0) - total;
+                if (customer.outstanding < 0) customer.outstanding = 0;
+                saveCustomers(customers);
+                // ⚠️ NO reversal ledger entry added – removed as requested
+            }
+
+            // Remove invoice from storage arrays
+            const remaining = invoices.filter(inv => inv.id != invoiceId);
+            saveSalesInvoices(remaining);
+            let allInv = getAllInvoices();
+            allInv = allInv.filter(inv => inv.id != invoiceId && inv.invoiceNo !== invoice.invoiceNo);
+            saveAllInvoices(allInv);
+
+            alert('Sales invoice deleted successfully.');
+            loadSalesInvoices();
+        } catch (err) {
+            console.error(err);
+            alert('Error: ' + err.message);
+        }
+    };
+
+    // Purchase Invoices
+    function loadPurchaseInvoices() {
+        const invoices = getPurchaseInvoices();
+        if (invoices.length === 0) {
+            document.getElementById('purchaseTable').innerHTML = '<p>No purchase invoices found.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>Invoice/PO No</th><th>Date</th><th>Supplier Email</th><th>Total (₹)</th><th>Action</th></tr></thead><tbody>';
+        invoices.forEach(inv => {
+            let docNo = inv.invoiceNo || inv.poNo || 'N/A';
+            let supplierEmail = inv.supplierEmail || (inv.supplier?.email) || 'Not recorded';
+            let total = inv.total || inv.grandTotal || 0;
+            html += `<tr>
+                <td>${escapeHtml(docNo)}</td>
+                <td>${inv.date || '-'}</td>
+                <td>${escapeHtml(supplierEmail)}</td>
+                <td>₹${total.toLocaleString()}</td>
+                <td><button class="delete-btn" onclick="deletePurchaseInvoiceHandler('${inv.id}')">Delete & Reverse</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('purchaseTable').innerHTML = html;
+    }
+
+    window.deletePurchaseInvoiceHandler = function(invoiceId) {
+        if (!confirm('Delete this purchase invoice? Stock will be reduced, supplier outstanding reduced.')) return;
+        try {
+            let invoices = getPurchaseInvoices();
+            const invoice = invoices.find(inv => inv.id == invoiceId);
+            if (!invoice) { alert('Invoice not found'); return; }
+
+            let total = invoice.total || invoice.grandTotal || 0;
+            let products = getProducts();
+            for (let item of invoice.items) {
+                let prod = products.find(p => p.id == item.productId || p.sku == item.productId);
+                if (prod) {
+                    prod.currentStock = (prod.currentStock || 0) - item.quantity;
+                    if (prod.currentStock < 0) prod.currentStock = 0;
+                }
+            }
+            saveProducts(products);
+
+            let supplierEmail = invoice.supplierEmail || (invoice.supplier?.email);
+            let suppliers = getSuppliers();
+            let supplier = suppliers.find(s => s.email === supplierEmail);
+            if (supplier) {
+                supplier.outstanding = (supplier.outstanding || 0) - total;
+                if (supplier.outstanding < 0) supplier.outstanding = 0;
+                saveSuppliers(suppliers);
+            }
+
+            const remaining = invoices.filter(inv => inv.id != invoiceId);
+            savePurchaseInvoices(remaining);
+
+            alert('Purchase invoice deleted successfully.');
+            loadPurchaseInvoices();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+    }
+
+    loadSalesInvoices();
 </script>
 </body>
-</html>
+    </html>
