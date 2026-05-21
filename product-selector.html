@@ -94,6 +94,32 @@
             flex: 1;
             min-width: 200px;
         }
+        .auto-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            padding: 12px 15px;
+            border-radius: 8px;
+        }
+        .auto-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .auto-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+        }
+        .auto-group input {
+            padding: 6px 10px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            width: 150px;
+        }
         .table-wrapper {
             overflow-x: auto;
             border-radius: 8px;
@@ -160,6 +186,9 @@
             th, td {
                 padding: 6px 4px;
             }
+            .auto-group input {
+                width: 120px;
+            }
         }
         @media (max-width: 600px) {
             .toolbar {
@@ -180,6 +209,26 @@
             <button class="btn-quote" onclick="createDocument('quotation')"><i class="fas fa-file-alt"></i> Quotation</button>
             <button class="btn-proforma" onclick="createDocument('proforma')"><i class="fas fa-file-invoice"></i> Proforma</button>
             <button onclick="window.location.href='index.html'"><i class="fas fa-home"></i> Back</button>
+        </div>
+    </div>
+
+    <!-- NEW: Auto-select by target amount & global discount -->
+    <div class="auto-row">
+        <div class="auto-group">
+            <label>🎯 Target Billing Amount (₹)</label>
+            <input type="number" id="targetAmount" placeholder="e.g., 5000" step="any" value="">
+        </div>
+        <div class="auto-group">
+            <label>&nbsp;</label>
+            <button id="autoSelectBtn" onclick="autoSelectProducts()">✨ Auto Select Products</button>
+        </div>
+        <div class="auto-group">
+            <label>🔄 Global Discount (%)</label>
+            <input type="number" id="globalDiscount" placeholder="e.g., 10" step="any" value="0" min="0" max="100">
+        </div>
+        <div class="auto-group">
+            <label>&nbsp;</label>
+            <button id="applyDiscountBtn" onclick="applyGlobalDiscount()">Apply to Selected</button>
         </div>
     </div>
 
@@ -289,13 +338,13 @@
                     <input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selected ? 'checked' : ''} onchange="toggleProduct('${p.id}', this.checked)">
                 </td>
                 <td><strong>${escapeHtml(p.sku)}</strong></td>
-                <td class="product-name">${escapeHtml(p.name)}</td>
-                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></td>
-                <td>${escapeHtml(p.unit)}</td>
-                <td class="price">₹${(p.price || 0).toLocaleString()}</td>
-                <td>${(p.currentStock || 0).toLocaleString()}</td>
-                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></td>
-                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></td>
+                <td class="product-name">${escapeHtml(p.name)}</strong></td>
+                <td><input type="text" class="hsn-input" value="${escapeHtml(hsnValue)}" ${selected ? '' : 'disabled'} onchange="updateHsn('${p.id}', this.value)"></strong></td>
+                <td>${escapeHtml(p.unit)}</strong></td>
+                <td class="price">₹${(p.price || 0).toLocaleString()}</strong></td>
+                <td>${(p.currentStock || 0).toLocaleString()}</strong></td>
+                <td><input type="number" class="qty-input" value="${qty}" min="0.01" step="0.01" ${selected ? '' : 'disabled'} onchange="updateQty('${p.id}', this.value)"></strong></td>
+                <td><input type="number" class="disc-input" value="${discount}" min="0" max="100" step="0.01" ${selected ? '' : 'disabled'} onchange="updateDiscount('${p.id}', this.value)"></strong></td>
             </tr>`;
         }
         html += `</tbody></table>`;
@@ -391,6 +440,141 @@
             window.location.href = 'quotation.html';
         } else {
             window.location.href = 'proforma-invoice.html';
+        }
+    }
+
+    // ========== NEW FEATURE 1: AUTO SELECT PRODUCTS BASED ON TARGET AMOUNT ==========
+    function autoSelectProducts() {
+        const target = parseFloat(document.getElementById('targetAmount').value);
+        if (isNaN(target) || target <= 0) {
+            alert('Please enter a valid target amount (greater than 0).');
+            return;
+        }
+
+        // Clear any existing selection
+        selectedProductRows.clear();
+
+        // Consider only products with positive stock
+        let available = allProducts.filter(p => p.currentStock > 0).map(p => ({
+            id: p.id,
+            sku: p.sku,
+            price: p.price,
+            maxQty: p.currentStock,
+            remainingStock: p.currentStock
+        }));
+
+        if (available.length === 0) {
+            alert('No products with positive stock found.');
+            return;
+        }
+
+        // Greedy algorithm: repeatedly pick the product whose unit price is closest to remaining amount,
+        // respecting stock limit. We'll try up to 100 iterations to avoid infinite loops.
+        let remaining = target;
+        let selected = new Map(); // id -> qty
+        let maxAttempts = 100;
+        let attempts = 0;
+
+        while (remaining > 0 && attempts < maxAttempts) {
+            attempts++;
+            let bestIdx = -1;
+            let bestDistance = Infinity;
+
+            for (let i = 0; i < available.length; i++) {
+                let p = available[i];
+                if (p.remainingStock <= 0) continue;
+                // Price per unit (no discount applied during selection)
+                let unitPrice = p.price;
+                let distance = Math.abs(unitPrice - remaining);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIdx = i;
+                }
+            }
+
+            if (bestIdx === -1) break; // no more available stock
+
+            let best = available[bestIdx];
+            let unitPrice = best.price;
+            // Determine how many units to take: at least 1, not exceeding remaining stock, and not exceeding amount needed
+            let maxUnits = Math.min(best.remainingStock, Math.ceil(remaining / unitPrice));
+            if (maxUnits <= 0) maxUnits = 1;
+            let qty = maxUnits;
+            let totalValue = qty * unitPrice;
+            if (totalValue > remaining) {
+                // Try smaller quantity if it overshoots too much? We'll keep as is for simplicity.
+                // Optionally we could check if qty-1 gives a total closer.
+                if (qty > 1) {
+                    let altTotal = (qty - 1) * unitPrice;
+                    if (Math.abs(altTotal - remaining) < Math.abs(totalValue - remaining)) {
+                        qty--;
+                        totalValue = altTotal;
+                    }
+                }
+            }
+            // Ensure we don't exceed stock
+            qty = Math.min(qty, best.remainingStock);
+            if (qty <= 0) continue;
+
+            selected.set(best.id, (selected.get(best.id) || 0) + qty);
+            remaining -= qty * unitPrice;
+            best.remainingStock -= qty;
+
+            // If remaining is very small (less than smallest unit price), stop
+            let minPrice = Math.min(...available.filter(p => p.remainingStock > 0).map(p => p.price));
+            if (remaining < minPrice && remaining > 0) {
+                // Try to add one more of the closest product to minimize difference
+                let bestAdjustIdx = -1;
+                let bestAdjustDiff = Infinity;
+                for (let i = 0; i < available.length; i++) {
+                    if (available[i].remainingStock > 0) {
+                        let diff = Math.abs(available[i].price - remaining);
+                        if (diff < bestAdjustDiff) {
+                            bestAdjustDiff = diff;
+                            bestAdjustIdx = i;
+                        }
+                    }
+                }
+                if (bestAdjustIdx !== -1) {
+                    let adjustProd = available[bestAdjustIdx];
+                    if (adjustProd.remainingStock > 0) {
+                        selected.set(adjustProd.id, (selected.get(adjustProd.id) || 0) + 1);
+                        remaining -= adjustProd.price;
+                    }
+                }
+                break;
+            }
+        }
+
+        // Now populate selectedProductRows with the selected quantities and default discount 0
+        for (let [id, qty] of selected.entries()) {
+            selectedProductRows.set(id, { qty: qty, discount: 0 });
+        }
+
+        // Re-render the table to reflect new selection
+        renderTable();
+        alert(`Auto-selection complete. Total selected value: ₹${(target - remaining).toFixed(2)} (difference: ₹${Math.abs(remaining).toFixed(2)})`);
+    }
+
+    // ========== NEW FEATURE 2: APPLY GLOBAL DISCOUNT TO ALL SELECTED PRODUCTS ==========
+    function applyGlobalDiscount() {
+        let globalDisc = parseFloat(document.getElementById('globalDiscount').value);
+        if (isNaN(globalDisc)) globalDisc = 0;
+        if (globalDisc < 0) globalDisc = 0;
+        if (globalDisc > 100) globalDisc = 100;
+
+        let updatedCount = 0;
+        for (let [id, data] of selectedProductRows.entries()) {
+            if (data.discount !== globalDisc) {
+                selectedProductRows.set(id, { ...data, discount: globalDisc });
+                updatedCount++;
+            }
+        }
+        if (updatedCount > 0) {
+            renderTable();
+            alert(`Global discount ${globalDisc}% applied to ${updatedCount} product(s).`);
+        } else {
+            alert('No selected products to update or discount already set.');
         }
     }
 
@@ -501,4 +685,4 @@
     loadProducts();
 </script>
 </body>
-                                                                               </html>
+</html>
