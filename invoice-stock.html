@@ -287,8 +287,6 @@
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
     }
 
-    // ========== REMOVE ROW (optional, can add a delete button) – not implemented for simplicity but can be added ==========
-
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
         document.getElementById('buyerAddress').value = currentUser.address || '';
@@ -532,9 +530,9 @@
                 <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
                 <td style="text-align:center;">18%</strong></td>`;
             if (isLocal) {
-                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${sgst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
+                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</strong><td style="text-align:right;">₹${sgst.toFixed(2)}</strong><td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
             } else {
-                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong>}<td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
+                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong><td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></tr>`;
             }
             row += `</tr>`;
             itemsHtml += row;
@@ -910,4 +908,4 @@
     })();
 </script>
 </body>
-                   </html>
+    </html>
