@@ -90,6 +90,7 @@
         .remove-item { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
         .add-item { background: #28a745; margin-bottom: 15px; }
         .btn-pdf { background: #e67e22; }
+        .date-input { width: 150px; background: #fff9e0; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -107,8 +108,8 @@
         <div class="invoice-title">
             <h2>EDIT INVOICE</h2>
             <p><strong>Invoice No:</strong> <input type="text" id="invoiceNo" style="width:180px; background:#fff9e0;"></p>
-            <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
-            <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
+            <p><strong>Date:</strong> <input type="date" id="invoiceDate" class="date-input" style="width:150px;"></p>
+            <p><strong>Due Date:</strong> <input type="date" id="dueDate" class="date-input" style="width:150px;"></p>
         </div>
     </div>
 
@@ -184,6 +185,22 @@
     let originalInvoice = null;
     let items = [];
 
+    // Helper: convert YYYY-MM-DD to DD/MM/YYYY for display/storage
+    function toDisplayDate(isoDate) {
+        if (!isoDate) return '';
+        const parts = isoDate.split('-');
+        if (parts.length !== 3) return isoDate;
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    // Helper: convert DD/MM/YYYY to YYYY-MM-DD for date picker
+    function toIsoDate(displayDate) {
+        if (!displayDate) return '';
+        const parts = displayDate.split('/');
+        if (parts.length !== 3) return displayDate;
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+
     function loadInvoice() {
         const invoiceNo = localStorage.getItem('editInvoiceNo');
         if (!invoiceNo) { alert('No invoice selected'); window.close(); return; }
@@ -192,8 +209,17 @@
         if (!originalInvoice) { alert('Invoice not found'); window.close(); return; }
 
         document.getElementById('invoiceNo').value = originalInvoice.invoiceNo;
-        document.getElementById('invoiceDate').innerText = originalInvoice.date;
-        document.getElementById('dueDate').innerText = originalInvoice.dueDate;
+        // Set date pickers using original date format (assuming stored as YYYY-MM-DD or DD/MM/YYYY)
+        let invDate = originalInvoice.date;
+        let dueDate = originalInvoice.dueDate;
+        if (invDate && invDate.includes('/')) {
+            invDate = toIsoDate(invDate);
+        }
+        if (dueDate && dueDate.includes('/')) {
+            dueDate = toIsoDate(dueDate);
+        }
+        document.getElementById('invoiceDate').value = invDate || '';
+        document.getElementById('dueDate').value = dueDate || '';
 
         document.getElementById('buyerName').value = originalInvoice.buyer?.name || '';
         document.getElementById('buyerAddress').value = originalInvoice.buyer?.address || '';
@@ -295,7 +321,12 @@
     function saveEditedInvoice() {
         const newInvoiceNo = document.getElementById('invoiceNo').value.trim();
         if (!newInvoiceNo) { alert('Invoice number cannot be empty'); return; }
-        // Check duplicate invoice number
+        // Convert date picker values to display format (DD/MM/YYYY)
+        const invoiceDatePicker = document.getElementById('invoiceDate').value;
+        const dueDatePicker = document.getElementById('dueDate').value;
+        const invoiceDateDisplay = invoiceDatePicker ? toDisplayDate(invoiceDatePicker) : '';
+        const dueDateDisplay = dueDatePicker ? toDisplayDate(dueDatePicker) : '';
+
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         if (newInvoiceNo !== originalInvoice.invoiceNo && allInvoices.some(i => i.invoiceNo === newInvoiceNo)) {
             alert('Invoice number already exists! Please use a different number.');
@@ -305,6 +336,8 @@
         const updatedInvoice = {
             ...originalInvoice,
             invoiceNo: newInvoiceNo,
+            date: invoiceDateDisplay,
+            dueDate: dueDateDisplay,
             buyer: {
                 name: document.getElementById('buyerName').value,
                 address: document.getElementById('buyerAddress').value,
@@ -387,10 +420,15 @@
         const roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
 
+        const invoiceDatePicker = document.getElementById('invoiceDate').value;
+        const dueDatePicker = document.getElementById('dueDate').value;
+        const invoiceDateDisplay = invoiceDatePicker ? toDisplayDate(invoiceDatePicker) : '';
+        const dueDateDisplay = dueDatePicker ? toDisplayDate(dueDatePicker) : '';
+
         const updatedInvoice = {
             invoiceNo: document.getElementById('invoiceNo').value,
-            date: document.getElementById('invoiceDate').innerText,
-            dueDate: document.getElementById('dueDate').innerText,
+            date: invoiceDateDisplay,
+            dueDate: dueDateDisplay,
             buyer: {
                 name: document.getElementById('buyerName').value,
                 address: document.getElementById('buyerAddress').value,
@@ -562,4 +600,4 @@
     loadInvoice();
 </script>
 </body>
-    </html>
+                </html>
