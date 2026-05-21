@@ -203,7 +203,7 @@
     </div>
 
     <table class="tax-summary-table">
-        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th><tr></thead>
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
@@ -243,7 +243,11 @@
 </div>
 
 <script>
-    // ========== INVOICE NUMBER LOGIC (original, scans existing invoices) ==========
+    // ========== GLOBAL VARIABLES ==========
+    let isSaving = false;
+    let invoiceAlreadySaved = false;
+
+    // ========== INVOICE NUMBER LOGIC (original – scans existing invoices) ==========
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -269,11 +273,6 @@
         const nextNumber = maxNumber + 1;
         return prefix + nextNumber.toString().padStart(4, '0');
     }
-
-    // ========== GLOBAL LOCKS (PREVENT DUPLICATES) ==========
-    let isSaving = false;
-    let invoiceAlreadySaved = false;
-    let processingNumbers = new Set();
 
     // ========== CART DATA ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
@@ -531,57 +530,68 @@
         return true;
     }
 
-    // ========== BULLETPROOF SAVE FUNCTION ==========
-    function saveInvoice() {
-        // Immediately disable button and remove onclick to prevent any second click
+    // ========== RESET BUTTON FUNCTION ==========
+    function resetSaveButton() {
         const saveBtn = document.getElementById('saveInvoiceBtn');
-        if (saveBtn.disabled) return;          // already disabled
+        saveBtn.disabled = false;
+        saveBtn.classList.remove('disabled-btn');
+        saveBtn.textContent = "💾 Save Invoice & Update Ledger";
+        isSaving = false;
+    }
+
+    // ========== NEW BULLETPROOF SAVE INVOICE ==========
+    function saveInvoice() {
+        const saveBtn = document.getElementById('saveInvoiceBtn');
+        
+        // HARD LOCK
+        if (saveBtn.disabled || isSaving || invoiceAlreadySaved) {
+            return;
+        }
+        
         saveBtn.disabled = true;
-        saveBtn.onclick = null;                 // remove click handler
         saveBtn.classList.add('disabled-btn');
         saveBtn.textContent = "Saving...";
-
-        // Extra lock checks
-        if (isSaving || invoiceAlreadySaved) {
-            return;
-        }
         isSaving = true;
-
-        // Validate cart
-        const validCart = cart.filter(item => item.part && item.part.trim() !== '');
-        if (validCart.length === 0) {
-            alert('Please add at least one item with a Part No.');
-            // re-enable button (though page will stay)
-            saveBtn.disabled = false;
-            saveBtn.onclick = saveInvoice;
-            saveBtn.textContent = "💾 Save Invoice & Update Ledger";
-            saveBtn.classList.remove('disabled-btn');
-            isSaving = false;
-            return;
-        }
-
-        const type = document.querySelector('input[name="invoiceType"]:checked').value;
-        const proposedNo = getNextInvoiceNumber(type);
-
-        // Check if this number is already being processed (concurrent clicks)
-        if (processingNumbers.has(proposedNo)) {
-            alert(`Invoice number ${proposedNo} is already being created. Please wait.`);
-            saveBtn.disabled = false;
-            saveBtn.onclick = saveInvoice;
-            saveBtn.textContent = "💾 Save Invoice & Update Ledger";
-            saveBtn.classList.remove('disabled-btn');
-            isSaving = false;
-            return;
-        }
-        processingNumbers.add(proposedNo);
-
-        // Proceed with save
+        
         try {
+            // VALIDATE ITEMS
+            const validCart = cart.filter(item => item.part && item.part.trim() !== '');
+            if (validCart.length === 0) {
+                alert('Please add at least one item with a Part No.');
+                resetSaveButton();
+                return;
+            }
+            
+            const type = document.querySelector('input[name="invoiceType"]:checked').value;
+            
+            // ALWAYS READ LATEST STORAGE
+            let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+            
+            // GENERATE INVOICE NUMBER
+            let proposedNo = getNextInvoiceNumber(type);
+            
+            // DUPLICATE CHECK
+            const alreadyExists = allInvoices.some(inv => inv.invoiceNo === proposedNo);
+            
+            // AUTO FIX DUPLICATE NUMBER
+            if (alreadyExists) {
+                let counter = 1;
+                let newNo;
+                do {
+                    const match = proposedNo.match(/(\d+)$/);
+                    const current = parseInt(match[1]) + counter;
+                    newNo = proposedNo.replace(/\d+$/, current.toString().padStart(4, '0'));
+                    counter++;
+                } while (allInvoices.some(inv => inv.invoiceNo === newNo));
+                proposedNo = newNo;
+            }
+            
+            // PRODUCT MASTER UPDATE
             for (let item of validCart) {
-                if (!item.part) continue;
                 ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
             }
-
+            
+            // BUYER DETAILS
             const buyer = {
                 name: document.getElementById('buyerName').value.trim(),
                 email: document.getElementById('buyerEmail').value.trim(),
@@ -590,7 +600,15 @@
                 gstin: document.getElementById('buyerGstin').value.trim(),
                 state: document.getElementById('buyerState').value.trim()
             };
-
+            
+            // EMAIL REQUIRED
+            if (!buyer.email) {
+                alert('Customer email is required.');
+                resetSaveButton();
+                return;
+            }
+            
+            // CUSTOMER SAVE
             let customersList = JSON.parse(localStorage.getItem('customers') || '[]');
             let existingCustomer = customersList.find(c => c.email === buyer.email);
             if (!existingCustomer && buyer.email) {
@@ -612,30 +630,22 @@
                 customersList.push(newCust);
                 localStorage.setItem('customers', JSON.stringify(customersList));
             }
-
-            if (!buyer.email) {
-                alert('Customer email is required.');
-                processingNumbers.delete(proposedNo);
-                saveBtn.disabled = false;
-                saveBtn.onclick = saveInvoice;
-                saveBtn.textContent = "💾 Save Invoice & Update Ledger";
-                saveBtn.classList.remove('disabled-btn');
-                isSaving = false;
-                return;
-            }
-
+            
+            // TOTALS
             const taxableTotals = calculateTaxableTotals();
             const gstApplicable = getGSTApplicableTotal();
             const packing = getPackingCharge();
             const roundedGSTApplicable = Math.round(gstApplicable);
             const roundOff = roundedGSTApplicable - gstApplicable;
             const grandTotal = roundedGSTApplicable + packing;
-
+            
+            // DATE FORMAT
             const dateParts = document.getElementById('invoiceDate').innerText.split('/');
             const invoiceDateFormatted = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-
+            
+            // CREATE INVOICE OBJECT (using proposedNo as ID)
             const invoice = {
-                id: Date.now() + Math.random(),
+                id: proposedNo,
                 date: invoiceDateFormatted,
                 customerEmail: buyer.email,
                 invoiceNo: proposedNo,
@@ -676,17 +686,39 @@
                     unit: item.unit || 'pc'
                 }))
             };
-
-            let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-            allInvoices = allInvoices.filter(inv => inv.id !== invoice.id);
+            
+            // FINAL STORAGE CHECK
+            allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+            if (allInvoices.some(inv => inv.invoiceNo === proposedNo)) {
+                alert('Duplicate invoice prevented.');
+                resetSaveButton();
+                return;
+            }
+            
+            // SAVE MAIN INVOICE
             allInvoices.push(invoice);
             localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
             
+            // SAVE SALES INVOICE
             let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
-            salesInvoices = salesInvoices.filter(inv => inv.id !== invoice.id);
-            salesInvoices.push(invoice);
-            localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
+            if (!salesInvoices.some(inv => inv.invoiceNo === proposedNo)) {
+                salesInvoices.push(invoice);
+                localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
+            }
             
+            // OPTIONAL EXTERNAL FUNCTION
+            if (typeof createSalesInvoice === 'function') {
+                try {
+                    const existsAlready = salesInvoices.some(inv => inv.invoiceNo === proposedNo);
+                    if (!existsAlready) {
+                        createSalesInvoice(invoice);
+                    }
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+            
+            // CUSTOMER LEDGER UPDATE
             const custIndex = customersList.findIndex(c => c.email === buyer.email);
             if (custIndex !== -1) {
                 customersList[custIndex].outstanding = (customersList[custIndex].outstanding || 0) + invoice.grandTotal;
@@ -694,28 +726,19 @@
                 localStorage.setItem('customers', JSON.stringify(customersList));
             }
             
-            if (typeof createSalesInvoice === 'function') {
-                try { createSalesInvoice(invoice); } catch(e) { console.warn(e); }
-            }
-
-            alert(`Invoice ${proposedNo} saved successfully!\n\nPacking: ₹${packing.toFixed(2)}\nRound Off: ₹${roundOff.toFixed(2)}`);
-            localStorage.setItem('invoiceCart', '[]');
+            // SUCCESS
             invoiceAlreadySaved = true;
-            saveBtn.classList.add('disabled-btn');
+            localStorage.setItem('invoiceCart', '[]');
+            alert(`Invoice ${proposedNo} saved successfully!`);
+            saveBtn.textContent = "Saved Successfully";
             setTimeout(() => window.close(), 1000);
         } catch (err) {
             alert("Error: " + err.message);
-            // re-enable button on error
-            saveBtn.disabled = false;
-            saveBtn.onclick = saveInvoice;
-            saveBtn.textContent = "💾 Save Invoice & Update Ledger";
-            saveBtn.classList.remove('disabled-btn');
-            processingNumbers.delete(proposedNo);
-            isSaving = false;
+            resetSaveButton();
         }
     }
 
-    // ========== PRINT AND PDF FUNCTIONS (unchanged) ==========
+    // ========== PRINT AND PDF FUNCTIONS ==========
     function printInvoice() {
         if (!invoiceAlreadySaved && !confirm("Invoice not saved yet. Print anyway? Data won't be stored.")) return;
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
@@ -809,7 +832,7 @@
         }
     }
 
-    // ========== INITIALIZATION ==========
+    // ========== INITIALISATION ==========
     if (currentUser) {
         document.getElementById('buyerName').value = currentUser.name || '';
         document.getElementById('buyerAddress').value = currentUser.address || '';
@@ -891,4 +914,4 @@
     })();
 </script>
 </body>
-                    </html>
+                                                                         </html>
