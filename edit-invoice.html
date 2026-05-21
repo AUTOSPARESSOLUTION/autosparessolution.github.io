@@ -185,6 +185,17 @@
     let originalInvoice = null;
     let items = [];
 
+    // Helper to convert DD/MM/YYYY to YYYY-MM-DD (for date picker display only)
+    function toIsoForPicker(dateStr) {
+        if (!dateStr) return '';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+        let parts = dateStr.split('/');
+        if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        return ''; // unknown format
+    }
+
     function loadInvoice() {
         const invoiceNo = localStorage.getItem('editInvoiceNo');
         if (!invoiceNo) { alert('No invoice selected'); window.close(); return; }
@@ -193,9 +204,11 @@
         if (!originalInvoice) { alert('Invoice not found'); window.close(); return; }
 
         document.getElementById('invoiceNo').value = originalInvoice.invoiceNo;
-        // Dates are now stored in YYYY-MM-DD format
-        document.getElementById('invoiceDate').value = originalInvoice.date || '';
-        document.getElementById('dueDate').value = originalInvoice.dueDate || '';
+        // Convert old date format to YYYY-MM-DD for the date picker
+        const invDate = toIsoForPicker(originalInvoice.date);
+        const dueDate = toIsoForPicker(originalInvoice.dueDate);
+        document.getElementById('invoiceDate').value = invDate || '';
+        document.getElementById('dueDate').value = dueDate || '';
 
         document.getElementById('buyerName').value = originalInvoice.buyer?.name || '';
         document.getElementById('buyerAddress').value = originalInvoice.buyer?.address || '';
@@ -297,9 +310,11 @@
     function saveEditedInvoice() {
         const newInvoiceNo = document.getElementById('invoiceNo').value.trim();
         if (!newInvoiceNo) { alert('Invoice number cannot be empty'); return; }
-        // Get dates in YYYY-MM-DD directly from date pickers
+        // Get dates from date picker (already YYYY-MM-DD)
         const invoiceDate = document.getElementById('invoiceDate').value;
         const dueDate = document.getElementById('dueDate').value;
+        if (!invoiceDate) { alert('Please select Invoice Date'); return; }
+        if (!dueDate) { alert('Please select Due Date'); return; }
 
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         if (newInvoiceNo !== originalInvoice.invoiceNo && allInvoices.some(i => i.invoiceNo === newInvoiceNo)) {
@@ -572,4 +587,4 @@
     loadInvoice();
 </script>
 </body>
-            </html>
+    </html>
