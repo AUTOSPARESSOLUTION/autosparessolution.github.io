@@ -235,8 +235,8 @@
     <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
         <button class="btn-sync" onclick="syncHsnFromInvoices()"><i class="fas fa-sync-alt"></i> Sync HSN from Sales</button>
         <button class="btn-purchase-sync" onclick="syncFromPurchaseInvoices()"><i class="fas fa-truck"></i> Sync from Purchase</button>
-        <!-- NEW: Open Stock Ledger to cross-verify stock -->
-        <button class="btn-sync" onclick="window.open('stock-ledger.html', '_blank')" style="background:#17a2b8;"><i class="fas fa-chart-line"></i> 📊 Open Stock Ledger</button>
+        <button class="btn-sync" onclick="refreshStockFromLedger()" style="background:#17a2b8;"><i class="fas fa-chart-line"></i> 🔄 Refresh Stock from Ledger</button>
+        <button class="btn-sync" onclick="window.open('stock-ledger.html', '_blank')" style="background:#6c757d;"><i class="fas fa-chart-line"></i> 📊 Open Stock Ledger</button>
     </div>
 
     <div class="search-box">
@@ -258,6 +258,65 @@
     let selectedProductRows = new Map();
     let filteredProducts = [];
 
+    // ---------- COMPUTE ACTUAL STOCK FROM LEDGER (purchases + sales) ----------
+    function computeStockFromTransactions() {
+        let stockMap = new Map();
+        // Purchase invoices (IN)
+        const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        purchaseInvoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                let productId = item.productId || item.part;
+                if (!productId) return;
+                productId = String(productId);
+                const qty = parseFloat(item.quantity) || 0;
+                if (qty === 0) return;
+                const current = stockMap.get(productId) || 0;
+                stockMap.set(productId, current + qty);
+            });
+        });
+        // Sales invoices (OUT)
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        allInvoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                let productId = item.part || item.productId;
+                if (!productId) return;
+                productId = String(productId);
+                const qty = parseFloat(item.qty) || 0;
+                if (qty === 0) return;
+                const current = stockMap.get(productId) || 0;
+                stockMap.set(productId, current - qty);
+            });
+        });
+        // Adjustments from inventoryTransactions (optional)
+        const transactions = getInventoryTransactions();
+        transactions.forEach(t => {
+            if (t.type === 'adjustment') {
+                let productId = String(t.productId);
+                let qty = parseFloat(t.quantity) || 0;
+                const current = stockMap.get(productId) || 0;
+                stockMap.set(productId, current + qty);
+            }
+        });
+        return stockMap;
+    }
+
+    function refreshStockFromLedger() {
+        // Recompute stock from ledger and update allProducts display
+        const stockMap = computeStockFromTransactions();
+        for (let p of allProducts) {
+            let computed = stockMap.get(p.id);
+            if (computed === undefined && p.sku) computed = stockMap.get(p.sku);
+            if (computed === undefined) computed = 0;
+            p.currentStock = computed;
+        }
+        // Also update localStorage product master? We do NOT modify master – only display.
+        // But we need to ensure the displayed stock is the computed one.
+        // We simply re-render.
+        filterProducts();
+        alert("Stock refreshed from ledger (purchases + sales).");
+    }
+
+    // Modified loadProducts: get master products, then override currentStock with computed stock from ledger
     function loadProducts() {
         if (typeof window.getProducts === 'function') {
             allProducts = window.getProducts();
@@ -273,15 +332,22 @@
                 </div>`;
             return;
         }
+        // Normalize product fields
         allProducts.forEach(p => {
             p.id = String(p.id);
             p.sku = p.sku || '';
             p.name = p.name || '';
             p.price = p.price || 0;
-            p.currentStock = p.currentStock || 0;
             p.unit = p.unit || 'pc';
             p.hsn = p.hsn || '';
         });
+        // Compute actual stock from ledger and override currentStock
+        const stockMap = computeStockFromTransactions();
+        for (let p of allProducts) {
+            let computed = stockMap.get(p.id);
+            if (computed === undefined && p.sku) computed = stockMap.get(p.sku);
+            p.currentStock = (computed !== undefined) ? computed : 0;
+        }
         filterProducts();
     }
 
