@@ -80,12 +80,6 @@
         .btn-purchase-sync:hover {
             background: #138496;
         }
-        .btn-refresh-stock {
-            background: #0a7c71;
-        }
-        .btn-refresh-stock:hover {
-            background: #09645a;
-        }
         .search-box {
             display: flex;
             flex-wrap: wrap;
@@ -218,7 +212,7 @@
         </div>
     </div>
 
-    <!-- NEW: Auto-select by target amount & global discount -->
+    <!-- Auto-select by target amount & global discount -->
     <div class="auto-row">
         <div class="auto-group">
             <label>🎯 Target Billing Amount (₹)</label>
@@ -241,7 +235,8 @@
     <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
         <button class="btn-sync" onclick="syncHsnFromInvoices()"><i class="fas fa-sync-alt"></i> Sync HSN from Sales</button>
         <button class="btn-purchase-sync" onclick="syncFromPurchaseInvoices()"><i class="fas fa-truck"></i> Sync from Purchase</button>
-        <button class="btn-refresh-stock" onclick="refreshStockFromMaster()"><i class="fas fa-database"></i> Refresh Stock from Master</button>
+        <!-- NEW: Open Stock Ledger to cross-verify stock -->
+        <button class="btn-sync" onclick="window.open('stock-ledger.html', '_blank')" style="background:#17a2b8;"><i class="fas fa-chart-line"></i> 📊 Open Stock Ledger</button>
     </div>
 
     <div class="search-box">
@@ -263,15 +258,11 @@
     let selectedProductRows = new Map();
     let filteredProducts = [];
 
-    // MODIFIED: Load products directly from product master (localStorage.products)
     function loadProducts() {
-        // Force read from localStorage product master (no dynamic calculation)
-        allProducts = JSON.parse(localStorage.getItem('products') || '[]');
-        if (!allProducts || allProducts.length === 0) {
-            // Fallback to getProducts() from data-manager.js if available
-            if (typeof window.getProducts === 'function') {
-                allProducts = window.getProducts();
-            }
+        if (typeof window.getProducts === 'function') {
+            allProducts = window.getProducts();
+        } else {
+            allProducts = JSON.parse(localStorage.getItem('products') || '[]');
         }
         if (!allProducts || allProducts.length === 0) {
             document.getElementById('productsTableContainer').innerHTML = `
@@ -292,25 +283,6 @@
             p.hsn = p.hsn || '';
         });
         filterProducts();
-    }
-
-    // NEW: Refresh stock directly from product master, clear selection
-    function refreshStockFromMaster() {
-        // Clear current selection
-        selectedProductRows.clear();
-        // Reload products directly from localStorage product master
-        allProducts = JSON.parse(localStorage.getItem('products') || '[]');
-        allProducts.forEach(p => {
-            p.id = String(p.id);
-            p.sku = p.sku || '';
-            p.name = p.name || '';
-            p.price = p.price || 0;
-            p.currentStock = p.currentStock || 0;
-            p.unit = p.unit || 'pc';
-            p.hsn = p.hsn || '';
-        });
-        filterProducts();
-        alert('Stock refreshed from product master.');
     }
 
     function filterProducts() {
@@ -380,7 +352,6 @@
         html += `</tbody></table>`;
         document.getElementById('productsTableContainer').innerHTML = html;
 
-        // Update "Select All" checkbox state
         const allCheckboxes = document.querySelectorAll('.product-checkbox');
         const allChecked = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.checked);
         document.getElementById('selectAllCheckbox').checked = allChecked;
@@ -473,7 +444,7 @@
         }
     }
 
-    // ========== AUTO SELECT PRODUCTS (uses product master stock) ==========
+    // ========== AUTO SELECT PRODUCTS BASED ON TARGET AMOUNT ==========
     function autoSelectProducts() {
         const target = parseFloat(document.getElementById('targetAmount').value);
         if (isNaN(target) || target <= 0) {
@@ -481,10 +452,8 @@
             return;
         }
 
-        // Clear any existing selection
         selectedProductRows.clear();
 
-        // Consider only products with positive stock (from product master)
         let available = allProducts.filter(p => p.currentStock > 0).map(p => ({
             id: p.id,
             sku: p.sku,
@@ -498,10 +467,8 @@
             return;
         }
 
-        // Greedy algorithm: repeatedly pick the product whose unit price is closest to remaining amount,
-        // respecting stock limit.
         let remaining = target;
-        let selected = new Map(); // id -> qty
+        let selected = new Map();
         let maxAttempts = 100;
         let attempts = 0;
 
@@ -575,7 +542,7 @@
         alert(`Auto-selection complete. Total selected value: ₹${(target - remaining).toFixed(2)} (difference: ₹${Math.abs(remaining).toFixed(2)})`);
     }
 
-    // ========== GLOBAL DISCOUNT ==========
+    // ========== APPLY GLOBAL DISCOUNT TO ALL SELECTED PRODUCTS ==========
     function applyGlobalDiscount() {
         let globalDisc = parseFloat(document.getElementById('globalDiscount').value);
         if (isNaN(globalDisc)) globalDisc = 0;
