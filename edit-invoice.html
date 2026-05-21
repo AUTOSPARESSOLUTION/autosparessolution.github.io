@@ -167,10 +167,10 @@
 
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
@@ -185,15 +185,45 @@
     let originalInvoice = null;
     let items = [];
 
-    // Helper to convert DD/MM/YYYY to YYYY-MM-DD (for date picker display only)
+    // ========== FULL DATE FORMAT FIX ==========
     function toIsoForPicker(dateStr) {
         if (!dateStr) return '';
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-        let parts = dateStr.split('/');
-        if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
-            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        // Remove extra spaces
+        dateStr = String(dateStr).trim();
+        // Already correct YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            return dateStr;
         }
-        return ''; // unknown format
+        // Convert YYYY-M-D → YYYY-MM-DD
+        let match = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (match) {
+            let year = match[1];
+            let month = match[2].padStart(2, '0');
+            let day = match[3].padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        // Convert DD/MM/YYYY or D/M/YYYY
+        match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (match) {
+            let day = match[1].padStart(2, '0');
+            let month = match[2].padStart(2, '0');
+            let year = match[3];
+            return `${year}-${month}-${day}`;
+        }
+        // Convert DD-MM-YYYY
+        match = dateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+        if (match) {
+            let day = match[1].padStart(2, '0');
+            let month = match[2].padStart(2, '0');
+            let year = match[3];
+            return `${year}-${month}-${day}`;
+        }
+        // Try automatic JS date conversion
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+            return d.toISOString().split('T')[0];
+        }
+        return '';
     }
 
     function loadInvoice() {
@@ -204,7 +234,7 @@
         if (!originalInvoice) { alert('Invoice not found'); window.close(); return; }
 
         document.getElementById('invoiceNo').value = originalInvoice.invoiceNo;
-        // Convert old date format to YYYY-MM-DD for the date picker
+        // Convert old date formats to YYYY-MM-DD for the date picker
         const invDate = toIsoForPicker(originalInvoice.date);
         const dueDate = toIsoForPicker(originalInvoice.dueDate);
         document.getElementById('invoiceDate').value = invDate || '';
@@ -300,8 +330,8 @@
                 <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
                 <td style="text-align:right;">₹${g.cgst.toFixed(2)}</td>
                 <td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹0.00</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+                <td style="text-align:right;">₹0.00</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -310,11 +340,16 @@
     function saveEditedInvoice() {
         const newInvoiceNo = document.getElementById('invoiceNo').value.trim();
         if (!newInvoiceNo) { alert('Invoice number cannot be empty'); return; }
-        // Get dates from date picker (already YYYY-MM-DD)
-        const invoiceDate = document.getElementById('invoiceDate').value;
-        const dueDate = document.getElementById('dueDate').value;
-        if (!invoiceDate) { alert('Please select Invoice Date'); return; }
-        if (!dueDate) { alert('Please select Due Date'); return; }
+
+        // Get date picker values (already YYYY-MM-DD)
+        let invoiceDateRaw = document.getElementById('invoiceDate').value;
+        let dueDateRaw = document.getElementById('dueDate').value;
+        if (!invoiceDateRaw) { alert('Please select Invoice Date'); return; }
+        if (!dueDateRaw) { alert('Please select Due Date'); return; }
+
+        // Convert to ISO string (YYYY-MM-DD)
+        const invoiceDate = new Date(invoiceDateRaw).toISOString().split('T')[0];
+        const dueDate = new Date(dueDateRaw).toISOString().split('T')[0];
 
         let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         if (newInvoiceNo !== originalInvoice.invoiceNo && allInvoices.some(i => i.invoiceNo === newInvoiceNo)) {
@@ -409,8 +444,11 @@
         const roundOff = Math.round(grand) - grand;
         grand = Math.round(grand);
 
-        const invoiceDate = document.getElementById('invoiceDate').value;
-        const dueDate = document.getElementById('dueDate').value;
+        // Get date picker values and convert to ISO
+        let invoiceDateRaw = document.getElementById('invoiceDate').value;
+        let dueDateRaw = document.getElementById('dueDate').value;
+        const invoiceDate = invoiceDateRaw ? new Date(invoiceDateRaw).toISOString().split('T')[0] : '';
+        const dueDate = dueDateRaw ? new Date(dueDateRaw).toISOString().split('T')[0] : '';
 
         const updatedInvoice = {
             invoiceNo: document.getElementById('invoiceNo').value,
@@ -471,11 +509,11 @@
             const totalTax = g.cgst + g.sgst;
             taxHtml += `<tr>
                 <td>${hsn || 'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
-                <td style="text-align:right;">₹${g.cgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>
-                <td style="text-align:right;">₹0.00</td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
+                <td style="text-align:right;">₹${g.cgst.toFixed(2)}</strong></td>
+                <td style="text-align:right;">₹${g.sgst.toFixed(2)}</strong></td>
+                <td style="text-align:right;">₹0.00</strong></td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
             </tr>`;
         }
 
@@ -486,18 +524,18 @@
             const sgstItem = taxable * 0.09;
             const totalItem = taxable + cgstItem + sgstItem;
             itemsHtml += `<tr>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${idx+1}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.part)}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.desc)}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px;">${escapeHtml(item.hsn)}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.discount}%</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgstItem.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgstItem.toFixed(2)}</td>
-                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${idx+1}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.part)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; word-break:break-word;">${escapeHtml(item.desc)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px;">${escapeHtml(item.hsn)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.qty}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${item.price.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">${item.discount}%</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${taxable.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:center;">18%</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${cgstItem.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${sgstItem.toFixed(2)}</strong></td>
+                <td style="border:1px solid #dee2e6; padding:6px 4px; text-align:right;">₹${totalItem.toFixed(2)}</strong></td>
             </tr>`;
         });
 
@@ -561,11 +599,11 @@
             </table>
             <div style="text-align:right;">
                 <table style="width:280px; margin-left:auto;">
-                    <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹${updatedInvoice.subtotal.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹${updatedInvoice.cgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹${updatedInvoice.sgst.toFixed(2)}</td></tr>
-                    <tr><td style="text-align:right;">Round Off:</td><td style="text-align:right;">₹${updatedInvoice.roundOff.toFixed(2)}</td></tr>
-                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹${updatedInvoice.grandTotal.toFixed(2)}</td></tr>
+                    <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹${updatedInvoice.subtotal.toFixed(2)}</strong></td></tr>
+                    <tr><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹${updatedInvoice.cgst.toFixed(2)}</strong></td></tr>
+                    <tr><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹${updatedInvoice.sgst.toFixed(2)}</strong></td></tr>
+                    <tr><td style="text-align:right;">Round Off:</strong></td><td style="text-align:right;">₹${updatedInvoice.roundOff.toFixed(2)}</strong></td></tr>
+                    <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹${updatedInvoice.grandTotal.toFixed(2)}</strong></td></tr>
                 </table>
             </div>
             <div style="margin-top:30px; border:1px solid #dee2e6; border-radius:8px; padding:15px; background:#f9f9f9;">
