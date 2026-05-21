@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
-        /* Your existing styles – unchanged */
+        /* ========== YOUR EXISTING STYLES – UNCHANGED ========== */
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
         .invoice-container { max-width: 1300px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 0 15px 15px 15px; border: 1px solid #dee2e6; }
@@ -70,7 +70,7 @@
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
-    <!-- All HTML content same as your last working version – keeping exactly as you had -->
+    <!-- All HTML content – same as your last working version -->
     <div class="company-header">
         <div class="logo-area">
             <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
@@ -172,7 +172,7 @@
             <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
             <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></tr>
             <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</strong></td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></td></tr>
             <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
             <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
@@ -203,10 +203,9 @@
 </div>
 
 <script>
-    // ========== GLOBAL LOCK TO PREVENT CONCURRENT SAVES OF SAME INVOICE NUMBER ==========
-    let isSaving = false;
-    let invoiceAlreadySaved = false;
-    let processingNumbers = new Set();  // stores invoice numbers currently being processed
+    // ========== GLOBAL LOCK – IMMEDIATE SYNC PREVENTION ==========
+    let isProcessing = false;           // Global sync flag
+    let invoiceAlreadySaved = false;    // Prevents second save after success
 
     // ========== LOAD CART FROM LOCALSTORAGE OR INITIALIZE EMPTY ==========
     let cart = JSON.parse(localStorage.getItem('invoiceCart') || '[]');
@@ -547,42 +546,49 @@
         return allInvoices.some(inv => inv.invoiceNo === invoiceNo) || salesInvoices.some(inv => inv.invoiceNo === invoiceNo);
     }
 
-    // ========== SAVE INVOICE WITH INVOICE NUMBER LOCK ==========
+    // ========== BULLETPROOF SAVE INVOICE – FIRST LOCK THEN WORK ==========
     function saveInvoice() {
-        if (isSaving) {
-            alert("Please wait, invoice is already being saved.");
+        // 1. Immediate synchronous lock check
+        if (isProcessing) {
+            alert("Save already in progress. Please wait.");
             return;
         }
         if (invoiceAlreadySaved) {
             alert("This invoice has already been saved. Cannot save again.");
             return;
         }
+        // 2. Lock immediately and disable button
+        isProcessing = true;
+        const saveBtn = document.getElementById('saveInvoiceBtn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+        saveBtn.classList.add('disabled-btn');
+
+        // 3. Validate cart
         const validCart = cart.filter(item => item.part && item.part.trim() !== '');
         if (validCart.length === 0) {
             alert('Cart empty. Please add at least one item with a Part No.');
+            isProcessing = false;
+            saveBtn.disabled = false;
+            saveBtn.textContent = "💾 Save Invoice & Update Ledger";
+            saveBtn.classList.remove('disabled-btn');
             return;
         }
 
         const type = document.querySelector('input[name="invoiceType"]:checked').value;
         const proposedInvoiceNo = getNextInvoiceNumber(type);
         
-        // Check if this invoice number is already being processed
-        if (processingNumbers.has(proposedInvoiceNo)) {
-            alert(`Invoice number ${proposedInvoiceNo} is currently being saved. Please wait.`);
-            return;
-        }
+        // 4. Check duplicate in storage
         if (isInvoiceNumberDuplicate(proposedInvoiceNo)) {
             alert(`Invoice number ${proposedInvoiceNo} already exists. Cannot save duplicate.`);
+            isProcessing = false;
+            saveBtn.disabled = false;
+            saveBtn.textContent = "💾 Save Invoice & Update Ledger";
+            saveBtn.classList.remove('disabled-btn');
             return;
         }
 
-        // Lock this invoice number
-        processingNumbers.add(proposedInvoiceNo);
-        isSaving = true;
-        const saveBtn = document.getElementById('saveInvoiceBtn');
-        saveBtn.disabled = true;
-        saveBtn.textContent = "Saving...";
-
+        // 5. Proceed with saving (async operations but lock is already held)
         try {
             for (let item of validCart) {
                 if (!item.part) continue;
@@ -631,10 +637,10 @@
 
             if (!buyer.email) {
                 alert('Customer email is required.');
-                processingNumbers.delete(proposedInvoiceNo);
-                isSaving = false;
+                isProcessing = false;
                 saveBtn.disabled = false;
                 saveBtn.textContent = "💾 Save Invoice & Update Ledger";
+                saveBtn.classList.remove('disabled-btn');
                 return;
             }
 
@@ -712,13 +718,14 @@
             setTimeout(() => window.close(), 1000);
         } catch (err) {
             alert("Error: " + err.message);
-        } finally {
-            isSaving = false;
-            processingNumbers.delete(proposedInvoiceNo);
+            // Release lock only on error
+            isProcessing = false;
             saveBtn.disabled = false;
             saveBtn.textContent = "💾 Save Invoice & Update Ledger";
-            if (invoiceAlreadySaved) saveBtn.classList.add('disabled-btn');
+            saveBtn.classList.remove('disabled-btn');
         }
+        // Lock is never released on success because the page closes. 
+        // On error, lock is released above.
     }
 
     function printInvoice() {
@@ -847,4 +854,4 @@
     })();
 </script>
 </body>
-                                       </html>
+                    </html>
