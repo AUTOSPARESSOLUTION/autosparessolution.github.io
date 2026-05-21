@@ -127,14 +127,15 @@
                 customer.outstanding = (customer.outstanding || 0) - total;
                 if (customer.outstanding < 0) customer.outstanding = 0;
                 saveCustomers(customers);
-                // ⚠️ NO reversal ledger entry added – removed as requested
+                // No reversal ledger entry added
             }
 
             // Remove invoice from storage arrays
             const remaining = invoices.filter(inv => inv.id != invoiceId);
             saveSalesInvoices(remaining);
             let allInv = getAllInvoices();
-            allInv = allInv.filter(inv => inv.id != invoiceId && inv.invoiceNo !== invoice.invoiceNo);
+            // FIX: Only remove by ID, not by invoice number (so duplicates with same number but different ID stay)
+            allInv = allInv.filter(inv => inv.id != invoiceId);
             saveAllInvoices(allInv);
 
             alert('Sales invoice deleted successfully.');
@@ -165,7 +166,7 @@
                 <td><button class="delete-btn" onclick="deletePurchaseInvoiceHandler('${inv.id}')">Delete & Reverse</button></td>
             </tr>`;
         });
-        html += '</tbody></table>';
+        html += '</tbody><table>';
         document.getElementById('purchaseTable').innerHTML = html;
     }
 
@@ -214,4 +215,4 @@
     loadSalesInvoices();
 </script>
 </body>
-    </html>
+</html>
