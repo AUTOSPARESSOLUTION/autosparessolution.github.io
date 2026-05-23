@@ -10,6 +10,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="access-control.js"></script>
+    <!-- Google AdSense (already present) -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389" crossorigin="anonymous"></script>
     <style>
         /* ========== GLOBAL STYLES ========== */
         :root {
@@ -271,6 +273,11 @@
                 <option value="proforma">📑 Proforma Invoice</option>
                 <option value="quotation">✉️ Quotation</option>
             </select>
+            <!-- NEW AI SCAN BUTTON (added without modifying existing lines) -->
+            <button id="ai-scan-btn" class="btn" style="background:#6c5ce7;">
+                <i class="fas fa-camera"></i> Scan Order
+            </button>
+            <input type="file" id="ai-scan-input" accept="image/*,application/pdf" capture="environment" style="display:none;">
         </div>
         <div class="stock-info-date">Stock last updated: <span id="last-updated-date">Loading...</span></div>
         <section id="products" class="section"><h2 class="section-title">Our Products</h2><div class="gallery"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</div></div></section>
@@ -285,6 +292,16 @@
             <div class="stat-card" style="background:rgba(255,255,255,0.08); padding:2rem; text-align:center;">98% Satisfaction</div>
             <div class="stat-card" style="background:rgba(255,255,255,0.08); padding:2rem; text-align:center;">24H Processing</div>
         </div>
+        <!-- Google AdSense unit inserted before About Us section -->
+        <ins class="adsbygoogle"
+             style="display:block; text-align:center; margin: 1rem 0;"
+             data-ad-layout="in-article"
+             data-ad-format="fluid"
+             data-ad-client="ca-pub-8126256456942389"
+             data-ad-slot="1234567890"></ins>
+        <script>
+            (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
         <section id="about" class="section"><h2 class="section-title">About Us</h2><p>Your trusted partner for auto parts.</p></section>
         <section id="investors" class="section"><h2 class="section-title">Investors</h2><p>Growth opportunities.</p></section>
         <section id="policies" class="section"><h2 class="section-title">Policies</h2><p>Privacy, shipping, returns.</p></section>
@@ -323,6 +340,21 @@
     </div>
     <div id="galleryModal" class="modal"><div class="modal-content"><span class="close-modal" id="galleryCloseBtn" onclick="closeGallery()">&times;</span><div id="gallery-media"></div><div id="gallery-thumbnails"></div></div></div>
     <div id="infoModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="closeInfoModal()">&times;</span><h3>Product Information</h3><div id="infoModalBody"></div></div></div>
+    <!-- NEW AI REVIEW MODAL (added without modifying existing lines) -->
+    <div id="aiReviewModal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:900px; background:#0f172a; color:#e2e8f0;">
+            <span class="close-modal" id="closeReviewModal" style="color:white;">&times;</span>
+            <h3 style="color:#facc15;">📋 Review Scanned Items</h3>
+            <div id="reviewTableContainer"></div>
+            <div style="margin-top:1rem; display:flex; justify-content:space-between;">
+                <button id="selectAllScanBtn" class="btn btn-secondary" style="background:#334155;">✓ Select All</button>
+                <div>
+                    <button id="confirmScanAddBtn" class="btn" style="background:#facc15; color:#0f172a;">✅ Add Selected to Cart</button>
+                    <button id="cancelScanBtn" class="btn btn-secondary" style="background:#334155; margin-left:1rem;">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="toast" id="toast"><i class="fas fa-check-circle"></i><span id="toast-message"></span></div>
     <footer style="background:rgba(0,0,0,0.9); color:#ccc; padding:2rem; text-align:center; margin-top:3rem;"><p>&copy; 2026 Auto Spares Solution. All Rights Reserved.</p></footer>
     <script>
@@ -803,5 +835,23 @@
         const originalLogout = logout;
         logout = function() { originalLogout(); if(typeof updateNavigationByRole === 'function') updateNavigationByRole(); };
     </script>
+    <!-- NEW AI MODULE SCRIPTS (must be created in /js/ai/ folder) -->
+    <!-- Libraries required for AI scan -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+    <!-- AI module scripts (order matters) -->
+    <script src="js/ai/ai-config.js"></script>
+    <script src="js/ai/ai-utils.js"></script>
+    <script src="js/ai/ai-ocr.js"></script>
+    <script src="js/ai/ai-parser.js"></script>
+    <script src="js/ai/ai-matcher.js"></script>
+    <script src="js/ai/ai-review-modal.js"></script>
+    <script src="js/ai/ai-cart.js"></script>
+    <script src="js/ai/ai-init.js"></script>
+    <!-- Dealer Reorder Memory scripts -->
+    <script src="js/reorder-history.js"></script>
+    <script src="js/reorder-ui.js"></script>
 </body>
-</html>
+    </html>
