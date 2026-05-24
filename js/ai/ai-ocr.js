@@ -38,7 +38,7 @@ async function extractFromExcelOrCSV(file) {
                     if (partColIndex !== -1) break;
                 }
                 if (partColIndex === -1) {
-                    reject(new Error("Column 'Part Number' not found in Excel/CSV"));
+                    reject(new Error("Column 'Part Number' not found"));
                     return;
                 }
                 let textLines = [];
@@ -59,7 +59,7 @@ async function extractFromExcelOrCSV(file) {
                 reject(err);
             }
         };
-        reader.onerror = () => reject(new Error("Failed to read Excel/CSV file"));
+        reader.onerror = () => reject(new Error("Failed to read file"));
         reader.readAsArrayBuffer(file);
     });
 }
@@ -75,10 +75,8 @@ async function extractTextFromFile(file) {
                         file.type === 'application/vnd.ms-excel' ||
                         file.name.match(/\.(xlsx|xls|csv)$/i);
         if (isExcel) {
-            console.log("Processing Excel/CSV file:", file.name);
             return await extractFromExcelOrCSV(file);
         } else if (file.type === 'application/pdf') {
-            console.log("Processing PDF file:", file.name);
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let fullText = '';
@@ -87,19 +85,13 @@ async function extractTextFromFile(file) {
                 const content = await page.getTextContent();
                 fullText += content.items.map(item => item.str).join(' ') + '\n';
             }
-            console.log("PDF text length:", fullText.length);
             return fullText;
         } else {
-            console.log("Processing image file:", file.name);
             await initOCR();
             const resizedBlob = await resizeImage(file, 1600);
             const ret = await ocrWorker.recognize(resizedBlob);
-            console.log("OCR extracted text length:", ret.data.text.length);
             return ret.data.text;
         }
-    } catch(err) {
-        console.error("extractTextFromFile error:", err);
-        throw err;
     } finally {
         if (scanBtn) {
             scanBtn.disabled = false;
