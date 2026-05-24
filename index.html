@@ -447,6 +447,7 @@
                 fixedProducts.forEach(part=>{ if(!productsData.some(p=>p.part===part)) productsData.push({ part, desc:"Auto Spare Part", List:0, Mrp:0, price:0, stock:0, boxQty:1, masterCarton:1, brand:"Unknown", video:"", media:[] }); });
                 productsData.forEach(p=>p.score = (p.price||0)*(p.stock||0));
                 allProducts = productsData;
+                window.allProducts = allProducts;
                 populateBrandDropdown(); populateBrandLogos();
                 filteredProducts = productsData.filter(p=>p.stock>0).slice(0,21);
                 displayProducts();
