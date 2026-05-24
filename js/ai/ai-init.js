@@ -1,4 +1,3 @@
-// ai-init.js – simple, robust version (no cloning, camera works)
 (function() {
     console.log("AI Scan Module initialising...");
 
@@ -9,7 +8,6 @@
             console.error("Scan button or file input not found");
             return;
         }
-        // Direct assignment – no cloning, preserves existing element
         scanBtn.onclick = function(e) {
             e.preventDefault();
             console.log("Scan button clicked");
@@ -49,7 +47,7 @@
                 console.error("Scan error:", err);
                 if (typeof showToast === 'function') showToast("Scan failed: " + err.message, true);
             }
-            fileInput.value = ''; // allow re-upload
+            fileInput.value = '';
         };
         console.log("AI Scan button ready");
     }
