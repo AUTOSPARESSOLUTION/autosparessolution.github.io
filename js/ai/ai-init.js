@@ -1,34 +1,54 @@
-function initializeAIScanner() {
-    if (!window.ENABLE_AI_SCAN) return;
-    // Wait for products to be loaded (allProducts is populated by your existing code)
-    const checkProducts = setInterval(() => {
-        if (window.allProducts && window.allProducts.length > 0) {
-            clearInterval(checkProducts);
-            if (typeof buildNormalizedIndex === 'function') buildNormalizedIndex();
-            if (typeof initFuse === 'function') initFuse();
-            console.log('AI Scanner ready');
+// ai-init.js – initialises AI scan button and file handler
+(function() {
+    console.log("AI Scan Module initialising...");
+
+    function initAIScan() {
+        const scanBtn = document.getElementById('ai-scan-btn');
+        const fileInput = document.getElementById('ai-scan-input');
+        if (!scanBtn || !fileInput) {
+            console.error("Scan button or file input not found!");
+            return;
         }
-    }, 500);
-    // Bind file input
-    const fileInput = document.getElementById('ai-scan-input');
-    if (fileInput) {
-        fileInput.addEventListener('change', async (e) => {
+        // Remove any existing listeners by cloning (clean way)
+        const newScanBtn = scanBtn.cloneNode(true);
+        scanBtn.parentNode.replaceChild(newScanBtn, scanBtn);
+        const newFileInput = fileInput.cloneNode(true);
+        fileInput.parentNode.replaceChild(newFileInput, fileInput);
+
+        newScanBtn.addEventListener('click', () => {
+            console.log("Scan button clicked");
+            newFileInput.click();
+        });
+
+        newFileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            if (file.size > (window.AI_MAX_FILE_SIZE_MB * 1024 * 1024)) {
-                aiShowToast(`File too large (max ${window.AI_MAX_FILE_SIZE_MB}MB)`, true);
-                return;
+            console.log("File selected:", file.name, "size:", file.size);
+            if (typeof showToast === 'function') {
+                showToast("Processing file...", false);
+            } else {
+                alert("Processing...");
             }
-            aiShowToast('🔍 Scanning file...');
             try {
                 const extractedText = await extractTextFromFile(file);
-                const parsedItems = extractItemsFromText(extractedText);
-                if (parsedItems.length === 0) {
-                    aiShowToast('No valid part numbers detected.', true);
+                console.log("Extracted text length:", extractedText.length);
+                if (extractedText.length < 5) {
+                    if (typeof showToast === 'function') showToast("No text extracted. Try a clearer image.", true);
+                    return;
+                }
+                const items = extractItemsFromText(extractedText);
+                console.log("Parsed items:", items);
+                if (items.length === 0) {
+                    if (typeof showToast === 'function') showToast("No part numbers found.", true);
+                    return;
+                }
+                if (!window.allProducts || window.allProducts.length === 0) {
+                    console.error("Product database not ready!");
+                    if (typeof showToast === 'function') showToast("Products not loaded yet. Refresh and try again.", true);
                     return;
                 }
                 const matches = [];
-                for (const item of parsedItems) {
+                for (const item of items) {
                     const match = matchProduct(item);
                     if (match) {
                         matches.push({ ...item, product: match.product, confidence: match.confidence });
@@ -36,27 +56,33 @@ function initializeAIScanner() {
                         matches.push({ ...item, product: null, confidence: 0 });
                     }
                 }
+                console.log("Matches ready:", matches.length);
                 showReviewModal(matches);
             } catch (err) {
-                console.error(err);
-                aiShowToast('Processing failed. Try another image/PDF.', true);
+                console.error("Scan error:", err);
+                if (typeof showToast === 'function') showToast("Scan failed: " + err.message, true);
             }
-            e.target.value = '';
+            newFileInput.value = ''; // allow re-upload
         });
+        console.log("AI Scan button ready");
     }
-    // Bind scan button
-    const scanBtn = document.getElementById('ai-scan-btn');
-    if (scanBtn) {
-        scanBtn.onclick = () => {
-            document.getElementById('ai-scan-input').click();
-        };
-    }
-    bindModalEvents();
-}
 
-// Start when DOM ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeAIScanner);
-} else {
-    initializeAIScanner();
-}
+    function waitForProducts() {
+        if (window.allProducts && window.allProducts.length > 0) {
+            console.log("Products loaded (" + window.allProducts.length + "). Initialising AI scan...");
+            if (typeof buildNormalizedIndex === 'function') buildNormalizedIndex();
+            if (typeof initFuse === 'function') initFuse();
+            initAIScan();
+            if (typeof bindModalEvents === 'function') bindModalEvents();
+        } else {
+            console.log("Waiting for allProducts...");
+            setTimeout(waitForProducts, 500);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', waitForProducts);
+    } else {
+        waitForProducts();
+    }
+})();
