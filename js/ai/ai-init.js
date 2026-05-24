@@ -1,6 +1,23 @@
 (function() {
     alert("AI init script loaded");
 
+    // Fallback function in case ai-review-modal.js is missing
+    if (typeof showReviewModal !== 'function') {
+        window.showReviewModal = function(matches) {
+            alert("showReviewModal called (fallback)\nMatches: " + JSON.stringify(matches, null, 2));
+            // Also try to directly add to cart (optional)
+            for (const m of matches) {
+                if (m.product && m.confidence >= 70) {
+                    if (typeof aiAddToCart === 'function') {
+                        aiAddToCart(m.product.part, m.product.price, m.editedQty || m.qty);
+                    }
+                }
+            }
+            if (typeof updateCartUI === 'function') updateCartUI();
+        };
+        alert("Fallback showReviewModal installed");
+    }
+
     function initAIScan() {
         alert("initAIScan called");
         const fileInput = document.getElementById('ai-scan-input');
