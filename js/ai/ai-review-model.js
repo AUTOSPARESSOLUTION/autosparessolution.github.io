@@ -1,3 +1,4 @@
+// ai-review-modal.js – editable review table with global exports
 let lastScannedMatches = [];
 
 function showReviewModal(matches) {
@@ -47,7 +48,7 @@ function renderReviewTable() {
         chk.checked = m.selected;
         chk.addEventListener('change', (e) => { m.selected = e.target.checked; });
         chkCell.appendChild(chk);
-        // Part Number
+        // Part Number (editable)
         const partCell = row.insertCell(1);
         const partInput = document.createElement('input');
         partInput.type = 'text';
@@ -154,7 +155,7 @@ function findProductByPart(part) {
 }
 
 function updateProductDropdown(cell, match, idx) {
-    // Handled in populateProductDropdown
+    // Not needed separately; handled in populateProductDropdown
 }
 
 function confirmAddScannedItems() {
@@ -198,4 +199,9 @@ function bindModalEvents() {
         const modal = document.getElementById('aiReviewModal');
         if (e.target === modal) modal.style.display = 'none';
     };
-            }
+}
+
+// ========== GLOBAL EXPOSURE (important for browsers) ==========
+window.showReviewModal = showReviewModal;
+window.confirmAddScannedItems = confirmAddScannedItems;
+window.bindModalEvents = bindModalEvents;
