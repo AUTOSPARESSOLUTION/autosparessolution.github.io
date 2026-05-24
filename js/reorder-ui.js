@@ -36,13 +36,10 @@ function reorderSavedOrder(orderId) {
     if (!order) return;
     const docType = (typeof getCurrentDocType === 'function') ? getCurrentDocType() : 'invoice';
     for (const item of order.items) {
-        // Use aiAddToCart if available, else fallback to your original addToCart
         if (typeof aiAddToCart === 'function') {
             aiAddToCart(item.part, item.price, item.qty);
         } else if (typeof addToCart === 'function') {
             addToCart(item.part, item.price);
-            // If your original addToCart doesn't take qty, we need to adjust quantity manually (advanced)
-            // For simplicity, we assume aiAddToCart exists (from AI module)
         }
     }
     if (typeof updateCartUI === 'function') updateCartUI();
@@ -74,7 +71,6 @@ function injectHistoryPanel() {
     }
 }
 
-// Hook into existing displayProducts and user login/logout
 if (typeof displayProducts === 'function') {
     const originalDisplay = displayProducts;
     window.displayProducts = function() {
@@ -99,7 +95,6 @@ if (typeof logout === 'function') {
         addReorderBadges();
     };
 }
-// Initial call if user already logged in
 if (window.currentUser) {
     setTimeout(() => {
         injectHistoryPanel();
