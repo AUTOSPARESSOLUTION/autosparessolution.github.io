@@ -1,4 +1,4 @@
-// ai-ocr.js – enhanced to support Excel/CSV files
+// ai-ocr.js – OCR, PDF, Excel/CSV extraction with debug logs
 let ocrWorker = null;
 
 async function initOCR() {
@@ -9,7 +9,7 @@ async function initOCR() {
     }
 }
 
-// Helper to process Excel/CSV files – reuses bulk upload logic
+// Helper to process Excel/CSV using XLSX library
 async function extractFromExcelOrCSV(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -23,7 +23,7 @@ async function extractFromExcelOrCSV(file) {
                     reject(new Error("File has no data rows"));
                     return;
                 }
-                // Find column indices for part number and quantity (same as bulk upload)
+                // Find column indices for part number and quantity
                 let partColIndex = -1, qtyColIndex = -1;
                 for (let i = 0; i < Math.min(rows.length, 15); i++) {
                     const row = rows[i];
@@ -43,7 +43,7 @@ async function extractFromExcelOrCSV(file) {
                     reject(new Error("Column 'Part Number' not found in Excel/CSV"));
                     return;
                 }
-                // Build a text representation: "PART_NUMBER QTY" per line
+                // Build text lines: "PARTNUMBER xQTY"
                 let textLines = [];
                 for (let i = 1; i < rows.length; i++) {
                     const row = rows[i];
@@ -74,13 +74,14 @@ async function extractTextFromFile(file) {
         scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
     }
     try {
-        // Check for Excel/CSV by MIME type or file extension
         const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
                         file.type === 'application/vnd.ms-excel' ||
                         file.name.match(/\.(xlsx|xls|csv)$/i);
         if (isExcel) {
+            console.log("Processing Excel/CSV file:", file.name);
             return await extractFromExcelOrCSV(file);
         } else if (file.type === 'application/pdf') {
+            console.log("Processing PDF file:", file.name);
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let fullText = '';
@@ -89,13 +90,19 @@ async function extractTextFromFile(file) {
                 const content = await page.getTextContent();
                 fullText += content.items.map(item => item.str).join(' ') + '\n';
             }
+            console.log("PDF text length:", fullText.length);
             return fullText;
         } else {
+            console.log("Processing image file:", file.name);
             await initOCR();
             const resizedBlob = await resizeImage(file, 1600);
             const ret = await ocrWorker.recognize(resizedBlob);
+            console.log("OCR extracted text length:", ret.data.text.length);
             return ret.data.text;
         }
+    } catch(err) {
+        console.error("extractTextFromFile error:", err);
+        throw err;
     } finally {
         if (scanBtn) {
             scanBtn.disabled = false;
