@@ -835,6 +835,18 @@
         const originalLogout = logout;
         logout = function() { originalLogout(); if(typeof updateNavigationByRole === 'function') updateNavigationByRole(); };
     </script>
+    <script>
+    // Global exposure for AI module (no existing code changed)
+    window.allProducts = allProducts;
+    window.carts = carts;
+    window.currentUser = currentUser;
+    window.updateCartUI = updateCartUI;
+    window.getCurrentDocType = getCurrentDocType;
+    window.addToCart = addToCart;
+    window.showToast = showToast;
+    window.aiAddToCart = aiAddToCart;
+    console.log("AI module exposed: allProducts count =", allProducts?.length);
+    </script>
     <!-- NEW AI MODULE SCRIPTS (must be created in /js/ai/ folder) -->
     <!-- Libraries required for AI scan -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
