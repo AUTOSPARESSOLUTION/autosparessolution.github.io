@@ -1,9 +1,8 @@
- function aiShowToast(message, isError = false) {
-    // If your existing showToast is global, use it; otherwise this fallback
+function aiShowToast(message, isError = false) {
     if (typeof showToast === 'function') {
         showToast(message, isError);
     } else {
-        alert(message);
+        console.log(message);
     }
 }
 
