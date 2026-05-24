@@ -1,4 +1,3 @@
-// ai-ocr.js – OCR, PDF, Excel/CSV extraction with debug logs
 let ocrWorker = null;
 
 async function initOCR() {
@@ -9,7 +8,6 @@ async function initOCR() {
     }
 }
 
-// Helper to process Excel/CSV using XLSX library
 async function extractFromExcelOrCSV(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -23,7 +21,6 @@ async function extractFromExcelOrCSV(file) {
                     reject(new Error("File has no data rows"));
                     return;
                 }
-                // Find column indices for part number and quantity
                 let partColIndex = -1, qtyColIndex = -1;
                 for (let i = 0; i < Math.min(rows.length, 15); i++) {
                     const row = rows[i];
@@ -43,7 +40,6 @@ async function extractFromExcelOrCSV(file) {
                     reject(new Error("Column 'Part Number' not found in Excel/CSV"));
                     return;
                 }
-                // Build text lines: "PARTNUMBER xQTY"
                 let textLines = [];
                 for (let i = 1; i < rows.length; i++) {
                     const row = rows[i];
