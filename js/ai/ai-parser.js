@@ -1,7 +1,7 @@
 function extractItemsFromText(text) {
     const lines = text.split(/\r?\n/);
     const items = [];
-    const partRegex = /([A-Z0-9][A-Z0-9\-_\.]{4,20})/gi;
+    const partRegex = /([A-Z0-9][A-Z0-9\-_\.]{3,20})/gi;
     for (const line of lines) {
         let qty = 1;
         const qtyMatch = line.match(/(?:qty|quantity|x)\s*(\d+)|(\d+)\s*(?:pcs|nos|qty)/i);
