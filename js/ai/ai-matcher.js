@@ -2,10 +2,7 @@ let normalizedIndex = new Map();
 let fuse = null;
 
 function buildNormalizedIndex() {
-    if (!window.allProducts) {
-        console.warn('allProducts not ready');
-        return;
-    }
+    if (!window.allProducts) return;
     normalizedIndex.clear();
     for (const prod of window.allProducts) {
         const norm = normalizePart(prod.part);
@@ -13,7 +10,7 @@ function buildNormalizedIndex() {
             normalizedIndex.set(norm, prod);
         }
     }
-    console.log(`AI: Normalized index built (${normalizedIndex.size} entries)`);
+    console.log(`AI: Normalized index built (${normalizedIndex.size})`);
 }
 
 function initFuse() {
@@ -39,7 +36,3 @@ function matchProduct(extractedItem) {
     }
     return null;
 }
-
-// Expose builders to be called after CSV loads
-window.buildNormalizedIndex = buildNormalizedIndex;
-window.initFuse = initFuse;
