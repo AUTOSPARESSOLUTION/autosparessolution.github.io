@@ -3,9 +3,13 @@ let ocrWorker = null;
 async function initOCR() {
     if (!ocrWorker) {
         ocrWorker = await Tesseract.createWorker('eng');
-        await ocrWorker.setParameters({
-            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.'
-        });
+        try {
+            await ocrWorker.setParameters({
+                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.'
+            });
+        } catch(err) {
+            console.warn('Whitelist setting failed (non-critical):', err);
+        }
     }
 }
 
@@ -19,13 +23,13 @@ async function extractFromExcelOrCSV(file) {
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "" });
                 if (!rows || rows.length < 2) {
-                    reject(new Error("File has no data rows"));
+                    reject(new Error("No data rows"));
                     return;
                 }
                 let partColIndex = -1, qtyColIndex = -1;
                 for (let i = 0; i < Math.min(rows.length, 15); i++) {
                     const row = rows[i];
-                    if (!row || row.length === 0) continue;
+                    if (!row) continue;
                     for (let j = 0; j < row.length; j++) {
                         const cell = (row[j] || "").toString().trim().toLowerCase();
                         if ((cell.includes("part") && (cell.includes("number") || cell === "part" || cell === "partno"))) {
@@ -38,7 +42,7 @@ async function extractFromExcelOrCSV(file) {
                     if (partColIndex !== -1) break;
                 }
                 if (partColIndex === -1) {
-                    reject(new Error("Column 'Part Number' not found"));
+                    reject(new Error("No 'Part Number' column found"));
                     return;
                 }
                 let textLines = [];
@@ -59,7 +63,7 @@ async function extractFromExcelOrCSV(file) {
                 reject(err);
             }
         };
-        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.onerror = () => reject(new Error("File read failed"));
         reader.readAsArrayBuffer(file);
     });
 }
@@ -90,6 +94,7 @@ async function extractTextFromFile(file) {
             await initOCR();
             const resizedBlob = await resizeImage(file, 1600);
             const ret = await ocrWorker.recognize(resizedBlob);
+            console.log("OCR raw text (first 300 chars):", ret.data.text.substring(0,300));
             return ret.data.text;
         }
     } finally {
