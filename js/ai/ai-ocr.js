@@ -2,7 +2,8 @@ let ocrWorker = null;
 
 async function initOCR() {
     if (!ocrWorker) {
-        ocrWorker = await Tesseract.createWorker('eng', 1, {
+        ocrWorker = await Tesseract.createWorker('eng');
+        await ocrWorker.setParameters({
             tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.'
         });
     }
