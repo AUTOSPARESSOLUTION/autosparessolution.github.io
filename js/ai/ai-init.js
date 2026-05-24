@@ -1,4 +1,4 @@
-// ai-init.js – simple, robust version
+// ai-init.js – safe version that preserves working camera
 (function() {
     console.log("AI Scan Module initialising...");
 
@@ -9,8 +9,7 @@
             console.error("Scan button or file input not found");
             return;
         }
-        // Remove any existing listener to avoid duplicates (but keep the element)
-        // We'll just add a new one; if one exists, it will be called twice – harmless.
+        // Direct assignment – no cloning
         scanBtn.onclick = function(e) {
             e.preventDefault();
             console.log("Scan button clicked");
@@ -25,7 +24,7 @@
                 const extractedText = await extractTextFromFile(file);
                 console.log("Extracted text length:", extractedText.length);
                 if (extractedText.length < 5) {
-                    if (typeof showToast === 'function') showToast("No text extracted. Try a clearer image.", true);
+                    if (typeof showToast === 'function') showToast("No text extracted. Try clearer image.", true);
                     return;
                 }
                 const items = extractItemsFromText(extractedText);
