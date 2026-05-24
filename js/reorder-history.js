@@ -59,22 +59,6 @@ function getOrderedPartsFrequency() {
     return Array.from(freq.values()).sort((a,b) => new Date(b.lastOrderDate) - new Date(a.lastOrderDate));
 }
 
-function getFrequentlyBoughtTogether(part, limit = 3) {
-    const history = loadOrderHistory();
-    const coOccur = new Map();
-    for (const order of history) {
-        const partsInOrder = order.items.map(i => i.part);
-        if (!partsInOrder.includes(part)) continue;
-        for (const otherPart of partsInOrder) {
-            if (otherPart === part) continue;
-            coOccur.set(otherPart, (coOccur.get(otherPart) || 0) + 1);
-        }
-    }
-    const sorted = Array.from(coOccur.entries()).sort((a,b) => b[1] - a[1]).slice(0, limit);
-    return sorted.map(([part]) => window.allProducts ? window.allProducts.find(p => p.part === part) : null).filter(p => p);
-}
-
-// Override generateDocument to save order (if it exists)
 if (typeof window.generateDocument === 'function') {
     const originalGenerateDocument = window.generateDocument;
     window.generateDocument = function() {
