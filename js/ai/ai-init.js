@@ -1,4 +1,4 @@
-// ai-init.js – safe version that preserves working camera
+// ai-init.js – simple, robust version (no cloning, camera works)
 (function() {
     console.log("AI Scan Module initialising...");
 
@@ -9,7 +9,7 @@
             console.error("Scan button or file input not found");
             return;
         }
-        // Direct assignment – no cloning
+        // Direct assignment – no cloning, preserves existing element
         scanBtn.onclick = function(e) {
             e.preventDefault();
             console.log("Scan button clicked");
@@ -24,7 +24,7 @@
                 const extractedText = await extractTextFromFile(file);
                 console.log("Extracted text length:", extractedText.length);
                 if (extractedText.length < 5) {
-                    if (typeof showToast === 'function') showToast("No text extracted. Try clearer image.", true);
+                    if (typeof showToast === 'function') showToast("No text extracted. Try a clearer image.", true);
                     return;
                 }
                 const items = extractItemsFromText(extractedText);
@@ -49,7 +49,7 @@
                 console.error("Scan error:", err);
                 if (typeof showToast === 'function') showToast("Scan failed: " + err.message, true);
             }
-            fileInput.value = '';
+            fileInput.value = ''; // allow re-upload
         };
         console.log("AI Scan button ready");
     }
