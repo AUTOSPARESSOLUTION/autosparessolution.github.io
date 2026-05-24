@@ -1,4 +1,3 @@
-// ai-review-modal.js – editable review table with dropdown product selection
 let lastScannedMatches = [];
 
 function showReviewModal(matches) {
@@ -34,8 +33,8 @@ function renderReviewTable() {
             <th>Matched Product<br><small>(click dropdown)</small></th>
             <th>Qty<br><small>(click to edit)</small></th>
             <th>Confidence</th><th>Price</th>
-          </tr></thead><tbody id="reviewTbody"></tbody>
-     </table>`;
+         </tr></thead><tbody id="reviewTbody"></tbody>
+    </table>`;
     container.innerHTML = html;
     const tbody = document.getElementById('reviewTbody');
     for (let i = 0; i < lastScannedMatches.length; i++) {
@@ -48,7 +47,7 @@ function renderReviewTable() {
         chk.checked = m.selected;
         chk.addEventListener('change', (e) => { m.selected = e.target.checked; });
         chkCell.appendChild(chk);
-        // Part Number (editable)
+        // Part Number
         const partCell = row.insertCell(1);
         const partInput = document.createElement('input');
         partInput.type = 'text';
@@ -61,12 +60,10 @@ function renderReviewTable() {
         partInput.style.padding = '4px';
         partInput.addEventListener('change', (e) => {
             m.editedPart = e.target.value.toUpperCase();
-            // Try to find product by this part number
             const product = findProductByPart(m.editedPart);
             if (product) {
                 m.editedProduct = product;
                 m.confidence = 100;
-                // Update dropdown and price
                 updateProductDropdown(row.cells[2], m, i);
                 row.cells[5].innerHTML = `₹${product.price.toFixed(2)}`;
             } else {
@@ -121,7 +118,7 @@ function renderReviewTable() {
             }
         });
         prodCell.appendChild(prodSelect);
-        // Quantity (editable)
+        // Quantity
         const qtyCell = row.insertCell(3);
         const qtyInput = document.createElement('input');
         qtyInput.type = 'number';
@@ -157,7 +154,7 @@ function findProductByPart(part) {
 }
 
 function updateProductDropdown(cell, match, idx) {
-    // Not needed if we replace the whole dropdown; handled inside populateProductDropdown
+    // Handled in populateProductDropdown
 }
 
 function confirmAddScannedItems() {
@@ -201,4 +198,4 @@ function bindModalEvents() {
         const modal = document.getElementById('aiReviewModal');
         if (e.target === modal) modal.style.display = 'none';
     };
-                                   }
+            }
