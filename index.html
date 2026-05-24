@@ -274,9 +274,9 @@
                 <option value="quotation">✉️ Quotation</option>
             </select>
             <!-- NEW AI SCAN BUTTON (added without modifying existing lines) -->
-            <button id="ai-scan-btn" class="btn" style="background:#6c5ce7;">
-                <i class="fas fa-camera"></i> Scan Order
-            </button>
+            <label for="ai-scan-input" id="ai-scan-btn" class="btn" style="background:#6c5ce7; cursor:pointer;">
+    <i class="fas fa-camera"></i> Scan Order
+</label>
             <input type="file" id="ai-scan-input" accept="image/*,.pdf,.xlsx,.xls,.csv" capture style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;">
         </div>
         <div class="stock-info-date">Stock last updated: <span id="last-updated-date">Loading...</span></div>
