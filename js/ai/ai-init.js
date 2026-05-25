@@ -1,50 +1,39 @@
 (function() {
-    alert("AI init script loaded");
-
-    // Fallback function in case ai-review-modal.js is missing
-    if (typeof showReviewModal !== 'function') {
-        window.showReviewModal = function(matches) {
-            alert("showReviewModal called (fallback)\nMatches: " + JSON.stringify(matches, null, 2));
-            // Also try to directly add to cart (optional)
-            for (const m of matches) {
-                if (m.product && m.confidence >= 70) {
-                    if (typeof aiAddToCart === 'function') {
-                        aiAddToCart(m.product.part, m.product.price, m.editedQty || m.qty);
-                    }
-                }
-            }
-            if (typeof updateCartUI === 'function') updateCartUI();
-        };
-        alert("Fallback showReviewModal installed");
-    }
+    console.log("AI Scan Module initialising...");
 
     function initAIScan() {
-        alert("initAIScan called");
         const fileInput = document.getElementById('ai-scan-input');
         if (!fileInput) {
-            alert("File input not found!");
+            console.error("File input not found");
             return;
         }
         fileInput.onchange = async function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            alert("File selected: " + file.name);
+            console.log("File selected:", file.name);
+            if (typeof showToast === 'function') showToast("Processing...", false);
             try {
-                alert("Calling extractTextFromFile...");
-                const extractedText = await extractTextFromFile(file);
-                alert("Extracted text length: " + extractedText.length + "\nFirst 200 chars:\n" + extractedText.substring(0,200));
+                // 🔁 extractTextFromFile now returns an object
+                const ocrResult = await extractTextFromFile(file);
+                
+                // ✅ Extract the plain text string safely
+                const extractedText = typeof ocrResult === 'string' ? ocrResult : (ocrResult.text || '');
+                
+                console.log("Extracted text length:", extractedText.length);
                 if (extractedText.length < 5) {
-                    alert("No text extracted. Image may be too blurry.");
+                    if (typeof showToast === 'function') showToast("No text extracted. Try a clearer image.", true);
                     return;
                 }
-                const items = extractItemsFromText(extractedText);
-                alert("Parsed items count: " + items.length + "\n" + JSON.stringify(items));
+                // ✅ Pass the full OCR object to the parser (it can handle both)
+                const items = extractItemsFromText(ocrResult);
+                console.log("Parsed items:", items);
                 if (!items.length) {
-                    alert("No part numbers found in extracted text.");
+                    if (typeof showToast === 'function') showToast("No part numbers found.", true);
                     return;
                 }
                 if (!window.allProducts || window.allProducts.length === 0) {
-                    alert("Product database not loaded (allProducts is empty).");
+                    console.error("Product database not ready");
+                    if (typeof showToast === 'function') showToast("Products not loaded. Refresh.", true);
                     return;
                 }
                 const matches = [];
@@ -53,29 +42,32 @@
                     if (match) matches.push({ ...item, product: match.product, confidence: match.confidence });
                     else matches.push({ ...item, product: null, confidence: 0 });
                 }
-                alert("Matches ready: " + matches.length);
                 showReviewModal(matches);
             } catch(err) {
-                alert("Error: " + err.message);
+                console.error("Scan error:", err);
+                if (typeof showToast === 'function') showToast("Scan failed: " + err.message, true);
             }
             fileInput.value = '';
         };
-        alert("AI Scan ready – file input onchange set");
+        console.log("AI Scan ready");
     }
 
     function waitForProducts() {
-        alert("waitForProducts – checking allProducts");
         if (window.allProducts && window.allProducts.length > 0) {
-            alert("Products loaded: " + window.allProducts.length);
+            console.log("Products loaded (" + window.allProducts.length + "). Initialising AI scan...");
             if (typeof buildNormalizedIndex === 'function') buildNormalizedIndex();
             if (typeof initFuse === 'function') initFuse();
             initAIScan();
             if (typeof bindModalEvents === 'function') bindModalEvents();
         } else {
-            alert("allProducts not ready yet, retrying in 1 second");
-            setTimeout(waitForProducts, 1000);
+            console.log("Waiting for allProducts...");
+            setTimeout(waitForProducts, 500);
         }
     }
 
-    waitForProducts();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', waitForProducts);
+    } else {
+        waitForProducts();
+    }
 })();
