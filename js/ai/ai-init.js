@@ -1,72 +1,86 @@
 (function() {
-    alert("AI init: script loaded");
+    console.log("AI Scan Module initialising...");
 
     function initAIScan() {
-        alert("initAIScan called");
         const fileInput = document.getElementById('ai-scan-input');
         if (!fileInput) {
-            alert("File input not found!");
+            console.error("File input not found");
             return;
         }
-        alert("File input found, attaching onchange");
         fileInput.onchange = async function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            alert("File selected: " + file.name);
+            console.log("File selected:", file.name);
+            if (typeof showToast === 'function') showToast("Processing...", false);
+
             try {
-                alert("Calling extractTextFromFile...");
+                // 1. Get OCR result (object)
                 const ocrResult = await extractTextFromFile(file);
-                alert("OCR result type: " + typeof ocrResult);
-                
-                const extractedText = typeof ocrResult === 'string' ? ocrResult : (ocrResult.text || '');
-                alert("Extracted text length: " + extractedText.length);
+
+                // 2. Extract plain text safely (supports old string or new object)
+                const extractedText = (typeof ocrResult === 'string') ? ocrResult : (ocrResult.text || '');
+                console.log("Extracted text length:", extractedText.length);
                 if (extractedText.length < 5) {
-                    alert("No text extracted. Image may be too blurry.");
+                    if (typeof showToast === 'function') showToast("No text extracted. Try a clearer image.", true);
                     return;
                 }
+
+                // 3. Pass the full OCR object (or string) to the parser – parser handles both
                 const items = extractItemsFromText(ocrResult);
-                alert("Parsed items count: " + items.length + "\n" + JSON.stringify(items));
+                console.log("Parsed items:", items);
                 if (!items.length) {
-                    alert("No part numbers found.");
+                    if (typeof showToast === 'function') showToast("No part numbers found.", true);
                     return;
                 }
+
+                // 4. Ensure product database is loaded
                 if (!window.allProducts || window.allProducts.length === 0) {
-                    alert("Product database not loaded (allProducts is empty).");
+                    console.error("Product database not ready");
+                    if (typeof showToast === 'function') showToast("Products not loaded. Refresh.", true);
                     return;
                 }
+
+                // 5. Match each extracted item
                 const matches = [];
                 for (const item of items) {
                     const match = matchProduct(item);
                     if (match) matches.push({ ...item, product: match.product, confidence: match.confidence });
                     else matches.push({ ...item, product: null, confidence: 0 });
                 }
-                alert("Matches ready: " + matches.length);
+                console.log("Matches:", matches);
+
+                // 6. Show review modal
                 if (typeof showReviewModal === 'function') {
                     showReviewModal(matches);
                 } else {
-                    alert("showReviewModal is not defined!");
+                    console.error("showReviewModal is not defined");
+                    if (typeof showToast === 'function') showToast("Modal function missing", true);
                 }
             } catch(err) {
-                alert("Error: " + err.message);
+                console.error("Scan error:", err);
+                if (typeof showToast === 'function') showToast("Scan failed: " + err.message, true);
             }
-            fileInput.value = '';
+            fileInput.value = ''; // allow re-upload
         };
-        alert("AI Scan ready – file input onchange set");
+        console.log("AI Scan ready");
     }
 
     function waitForProducts() {
-        alert("waitForProducts – checking allProducts");
         if (window.allProducts && window.allProducts.length > 0) {
-            alert("Products loaded: " + window.allProducts.length);
+            console.log("Products loaded (" + window.allProducts.length + "). Initialising AI scan...");
             if (typeof buildNormalizedIndex === 'function') buildNormalizedIndex();
             if (typeof initFuse === 'function') initFuse();
             initAIScan();
             if (typeof bindModalEvents === 'function') bindModalEvents();
         } else {
-            alert("allProducts not ready yet, retrying in 1 second");
-            setTimeout(waitForProducts, 1000);
+            console.log("Waiting for allProducts...");
+            setTimeout(waitForProducts, 500);
         }
     }
 
-    waitForProducts();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', waitForProducts);
+    } else {
+        waitForProducts();
+    }
 })();
