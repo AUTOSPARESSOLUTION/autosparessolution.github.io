@@ -5,15 +5,75 @@ async function initOCR() {
         ocrWorker = await Tesseract.createWorker('eng');
         try {
             await ocrWorker.setParameters({
-                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.'
+                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./',
+                tessedit_pageseg_mode: '6',
+                preserve_interword_spaces: '1'
             });
         } catch(err) {
-            console.warn('Whitelist setting failed (non-critical):', err);
+            console.warn('Parameter set warning:', err);
         }
     }
 }
 
+// Adaptive resizing: smaller for mobile
+function getAdaptiveMaxSize() {
+    return window.innerWidth < 768 ? 1100 : 1600;
+}
+
+// Fast binarisation (removes shadows)
+async function preprocessImageBinary(file, threshold = 140) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+                const val = avg > threshold ? 255 : 0;
+                data[i] = data[i+1] = data[i+2] = val;
+            }
+            ctx.putImageData(imageData, 0, 0);
+            canvas.toBlob(blob => {
+                URL.revokeObjectURL(url);
+                resolve(blob);
+            }, file.type);
+        };
+        img.src = url;
+    });
+}
+
+// Group words into lines based on vertical position
+function groupWordsIntoLines(words, yTolerance = 12) {
+    if (!words || words.length === 0) return [];
+    const lines = [];
+    const sorted = [...words].sort((a, b) => a.bbox.y0 - b.bbox.y0);
+    for (const word of sorted) {
+        let placed = false;
+        for (const line of lines) {
+            if (Math.abs(line.y - word.bbox.y0) < yTolerance) {
+                line.words.push(word);
+                placed = true;
+                break;
+            }
+        }
+        if (!placed) {
+            lines.push({ y: word.bbox.y0, words: [word] });
+        }
+    }
+    return lines.map(line => {
+        line.words.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+        return line.words.map(w => w.text).join(' ');
+    });
+}
+
 async function extractFromExcelOrCSV(file) {
+    // ... same as before (keep your existing implementation)
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -89,13 +149,25 @@ async function extractTextFromFile(file) {
                 const content = await page.getTextContent();
                 fullText += content.items.map(item => item.str).join(' ') + '\n';
             }
-            return fullText;
+            return { text: fullText, words: null };
         } else {
             await initOCR();
-            const resizedBlob = await resizeImage(file, 1600);
-            const ret = await ocrWorker.recognize(resizedBlob);
-            console.log("OCR raw text (first 300 chars):", ret.data.text.substring(0,300));
-            return ret.data.text;
+            const preprocessed = await preprocessImageBinary(file, 140);
+            const maxSize = getAdaptiveMaxSize();
+            const resized = await resizeImage(preprocessed, maxSize);
+            // Timeout protection (25 seconds)
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('OCR timeout')), 25000)
+            );
+            const ret = await Promise.race([
+                ocrWorker.recognize(resized, {}, { text: true, blocks: false }),
+                timeoutPromise
+            ]);
+            // Filter low-confidence words (<55%)
+            const highConfWords = (ret.data.words || []).filter(w => w.confidence > 55);
+            const reconstructedLines = groupWordsIntoLines(highConfWords);
+            const fullText = reconstructedLines.join('\n');
+            return { text: fullText, words: highConfWords, rawText: ret.data.text };
         }
     } finally {
         if (scanBtn) {
