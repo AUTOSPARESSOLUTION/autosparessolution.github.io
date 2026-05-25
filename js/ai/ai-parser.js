@@ -8,12 +8,11 @@ function extractItemsFromText(ocrResult) {
     return extractFromLines(lines);
 }
 
-// ========== PATTERN FOR MAHINDRA PART NUMBERS ==========
+// ========== PATTERN FOR MAHINDRA PART NUMBERS (with /g flag) ==========
 // Numeric: 5‑13 digits
 // Alphanumeric: common patterns (4 digits + 3 letters + 4 digits + letter, etc.)
-// Also matches standalone part numbers that may be preceded/followed by spaces or punctuation
-const PART_PATTERN_STRICT = /\b(?:\d{5,13}|\d{4}[A-Z]{3}\d{4}[A-Z]|\d{4}[A-Z]{2}\d{4}[A-Z]|\d{3}[A-Z]{3}\d{4})\b/i;
-const PART_PATTERN_GENERIC = /\b(?=.*[A-Z])(?=.*\d)[A-Z0-9]{5,}\b/i;
+const PART_PATTERN_STRICT = /\b(?:\d{5,13}|\d{4}[A-Z]{3}\d{4}[A-Z]|\d{4}[A-Z]{2}\d{4}[A-Z]|\d{3}[A-Z]{3}\d{4})\b/gi;
+const PART_PATTERN_GENERIC = /\b(?=.*[A-Z])(?=.*\d)[A-Z0-9]{5,}\b/gi;
 
 // ========== COLUMN + ROW‑WIDE HYBRID EXTRACTOR ==========
 function extractFromRowsWithFallback(rows) {
@@ -200,9 +199,11 @@ function extractFromRowsGeneric(rows) {
     return Array.from(merged.values());
 }
 
-// ---------- Fallback line parser for PDF text layer and Excel ----------
+// ---------- Fallback line parser for PDF text layer and Excel (fixed .matchAll) ----------
 function extractFromLines(lines) {
     const items = [];
+    // ⬇️ MUST have /g flag for .matchAll()
+    const partPattern = /\b(?:\d{5,13}|\d{4}[A-Z]{3}\d{4}[A-Z]|\d{4}[A-Z]{2}\d{4}[A-Z]|\d{3}[A-Z]{3}\d{4})\b/gi;
     const ignoreIfContains = /(invoice|gst|cgst|sgst|total|subtotal|amount|tax|hsn|sac|mobile|phone|email|bank|address|date|delivery|shipping|buyer|seller|dispatch|terms|payment|ack|page|state|code|gstin)/i;
     const minLineLength = 10;
     
@@ -212,7 +213,8 @@ function extractFromLines(lines) {
         if (line.length < minLineLength) continue;
         if (ignoreIfContains.test(line)) continue;
         
-        const partMatches = [...line.matchAll(PART_PATTERN_STRICT)];
+        // ⬇️ Now works because partPattern has /g
+        const partMatches = [...line.matchAll(partPattern)];
         if (partMatches.length === 0) continue;
         
         let qty = 1;
@@ -254,4 +256,4 @@ function extractFromLines(lines) {
     }
     console.log("Line parser extracted:", Array.from(merged.values()));
     return Array.from(merged.values());
-                }
+            }
