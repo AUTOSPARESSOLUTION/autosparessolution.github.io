@@ -1,39 +1,37 @@
 (function() {
-    console.log("AI Scan Module initialising...");
+    alert("AI init: script loaded");
 
     function initAIScan() {
+        alert("initAIScan called");
         const fileInput = document.getElementById('ai-scan-input');
         if (!fileInput) {
-            console.error("File input not found");
+            alert("File input not found!");
             return;
         }
+        alert("File input found, attaching onchange");
         fileInput.onchange = async function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            console.log("File selected:", file.name);
-            if (typeof showToast === 'function') showToast("Processing...", false);
+            alert("File selected: " + file.name);
             try {
-                // 🔁 extractTextFromFile now returns an object
+                alert("Calling extractTextFromFile...");
                 const ocrResult = await extractTextFromFile(file);
+                alert("OCR result type: " + typeof ocrResult);
                 
-                // ✅ Extract the plain text string safely
                 const extractedText = typeof ocrResult === 'string' ? ocrResult : (ocrResult.text || '');
-                
-                console.log("Extracted text length:", extractedText.length);
+                alert("Extracted text length: " + extractedText.length);
                 if (extractedText.length < 5) {
-                    if (typeof showToast === 'function') showToast("No text extracted. Try a clearer image.", true);
+                    alert("No text extracted. Image may be too blurry.");
                     return;
                 }
-                // ✅ Pass the full OCR object to the parser (it can handle both)
                 const items = extractItemsFromText(ocrResult);
-                console.log("Parsed items:", items);
+                alert("Parsed items count: " + items.length + "\n" + JSON.stringify(items));
                 if (!items.length) {
-                    if (typeof showToast === 'function') showToast("No part numbers found.", true);
+                    alert("No part numbers found.");
                     return;
                 }
                 if (!window.allProducts || window.allProducts.length === 0) {
-                    console.error("Product database not ready");
-                    if (typeof showToast === 'function') showToast("Products not loaded. Refresh.", true);
+                    alert("Product database not loaded (allProducts is empty).");
                     return;
                 }
                 const matches = [];
@@ -42,32 +40,33 @@
                     if (match) matches.push({ ...item, product: match.product, confidence: match.confidence });
                     else matches.push({ ...item, product: null, confidence: 0 });
                 }
-                showReviewModal(matches);
+                alert("Matches ready: " + matches.length);
+                if (typeof showReviewModal === 'function') {
+                    showReviewModal(matches);
+                } else {
+                    alert("showReviewModal is not defined!");
+                }
             } catch(err) {
-                console.error("Scan error:", err);
-                if (typeof showToast === 'function') showToast("Scan failed: " + err.message, true);
+                alert("Error: " + err.message);
             }
             fileInput.value = '';
         };
-        console.log("AI Scan ready");
+        alert("AI Scan ready – file input onchange set");
     }
 
     function waitForProducts() {
+        alert("waitForProducts – checking allProducts");
         if (window.allProducts && window.allProducts.length > 0) {
-            console.log("Products loaded (" + window.allProducts.length + "). Initialising AI scan...");
+            alert("Products loaded: " + window.allProducts.length);
             if (typeof buildNormalizedIndex === 'function') buildNormalizedIndex();
             if (typeof initFuse === 'function') initFuse();
             initAIScan();
             if (typeof bindModalEvents === 'function') bindModalEvents();
         } else {
-            console.log("Waiting for allProducts...");
-            setTimeout(waitForProducts, 500);
+            alert("allProducts not ready yet, retrying in 1 second");
+            setTimeout(waitForProducts, 1000);
         }
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', waitForProducts);
-    } else {
-        waitForProducts();
-    }
+    waitForProducts();
 })();
