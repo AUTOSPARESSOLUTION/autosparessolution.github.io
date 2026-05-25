@@ -1,97 +1,101 @@
-(function() {
-    alert("🔵 AI init: script loaded");
+// ai-init.js – stable production version
+(function () {
+    console.log("AI module booting...");
 
-    // Simple fallback modal (in case ai-review-modal.js missing)
-    if (typeof showReviewModal !== 'function') {
-        window.showReviewModal = function(matches) {
-            alert("✅ Fallback modal: " + matches.length + " matches found.\n" + JSON.stringify(matches.map(m => ({ part: m.partRaw, qty: m.qty, product: m.product?.part })), null, 2));
-            let msg = "Add to cart?\n";
-            for (let m of matches) {
-                if (m.product) msg += `${m.partRaw} → ${m.product.part} x${m.qty}\n`;
+    function aiAlert(msg) {
+        console.log(msg);
+        if (typeof showToast === 'function') {
+            showToast(msg, false);
+        }
+    }
+
+    async function handleFile(fileInput) {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        try {
+            aiAlert("📷 File selected");
+
+            aiAlert("🔍 Reading document...");
+            const ocrResult = await extractTextFromFile(file);
+            const extractedText = typeof ocrResult === 'string' ? ocrResult : (ocrResult.text || '');
+            console.log("OCR TEXT:", extractedText);
+
+            if (!extractedText || extractedText.length < 5) {
+                aiAlert("❌ No readable text found");
+                return;
             }
-            if (confirm(msg + "\nClick OK to add all")) {
-                let added = 0;
-                for (let m of matches) {
-                    if (m.product && typeof window.aiAddToCart === 'function') {
-                        window.aiAddToCart(m.product.part, m.product.price, m.qty);
-                        added++;
-                    }
+
+            aiAlert("🧠 Detecting part numbers...");
+            const items = extractItemsFromText(ocrResult);
+            console.log("PARSED ITEMS:", items);
+
+            if (!items || items.length === 0) {
+                aiAlert("❌ No valid items detected");
+                return;
+            }
+            aiAlert(`✅ ${items.length} item(s) detected`);
+
+            if (!window.allProducts || window.allProducts.length === 0) {
+                aiAlert("❌ Product database not loaded");
+                return;
+            }
+
+            aiAlert("🔎 Matching products...");
+            const matches = [];
+            for (const item of items) {
+                const match = matchProduct(item);
+                if (match) {
+                    matches.push({ ...item, product: match.product, confidence: match.confidence });
+                } else {
+                    matches.push({ ...item, product: null, confidence: 0 });
                 }
-                if (added && typeof updateCartUI === 'function') updateCartUI();
-                alert(`Added ${added} items to cart`);
             }
-        };
-        window.confirmAddScannedItems = function() {};
-        window.bindModalEvents = function() {};
-        alert("📦 Fallback modal installed");
+            console.log("MATCHES:", matches);
+
+            aiAlert("📋 Opening review...");
+            if (typeof showReviewModal === 'function') {
+                showReviewModal(matches);
+            } else {
+                console.error("showReviewModal missing");
+                aiAlert("❌ Review modal missing");
+            }
+        } catch (err) {
+            console.error(err);
+            aiAlert("❌ Scan failed: " + err.message);
+        }
+        fileInput.value = '';
     }
 
     function initAIScan() {
-        alert("🟢 initAIScan called");
+        console.log("Initialising AI scan...");
         const fileInput = document.getElementById('ai-scan-input');
         if (!fileInput) {
-            alert("❌ File input not found!");
+            console.error("ai-scan-input not found");
             return;
         }
-        alert("✅ File input found, attaching onchange");
-        fileInput.onchange = async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            alert("📎 File selected: " + file.name);
-            try {
-                alert("📷 Calling extractTextFromFile...");
-                const ocrResult = await extractTextFromFile(file);
-                const extractedText = typeof ocrResult === 'string' ? ocrResult : (ocrResult.text || '');
-                alert("📄 OCR text length: " + extractedText.length + "\nFirst 300 chars:\n" + extractedText.substring(0,300));
-                if (extractedText.length < 10) {
-                    alert("⚠️ No text extracted (OCR may have failed)");
-                    return;
-                }
-                alert("🔧 Parsing items...");
-                const items = extractItemsFromText(ocrResult);
-                alert("📦 Items parsed: " + items.length);
-                if (items.length === 0) {
-                    alert("⚠️ No part numbers found in OCR text.");
-                    return;
-                }
-                if (!window.allProducts || window.allProducts.length === 0) {
-                    alert("❌ Product database not loaded (allProducts empty)");
-                    return;
-                }
-                alert("🎯 Matching products...");
-                const matches = [];
-                for (const item of items) {
-                    const match = matchProduct(item);
-                    if (match) matches.push({ ...item, product: match.product, confidence: match.confidence });
-                }
-                alert("✅ Matches ready: " + matches.length);
-                if (matches.length === 0) {
-                    alert("⚠️ No matches found in product database");
-                    return;
-                }
-                alert("🖼️ Opening review modal...");
-                showReviewModal(matches);
-            } catch(err) {
-                alert("❌ ERROR: " + err.message);
-            }
-            fileInput.value = '';
+        fileInput.onchange = async function () {
+            await handleFile(fileInput);
         };
-        alert("🟢 AI Scan ready (listener attached)");
+        aiAlert("✅ AI Scan Ready");
     }
 
     function waitForProducts() {
-        alert("⏳ waitForProducts - checking allProducts");
-        if (window.allProducts && window.allProducts.length > 0) {
-            alert("✅ Products loaded: " + window.allProducts.length);
+        if (window.allProducts && Array.isArray(window.allProducts) && window.allProducts.length > 0) {
+            console.log("Products loaded:", window.allProducts.length);
             if (typeof buildNormalizedIndex === 'function') buildNormalizedIndex();
             if (typeof initFuse === 'function') initFuse();
-            initAIScan();
             if (typeof bindModalEvents === 'function') bindModalEvents();
+            initAIScan();
         } else {
-            alert("⏳ allProducts not ready, retrying in 1s...");
+            console.log("Waiting for allProducts...");
             setTimeout(waitForProducts, 1000);
         }
     }
 
-    waitForProducts();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', waitForProducts);
+    } else {
+        waitForProducts();
+    }
 })();
