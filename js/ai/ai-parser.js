@@ -1,110 +1,60 @@
 function extractItemsFromText(ocrResult) {
-    // If we have rows with word coordinates, use column detection
-    if (ocrResult.rows && ocrResult.rows.length > 0) {
-        return extractFromRows(ocrResult.rows);
-    }
-    // Fallback to plain text parsing (for PDFs/Excel)
     const text = typeof ocrResult === 'string' ? ocrResult : ocrResult.text;
     const lines = text.split(/\r?\n/);
-    return extractFromLines(lines);
-}
-
-function extractFromRows(rows) {
     const items = [];
-    // Heuristic: find typical part number column and quantity column
-    // Collect all word X positions to guess columns
-    const allWords = [];
-    for (const row of rows) {
-        for (const word of row.words) {
-            allWords.push({ x: word.bbox.x0, text: word.text });
-        }
-    }
-    // Find clusters of X positions (columns)
-    const xPositions = [...new Set(allWords.map(w => Math.round(w.x / 20) * 20))].sort((a,b)=>a-b);
     
-    // Part numbers usually contain letters and digits, length > 5
-    // Quantities are small numbers (1-999)
-    for (const row of rows) {
-        // Skip rows that are obviously headers/totals
-        const rowText = row.text.toLowerCase();
-        if (/(invoice|gst|total|amount|tax|hsn|sac|phone|email|address|page|state)/i.test(rowText)) continue;
-        if (rowText.length < 8) continue;
-        
-        // Find part number candidate
-        let part = null;
-        let qty = 1;
-        for (const word of row.words) {
-            const txt = word.text;
-            // Part number pattern: at least one letter and one digit, length >= 5
-            if (/^(?=.*[A-Z])(?=.*\d)[A-Z0-9]{5,}$/i.test(txt)) {
-                part = txt;
-                // Look for quantity in the same row, preferably a small number to the right
-                for (const w2 of row.words) {
-                    const num = parseInt(w2.text);
-                    if (!isNaN(num) && num > 0 && num < 1000 && w2.bbox.x0 > word.bbox.x0) {
-                        qty = num;
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-        if (part) {
-            items.push({ partRaw: part, qty: qty });
-        }
-    }
-    
-    // Merge duplicates
-    const merged = new Map();
-    for (const it of items) {
-        const norm = normalizePart(it.partRaw);
-        if (!norm) continue;
-        if (merged.has(norm)) {
-            merged.get(norm).qty += it.qty;
-        } else {
-            merged.set(norm, { partRaw: it.partRaw, qty: it.qty });
-        }
-    }
-    return Array.from(merged.values());
-}
-
-function extractFromLines(lines) {
-    const items = [];
+    // Part number pattern: must contain letters AND digits, length 5-20
     const partPattern = /\b(?=.*[A-Z])(?=.*\d)[A-Z0-9]{5,}(?:[-.\/][A-Z0-9]+)*\b/g;
-    const ignoreIfContains = /(invoice|gst|total|amount|tax|hsn|sac|mobile|phone|email|bank|address|date|delivery|shipping)/i;
     
-    for (let line of lines) {
-        line = line.trim();
+    // Words that indicate a line is definitely NOT an order line (invoice metadata)
+    const ignoreIfContains = /(invoice|gst|cgst|sgst|total|subtotal|amount|tax|hsn|sac|mobile|phone|email|bank|address|date|delivery|shipping|buyer|seller|dispatch|terms|payment|ack|page|state|code|gstin)/i;
+    
+    // Also ignore lines that are too short (likely noise)
+    const minLineLength = 10;
+    
+    for (let rawLine of lines) {
+        let line = rawLine.trim();
         if (!line) continue;
-        if (line.length < 10) continue;
+        if (line.length < minLineLength) continue;
         if (ignoreIfContains.test(line)) continue;
         
+        // Find all part number candidates
         const partMatches = [...line.matchAll(partPattern)];
         if (partMatches.length === 0) continue;
         
-        // Extract quantity
+        // Extract quantity: look for a number (1-999) at the end of the line OR after "x"
         let qty = 1;
         const qtyPatterns = [
-            /(?:qty|quantity|x)\s*(\d+)/i,
-            /\b(\d{1,3})\b\s*$/
+            /(?:qty|quantity|qnty|pcs|nos|x)\s*[:\-]?\s*(\d+)/i,
+            /(\d+)\s*(?:pcs|nos|qty)/i,
+            /\b(\d{1,3})\b\s*$/,
+            /x(\d{1,3})\b/
         ];
         for (const pat of qtyPatterns) {
-            const m = line.match(pat);
-            if (m) { qty = parseInt(m[1]) || 1; break; }
+            const match = line.match(pat);
+            if (match) {
+                qty = parseInt(match[1]) || 1;
+                break;
+            }
         }
         
+        // For each candidate, filter obvious false positives
         for (const m of partMatches) {
             let part = m[0];
-            // ignore dates, long numbers
+            // Ignore dates (DD-MM-YY)
             if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(part)) continue;
+            // Ignore long numeric only
             if (/^\d{10,}$/.test(part)) continue;
+            // Ignore pure numbers less than 4 digits (could be row numbers or prices)
             if (/^\d{1,3}$/.test(part)) continue;
-            const norm = normalizePart(part);
-            if (!norm || norm.length < 4) continue;
+            
+            const normalized = normalizePart(part);
+            if (!normalized || normalized.length < 4) continue;
             items.push({ partRaw: part, qty: qty });
         }
     }
-    // Merge duplicates
+    
+    // Merge duplicates (same part, sum quantities)
     const merged = new Map();
     for (const it of items) {
         const norm = normalizePart(it.partRaw);
@@ -115,5 +65,7 @@ function extractFromLines(lines) {
             merged.set(norm, { partRaw: it.partRaw, qty: it.qty });
         }
     }
+    
+    console.log("Parser extracted items:", Array.from(merged.values()));
     return Array.from(merged.values());
-        }
+                }
