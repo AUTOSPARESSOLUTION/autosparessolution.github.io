@@ -1,71 +1,61 @@
-// ai-parser.js – row‑based scoring, SKU shape, intelligent quantity
 function extractItemsFromText(ocrResult) {
     const text = typeof ocrResult === 'string' ? ocrResult : ocrResult.text;
     const lines = text.split(/\r?\n/);
     const items = [];
     
-    // SKU pattern: at least one letter and one number, 3+ chars
-    const partPattern = /\b(?=.*[A-Z])(?=.*\d)[A-Z0-9]{3,}(?:[-.\/][A-Z0-9]+)*\b/g;
+    // Pattern for spare part numbers (alphanumeric, dashes, dots, slashes)
+    // Adjust this based on your actual part number format
+    const partPattern = /\b([A-Z0-9]{3,}(?:[-.\/][A-Z0-9]+)*)\b/g;
     
-    // Negative signals (invoice metadata)
-    const negativeSignals = /invoice|gst|cgst|sgst|total|subtotal|amount|tax|hsn|sac|mobile|phone|email|bank|ifsc|address|date|delivery|shipping|bill to|ship to|terms|payment|thank you/i;
-    
-    // Helper: extract quantity from the end of a line or after part number
-    function extractQtyFromLine(line) {
-        const nums = [...line.matchAll(/\b(\d{1,3})\b/g)]
-            .map(m => parseInt(m[1]))
-            .filter(n => n > 0 && n < 1000);
-        if (!nums.length) return 1;
-        // Usually the last small number is quantity
-        return nums[nums.length - 1];
-    }
+    // Words that indicate a row is NOT an order line
+    const ignoreKeywords = /invoice|gst|cgst|sgst|total|subtotal|amount|tax|hsn|sac|mobile|phone|email|bank|address|date|delivery|shipping|buyer|seller|dispatch|terms|payment|ack/i;
     
     for (let rawLine of lines) {
         let line = rawLine.trim();
         if (!line) continue;
         
-        // Compute line score
-        let score = 0;
+        // Skip obvious non‑order lines
+        if (ignoreKeywords.test(line)) continue;
+        // Skip lines that are too short (likely noise)
+        if (line.length < 5 || line.length > 200) continue;
         
-        // Penalise obvious metadata lines
-        if (negativeSignals.test(line)) {
-            score -= 80;
-        }
-        // Penalise very long or very short lines
-        if (line.length > 150 || line.length < 6) score -= 20;
-        // Penalise lines containing currency symbol
-        if (/[₹$]/.test(line)) score -= 40;
-        // Penalise lines with date patterns
-        if (/\d{1,2}[-/]\d{1,2}[-/]\d{2,4}/.test(line)) score -= 60;
-        
-        // Find SKU-shaped tokens
+        // Find all possible part numbers in this line
         const partMatches = [...line.matchAll(partPattern)];
         if (partMatches.length === 0) continue;
         
-        // Boost score for each potential part number
-        score += partMatches.length * 40;
+        // Extract quantity: look for a standalone number (1-999) at the end of the line
+        let qty = 1;
+        // First, try to find "Qty" pattern
+        const qtyPatterns = [
+            /(?:qty|quantity|qnty|pcs|nos|x)\s*[:\-]?\s*(\d+)/i,
+            /(\d+)\s*(?:pcs|nos|qty)/i,
+            /\b(\d{1,3})\b\s*$/   // number at the very end
+        ];
+        for (const pat of qtyPatterns) {
+            const match = line.match(pat);
+            if (match) {
+                qty = parseInt(match[1]) || 1;
+                break;
+            }
+        }
         
-        // Extract quantity using row‑based heuristics
-        let qty = extractQtyFromLine(line);
-        if (qty > 1) score += 20;
-        
-        // Only accept lines with a positive score (likely order rows)
-        if (score < 20) continue;
-        
-        for (const m of partMatches) {
-            let part = m[0];
-            // Filter obvious false positives
+        // For each candidate part number, apply additional filters
+        for (const match of partMatches) {
+            let part = match[1];
+            // Ignore dates (e.g., 14-05-26)
             if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(part)) continue;
+            // Ignore long numeric only (GSTIN, invoice numbers)
             if (/^\d{12,}$/.test(part)) continue;
+            // Ignore pure numbers shorter than 4 (could be row numbers or prices)
             if (/^\d{1,3}$/.test(part)) continue;
-            
+            // Normalise and add
             const normalized = normalizePart(part);
             if (!normalized || normalized.length < 4) continue;
             items.push({ partRaw: part, qty });
         }
     }
     
-    // Merge duplicates
+    // Merge duplicates (same part, sum quantities)
     const merged = new Map();
     for (const it of items) {
         const norm = normalizePart(it.partRaw);
@@ -77,4 +67,4 @@ function extractItemsFromText(ocrResult) {
         }
     }
     return Array.from(merged.values());
-    }
+                }
