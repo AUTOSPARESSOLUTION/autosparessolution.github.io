@@ -1,18 +1,16 @@
-// ai-ocr.js – stable production version
 let ocrWorker = null;
 
 async function initOCR() {
     if (!ocrWorker) {
         ocrWorker = await Tesseract.createWorker('eng');
         await ocrWorker.setParameters({
-            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.',
-            tessedit_pageseg_mode: '6'   // single uniform block of text – improves invoice reading
+            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.'
         });
     }
 }
 
-// Simple preprocessing – resize and binarise (grayscale threshold)
 async function preprocessImage(blob) {
+    // Keep your existing preprocessing (resize + binarise)
     return new Promise((resolve) => {
         const img = new Image();
         const url = URL.createObjectURL(blob);
@@ -34,9 +32,7 @@ async function preprocessImage(blob) {
             for (let i = 0; i < data.length; i += 4) {
                 const avg = (data[i] + data[i+1] + data[i+2]) / 3;
                 const val = avg > 140 ? 255 : 0;
-                data[i] = val;
-                data[i+1] = val;
-                data[i+2] = val;
+                data[i] = val; data[i+1] = val; data[i+2] = val;
             }
             ctx.putImageData(imageData, 0, 0);
             canvas.toBlob(blob => {
@@ -48,8 +44,8 @@ async function preprocessImage(blob) {
     });
 }
 
-// Extract text from Excel/CSV files (used by AI scan button)
 async function extractFromExcelOrCSV(file) {
+    // Your existing Excel function (same as before)
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -58,30 +54,20 @@ async function extractFromExcelOrCSV(file) {
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "" });
-                if (!rows || rows.length < 2) {
-                    reject(new Error("No data rows"));
-                    return;
-                }
+                if (!rows || rows.length < 2) reject(new Error("No data rows"));
                 let partColIndex = -1, qtyColIndex = -1;
                 for (let i = 0; i < Math.min(rows.length, 15); i++) {
                     const row = rows[i];
                     if (!row) continue;
                     for (let j = 0; j < row.length; j++) {
                         const cell = (row[j] || "").toString().trim().toLowerCase();
-                        if ((cell.includes("part") && (cell.includes("number") || cell === "part" || cell === "partno"))) {
-                            partColIndex = j;
-                        }
-                        if (cell.includes("qty") || cell === "quantity" || cell === "qty.") {
-                            qtyColIndex = j;
-                        }
+                        if ((cell.includes("part") && (cell.includes("number") || cell === "part" || cell === "partno"))) partColIndex = j;
+                        if (cell.includes("qty") || cell === "quantity" || cell === "qty.") qtyColIndex = j;
                     }
                     if (partColIndex !== -1) break;
                 }
-                if (partColIndex === -1) {
-                    reject(new Error("No 'Part Number' column found"));
-                    return;
-                }
-                let textLines = [];
+                if (partColIndex === -1) reject(new Error("No 'Part Number' column found"));
+                let lines = [];
                 for (let i = 1; i < rows.length; i++) {
                     const row = rows[i];
                     if (!row || row.length === 0) continue;
@@ -92,19 +78,16 @@ async function extractFromExcelOrCSV(file) {
                         let qtyVal = parseFloat(row[qtyColIndex]);
                         if (!isNaN(qtyVal) && qtyVal > 0) qty = Math.floor(qtyVal);
                     }
-                    textLines.push(`${partNoRaw} x${qty}`);
+                    lines.push(`${partNoRaw} x${qty}`);
                 }
-                resolve(textLines.join('\n'));
-            } catch(err) {
-                reject(err);
-            }
+                resolve(lines.join('\n'));
+            } catch(err) { reject(err); }
         };
         reader.onerror = () => reject(new Error("File read failed"));
         reader.readAsArrayBuffer(file);
     });
 }
 
-// Main entry point for extracting text from any file (image, PDF, Excel)
 async function extractTextFromFile(file) {
     const scanBtn = document.getElementById('ai-scan-btn');
     if (scanBtn) {
@@ -112,52 +95,24 @@ async function extractTextFromFile(file) {
         scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
     }
     try {
-        // Excel/CSV
         if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
             const text = await extractFromExcelOrCSV(file);
             return { text: text, words: null };
-        }
-        // PDF
-        else if (file.type === 'application/pdf') {
+        } else if (file.type === 'application/pdf') {
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let fullText = '';
-            // Try to extract text layer first (for searchable PDFs)
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ');
-                if (pageText.trim().length > 50) {
-                    fullText += pageText + '\n';
-                }
-            }
-            // If no text found, fallback to OCR on each page (for scanned PDFs)
-            if (fullText.trim().length === 0) {
-                await initOCR();
-                if (typeof showToast === 'function') showToast("PDF has no text, OCR scanning pages...", false);
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const viewport = page.getViewport({ scale: 2.5 });
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-                    await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
-                    const preprocessed = await preprocessImage(blob);
-                    const ret = await ocrWorker.recognize(preprocessed);
-                    fullText += ret.data.text + '\n';
-                }
+                fullText += textContent.items.map(item => item.str).join(' ') + '\n';
             }
             return { text: fullText, words: null };
-        }
-        // Image (JPG, PNG, etc.)
-        else {
+        } else {
             await initOCR();
             const preprocessed = await preprocessImage(file);
             const ret = await ocrWorker.recognize(preprocessed);
-            const plainText = ret.data.text;
-            return { text: plainText, words: null };
+            return { text: ret.data.text, words: null };
         }
     } finally {
         if (scanBtn) {
@@ -167,7 +122,6 @@ async function extractTextFromFile(file) {
     }
 }
 
-// Terminate worker on page unload to free memory
 window.addEventListener('beforeunload', async () => {
     if (ocrWorker) {
         await ocrWorker.terminate();
