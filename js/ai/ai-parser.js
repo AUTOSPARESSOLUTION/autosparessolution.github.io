@@ -1,62 +1,71 @@
-// ai-parser.js – intelligent line‑scoring parser
-function extractItemsFromText(text) {
+// ai-parser.js – row‑based scoring, SKU shape, intelligent quantity
+function extractItemsFromText(ocrResult) {
+    const text = typeof ocrResult === 'string' ? ocrResult : ocrResult.text;
     const lines = text.split(/\r?\n/);
     const items = [];
     
-    // Part number pattern (alphanumeric, dots, dashes, slashes, at least 4 chars)
-    const partPattern = /\b([A-Z0-9]{4,}(?:[-.\/][A-Z0-9]+)*)\b/g;
+    // SKU pattern: at least one letter and one number, 3+ chars
+    const partPattern = /\b(?=.*[A-Z])(?=.*\d)[A-Z0-9]{3,}(?:[-.\/][A-Z0-9]+)*\b/g;
     
-    // Words that indicate an entire line should be ignored (invoice metadata)
-    const noiseKeywords = /invoice|gst|cgst|sgst|total|subtotal|amount|tax|hsn|sac|mobile|phone|email|bank|ifsc|address|date|delivery|shipping|bill to|ship to|terms|payment|thank you/i;
+    // Negative signals (invoice metadata)
+    const negativeSignals = /invoice|gst|cgst|sgst|total|subtotal|amount|tax|hsn|sac|mobile|phone|email|bank|ifsc|address|date|delivery|shipping|bill to|ship to|terms|payment|thank you/i;
+    
+    // Helper: extract quantity from the end of a line or after part number
+    function extractQtyFromLine(line) {
+        const nums = [...line.matchAll(/\b(\d{1,3})\b/g)]
+            .map(m => parseInt(m[1]))
+            .filter(n => n > 0 && n < 1000);
+        if (!nums.length) return 1;
+        // Usually the last small number is quantity
+        return nums[nums.length - 1];
+    }
     
     for (let rawLine of lines) {
         let line = rawLine.trim();
         if (!line) continue;
         
-        // 1. Skip lines that look like invoice metadata
-        if (noiseKeywords.test(line)) continue;
+        // Compute line score
+        let score = 0;
         
-        // 2. Skip lines that are too short or too long (likely noise)
-        if (line.length < 5 || line.length > 200) continue;
-        
-        // 3. Find all possible part numbers in the line
-        const partMatches = [...line.matchAll(partPattern)];
-        if (!partMatches.length) continue;
-        
-        // 4. Detect quantity using multiple patterns
-        let qty = 1;
-        const qtyPatterns = [
-            /(?:qty|quantity|qnty|pcs|nos|x)\s*[:\-]?\s*(\d+)/i,      // "Qty 5", "x2"
-            /(\d+)\s*(?:pcs|nos|qty|quantity)/i,                       // "5 pcs"
-            /\b(\d{1,3})\b\s*$/                                        // ends with number
-        ];
-        for (const pattern of qtyPatterns) {
-            const qMatch = line.match(pattern);
-            if (qMatch) {
-                qty = parseInt(qMatch[1]) || 1;
-                break;
-            }
+        // Penalise obvious metadata lines
+        if (negativeSignals.test(line)) {
+            score -= 80;
         }
+        // Penalise very long or very short lines
+        if (line.length > 150 || line.length < 6) score -= 20;
+        // Penalise lines containing currency symbol
+        if (/[₹$]/.test(line)) score -= 40;
+        // Penalise lines with date patterns
+        if (/\d{1,2}[-/]\d{1,2}[-/]\d{2,4}/.test(line)) score -= 60;
         
-        // 5. For each candidate part number, filter obvious noise
+        // Find SKU-shaped tokens
+        const partMatches = [...line.matchAll(partPattern)];
+        if (partMatches.length === 0) continue;
+        
+        // Boost score for each potential part number
+        score += partMatches.length * 40;
+        
+        // Extract quantity using row‑based heuristics
+        let qty = extractQtyFromLine(line);
+        if (qty > 1) score += 20;
+        
+        // Only accept lines with a positive score (likely order rows)
+        if (score < 20) continue;
+        
         for (const m of partMatches) {
-            let part = m[1];
-            // Ignore dates (DD-MM-YYYY, DD/MM/YY, etc.)
+            let part = m[0];
+            // Filter obvious false positives
             if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(part)) continue;
-            // Ignore long numeric strings (GSTIN, invoice numbers, phone numbers)
             if (/^\d{12,}$/.test(part)) continue;
-            // Ignore pure numbers shorter than 4 digits (could be row numbers or prices)
             if (/^\d{1,3}$/.test(part)) continue;
             
-            // Apply normalisation (removes special characters, uppercase)
             const normalized = normalizePart(part);
             if (!normalized || normalized.length < 4) continue;
-            
             items.push({ partRaw: part, qty });
         }
     }
     
-    // 6. Merge duplicate part numbers (same part, sum quantities)
+    // Merge duplicates
     const merged = new Map();
     for (const it of items) {
         const norm = normalizePart(it.partRaw);
@@ -67,6 +76,5 @@ function extractItemsFromText(text) {
             merged.set(norm, { partRaw: it.partRaw, qty: it.qty });
         }
     }
-    
     return Array.from(merged.values());
-                }
+    }
