@@ -60,8 +60,6 @@ async function preprocessImage(blob) {
             let width = img.width;
             let height = img.height;
 
-            // Better mobile stability
-
             const maxWidth = 1600;
 
             if (width > maxWidth) {
@@ -85,10 +83,6 @@ async function preprocessImage(blob) {
                 height
             );
 
-            // =================================================
-            // BETTER OCR CONTRAST
-            // =================================================
-
             const imageData =
                 ctx.getImageData(
                     0,
@@ -111,8 +105,6 @@ async function preprocessImage(blob) {
                         data[i+1] +
                         data[i+2]
                     ) / 3;
-
-                // Better threshold
 
                 const val =
                     avg > 155 ? 255 : 0;
@@ -144,10 +136,6 @@ async function preprocessImage(blob) {
         };
 
         img.onerror = () => {
-
-            alert(
-                "❌ Image preprocessing failed"
-            );
 
             URL.revokeObjectURL(url);
 
@@ -242,24 +230,8 @@ async function extractFromExcelOrCSV(file) {
                         }
                     );
 
-                if (
-                    !rows ||
-                    rows.length < 2
-                ) {
-
-                    reject(
-                        new Error("No rows found")
-                    );
-
-                    return;
-                }
-
                 let partColIndex = -1;
                 let qtyColIndex = -1;
-
-                // =============================================
-                // FIND HEADERS
-                // =============================================
 
                 for (
                     let i = 0;
@@ -287,7 +259,6 @@ async function extractFromExcelOrCSV(file) {
                         if (
                             cell.includes("part")
                         ) {
-
                             partColIndex = j;
                         }
 
@@ -295,7 +266,6 @@ async function extractFromExcelOrCSV(file) {
                             cell.includes("qty") ||
                             cell.includes("quantity")
                         ) {
-
                             qtyColIndex = j;
                         }
                     }
@@ -319,10 +289,6 @@ async function extractFromExcelOrCSV(file) {
 
                     return;
                 }
-
-                // =============================================
-                // BUILD TEXT
-                // =============================================
 
                 let lines = [];
 
@@ -415,24 +381,24 @@ async function extractTextFromFile(file) {
 
     try {
 
-        console.log(
-            "📎 FILE:",
-            file.name
-        );
+        const fileName =
+            (file.name || '').toLowerCase();
+
+        const fileType =
+            (file.type || '').toLowerCase();
 
         // =============================================
         // EXCEL / CSV
         // =============================================
 
         if (
-            file.name.match(
-                /\.(xlsx|xls|csv)$/i
-            )
+            fileName.endsWith('.xlsx') ||
+            fileName.endsWith('.xls') ||
+            fileName.endsWith('.csv') ||
+            fileType.includes('spreadsheet') ||
+            fileType.includes('excel') ||
+            fileType.includes('csv')
         ) {
-
-            console.log(
-                "📊 Excel/CSV detected"
-            );
 
             const text =
                 await extractFromExcelOrCSV(file);
@@ -451,10 +417,6 @@ async function extractTextFromFile(file) {
             file.type === 'application/pdf'
         ) {
 
-            console.log(
-                "📄 PDF detected"
-            );
-
             const arrayBuffer =
                 await file.arrayBuffer();
 
@@ -468,26 +430,11 @@ async function extractTextFromFile(file) {
 
             await initOCR();
 
-            if (
-                typeof showToast === 'function'
-            ) {
-
-                showToast(
-                    `OCR scanning ${pdf.numPages} page(s)...`,
-                    false
-                );
-            }
-
             for (
                 let i = 1;
                 i <= pdf.numPages;
                 i++
             ) {
-
-                console.log(
-                    "📄 OCR page:",
-                    i
-                );
 
                 const page =
                     await pdf.getPage(i);
@@ -512,10 +459,6 @@ async function extractTextFromFile(file) {
                     ret.data.text + '\n';
             }
 
-            console.log(
-                "✅ PDF OCR complete"
-            );
-
             return {
                 text: fullText,
                 words: null
@@ -528,10 +471,6 @@ async function extractTextFromFile(file) {
 
         else {
 
-            console.log(
-                "🖼️ Image detected"
-            );
-
             await initOCR();
 
             const optimized =
@@ -542,79 +481,10 @@ async function extractTextFromFile(file) {
                     optimized
                 );
 
-            const words =
-                (ret.data.words || [])
-                .filter(
-                    w => w.confidence > 50
-                );
-
-            // =========================================
-            // LINE RECONSTRUCTION
-            // =========================================
-
-            const lines = [];
-
-            words.sort(
-                (a, b) =>
-                    a.bbox.y0 - b.bbox.y0
-            );
-
-            let currentLine = {
-                y: words[0]?.bbox.y0,
-                words: []
-            };
-
-            for (const w of words) {
-
-                if (
-                    Math.abs(
-                        w.bbox.y0 -
-                        currentLine.y
-                    ) < 18
-                ) {
-
-                    currentLine.words.push(w);
-
-                } else {
-
-                    lines.push(currentLine);
-
-                    currentLine = {
-                        y: w.bbox.y0,
-                        words: [w]
-                    };
-                }
-            }
-
-            if (
-                currentLine.words.length
-            ) {
-
-                lines.push(currentLine);
-            }
-
-            const text =
-                lines.map(line => {
-
-                    line.words.sort(
-                        (a,b) =>
-                            a.bbox.x0 - b.bbox.x0
-                    );
-
-                    return line.words
-                        .map(w => w.text)
-                        .join(' ');
-
-                }).join('\n');
-
-            console.log(
-                "✅ IMAGE OCR complete"
-            );
-
             return {
-                text: text,
-                words: words,
-                rawText: ret.data.text
+                text: ret.data.text || '',
+                words: ret.data.words || [],
+                rawText: ret.data.text || ''
             };
         }
 
@@ -642,4 +512,4 @@ async function extractTextFromFile(file) {
                 '<i class="fas fa-camera"></i> Scan Order';
         }
     }
-                       }
+                    }
