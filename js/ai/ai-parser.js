@@ -1,697 +1,195 @@
-(function () {
+function extractItemsFromText(ocrResult) {
 
-    console.log("🔵 AI SYSTEM STARTING");
+    const text =
+        typeof ocrResult === 'string'
+            ? ocrResult
+            : (ocrResult.text || '');
 
-    // =====================================================
-    // FALLBACK MODAL
-    // =====================================================
+    console.log("RAW OCR:", text);
 
-    if (typeof showReviewModal !== 'function') {
+    if (!text || text.length < 3) {
 
-        window.showReviewModal = function (matches) {
+        console.warn("OCR EMPTY");
 
-            let msg = "MATCHES FOUND:\n\n";
+        return [];
+    }
 
-            matches.forEach(m => {
+    const lines =
+        text.split(/\r?\n/);
 
-                msg += `${m.partRaw} x${m.qty}\n`;
+    const items = [];
 
+    // OCR friendly pattern
+
+    const partPattern =
+        /[A-Z0-9\-\/\.]{5,25}/g;
+
+    // Ignore invoice metadata
+
+    const ignoreIfContains =
+        /(invoice|gst|cgst|sgst|total|subtotal|amount|tax|hsn|sac|mobile|phone|email|bank|address|date|delivery|shipping|buyer|seller|dispatch|terms|payment|ack|page|state|code|gstin)/i;
+
+    // Reduced line limit
+
+    const minLineLength = 4;
+
+    for (let rawLine of lines) {
+
+        let line =
+            rawLine.trim().toUpperCase();
+
+        console.log("LINE:", line);
+
+        if (!line)
+            continue;
+
+        if (
+            line.length < minLineLength
+        )
+            continue;
+
+        if (
+            ignoreIfContains.test(line)
+        )
+            continue;
+
+        // =============================================
+        // PART MATCH
+        // =============================================
+
+        const partMatches =
+            [...line.matchAll(partPattern)];
+
+        if (
+            partMatches.length === 0
+        )
+            continue;
+
+        // =============================================
+        // QTY
+        // =============================================
+
+        let qty = 1;
+
+        const qtyPatterns = [
+
+            /(?:qty|quantity|qnty|pcs|nos|x)\s*[:\-]?\s*(\d+)/i,
+
+            /(\d+)\s*(?:pcs|nos|qty)/i,
+
+            /x(\d{1,3})\b/i
+        ];
+
+        for (const pat of qtyPatterns) {
+
+            const match =
+                line.match(pat);
+
+            if (match) {
+
+                qty =
+                    parseInt(match[1]) || 1;
+
+                break;
+            }
+        }
+
+        // =============================================
+        // PROCESS PARTS
+        // =============================================
+
+        for (const m of partMatches) {
+
+            let part = m[0];
+
+            console.log(
+                "PART CANDIDATE:",
+                part
+            );
+
+            // Ignore dates
+
+            if (
+                /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(part)
+            ) {
+                continue;
+            }
+
+            // Ignore very long numbers
+
+            if (
+                /^\d{10,}$/.test(part)
+            ) {
+                continue;
+            }
+
+            // Ignore tiny numbers
+
+            if (
+                /^\d{1,3}$/.test(part)
+            ) {
+                continue;
+            }
+
+            // Must contain number
+
+            if (
+                !/\d/.test(part)
+            ) {
+                continue;
+            }
+
+            const normalized =
+                normalizePart(part);
+
+            if (
+                !normalized ||
+                normalized.length < 4
+            ) {
+                continue;
+            }
+
+            items.push({
+                partRaw: part,
+                qty: qty
             });
-
-            alert(msg);
-        };
-    }
-
-    // =====================================================
-    // NORMALIZE PART
-    // =====================================================
-
-    function normalizePart(part) {
-
-        if (!part) return '';
-
-        return String(part)
-            .toUpperCase()
-            .replace(/[^A-Z0-9]/g, '')
-            .trim();
-    }
-
-    // =====================================================
-    // OCR FIX
-    // =====================================================
-
-    function correctOCRPart(part) {
-
-        if (!part) return '';
-
-        return part
-            .replace(/O/g, '0')
-            .replace(/I/g, '1')
-            .replace(/L/g, '1');
-    }
-
-    // =====================================================
-    // BUILD PRODUCT INDEX
-    // =====================================================
-
-    window.normalizedIndex = {};
-
-    function buildNormalizedIndex() {
-
-        window.normalizedIndex = {};
-
-        if (!window.allProducts) {
-
-            console.error("❌ allProducts missing");
-
-            return;
-        }
-
-        for (const p of window.allProducts) {
-
-            if (!p || !p.part)
-                continue;
-
-            const norm =
-                normalizePart(p.part);
-
-            if (!norm)
-                continue;
-
-            window.normalizedIndex[norm] = p;
-        }
-
-        console.log(
-            "✅ INDEX BUILT:",
-            Object.keys(window.normalizedIndex).length
-        );
-    }
-
-    // =====================================================
-    // MATCH PRODUCT
-    // =====================================================
-
-    function matchProduct(item) {
-
-        if (!item || !item.partRaw)
-            return null;
-
-        const original =
-            normalizePart(item.partRaw);
-
-        if (!original)
-            return null;
-
-        // EXACT
-
-        if (
-            window.normalizedIndex &&
-            window.normalizedIndex[original]
-        ) {
-
-            return {
-                product:
-                    window.normalizedIndex[original],
-                confidence: 1
-            };
-        }
-
-        // OCR FIXED
-
-        const corrected =
-            normalizePart(
-                correctOCRPart(original)
-            );
-
-        if (
-            corrected &&
-            window.normalizedIndex[corrected]
-        ) {
-
-            return {
-                product:
-                    window.normalizedIndex[corrected],
-                confidence: 0.95
-            };
-        }
-
-        return null;
-    }
-
-    // =====================================================
-    // OCR PARSER
-    // =====================================================
-
-    function extractItemsFromText(ocrResult) {
-
-        try {
-
-            console.log("🔵 PARSER START");
-
-            let text = '';
-
-            // =============================================
-            // GET OCR TEXT
-            // =============================================
-
-            if (typeof ocrResult === 'string') {
-
-                text = ocrResult;
-
-            } else if (
-                ocrResult &&
-                typeof ocrResult.text === 'string'
-            ) {
-
-                text = ocrResult.text;
-            }
-
-            console.log(
-                "📄 OCR TEXT LENGTH:",
-                text.length
-            );
-
-            console.log(
-                "📄 OCR RAW TEXT:"
-            );
-
-            console.log(text);
-
-            alert(
-                "OCR LENGTH: " +
-                text.length
-            );
-
-            // =============================================
-            // EMPTY
-            // =============================================
-
-            if (
-                !text ||
-                text.trim().length === 0
-            ) {
-
-                alert(
-                    "❌ OCR RETURNED EMPTY TEXT"
-                );
-
-                return [];
-            }
-
-            // =============================================
-            // CLEAN
-            // =============================================
-
-            let cleaned = text
-                .toUpperCase()
-                .replace(/\r/g, ' ')
-                .replace(/\n/g, ' ')
-                .replace(/[|]/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-
-            console.log(
-                "📄 CLEANED OCR:"
-            );
-
-            console.log(cleaned);
-
-            // =============================================
-            // GLOBAL SEARCH
-            // =============================================
-
-            const regex =
-                /[A-Z0-9\-\/\.]{5,30}/g;
-
-            const matches =
-                cleaned.match(regex);
-
-            console.log(
-                "🔍 REGEX MATCHES:"
-            );
-
-            console.log(matches);
-
-            alert(
-                "RAW MATCHES: " +
-                (
-                    matches
-                        ? matches.length
-                        : 0
-                )
-            );
-
-            if (
-                !matches ||
-                matches.length === 0
-            ) {
-
-                alert(
-                    "❌ NO TOKENS FOUND"
-                );
-
-                return [];
-            }
-
-            const items = [];
-
-            // =============================================
-            // PROCESS TOKENS
-            // =============================================
-
-            for (let token of matches) {
-
-                console.log(
-                    "➡️ TOKEN:",
-                    token
-                );
-
-                if (!token)
-                    continue;
-
-                let part =
-                    normalizePart(token);
-
-                if (!part)
-                    continue;
-
-                console.log(
-                    "➡️ NORMALIZED:",
-                    part
-                );
-
-                // Skip short
-                if (part.length < 5)
-                    continue;
-
-                // Must contain digit
-                if (!/\d/.test(part))
-                    continue;
-
-                // Skip invoice words
-                if (
-                    /TOTAL|CGST|SGST|IGST|AMOUNT|GST|TAX|STATE|HSN|RATE|QTY/i.test(part)
-                ) {
-                    continue;
-                }
-
-                // Skip huge numbers
-                if (
-                    /^\d{10,}$/.test(part)
-                ) {
-                    continue;
-                }
-
-                items.push({
-                    partRaw: part,
-                    qty: 1
-                });
-            }
-
-            console.log(
-                "📦 ITEMS:"
-            );
-
-            console.log(items);
-
-            alert(
-                "ITEMS FOUND: " +
-                items.length
-            );
-
-            // =============================================
-            // MERGE
-            // =============================================
-
-            const merged = new Map();
-
-            for (const item of items) {
-
-                if (
-                    merged.has(item.partRaw)
-                ) {
-
-                    merged.get(item.partRaw).qty += 1;
-
-                } else {
-
-                    merged.set(
-                        item.partRaw,
-                        item
-                    );
-                }
-            }
-
-            const result =
-                Array.from(
-                    merged.values()
-                );
-
-            console.log(
-                "✅ FINAL RESULT:"
-            );
-
-            console.log(result);
-
-            alert(
-                "FINAL PARTS: " +
-                result.length
-            );
-
-            return result;
-
-        } catch (err) {
-
-            console.error(err);
-
-            alert(
-                "❌ PARSER CRASH:\n" +
-                (
-                    err?.message ||
-                    err ||
-                    "UNKNOWN"
-                )
-            );
-
-            return [];
         }
     }
 
-    // =====================================================
-    // OCR
-    // =====================================================
+    // =============================================
+    // MERGE DUPLICATES
+    // =============================================
 
-    async function performOCR(file) {
+    const merged = new Map();
 
-        try {
+    for (const it of items) {
 
-            if (
-                typeof Tesseract === 'undefined'
-            ) {
+        const norm =
+            normalizePart(it.partRaw);
 
-                alert(
-                    "❌ Tesseract.js NOT loaded"
-                );
+        if (!norm)
+            continue;
 
-                throw new Error(
-                    "Tesseract.js missing"
-                );
-            }
+        if (merged.has(norm)) {
 
-            alert(
-                "🔍 OCR STARTING..."
-            );
-
-            const result =
-                await Tesseract.recognize(
-                    file,
-                    'eng'
-                );
-
-            console.log(
-                "📄 OCR RESULT:"
-            );
-
-            console.log(result);
-
-            const text =
-                result?.data?.text || '';
-
-            alert(
-                "OCR COMPLETE\nTEXT LENGTH: " +
-                text.length
-            );
-
-            return {
-                text: text
-            };
-
-        } catch (err) {
-
-            console.error(err);
-
-            alert(
-                "❌ OCR FAILED:\n" +
-                (
-                    err?.message ||
-                    err
-                )
-            );
-
-            return {
-                text: ''
-            };
-        }
-    }
-
-    // =====================================================
-    // FILE EXTRACTOR
-    // =====================================================
-
-    async function extractTextFromFile(file) {
-
-        try {
-
-            if (!file) {
-
-                throw new Error(
-                    "No file selected"
-                );
-            }
-
-            console.log(
-                "📎 FILE:",
-                file.name
-            );
-
-            alert(
-                "PROCESSING FILE:\n" +
-                file.name
-            );
-
-            return await performOCR(file);
-
-        } catch (err) {
-
-            console.error(err);
-
-            alert(
-                "❌ FILE EXTRACT ERROR:\n" +
-                (
-                    err?.message ||
-                    err
-                )
-            );
-
-            return {
-                text: ''
-            };
-        }
-    }
-
-    // =====================================================
-    // INIT AI SCAN
-    // =====================================================
-
-    function initAIScan() {
-
-        console.log(
-            "🟢 INIT AI SCAN"
-        );
-
-        const fileInput =
-            document.getElementById(
-                'ai-scan-input'
-            );
-
-        if (!fileInput) {
-
-            alert(
-                "❌ ai-scan-input NOT FOUND"
-            );
-
-            return;
-        }
-
-        alert(
-            "✅ FILE INPUT FOUND"
-        );
-
-        fileInput.onchange =
-            async function (e) {
-
-            try {
-
-                const file =
-                    e.target.files[0];
-
-                if (!file) {
-
-                    alert(
-                        "❌ NO FILE SELECTED"
-                    );
-
-                    return;
-                }
-
-                alert(
-                    "📎 FILE SELECTED:\n" +
-                    file.name
-                );
-
-                // =========================================
-                // OCR
-                // =========================================
-
-                const ocrResult =
-                    await extractTextFromFile(file);
-
-                console.log(
-                    "🔵 OCR RESULT OBJECT:"
-                );
-
-                console.log(ocrResult);
-
-                alert(
-                    "OCR RESULT RECEIVED"
-                );
-
-                // =========================================
-                // PARSER
-                // =========================================
-
-                const items =
-                    extractItemsFromText(
-                        ocrResult
-                    );
-
-                console.log(
-                    "🔵 PARSED ITEMS:"
-                );
-
-                console.log(items);
-
-                alert(
-                    "PARSED ITEMS: " +
-                    items.length
-                );
-
-                if (
-                    items.length === 0
-                ) {
-
-                    alert(
-                        "❌ NO VALID PARTS FOUND"
-                    );
-
-                    return;
-                }
-
-                // =========================================
-                // MATCH PRODUCTS
-                // =========================================
-
-                const matches = [];
-
-                for (const item of items) {
-
-                    const match =
-                        matchProduct(item);
-
-                    if (
-                        match &&
-                        match.product
-                    ) {
-
-                        matches.push({
-                            ...item,
-                            product:
-                                match.product
-                        });
-                    }
-                }
-
-                console.log(
-                    "🎯 MATCHES:"
-                );
-
-                console.log(matches);
-
-                alert(
-                    "MATCHES FOUND: " +
-                    matches.length
-                );
-
-                if (
-                    matches.length === 0
-                ) {
-
-                    alert(
-                        "❌ NO PRODUCT MATCHES"
-                    );
-
-                    return;
-                }
-
-                showReviewModal(matches);
-
-            } catch (err) {
-
-                console.error(err);
-
-                alert(
-                    "❌ MAIN ERROR:\n" +
-                    (
-                        err?.message ||
-                        err ||
-                        "UNKNOWN"
-                    )
-                );
-            }
-        };
-
-        console.log(
-            "✅ AI SCAN READY"
-        );
-    }
-
-    // =====================================================
-    // WAIT PRODUCTS
-    // =====================================================
-
-    function waitForProducts() {
-
-        console.log(
-            "⏳ WAITING PRODUCTS"
-        );
-
-        if (
-            window.allProducts &&
-            window.allProducts.length > 0
-        ) {
-
-            alert(
-                "✅ PRODUCTS LOADED:\n" +
-                window.allProducts.length
-            );
-
-            buildNormalizedIndex();
-
-            initAIScan();
+            merged.get(norm).qty += it.qty;
 
         } else {
 
-            setTimeout(
-                waitForProducts,
-                1000
-            );
+            merged.set(norm, {
+                partRaw: it.partRaw,
+                qty: it.qty
+            });
         }
     }
 
-    // =====================================================
-    // START
-    // =====================================================
+    const result =
+        Array.from(merged.values());
 
-    waitForProducts();
+    console.log(
+        "FINAL PARSED ITEMS:",
+        result
+    );
 
-})();
+    return result;
+}
