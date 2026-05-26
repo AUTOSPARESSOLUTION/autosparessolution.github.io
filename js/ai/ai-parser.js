@@ -1,71 +1,183 @@
 function extractItemsFromText(ocrResult) {
-    const text = typeof ocrResult === 'string' ? ocrResult : ocrResult.text;
-    const lines = text.split(/\r?\n/);
+
+    const text = typeof ocrResult === 'string'
+        ? ocrResult
+        : (ocrResult.text || '');
+
+    // =========================
+    // OCR CLEANING
+    // =========================
+
+    let cleaned = text
+        .replace(/\r/g, '')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/Pcs\./gi, 'PCS')
+        .replace(/Pc\b/gi, 'PC')
+        .replace(/\n{2,}/g, '\n');
+
+    let rawLines = cleaned.split('\n')
+        .map(l => l.trim())
+        .filter(Boolean);
+
+    // =========================
+    // MERGE BROKEN LINES
+    // =========================
+
+    const lines = [];
+
+    for (let i = 0; i < rawLines.length; i++) {
+
+        let line = rawLines[i];
+
+        // If next line looks like continuation
+        if (
+            i + 1 < rawLines.length &&
+            !/\b(?:PC|PCS|NOS)\b/i.test(line) &&
+            !/^\d+\s+[A-Z0-9]/.test(rawLines[i + 1])
+        ) {
+            line += ' ' + rawLines[i + 1];
+            i++;
+        }
+
+        lines.push(line);
+    }
+
+    // =========================
+    // IGNORE METADATA
+    // =========================
+
+    const ignorePattern =
+        /(invoice|gstin|cgst|sgst|taxable|total|amount|bank|declaration|jurisdiction|authorised|output|state|email|phone|mobile|ack|irn|terms)/i;
+
     const items = [];
-    
-    // Part number pattern: must contain letters AND digits, length 5-20
-    const partPattern = /\b(?=.*[A-Z])(?=.*\d)[A-Z0-9]{5,}(?:[-.\/][A-Z0-9]+)*\b/g;
-    
-    // Words that indicate a line is definitely NOT an order line (invoice metadata)
-    const ignoreIfContains = /(invoice|gst|cgst|sgst|total|subtotal|amount|tax|hsn|sac|mobile|phone|email|bank|address|date|delivery|shipping|buyer|seller|dispatch|terms|payment|ack|page|state|code|gstin)/i;
-    
-    // Also ignore lines that are too short (likely noise)
-    const minLineLength = 10;
-    
-    for (let rawLine of lines) {
-        let line = rawLine.trim();
-        if (!line) continue;
-        if (line.length < minLineLength) continue;
-        if (ignoreIfContains.test(line)) continue;
-        
-        // Find all part number candidates
-        const partMatches = [...line.matchAll(partPattern)];
-        if (partMatches.length === 0) continue;
-        
-        // Extract quantity: look for a number (1-999) at the end of the line OR after "x"
+
+    // =========================
+    // MAIN TABLE ROW PARSER
+    // =========================
+
+    for (const line of lines) {
+
+        if (ignorePattern.test(line))
+            continue;
+
+        // Must contain GST and quantity
+        if (
+            !/\b\d+\s*%\b/.test(line) ||
+            !/\b\d+\s*(PC|PCS|NOS)\b/i.test(line)
+        ) {
+            continue;
+        }
+
+        // Split row into tokens
+        const tokens = line.split(/\s+/);
+
+        let part = null;
         let qty = 1;
-        const qtyPatterns = [
-            /(?:qty|quantity|qnty|pcs|nos|x)\s*[:\-]?\s*(\d+)/i,
-            /(\d+)\s*(?:pcs|nos|qty)/i,
-            /\b(\d{1,3})\b\s*$/,
-            /x(\d{1,3})\b/
-        ];
-        for (const pat of qtyPatterns) {
-            const match = line.match(pat);
-            if (match) {
-                qty = parseInt(match[1]) || 1;
+
+        // =========================
+        // FIND PART NUMBER
+        // =========================
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            let t = tokens[i].toUpperCase();
+
+            // Remove punctuation
+            t = t.replace(/[.,]/g, '');
+
+            // Skip serial number
+            if (/^\d{1,3}$/.test(t))
+                continue;
+
+            // Skip HSN codes
+            if (/^\d{8}$/.test(t))
+                continue;
+
+            // Skip percentages
+            if (/^\d+%?$/.test(t))
+                continue;
+
+            // VALID PART RULES
+
+            const hasLetter = /[A-Z]/.test(t);
+            const hasDigit = /\d/.test(t);
+
+            // Alphanumeric part
+            if (
+                hasLetter &&
+                hasDigit &&
+                t.length >= 5
+            ) {
+                part = t;
+                break;
+            }
+
+            // Numeric automotive part
+            if (
+                /^\d{5,8}$/.test(t)
+            ) {
+                part = t;
                 break;
             }
         }
-        
-        // For each candidate, filter obvious false positives
-        for (const m of partMatches) {
-            let part = m[0];
-            // Ignore dates (DD-MM-YY)
-            if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(part)) continue;
-            // Ignore long numeric only
-            if (/^\d{10,}$/.test(part)) continue;
-            // Ignore pure numbers less than 4 digits (could be row numbers or prices)
-            if (/^\d{1,3}$/.test(part)) continue;
-            
-            const normalized = normalizePart(part);
-            if (!normalized || normalized.length < 4) continue;
-            items.push({ partRaw: part, qty: qty });
+
+        // =========================
+        // FIND QUANTITY
+        // =========================
+
+        const qtyMatch = line.match(
+            /\b(\d{1,3})\s*(PC|PCS|NOS)\b/i
+        );
+
+        if (qtyMatch) {
+            qty = parseInt(qtyMatch[1]) || 1;
+        }
+
+        // =========================
+        // SAVE
+        // =========================
+
+        if (part) {
+
+            items.push({
+                partRaw: part,
+                qty: qty
+            });
         }
     }
-    
-    // Merge duplicates (same part, sum quantities)
+
+    // =========================
+    // MERGE DUPLICATES
+    // =========================
+
     const merged = new Map();
-    for (const it of items) {
-        const norm = normalizePart(it.partRaw);
-        if (!norm) continue;
-        if (merged.has(norm)) {
-            merged.get(norm).qty += it.qty;
+
+    for (const item of items) {
+
+        const key = normalizePart(item.partRaw);
+
+        if (!key)
+            continue;
+
+        if (merged.has(key)) {
+
+            merged.get(key).qty += item.qty;
+
         } else {
-            merged.set(norm, { partRaw: it.partRaw, qty: it.qty });
+
+            merged.set(key, {
+                partRaw: item.partRaw,
+                qty: item.qty
+            });
         }
     }
-    
-    console.log("Parser extracted items:", Array.from(merged.values()));
-    return Array.from(merged.values());
+
+    const result = Array.from(merged.values());
+
+    console.log(
+        "FINAL PARSED ITEMS:",
+        result
+    );
+
+    return result;
                 }
