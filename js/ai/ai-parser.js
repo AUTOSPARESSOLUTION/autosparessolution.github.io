@@ -1,157 +1,173 @@
 function extractItemsFromText(ocrResult) {
 
-    const text = typeof ocrResult === 'string'
-        ? ocrResult
-        : (ocrResult?.text || '');
+    try {
 
-    if (!text || text.length < 5) {
+        console.log("🔵 extractItemsFromText START");
 
-        console.warn("⚠️ OCR text empty");
+        // =============================================
+        // GET OCR TEXT
+        // =============================================
+
+        let text = '';
+
+        if (typeof ocrResult === 'string') {
+
+            text = ocrResult;
+
+        } else if (ocrResult && ocrResult.text) {
+
+            text = ocrResult.text;
+
+        }
+
+        console.log("📄 OCR TEXT LENGTH:", text.length);
+
+        console.log("📄 RAW OCR TEXT:");
+        console.log(text);
+
+        // =============================================
+        // EMPTY CHECK
+        // =============================================
+
+        if (!text || text.trim().length === 0) {
+
+            console.error("❌ OCR TEXT EMPTY");
+
+            alert("OCR returned empty text");
+
+            return [];
+        }
+
+        // =============================================
+        // CLEAN TEXT
+        // =============================================
+
+        let cleaned = text
+            .toUpperCase()
+            .replace(/\r/g, ' ')
+            .replace(/\n/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        console.log("📄 CLEANED TEXT:");
+        console.log(cleaned);
+
+        // =============================================
+        // GLOBAL PART SEARCH
+        // =============================================
+
+        const regex =
+            /[A-Z0-9\-\/\.]{5,25}/g;
+
+        const matches =
+            cleaned.match(regex);
+
+        console.log("🔍 REGEX MATCHES:");
+        console.log(matches);
+
+        // =============================================
+        // NO MATCHES
+        // =============================================
+
+        if (!matches || matches.length === 0) {
+
+            console.error("❌ NO REGEX MATCHES");
+
+            alert("No regex matches found");
+
+            return [];
+        }
+
+        const items = [];
+
+        // =============================================
+        // PROCESS TOKENS
+        // =============================================
+
+        for (let raw of matches) {
+
+            console.log("➡️ TOKEN:", raw);
+
+            if (!raw)
+                continue;
+
+            let part =
+                raw.replace(/[^A-Z0-9]/g, '');
+
+            console.log("➡️ NORMALIZED:", part);
+
+            // Skip tiny
+            if (part.length < 5)
+                continue;
+
+            // Must contain digit
+            if (!/\d/.test(part))
+                continue;
+
+            // Skip pure numbers
+            if (/^\d+$/.test(part)) {
+
+                if (part.length <= 4)
+                    continue;
+            }
+
+            // Skip invoice words
+            if (
+                /TOTAL|CGST|SGST|IGST|AMOUNT|TAX|HSN|GST|STATE/i.test(part)
+            ) {
+                continue;
+            }
+
+            items.push({
+                partRaw: part,
+                qty: 1
+            });
+        }
+
+        console.log("📦 ITEMS BEFORE MERGE:");
+        console.log(items);
+
+        // =============================================
+        // MERGE
+        // =============================================
+
+        const merged = new Map();
+
+        for (const item of items) {
+
+            if (merged.has(item.partRaw)) {
+
+                merged.get(item.partRaw).qty += item.qty;
+
+            } else {
+
+                merged.set(item.partRaw, item);
+            }
+        }
+
+        const result =
+            Array.from(merged.values());
+
+        console.log("✅ FINAL RESULT:");
+        console.log(result);
+
+        alert(
+            "Parser found " +
+            result.length +
+            " possible parts"
+        );
+
+        return result;
+
+    } catch (err) {
+
+        console.error(err);
+
+        alert(
+            "Parser Crash:\n" +
+            (err?.message || err)
+        );
 
         return [];
     }
-
-    console.log("📄 RAW OCR TEXT:\n", text);
-
-    // =====================================================
-    // CLEAN TEXT
-    // =====================================================
-
-    let cleaned = text
-        .toUpperCase()
-        .replace(/\r/g, ' ')
-        .replace(/\n/g, ' ')
-        .replace(/[|]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    console.log("📄 CLEANED OCR:\n", cleaned);
-
-    const items = [];
-
-    // =====================================================
-    // GLOBAL PART PATTERN
-    // =====================================================
-
-    const partPattern =
-        /\b[A-Z0-9\-\/\.]{5,25}\b/g;
-
-    const matches =
-        [...cleaned.matchAll(partPattern)];
-
-    console.log("🔍 RAW MATCHES:", matches);
-
-    for (const m of matches) {
-
-        let part = m[0];
-
-        if (!part)
-            continue;
-
-        part = normalizePart(part);
-
-        // =================================================
-        // SKIP BAD TOKENS
-        // =================================================
-
-        // Skip small numbers
-        if (/^\d{1,4}$/.test(part))
-            continue;
-
-        // Skip very long numbers
-        if (/^\d{10,}$/.test(part))
-            continue;
-
-        // Skip HSN
-        if (/^\d{8}$/.test(part))
-            continue;
-
-        // Skip invoice words
-        if (
-            /^(TOTAL|CGST|SGST|IGST|STATE|TAX|AMOUNT|QTY|RATE|HSN|GST|INV)$/i.test(part)
-        ) {
-            continue;
-        }
-
-        // Must contain digit
-        if (!/\d/.test(part))
-            continue;
-
-        // =================================================
-        // FIND NEARBY QUANTITY
-        // =================================================
-
-        let qty = 1;
-
-        const start =
-            Math.max(0, m.index - 30);
-
-        const end =
-            Math.min(cleaned.length, m.index + 50);
-
-        const nearby =
-            cleaned.substring(start, end);
-
-        console.log(
-            "🔎 Nearby text:",
-            nearby
-        );
-
-        const qtyMatch =
-            nearby.match(
-                /(\d{1,3})\s*(PCS?|NOS?|QTY|PC)/i
-            );
-
-        if (qtyMatch) {
-
-            qty =
-                parseInt(qtyMatch[1]) || 1;
-        }
-
-        // =================================================
-        // SAVE
-        // =================================================
-
-        items.push({
-            partRaw: part,
-            qty: qty
-        });
-    }
-
-    // =====================================================
-    // MERGE DUPLICATES
-    // =====================================================
-
-    const merged = new Map();
-
-    for (const item of items) {
-
-        const key =
-            normalizePart(item.partRaw);
-
-        if (!key)
-            continue;
-
-        if (merged.has(key)) {
-
-            merged.get(key).qty += item.qty;
-
-        } else {
-
-            merged.set(key, {
-                partRaw: item.partRaw,
-                qty: item.qty
-            });
-        }
-    }
-
-    const result =
-        Array.from(merged.values());
-
-    console.log(
-        "✅ FINAL ITEMS:",
-        result
-    );
-
-    return result;
-    }
+}
