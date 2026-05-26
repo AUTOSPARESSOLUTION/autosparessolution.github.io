@@ -10,6 +10,10 @@ function extractItemsFromText(ocrResult) {
     if (!text)
         return [];
 
+    // ==================================================
+    // CLEAN TEXT
+    // ==================================================
+
     const cleaned =
         text
         .toUpperCase()
@@ -17,8 +21,14 @@ function extractItemsFromText(ocrResult) {
         .replace(/[|]/g, ' ')
         .replace(/\s+/g, ' ');
 
+    console.log("CLEANED:", cleaned);
+
+    // ==================================================
+    // TOKENIZE
+    // ==================================================
+
     const tokens =
-        cleaned.match(/[A-Z0-9\-\/\.]{4,30}/g) || [];
+        cleaned.match(/[A-Z0-9\-\/\.]{4,40}/g) || [];
 
     console.log("TOKENS:", tokens);
 
@@ -31,30 +41,81 @@ function extractItemsFromText(ocrResult) {
         if (!token)
             continue;
 
-        token =
-            token
+        token = token.trim();
+
+        // ==============================================
+        // OCR CORRECTION
+        // ==============================================
+
+        token = token
             .replace(/O/g, '0')
             .replace(/I/g, '1');
 
+        // ==============================================
+        // BASIC FILTERS
+        // ==============================================
+
+        if (token.length < 5)
+            continue;
+
+        // Must contain BOTH letter and number
+
+        if (!/[A-Z]/.test(token))
+            continue;
+
+        if (!/\d/.test(token))
+            continue;
+
+        // ==============================================
+        // REMOVE PRICE VALUES
+        // ==============================================
+
+        // Reject decimal prices
+
+        if (/^\d+\.\d+$/.test(token))
+            continue;
+
+        // Reject pure numeric
+
+        if (/^\d+$/.test(token))
+            continue;
+
+        // Reject date
+
+        if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(token))
+            continue;
+
+        // Reject GST/Invoice words
+
         if (
-            token.length < 4
+            /GST|CGST|SGST|TOTAL|AMOUNT|HSN|TAX|RATE|QTY|PCS|NOS|INVOICE/i.test(token)
         )
             continue;
 
-        if (
-            !/\d/.test(token)
-        )
+        // ==============================================
+        // MUST LOOK LIKE REAL PART NUMBER
+        // ==============================================
+
+        // Good examples:
+        // 0313AAB03061N
+        // MVS0305D020021N
+        // 426244700-0500
+
+        const looksLikePart =
+            (
+                /[A-Z]/.test(token) &&
+                /\d/.test(token)
+            ) ||
+            (
+                /\d{4,}[-\/]\d+/.test(token)
+            );
+
+        if (!looksLikePart)
             continue;
 
-        if (
-            /GST|CGST|SGST|TOTAL|AMOUNT|HSN|TAX/i.test(token)
-        )
-            continue;
-
-        if (
-            /^\d{10,}$/.test(token)
-        )
-            continue;
+        // ==============================================
+        // QUANTITY DETECTION
+        // ==============================================
 
         let qty = 1;
 
@@ -68,10 +129,16 @@ function extractItemsFromText(ocrResult) {
 
             qty = parseInt(next);
 
-        } else if (/^\d{1,3}$/.test(next2)) {
+        }
+        else if (/^\d{1,3}$/.test(next2)) {
 
             qty = parseInt(next2);
         }
+
+        // Prevent impossible qty
+
+        if (qty > 500)
+            qty = 1;
 
         items.push({
             partRaw: token,
@@ -79,12 +146,15 @@ function extractItemsFromText(ocrResult) {
         });
     }
 
+    // ==================================================
+    // REMOVE DUPLICATES
+    // ==================================================
+
     const merged = new Map();
 
     for (const item of items) {
 
-        const key =
-            item.partRaw;
+        const key = item.partRaw;
 
         if (merged.has(key)) {
 
@@ -96,7 +166,10 @@ function extractItemsFromText(ocrResult) {
         }
     }
 
-    return Array.from(
-        merged.values()
-    );
-}
+    const result =
+        Array.from(merged.values());
+
+    console.log("FINAL ITEMS:", result);
+
+    return result;
+    }
