@@ -2,159 +2,132 @@ function extractItemsFromText(ocrResult) {
 
     const text = typeof ocrResult === 'string'
         ? ocrResult
-        : (ocrResult.text || '');
+        : (ocrResult?.text || '');
 
-    // =========================
-    // OCR CLEANING
-    // =========================
+    if (!text || text.length < 5) {
 
-    let cleaned = text
-        .replace(/\r/g, '')
-        .replace(/[ \t]+/g, ' ')
-        .replace(/Pcs\./gi, 'PCS')
-        .replace(/Pc\b/gi, 'PC')
-        .replace(/\n{2,}/g, '\n');
+        console.warn("⚠️ OCR text empty");
 
-    let rawLines = cleaned.split('\n')
-        .map(l => l.trim())
-        .filter(Boolean);
-
-    // =========================
-    // MERGE BROKEN LINES
-    // =========================
-
-    const lines = [];
-
-    for (let i = 0; i < rawLines.length; i++) {
-
-        let line = rawLines[i];
-
-        // If next line looks like continuation
-        if (
-            i + 1 < rawLines.length &&
-            !/\b(?:PC|PCS|NOS)\b/i.test(line) &&
-            !/^\d+\s+[A-Z0-9]/.test(rawLines[i + 1])
-        ) {
-            line += ' ' + rawLines[i + 1];
-            i++;
-        }
-
-        lines.push(line);
+        return [];
     }
 
-    // =========================
-    // IGNORE METADATA
-    // =========================
+    console.log("📄 RAW OCR TEXT:\n", text);
 
-    const ignorePattern =
-        /(invoice|gstin|cgst|sgst|taxable|total|amount|bank|declaration|jurisdiction|authorised|output|state|email|phone|mobile|ack|irn|terms)/i;
+    // =====================================================
+    // CLEAN TEXT
+    // =====================================================
+
+    let cleaned = text
+        .toUpperCase()
+        .replace(/\r/g, ' ')
+        .replace(/\n/g, ' ')
+        .replace(/[|]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    console.log("📄 CLEANED OCR:\n", cleaned);
 
     const items = [];
 
-    // =========================
-    // MAIN TABLE ROW PARSER
-    // =========================
+    // =====================================================
+    // GLOBAL PART PATTERN
+    // =====================================================
 
-    for (const line of lines) {
+    const partPattern =
+        /\b[A-Z0-9\-\/\.]{5,25}\b/g;
 
-        if (ignorePattern.test(line))
+    const matches =
+        [...cleaned.matchAll(partPattern)];
+
+    console.log("🔍 RAW MATCHES:", matches);
+
+    for (const m of matches) {
+
+        let part = m[0];
+
+        if (!part)
             continue;
 
-        // Must contain GST and quantity
+        part = normalizePart(part);
+
+        // =================================================
+        // SKIP BAD TOKENS
+        // =================================================
+
+        // Skip small numbers
+        if (/^\d{1,4}$/.test(part))
+            continue;
+
+        // Skip very long numbers
+        if (/^\d{10,}$/.test(part))
+            continue;
+
+        // Skip HSN
+        if (/^\d{8}$/.test(part))
+            continue;
+
+        // Skip invoice words
         if (
-            !/\b\d+\s*%\b/.test(line) ||
-            !/\b\d+\s*(PC|PCS|NOS)\b/i.test(line)
+            /^(TOTAL|CGST|SGST|IGST|STATE|TAX|AMOUNT|QTY|RATE|HSN|GST|INV)$/i.test(part)
         ) {
             continue;
         }
 
-        // Split row into tokens
-        const tokens = line.split(/\s+/);
+        // Must contain digit
+        if (!/\d/.test(part))
+            continue;
 
-        let part = null;
+        // =================================================
+        // FIND NEARBY QUANTITY
+        // =================================================
+
         let qty = 1;
 
-        // =========================
-        // FIND PART NUMBER
-        // =========================
+        const start =
+            Math.max(0, m.index - 30);
 
-        for (let i = 0; i < tokens.length; i++) {
+        const end =
+            Math.min(cleaned.length, m.index + 50);
 
-            let t = tokens[i].toUpperCase();
+        const nearby =
+            cleaned.substring(start, end);
 
-            // Remove punctuation
-            t = t.replace(/[.,]/g, '');
-
-            // Skip serial number
-            if (/^\d{1,3}$/.test(t))
-                continue;
-
-            // Skip HSN codes
-            if (/^\d{8}$/.test(t))
-                continue;
-
-            // Skip percentages
-            if (/^\d+%?$/.test(t))
-                continue;
-
-            // VALID PART RULES
-
-            const hasLetter = /[A-Z]/.test(t);
-            const hasDigit = /\d/.test(t);
-
-            // Alphanumeric part
-            if (
-                hasLetter &&
-                hasDigit &&
-                t.length >= 5
-            ) {
-                part = t;
-                break;
-            }
-
-            // Numeric automotive part
-            if (
-                /^\d{5,8}$/.test(t)
-            ) {
-                part = t;
-                break;
-            }
-        }
-
-        // =========================
-        // FIND QUANTITY
-        // =========================
-
-        const qtyMatch = line.match(
-            /\b(\d{1,3})\s*(PC|PCS|NOS)\b/i
+        console.log(
+            "🔎 Nearby text:",
+            nearby
         );
 
+        const qtyMatch =
+            nearby.match(
+                /(\d{1,3})\s*(PCS?|NOS?|QTY|PC)/i
+            );
+
         if (qtyMatch) {
-            qty = parseInt(qtyMatch[1]) || 1;
+
+            qty =
+                parseInt(qtyMatch[1]) || 1;
         }
 
-        // =========================
+        // =================================================
         // SAVE
-        // =========================
+        // =================================================
 
-        if (part) {
-
-            items.push({
-                partRaw: part,
-                qty: qty
-            });
-        }
+        items.push({
+            partRaw: part,
+            qty: qty
+        });
     }
 
-    // =========================
+    // =====================================================
     // MERGE DUPLICATES
-    // =========================
+    // =====================================================
 
     const merged = new Map();
 
     for (const item of items) {
 
-        const key = normalizePart(item.partRaw);
+        const key =
+            normalizePart(item.partRaw);
 
         if (!key)
             continue;
@@ -172,12 +145,13 @@ function extractItemsFromText(ocrResult) {
         }
     }
 
-    const result = Array.from(merged.values());
+    const result =
+        Array.from(merged.values());
 
     console.log(
-        "FINAL PARSED ITEMS:",
+        "✅ FINAL ITEMS:",
         result
     );
 
     return result;
-                }
+    }
