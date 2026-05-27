@@ -1,4 +1,4 @@
-console.log("FINAL ai-parser.js LOADED");
+console.log("ULTIMATE ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -18,7 +18,7 @@ function extractItemsFromText(ocrResult) {
     const items = [];
 
     const ignoreWords =
-        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE|DISC|VALUE/i;
+        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE|DISC|VALUE|RUPEES/i;
 
     const tokenPattern =
         /[A-Z0-9\-\/\.]{4,40}/g;
@@ -44,13 +44,28 @@ function extractItemsFromText(ocrResult) {
 
         let foundPart = null;
 
+        // =====================================
+        // FIND VALID PART
+        // =====================================
+
         for (let token of tokens) {
 
+            token = token.trim();
+
+            // SMART OCR FIX
+
+            token = token.replace(
+                /(?<=\d)O|O(?=\d)/g,
+                '0'
+            );
+
+            token = token.replace(
+                /(?<=\d)I|I(?=\d)/g,
+                '1'
+            );
+
             token =
-                token
-                .trim()
-                .replace(/O/g, '0')
-                .replace(/I/g, '1');
+                token.replace(/\s+/g, '');
 
             // skip decimal
 
@@ -62,7 +77,7 @@ function extractItemsFromText(ocrResult) {
             if (/^\d{10,}$/.test(token))
                 continue;
 
-            // skip GSTIN
+            // skip gstin
 
             if (/^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token))
                 continue;
@@ -91,8 +106,6 @@ function extractItemsFromText(ocrResult) {
             const hasDigit =
                 /\d/.test(token);
 
-            // VALID PART RULES
-
             const validPart =
 
                 // alphanumeric
@@ -105,7 +118,7 @@ function extractItemsFromText(ocrResult) {
 
                 ||
 
-                // numeric parts
+                // numeric
 
                 (
                     /^\d{5,12}$/.test(token)
@@ -113,7 +126,7 @@ function extractItemsFromText(ocrResult) {
 
                 ||
 
-                // bearing types
+                // bearing
 
                 (
                     /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
@@ -128,25 +141,6 @@ function extractItemsFromText(ocrResult) {
             if (!validPart)
                 continue;
 
-            // IMPORTANT:
-            // avoid price/rate confusion
-
-            if (
-                /^\d+$/.test(token)
-            ) {
-
-                const num =
-                    parseInt(token);
-
-                // avoid amounts
-
-                if (
-                    num > 999999
-                ) {
-                    continue;
-                }
-            }
-
             foundPart = token;
 
             break;
@@ -155,33 +149,46 @@ function extractItemsFromText(ocrResult) {
         if (!foundPart)
             continue;
 
-        // =========================
+        // =====================================
         // QTY DETECTION
-        // =========================
+        // =====================================
 
         let qty = 1;
 
-        for (const t of tokens) {
+        // try last realistic number in line
 
-            if (
-                /^[1-9][0-9]{0,2}$/.test(t)
-            ) {
+        const numericTokens =
+            tokens.filter(t =>
+                /^[0-9]{1,3}$/.test(t)
+            );
 
-                const n =
-                    parseInt(t);
+        if (numericTokens.length > 0) {
 
-                // realistic qty only
+            // usually qty near end
+
+            const reversed =
+                [...numericTokens].reverse();
+
+            for (const n of reversed) {
+
+                const val =
+                    parseInt(n);
 
                 if (
-                    n <= 200
+                    val >= 1 &&
+                    val <= 200
                 ) {
 
-                    qty = n;
+                    qty = val;
 
                     break;
                 }
             }
         }
+
+        // =====================================
+        // STORE ITEM
+        // =====================================
 
         items.push({
 
@@ -191,16 +198,13 @@ function extractItemsFromText(ocrResult) {
         });
     }
 
-    // =========================
+    // =====================================
     // MERGE DUPLICATES
-    // =========================
+    // =====================================
 
     const merged = new Map();
 
     for (const item of items) {
-
-        // IMPORTANT FIX:
-        // 088630 = 88630
 
         const key =
             item.partRaw
@@ -234,4 +238,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-            }
+                }
