@@ -1,19 +1,47 @@
-console.log("NEW ai-matcher.js LOADED");
+console.log("ULTIMATE ai-matcher.js LOADED");
 
 let normalizedIndex = new Map();
+
 let fuse = null;
+
+// =======================================
+// NORMALIZE PART
+// =======================================
 
 function normalizePart(part) {
 
     if (!part)
         return '';
 
-    return part
-        .toString()
+    return String(part)
+
         .toUpperCase()
+
+        .trim()
+
+        // remove spaces
+
+        .replace(/\s+/g, '')
+
+        // remove special chars
+
         .replace(/[^A-Z0-9]/g, '')
+
+        // OCR corrections
+
+        .replace(/O/g, '0')
+
+        .replace(/I/g, '1')
+
+        // IMPORTANT:
+        // 088630 = 88630
+
         .replace(/^0+/, '');
 }
+
+// =======================================
+// BUILD INDEX
+// =======================================
 
 function buildNormalizedIndex() {
 
@@ -24,23 +52,34 @@ function buildNormalizedIndex() {
 
     for (const prod of window.allProducts) {
 
+        if (!prod.part)
+            continue;
+
         const norm =
             normalizePart(prod.part);
 
-        if (
-            norm &&
-            !normalizedIndex.has(norm)
-        ) {
+        if (!norm)
+            continue;
 
-            normalizedIndex.set(norm, prod);
-        }
+        normalizedIndex.set(norm, prod);
     }
 
     console.log(
         "Normalized index built:",
         normalizedIndex.size
     );
+
+    // DEBUG SAMPLE
+
+    console.log(
+        "Sample keys:",
+        Array.from(normalizedIndex.keys()).slice(0,20)
+    );
 }
+
+// =======================================
+// INIT FUSE
+// =======================================
 
 function initFuse() {
 
@@ -57,68 +96,53 @@ function initFuse() {
 
         includeScore: true
     });
+
+    console.log("Fuse ready");
 }
 
-function attemptCorrection(part) {
-
-    const normalized =
-        normalizePart(part);
-
-    if (!normalized)
-        return null;
-
-    if (
-        normalizedIndex.has(normalized)
-    ) {
-
-        return normalizedIndex.get(normalized);
-    }
-
-    const variants = [
-
-        normalized.replace(/O/g, '0'),
-
-        normalized.replace(/0/g, 'O'),
-
-        normalized.replace(/I/g, '1'),
-
-        normalized.replace(/1/g, 'I'),
-
-        normalized.replace(/S/g, '5'),
-
-        normalized.replace(/5/g, 'S')
-    ];
-
-    for (const v of variants) {
-
-        if (
-            normalizedIndex.has(v)
-        ) {
-
-            return normalizedIndex.get(v);
-        }
-    }
-
-    return null;
-}
+// =======================================
+// MATCH PRODUCT
+// =======================================
 
 function matchProduct(extractedItem) {
 
     const rawPart =
         extractedItem.partRaw;
 
-    let product =
-        attemptCorrection(rawPart);
+    const normalized =
+        normalizePart(rawPart);
 
-    if (product) {
+    console.log(
+        "Matching:",
+        rawPart,
+        "→",
+        normalized
+    );
+
+    // ===================================
+    // EXACT MATCH
+    // ===================================
+
+    if (
+        normalizedIndex.has(normalized)
+    ) {
+
+        console.log(
+            "EXACT MATCH FOUND"
+        );
 
         return {
 
-            product,
+            product:
+                normalizedIndex.get(normalized),
 
             confidence: 100
         };
     }
+
+    // ===================================
+    // FUZZY MATCH
+    // ===================================
 
     if (fuse) {
 
@@ -130,14 +154,25 @@ function matchProduct(extractedItem) {
             results[0].score < 0.08
         ) {
 
+            console.log(
+                "FUZZY MATCH:",
+                results[0]
+            );
+
             return {
 
-                product: results[0].item,
+                product:
+                    results[0].item,
 
-                confidence: 90
+                confidence: 80
             };
         }
     }
+
+    console.log(
+        "NO MATCH:",
+        rawPart
+    );
 
     return null;
 }
