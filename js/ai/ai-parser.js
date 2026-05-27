@@ -1,4 +1,4 @@
-console.log("ULTIMATE ai-parser.js LOADED");
+console.log("SMART PDF ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -21,7 +21,7 @@ function extractItemsFromText(ocrResult) {
         /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE|DISC|VALUE|RUPEES/i;
 
     const tokenPattern =
-        /[A-Z0-9\-\/\.]{4,40}/g;
+        /[A-Z0-9\-\/\.]{2,40}/g;
 
     for (let rawLine of lines) {
 
@@ -36,11 +36,50 @@ function extractItemsFromText(ocrResult) {
         if (ignoreWords.test(line))
             continue;
 
-        const tokens =
+        let tokens =
             line.match(tokenPattern) || [];
 
         if (tokens.length === 0)
             continue;
+
+        // =====================================
+        // SMART PDF TOKEN JOIN
+        // =====================================
+
+        const joinedTokens = [];
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            let current =
+                tokens[i];
+
+            // join with next token if short split
+
+            if (
+                i < tokens.length - 1
+            ) {
+
+                const combined =
+                    current + tokens[i + 1];
+
+                if (
+
+                    /^[A-Z0-9]{5,25}$/.test(combined)
+
+                ) {
+
+                    joinedTokens.push(combined);
+
+                    i++;
+
+                    continue;
+                }
+            }
+
+            joinedTokens.push(current);
+        }
+
+        tokens = joinedTokens;
 
         let foundPart = null;
 
@@ -52,7 +91,7 @@ function extractItemsFromText(ocrResult) {
 
             token = token.trim();
 
-            // SMART OCR FIX
+            // SMART OCR FIXES
 
             token = token.replace(
                 /(?<=\d)O|O(?=\d)/g,
@@ -67,27 +106,19 @@ function extractItemsFromText(ocrResult) {
             token =
                 token.replace(/\s+/g, '');
 
-            // skip decimal
+            // SKIPS
 
             if (/^\d+\.\d+$/.test(token))
                 continue;
 
-            // skip huge numbers
-
             if (/^\d{10,}$/.test(token))
                 continue;
-
-            // skip gstin
 
             if (/^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token))
                 continue;
 
-            // skip tiny numbers
-
             if (/^\d{1,3}$/.test(token))
                 continue;
-
-            // skip common HSN
 
             const commonHSN = [
                 '7318',
@@ -108,8 +139,6 @@ function extractItemsFromText(ocrResult) {
 
             const validPart =
 
-                // alphanumeric
-
                 (
                     hasLetter &&
                     hasDigit &&
@@ -118,15 +147,11 @@ function extractItemsFromText(ocrResult) {
 
                 ||
 
-                // numeric
-
                 (
                     /^\d{5,12}$/.test(token)
                 )
 
                 ||
-
-                // bearing
 
                 (
                     /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
@@ -150,12 +175,10 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         // =====================================
-        // QTY DETECTION
+        // QTY
         // =====================================
 
         let qty = 1;
-
-        // try last realistic number in line
 
         const numericTokens =
             tokens.filter(t =>
@@ -163,8 +186,6 @@ function extractItemsFromText(ocrResult) {
             );
 
         if (numericTokens.length > 0) {
-
-            // usually qty near end
 
             const reversed =
                 [...numericTokens].reverse();
@@ -185,10 +206,6 @@ function extractItemsFromText(ocrResult) {
                 }
             }
         }
-
-        // =====================================
-        // STORE ITEM
-        // =====================================
 
         items.push({
 
@@ -238,4 +255,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-                }
+                        }
