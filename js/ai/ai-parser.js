@@ -19,7 +19,7 @@ function extractItemsFromText(ocrResult) {
     const items = [];
 
     // =============================================
-    // SIMPLE TOKEN PATTERN
+    // TOKEN PATTERN
     // =============================================
 
     const tokenPattern =
@@ -60,7 +60,7 @@ function extractItemsFromText(ocrResult) {
         let foundPart = null;
 
         // =========================================
-        // FIND PART
+        // FIND BEST PART
         // =========================================
 
         for (let token of tokens) {
@@ -71,7 +71,7 @@ function extractItemsFromText(ocrResult) {
                 .replace(/O/g, '0')
                 .replace(/I/g, '1');
 
-            // reject decimal price
+            // Reject decimal prices
 
             if (
                 /^\d+\.\d+$/.test(token)
@@ -79,7 +79,7 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            // reject long phone numbers
+            // Reject phone numbers
 
             if (
                 /^\d{10,}$/.test(token)
@@ -87,7 +87,7 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            // reject tiny numbers
+            // Reject tiny numbers
 
             if (
                 /^\d{1,3}$/.test(token)
@@ -96,49 +96,96 @@ function extractItemsFromText(ocrResult) {
             }
 
             // =====================================
-            // VALID PARTS
+            // PRIORITY 1
+            // MIXED LETTER + DIGIT
             // =====================================
 
-            const validPart =
+            if (
+                /[A-Z]/.test(token) &&
+                /\d/.test(token) &&
+                token.length >= 4
+            ) {
 
-                // Mixed type
-                (
-                    /[A-Z]/.test(token) &&
-                    /\d/.test(token) &&
-                    token.length >= 4
-                )
+                foundPart = token;
 
-                ||
-
-                // Numeric part
-                (
-                    /^\d{4,12}$/.test(token)
-                )
-
-                ||
-
-                // Bearing
-                (
-                    /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
-                )
-
-                ||
-
-                (
-                    /^\d{4,6}[-]?(ZZ|RS|2RS)$/.test(token)
+                console.log(
+                    "FOUND MIXED PART:",
+                    foundPart
                 );
 
-            if (!validPart)
-                continue;
+                break;
+            }
 
-            foundPart = token;
+            // =====================================
+            // PRIORITY 2
+            // LEADING ZERO OEM
+            // =====================================
 
-            console.log(
-                "FOUND PART:",
-                foundPart
-            );
+            if (
+                /^0\d{4,12}$/.test(token)
+            ) {
 
-            break;
+                foundPart = token;
+
+                console.log(
+                    "FOUND ZERO OEM:",
+                    foundPart
+                );
+
+                break;
+            }
+
+            // =====================================
+            // PRIORITY 3
+            // NUMERIC OEM
+            // =====================================
+
+            if (
+                /^\d{5,12}$/.test(token)
+            ) {
+
+                const commonHSN = [
+                    '7318',
+                    '8482',
+                    '8708',
+                    '4011',
+                    '3926'
+                ];
+
+                if (
+                    commonHSN.includes(token)
+                ) {
+                    continue;
+                }
+
+                foundPart = token;
+
+                console.log(
+                    "FOUND NUMERIC OEM:",
+                    foundPart
+                );
+
+                break;
+            }
+
+            // =====================================
+            // PRIORITY 4
+            // BEARING TYPE
+            // =====================================
+
+            if (
+                /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
+            ) {
+
+                foundPart = token;
+
+                console.log(
+                    "FOUND BEARING:",
+                    foundPart
+                );
+
+                break;
+            }
         }
 
         if (!foundPart)
@@ -179,7 +226,7 @@ function extractItemsFromText(ocrResult) {
     }
 
     // =============================================
-    // REMOVE DUPLICATES
+    // MERGE DUPLICATES
     // =============================================
 
     const merged = new Map();
@@ -210,4 +257,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return result;
-                }
+    }
