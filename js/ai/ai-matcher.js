@@ -3,6 +3,30 @@
 let normalizedIndex = new Map();
 let fuse = null;
 
+// =====================================================
+// NORMALIZE PART
+// =====================================================
+
+function normalizePart(part) {
+
+    if (!part) return '';
+
+    return part
+        .toString()
+        .toUpperCase()
+        .trim()
+
+        // remove spaces
+        .replace(/\s+/g, '')
+
+        // remove symbols
+        .replace(/[^A-Z0-9]/g, '');
+}
+
+// =====================================================
+// BUILD INDEX
+// =====================================================
+
 function buildNormalizedIndex() {
 
     if (!window.allProducts) return;
@@ -11,16 +35,32 @@ function buildNormalizedIndex() {
 
     for (const prod of window.allProducts) {
 
-        const norm = normalizePart(prod.part);
+        if (!prod || !prod.part)
+            continue;
 
-        if (norm && !normalizedIndex.has(norm)) {
+        const norm =
+            normalizePart(prod.part);
 
-            normalizedIndex.set(norm, prod);
+        if (
+            norm &&
+            !normalizedIndex.has(norm)
+        ) {
+
+            normalizedIndex.set(
+                norm,
+                prod
+            );
         }
     }
 
-    console.log(`Normalized index built (${normalizedIndex.size})`);
+    console.log(
+        `Normalized index built (${normalizedIndex.size})`
+    );
 }
+
+// =====================================================
+// INIT FUSE
+// =====================================================
 
 function initFuse() {
 
@@ -39,44 +79,31 @@ function initFuse() {
 }
 
 // =====================================================
-// NORMALIZE PART
-// =====================================================
-
-function normalizePart(part) {
-
-    if (!part) return '';
-
-    return part
-        .toString()
-        .toUpperCase()
-        .replace(/\s+/g, '')
-        .replace(/[^A-Z0-9]/g, '');
-}
-
-// =====================================================
 // COMMON OCR CORRECTIONS
 // =====================================================
 
 function attemptCorrection(part) {
 
-    const normalized = normalizePart(part);
+    const normalized =
+        normalizePart(part);
 
-    if (!normalized) return null;
+    if (!normalized)
+        return null;
 
     // =============================================
     // EXACT MATCH
     // =============================================
 
-    if (normalizedIndex.has(normalized)) {
+    if (
+        normalizedIndex.has(normalized)
+    ) {
 
         return normalizedIndex.get(normalized);
     }
 
     // =============================================
-    // LEADING ZERO NUMERIC MATCH
-    // Example:
-    // 088630 == 88630
-    // 0097871 == 97871
+    // LEADING ZERO SUPPORT
+    // 088630 → 88630
     // =============================================
 
     if (/^0+\d+$/.test(normalized)) {
@@ -84,7 +111,9 @@ function attemptCorrection(part) {
         const withoutZero =
             normalized.replace(/^0+/, '');
 
-        if (normalizedIndex.has(withoutZero)) {
+        if (
+            normalizedIndex.has(withoutZero)
+        ) {
 
             return normalizedIndex.get(withoutZero);
         }
@@ -126,13 +155,18 @@ function attemptCorrection(part) {
 
 function matchProduct(extractedItem) {
 
-    const rawPart = extractedItem.partRaw;
+    if (!extractedItem)
+        return null;
+
+    const rawPart =
+        extractedItem.partRaw;
 
     // =============================================
     // TRY EXACT MATCH + CORRECTION
     // =============================================
 
-    let product = attemptCorrection(rawPart);
+    let product =
+        attemptCorrection(rawPart);
 
     if (product) {
 
@@ -145,12 +179,13 @@ function matchProduct(extractedItem) {
     }
 
     // =============================================
-    // FUZZY FALLBACK
+    // FUZZY SEARCH
     // =============================================
 
     if (fuse) {
 
-        const results = fuse.search(rawPart);
+        const results =
+            fuse.search(rawPart);
 
         if (
 
@@ -161,7 +196,8 @@ function matchProduct(extractedItem) {
 
             return {
 
-                product: results[0].item,
+                product:
+                    results[0].item,
 
                 confidence: 90
             };
@@ -175,7 +211,8 @@ function matchProduct(extractedItem) {
 
             return {
 
-                product: results[0].item,
+                product:
+                    results[0].item,
 
                 confidence: 75
             };
@@ -183,4 +220,4 @@ function matchProduct(extractedItem) {
     }
 
     return null;
-}
+            }
