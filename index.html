@@ -857,12 +857,17 @@
     <!-- AI module scripts (order matters) -->
     <script src="js/ai/ai-config.js"></script>
     <script src="js/ai/ai-utils.js"></script>
-    <script src="js/ai/ai-ocr.js"></script>
-    <script src="js/ai/ai-parser.js"></script>
-    <script src="js/ai/ai-matcher.js"></script>
+    <script>
+window.AI_VERSION = Date.now();
+</script>
+
+<script src="js/ai/ai-ocr.js?v=" + window.AI_VERSION></script>
+<script src="js/ai/ai-parser.js?v=" + window.AI_VERSION></script>
+<script src="js/ai/ai-matcher.js?v=" + window.AI_VERSION></script>
+<script src="js/ai/ai-init.js?v=" + window.AI_VERSION></script>
     <script src="js/ai/ai-review-modal.js"></script>
     <script src="js/ai/ai-cart.js"></script>
-    <script src="js/ai/ai-init.js"></script>
+    
     <!-- Dealer Reorder Memory scripts -->
     <script src="js/reorder-history.js"></script>
     <script src="js/reorder-ui.js"></script>
