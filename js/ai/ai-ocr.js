@@ -1,25 +1,34 @@
 let ocrWorker = null;
 
+// =====================================================
+// INIT OCR
+// =====================================================
+
 async function initOCR() {
 
     if (!ocrWorker) {
 
-        ocrWorker = await Tesseract.createWorker('eng');
+        console.log("🔵 Initializing OCR Worker...");
+
+        ocrWorker =
+            await Tesseract.createWorker('eng');
 
         await ocrWorker.setParameters({
 
             tessedit_char_whitelist:
-                'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-./',
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./ ',
 
-            tessedit_pageseg_mode: '6',
+            tessedit_pageseg_mode: '11',
 
             preserve_interword_spaces: '1'
         });
+
+        console.log("✅ OCR Worker Ready");
     }
 }
 
 // =====================================================
-// IMAGE PREPROCESSING
+// IMAGE PREPROCESS
 // =====================================================
 
 async function preprocessImage(blob) {
@@ -39,11 +48,7 @@ async function preprocessImage(blob) {
             let width = img.width;
             let height = img.height;
 
-            // =============================================
-            // SMART RESIZE
-            // =============================================
-
-            const maxWidth = 1400;
+            const maxWidth = 1000;
 
             if (width > maxWidth) {
 
@@ -57,10 +62,6 @@ async function preprocessImage(blob) {
             const ctx =
                 canvas.getContext('2d');
 
-            // =============================================
-            // DRAW IMAGE
-            // =============================================
-
             ctx.drawImage(
                 img,
                 0,
@@ -68,10 +69,6 @@ async function preprocessImage(blob) {
                 width,
                 height
             );
-
-            // =============================================
-            // IMAGE DATA
-            // =============================================
 
             const imageData =
                 ctx.getImageData(
@@ -81,12 +78,7 @@ async function preprocessImage(blob) {
                     height
                 );
 
-            const data =
-                imageData.data;
-
-            // =============================================
-            // OCR OPTIMIZATION
-            // =============================================
+            const data = imageData.data;
 
             for (
                 let i = 0;
@@ -97,24 +89,17 @@ async function preprocessImage(blob) {
                 const avg =
                     (
                         data[i] +
-                        data[i + 1] +
-                        data[i + 2]
+                        data[i+1] +
+                        data[i+2]
                     ) / 3;
 
-                // softer contrast
                 const val =
-                    avg > 135
-                        ? 255
-                        : avg * 0.7;
+                    avg > 155 ? 255 : 0;
 
                 data[i] = val;
-                data[i + 1] = val;
-                data[i + 2] = val;
+                data[i+1] = val;
+                data[i+2] = val;
             }
-
-            // =============================================
-            // PUT IMAGE BACK
-            // =============================================
 
             ctx.putImageData(
                 imageData,
@@ -122,13 +107,9 @@ async function preprocessImage(blob) {
                 0
             );
 
-            // =============================================
-            // EXPORT IMAGE
-            // =============================================
-
             canvas.toBlob(
 
-                (blob) => {
+                blob => {
 
                     URL.revokeObjectURL(url);
 
@@ -137,7 +118,7 @@ async function preprocessImage(blob) {
 
                 'image/jpeg',
 
-                0.95
+                0.92
             );
         };
 
@@ -149,7 +130,10 @@ async function preprocessImage(blob) {
 // PDF PAGE TO IMAGE
 // =====================================================
 
-async function pdfPageToImage(page, scale = 2.5) {
+async function pdfPageToImage(
+    page,
+    scale = 2
+) {
 
     const viewport =
         page.getViewport({
@@ -162,16 +146,12 @@ async function pdfPageToImage(page, scale = 2.5) {
     const context =
         canvas.getContext('2d');
 
-    canvas.width =
-        viewport.width;
-
-    canvas.height =
-        viewport.height;
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
 
     await page.render({
 
         canvasContext: context,
-
         viewport: viewport
 
     }).promise;
@@ -184,13 +164,13 @@ async function pdfPageToImage(page, scale = 2.5) {
 
             'image/jpeg',
 
-            0.95
+            0.92
         );
     });
 }
 
 // =====================================================
-// EXCEL / CSV EXTRACTION
+// EXCEL / CSV
 // =====================================================
 
 async function extractFromExcelOrCSV(file) {
@@ -200,8 +180,7 @@ async function extractFromExcelOrCSV(file) {
         const reader =
             new FileReader();
 
-        reader.onload =
-            function(e) {
+        reader.onload = function(e) {
 
             try {
 
@@ -229,23 +208,12 @@ async function extractFromExcelOrCSV(file) {
                         }
                     );
 
-                if (
-                    !rows ||
-                    rows.length < 1
-                ) {
-
-                    reject(
-                        new Error("No rows found")
-                    );
-
-                    return;
-                }
-
-                let lines = [];
+                let partColIndex = -1;
+                let qtyColIndex = -1;
 
                 for (
                     let i = 0;
-                    i < rows.length;
+                    i < Math.min(rows.length, 15);
                     i++
                 ) {
 
@@ -254,24 +222,104 @@ async function extractFromExcelOrCSV(file) {
                     if (!row)
                         continue;
 
-                    const rowText =
-                        row
-                        .map(v =>
-                            String(v || '').trim()
-                        )
-                        .join(' ');
-
-                    if (
-                        rowText.trim()
+                    for (
+                        let j = 0;
+                        j < row.length;
+                        j++
                     ) {
 
-                        lines.push(rowText);
+                        const cell =
+                            (row[j] || "")
+                            .toString()
+                            .trim()
+                            .toLowerCase();
+
+                        if (
+                            cell.includes("part")
+                        ) {
+
+                            partColIndex = j;
+                        }
+
+                        if (
+                            cell.includes("qty") ||
+                            cell.includes("quantity")
+                        ) {
+
+                            qtyColIndex = j;
+                        }
+                    }
+
+                    if (
+                        partColIndex !== -1
+                    ) {
+                        break;
                     }
                 }
 
-                resolve(
-                    lines.join('\n')
-                );
+                if (
+                    partColIndex === -1
+                ) {
+
+                    reject(
+                        new Error(
+                            "Part column not found"
+                        )
+                    );
+
+                    return;
+                }
+
+                let lines = [];
+
+                for (
+                    let i = 1;
+                    i < rows.length;
+                    i++
+                ) {
+
+                    const row = rows[i];
+
+                    if (
+                        !row ||
+                        row.length === 0
+                    )
+                        continue;
+
+                    const part =
+                        row[partColIndex]
+                        ?.toString()
+                        ?.trim();
+
+                    if (!part)
+                        continue;
+
+                    let qty = 1;
+
+                    if (
+                        qtyColIndex !== -1
+                    ) {
+
+                        const q =
+                            parseFloat(
+                                row[qtyColIndex]
+                            );
+
+                        if (
+                            !isNaN(q) &&
+                            q > 0
+                        ) {
+
+                            qty = Math.floor(q);
+                        }
+                    }
+
+                    lines.push(
+                        `${part} x${qty}`
+                    );
+                }
+
+                resolve(lines.join('\n'));
 
             } catch(err) {
 
@@ -279,60 +327,48 @@ async function extractFromExcelOrCSV(file) {
             }
         };
 
-        reader.onerror = () =>
+        reader.onerror = () => {
+
             reject(
                 new Error(
                     "File read failed"
                 )
             );
+        };
 
         reader.readAsArrayBuffer(file);
     });
 }
 
 // =====================================================
-// MAIN FILE OCR
+// MAIN FILE EXTRACTOR
 // =====================================================
 
 async function extractTextFromFile(file) {
 
-    const scanBtn =
-        document.getElementById(
-            'ai-scan-btn'
-        );
-
-    if (scanBtn) {
-
-        scanBtn.disabled = true;
-
-        scanBtn.innerHTML =
-            '<i class="fas fa-spinner fa-spin"></i> Scanning...';
-    }
-
     try {
 
-        // =============================================
-        // EXCEL / CSV
-        // =============================================
+        const fileName =
+            (file.name || '').toLowerCase();
+
+        // Excel / CSV
 
         if (
-            file.name.match(/\.(xlsx|xls|csv)$/i)
+            fileName.endsWith('.xlsx') ||
+            fileName.endsWith('.xls') ||
+            fileName.endsWith('.csv')
         ) {
 
             const text =
                 await extractFromExcelOrCSV(file);
 
             return {
-
                 text: text,
-
                 words: null
             };
         }
 
-        // =============================================
         // PDF
-        // =============================================
 
         else if (
             file.type === 'application/pdf'
@@ -343,9 +379,9 @@ async function extractTextFromFile(file) {
 
             const pdf =
                 await pdfjsLib
-                .getDocument({
-                    data: arrayBuffer
-                }).promise;
+                    .getDocument({
+                        data: arrayBuffer
+                    }).promise;
 
             let fullText = '';
 
@@ -360,37 +396,61 @@ async function extractTextFromFile(file) {
                 const page =
                     await pdf.getPage(i);
 
-                const imageBlob =
-                    await pdfPageToImage(
-                        page,
-                        2.5
-                    );
+                let usedNativeText = false;
 
-                const optimized =
-                    await preprocessImage(
-                        imageBlob
-                    );
+                try {
 
-                const ret =
-                    await ocrWorker.recognize(
-                        optimized
-                    );
+                    const txt =
+                        await page.getTextContent();
 
-                fullText +=
-                    ret.data.text + '\n';
+                    const pageText =
+                        txt.items
+                        .map(x => x.str)
+                        .join(' ');
+
+                    if (
+                        pageText &&
+                        pageText.length > 100
+                    ) {
+
+                        fullText +=
+                            pageText + '\n';
+
+                        usedNativeText = true;
+                    }
+
+                } catch(e) {}
+
+                if (!usedNativeText) {
+
+                    const imageBlob =
+                        await pdfPageToImage(
+                            page,
+                            2
+                        );
+
+                    const preprocessed =
+                        await preprocessImage(
+                            imageBlob
+                        );
+
+                    const ret =
+                        await ocrWorker.recognize(
+                            preprocessed
+                        );
+
+                    fullText +=
+                        ret.data.text + '\n';
+                }
             }
 
             return {
-
                 text: fullText,
-
                 words: null
             };
         }
 
-        // =============================================
-        // IMAGE OCR
-        // =============================================
+        // IMAGE
 
         else {
 
@@ -406,7 +466,8 @@ async function extractTextFromFile(file) {
 
             return {
 
-                text: ret.data.text || '',
+                text:
+                    ret.data.text || '',
 
                 words:
                     ret.data.words || [],
@@ -416,14 +477,13 @@ async function extractTextFromFile(file) {
             };
         }
 
-    } finally {
+    } catch(err) {
 
-        if (scanBtn) {
+        console.error(err);
 
-            scanBtn.disabled = false;
-
-            scanBtn.innerHTML =
-                '<i class="fas fa-camera"></i> Scan Order';
-        }
+        return {
+            text: '',
+            words: null
+        };
     }
-                    }
+                }
