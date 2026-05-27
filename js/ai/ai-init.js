@@ -1,137 +1,321 @@
-console.log("NEW ai-init.js LOADED");
+console.log("FINAL ai-init.js LOADED");
 
 (function () {
 
+    // =====================================
+    // INIT AI SCAN
+    // =====================================
+
     function initAIScan() {
 
+        console.log("initAIScan() started");
+
         const fileInput =
-            document.getElementById(
-                'ai-scan-input'
-            );
+            document.getElementById('ai-scan-input');
 
         if (!fileInput) {
 
-            console.error(
-                "File input not found"
-            );
+            alert("ai-scan-input not found");
 
             return;
         }
 
-        fileInput.onchange =
-            async function (e) {
+        fileInput.onchange = async function (e) {
 
-                const file =
-                    e.target.files[0];
+            const file =
+                e.target.files[0];
 
-                if (!file)
-                    return;
+            if (!file)
+                return;
 
-                try {
+            try {
 
-                    const ocrResult =
-                        await extractTextFromFile(file);
+                // =====================================
+                // DEBUG FILE INFO
+                // =====================================
 
-                    const items =
-                        extractItemsFromText(
-                            ocrResult
-                        );
+                alert(
+                    "FILE:\n\n" +
+                    file.name +
+                    "\n\nTYPE:\n" +
+                    file.type
+                );
 
-                    console.log(
-                        "Items Parsed:",
-                        items
-                    );
+                console.log(
+                    "Selected File:",
+                    file
+                );
 
-                    if (
-                        items.length === 0
-                    ) {
+                // =====================================
+                // OCR
+                // =====================================
 
-                        alert(
-                            "No valid part number found"
-                        );
+                alert("Starting OCR...");
 
-                        return;
-                    }
+                const ocrResult =
+                    await extractTextFromFile(file);
 
-                    const matches = [];
+                console.log(
+                    "FULL OCR RESULT:",
+                    ocrResult
+                );
 
-                    for (const item of items) {
+                // =====================================
+                // OCR TEXT
+                // =====================================
 
-                        const match =
-                            matchProduct(item);
+                const extractedText =
 
-                        if (match) {
+                    typeof ocrResult === 'string'
 
-                            matches.push({
+                        ? ocrResult
 
-                                ...item,
+                        : (ocrResult.text || '');
 
-                                product:
-                                    match.product,
+                console.log(
+                    "OCR TEXT:",
+                    extractedText
+                );
 
-                                confidence:
-                                    match.confidence
-                            });
-                        }
-                    }
+                alert(
+                    "OCR LENGTH: " +
+                    extractedText.length
+                );
 
-                    console.log(
-                        "Matches:",
-                        matches
-                    );
+                // =====================================
+                // SHOW OCR PREVIEW
+                // =====================================
 
-                    if (
-                        matches.length === 0
-                    ) {
+                alert(
+                    "OCR PREVIEW:\n\n" +
+                    extractedText.substring(0, 1000)
+                );
 
-                        alert(
-                            "No matching products found"
-                        );
+                // =====================================
+                // EMPTY OCR CHECK
+                // =====================================
 
-                        return;
-                    }
-
-                    if (
-                        typeof showReviewModal === 'function'
-                    ) {
-
-                        showReviewModal(matches);
-
-                    } else {
-
-                        alert(
-                            JSON.stringify(matches, null, 2)
-                        );
-                    }
-
-                } catch (err) {
-
-                    console.error(err);
+                if (
+                    extractedText.length < 5
+                ) {
 
                     alert(
-                        "Scan error: " +
-                        err.message
+                        "OCR FAILED - EMPTY TEXT"
                     );
+
+                    return;
                 }
 
-                fileInput.value = '';
-            };
+                // =====================================
+                // PARSER
+                // =====================================
+
+                alert("Parsing items...");
+
+                const items =
+                    extractItemsFromText(
+                        ocrResult
+                    );
+
+                console.log(
+                    "PARSED ITEMS:",
+                    items
+                );
+
+                alert(
+                    "ITEMS PARSED: " +
+                    items.length
+                );
+
+                // =====================================
+                // NO ITEMS
+                // =====================================
+
+                if (
+                    items.length === 0
+                ) {
+
+                    alert(
+                        "NO VALID PART NUMBER FOUND"
+                    );
+
+                    return;
+                }
+
+                // =====================================
+                // PRODUCTS CHECK
+                // =====================================
+
+                if (
+                    !window.allProducts ||
+                    window.allProducts.length === 0
+                ) {
+
+                    alert(
+                        "PRODUCT DATABASE NOT LOADED"
+                    );
+
+                    return;
+                }
+
+                // =====================================
+                // MATCH PRODUCTS
+                // =====================================
+
+                alert("Matching products...");
+
+                const matches = [];
+
+                for (const item of items) {
+
+                    console.log(
+                        "Matching:",
+                        item
+                    );
+
+                    const match =
+                        matchProduct(item);
+
+                    if (match) {
+
+                        matches.push({
+
+                            ...item,
+
+                            product:
+                                match.product,
+
+                            confidence:
+                                match.confidence
+                        });
+                    }
+                }
+
+                console.log(
+                    "FINAL MATCHES:",
+                    matches
+                );
+
+                alert(
+                    "MATCHES FOUND: " +
+                    matches.length
+                );
+
+                // =====================================
+                // NO MATCHES
+                // =====================================
+
+                if (
+                    matches.length === 0
+                ) {
+
+                    alert(
+                        "NO MATCHING PRODUCTS FOUND"
+                    );
+
+                    return;
+                }
+
+                // =====================================
+                // SHOW RESULTS
+                // =====================================
+
+                if (
+                    typeof showReviewModal === 'function'
+                ) {
+
+                    showReviewModal(matches);
+
+                } else {
+
+                    let msg =
+                        "MATCHES:\n\n";
+
+                    for (const m of matches) {
+
+                        msg +=
+                            m.partRaw +
+                            " → " +
+                            (m.product?.part || 'NO PRODUCT') +
+                            " x" +
+                            m.qty +
+                            "\n";
+                    }
+
+                    alert(msg);
+                }
+
+            } catch (err) {
+
+                console.error(err);
+
+                alert(
+                    "SCAN ERROR:\n\n" +
+                    err.message
+                );
+            }
+
+            fileInput.value = '';
+        };
 
         console.log(
-            "AI Scan Ready"
+            "AI SCAN READY"
         );
     }
 
+    // =====================================
+    // WAIT FOR PRODUCTS
+    // =====================================
+
     function waitForProducts() {
+
+        console.log(
+            "Checking products..."
+        );
 
         if (
             window.allProducts &&
             window.allProducts.length > 0
         ) {
 
-            buildNormalizedIndex();
+            console.log(
+                "Products Loaded:",
+                window.allProducts.length
+            );
 
-            initFuse();
+            // =====================================
+            // BUILD INDEX
+            // =====================================
+
+            if (
+                typeof buildNormalizedIndex === 'function'
+            ) {
+
+                buildNormalizedIndex();
+
+                console.log(
+                    "Normalized index ready"
+                );
+            }
+
+            // =====================================
+            // INIT FUSE
+            // =====================================
+
+            if (
+                typeof initFuse === 'function'
+            ) {
+
+                initFuse();
+
+                console.log(
+                    "Fuse ready"
+                );
+            }
+
+            // =====================================
+            // START AI
+            // =====================================
 
             initAIScan();
 
@@ -151,6 +335,10 @@ console.log("NEW ai-init.js LOADED");
             );
         }
     }
+
+    // =====================================
+    // START SYSTEM
+    // =====================================
 
     waitForProducts();
 
