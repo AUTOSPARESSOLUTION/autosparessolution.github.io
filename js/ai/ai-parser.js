@@ -1,4 +1,4 @@
-console.log("NEW ai-parser.js LOADED");
+console.log("FINAL ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -18,7 +18,7 @@ function extractItemsFromText(ocrResult) {
     const items = [];
 
     const ignoreWords =
-        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE/i;
+        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE|DISC|VALUE/i;
 
     const tokenPattern =
         /[A-Z0-9\-\/\.]{4,40}/g;
@@ -42,20 +42,6 @@ function extractItemsFromText(ocrResult) {
         if (tokens.length === 0)
             continue;
 
-        let hasHSN = false;
-
-        for (const t of tokens) {
-
-            if (/^\d{4,8}$/.test(t)) {
-
-                hasHSN = true;
-                break;
-            }
-        }
-
-        if (!hasHSN)
-            continue;
-
         let foundPart = null;
 
         for (let token of tokens) {
@@ -66,23 +52,27 @@ function extractItemsFromText(ocrResult) {
                 .replace(/O/g, '0')
                 .replace(/I/g, '1');
 
-            const hasLetter =
-                /[A-Z]/.test(token);
-
-            const hasDigit =
-                /\d/.test(token);
+            // skip decimal
 
             if (/^\d+\.\d+$/.test(token))
                 continue;
 
+            // skip huge numbers
+
             if (/^\d{10,}$/.test(token))
                 continue;
+
+            // skip GSTIN
 
             if (/^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token))
                 continue;
 
+            // skip tiny numbers
+
             if (/^\d{1,3}$/.test(token))
                 continue;
+
+            // skip common HSN
 
             const commonHSN = [
                 '7318',
@@ -95,7 +85,17 @@ function extractItemsFromText(ocrResult) {
             if (commonHSN.includes(token))
                 continue;
 
+            const hasLetter =
+                /[A-Z]/.test(token);
+
+            const hasDigit =
+                /\d/.test(token);
+
+            // VALID PART RULES
+
             const validPart =
+
+                // alphanumeric
 
                 (
                     hasLetter &&
@@ -105,11 +105,15 @@ function extractItemsFromText(ocrResult) {
 
                 ||
 
+                // numeric parts
+
                 (
                     /^\d{5,12}$/.test(token)
                 )
 
                 ||
+
+                // bearing types
 
                 (
                     /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
@@ -124,6 +128,25 @@ function extractItemsFromText(ocrResult) {
             if (!validPart)
                 continue;
 
+            // IMPORTANT:
+            // avoid price/rate confusion
+
+            if (
+                /^\d+$/.test(token)
+            ) {
+
+                const num =
+                    parseInt(token);
+
+                // avoid amounts
+
+                if (
+                    num > 999999
+                ) {
+                    continue;
+                }
+            }
+
             foundPart = token;
 
             break;
@@ -132,15 +155,26 @@ function extractItemsFromText(ocrResult) {
         if (!foundPart)
             continue;
 
+        // =========================
+        // QTY DETECTION
+        // =========================
+
         let qty = 1;
 
         for (const t of tokens) {
 
-            if (/^[1-9][0-9]{0,2}$/.test(t)) {
+            if (
+                /^[1-9][0-9]{0,2}$/.test(t)
+            ) {
 
-                const n = parseInt(t);
+                const n =
+                    parseInt(t);
 
-                if (n <= 200) {
+                // realistic qty only
+
+                if (
+                    n <= 200
+                ) {
 
                     qty = n;
 
@@ -157,12 +191,20 @@ function extractItemsFromText(ocrResult) {
         });
     }
 
+    // =========================
+    // MERGE DUPLICATES
+    // =========================
+
     const merged = new Map();
 
     for (const item of items) {
 
+        // IMPORTANT FIX:
+        // 088630 = 88630
+
         const key =
-            item.partRaw.replace(/^0+/, '');
+            item.partRaw
+                .replace(/^0+/, '');
 
         if (merged.has(key)) {
 
@@ -172,19 +214,24 @@ function extractItemsFromText(ocrResult) {
 
             merged.set(key, {
 
-                partRaw: item.partRaw,
+                partRaw:
+                    item.partRaw,
 
-                qty: item.qty
+                qty:
+                    item.qty
             });
         }
     }
 
+    const finalItems =
+        Array.from(
+            merged.values()
+        );
+
     console.log(
-        "FINAL PARSED:",
-        Array.from(merged.values())
+        "FINAL ITEMS:",
+        finalItems
     );
 
-    return Array.from(
-        merged.values()
-    );
-}
+    return finalItems;
+            }
