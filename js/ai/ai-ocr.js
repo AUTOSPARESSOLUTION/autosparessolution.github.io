@@ -6,36 +6,24 @@ let ocrWorker = null;
 
 async function initOCR() {
 
-    try {
+    if (!ocrWorker) {
 
-        if (!ocrWorker) {
+        console.log("🔵 Initializing OCR Worker...");
 
-            console.log("🔵 Initializing OCR Worker...");
+        ocrWorker =
+            await Tesseract.createWorker('eng');
 
-            ocrWorker =
-                await Tesseract.createWorker('eng');
+        await ocrWorker.setParameters({
 
-            await ocrWorker.setParameters({
+            tessedit_char_whitelist:
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./ ',
 
-                tessedit_char_whitelist:
-                    'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./ ',
+            tessedit_pageseg_mode: '11',
 
-                tessedit_pageseg_mode: '6',
+            preserve_interword_spaces: '1'
+        });
 
-                preserve_interword_spaces: '1'
-            });
-
-            console.log("✅ OCR Worker Ready");
-        }
-
-    } catch(err) {
-
-        console.error(err);
-
-        alert(
-            "❌ OCR INIT FAILED:\n" +
-            (err?.message || err)
-        );
+        console.log("✅ OCR Worker Ready");
     }
 }
 
@@ -60,12 +48,11 @@ async function preprocessImage(blob) {
             let width = img.width;
             let height = img.height;
 
-            const maxWidth = 1600;
+            const maxWidth = 1000;
 
             if (width > maxWidth) {
 
                 height *= maxWidth / width;
-
                 width = maxWidth;
             }
 
@@ -131,15 +118,8 @@ async function preprocessImage(blob) {
 
                 'image/jpeg',
 
-                0.95
+                0.92
             );
-        };
-
-        img.onerror = () => {
-
-            URL.revokeObjectURL(url);
-
-            resolve(blob);
         };
 
         img.src = url;
@@ -152,7 +132,7 @@ async function preprocessImage(blob) {
 
 async function pdfPageToImage(
     page,
-    scale = 3
+    scale = 2
 ) {
 
     const viewport =
@@ -167,13 +147,11 @@ async function pdfPageToImage(
         canvas.getContext('2d');
 
     canvas.width = viewport.width;
-
     canvas.height = viewport.height;
 
     await page.render({
 
         canvasContext: context,
-
         viewport: viewport
 
     }).promise;
@@ -186,7 +164,7 @@ async function pdfPageToImage(
 
             'image/jpeg',
 
-            0.95
+            0.92
         );
     });
 }
@@ -259,6 +237,7 @@ async function extractFromExcelOrCSV(file) {
                         if (
                             cell.includes("part")
                         ) {
+
                             partColIndex = j;
                         }
 
@@ -266,6 +245,7 @@ async function extractFromExcelOrCSV(file) {
                             cell.includes("qty") ||
                             cell.includes("quantity")
                         ) {
+
                             qtyColIndex = j;
                         }
                     }
@@ -366,38 +346,17 @@ async function extractFromExcelOrCSV(file) {
 
 async function extractTextFromFile(file) {
 
-    const scanBtn =
-        document.getElementById(
-            'ai-scan-btn'
-        );
-
-    if (scanBtn) {
-
-        scanBtn.disabled = true;
-
-        scanBtn.innerHTML =
-            '<i class="fas fa-spinner fa-spin"></i> Scanning...';
-    }
-
     try {
 
         const fileName =
             (file.name || '').toLowerCase();
 
-        const fileType =
-            (file.type || '').toLowerCase();
-
-        // =============================================
-        // EXCEL / CSV
-        // =============================================
+        // Excel / CSV
 
         if (
             fileName.endsWith('.xlsx') ||
             fileName.endsWith('.xls') ||
-            fileName.endsWith('.csv') ||
-            fileType.includes('spreadsheet') ||
-            fileType.includes('excel') ||
-            fileType.includes('csv')
+            fileName.endsWith('.csv')
         ) {
 
             const text =
@@ -409,9 +368,7 @@ async function extractTextFromFile(file) {
             };
         }
 
-        // =============================================
         // PDF
-        // =============================================
 
         else if (
             file.type === 'application/pdf'
@@ -439,24 +396,52 @@ async function extractTextFromFile(file) {
                 const page =
                     await pdf.getPage(i);
 
-                const imageBlob =
-                    await pdfPageToImage(
-                        page,
-                        3
-                    );
+                let usedNativeText = false;
 
-                const preprocessed =
-                    await preprocessImage(
-                        imageBlob
-                    );
+                try {
 
-                const ret =
-                    await ocrWorker.recognize(
-                        preprocessed
-                    );
+                    const txt =
+                        await page.getTextContent();
 
-                fullText +=
-                    ret.data.text + '\n';
+                    const pageText =
+                        txt.items
+                        .map(x => x.str)
+                        .join(' ');
+
+                    if (
+                        pageText &&
+                        pageText.length > 100
+                    ) {
+
+                        fullText +=
+                            pageText + '\n';
+
+                        usedNativeText = true;
+                    }
+
+                } catch(e) {}
+
+                if (!usedNativeText) {
+
+                    const imageBlob =
+                        await pdfPageToImage(
+                            page,
+                            2
+                        );
+
+                    const preprocessed =
+                        await preprocessImage(
+                            imageBlob
+                        );
+
+                    const ret =
+                        await ocrWorker.recognize(
+                            preprocessed
+                        );
+
+                    fullText +=
+                        ret.data.text + '\n';
+                }
             }
 
             return {
@@ -465,9 +450,7 @@ async function extractTextFromFile(file) {
             };
         }
 
-        // =============================================
         // IMAGE
-        // =============================================
 
         else {
 
@@ -482,9 +465,15 @@ async function extractTextFromFile(file) {
                 );
 
             return {
-                text: ret.data.text || '',
-                words: ret.data.words || [],
-                rawText: ret.data.text || ''
+
+                text:
+                    ret.data.text || '',
+
+                words:
+                    ret.data.words || [],
+
+                rawText:
+                    ret.data.text || ''
             };
         }
 
@@ -492,24 +481,9 @@ async function extractTextFromFile(file) {
 
         console.error(err);
 
-        alert(
-            "❌ OCR ERROR:\n" +
-            (err?.message || err)
-        );
-
         return {
             text: '',
             words: null
         };
-
-    } finally {
-
-        if (scanBtn) {
-
-            scanBtn.disabled = false;
-
-            scanBtn.innerHTML =
-                '<i class="fas fa-camera"></i> Scan Order';
-        }
     }
                     }
