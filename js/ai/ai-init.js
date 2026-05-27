@@ -1,302 +1,148 @@
-(function() {
+console.log("NEW ai-init.js LOADED");
 
-    alert("🔵 AI init: script loaded");
-
-    // =====================================================
-    // FALLBACK MODAL
-    // =====================================================
-
-    if (typeof showReviewModal !== 'function') {
-
-        window.showReviewModal = function(matches) {
-
-            alert(
-                "✅ Fallback modal: " +
-                matches.length +
-                " matches found.\n" +
-                JSON.stringify(
-                    matches.map(m => ({
-                        part: m.partRaw,
-                        qty: m.qty,
-                        product: m.product?.part
-                    })),
-                    null,
-                    2
-                )
-            );
-
-            let msg = "Add to cart?\n";
-
-            for (let m of matches) {
-
-                if (m.product) {
-
-                    msg += `${m.partRaw} → ${m.product.part} x${m.qty}\n`;
-                }
-            }
-
-            if (confirm(msg + "\nClick OK to add all")) {
-
-                let added = 0;
-
-                for (let m of matches) {
-
-                    if (
-                        m.product &&
-                        typeof window.aiAddToCart === 'function'
-                    ) {
-
-                        window.aiAddToCart(
-                            m.product.part,
-                            m.product.price,
-                            m.qty
-                        );
-
-                        added++;
-                    }
-                }
-
-                if (
-                    added &&
-                    typeof updateCartUI === 'function'
-                ) {
-                    updateCartUI();
-                }
-
-                alert(`Added ${added} items to cart`);
-            }
-        };
-
-        window.confirmAddScannedItems = function() {};
-        window.bindModalEvents = function() {};
-
-        alert("📦 Fallback modal installed");
-    }
-
-    // =====================================================
-    // INIT AI SCAN
-    // =====================================================
+(function () {
 
     function initAIScan() {
 
-        alert("🟢 initAIScan called");
-
         const fileInput =
-            document.getElementById('ai-scan-input');
+            document.getElementById(
+                'ai-scan-input'
+            );
 
         if (!fileInput) {
 
-            alert("❌ File input not found!");
+            console.error(
+                "File input not found"
+            );
 
             return;
         }
 
-        alert("✅ File input found");
+        fileInput.onchange =
+            async function (e) {
 
-        fileInput.onchange = async function(e) {
+                const file =
+                    e.target.files[0];
 
-            const file = e.target.files[0];
-
-            if (!file) return;
-
-            alert("📎 File selected: " + file.name);
-
-            try {
-
-                // =========================================
-                // OCR
-                // =========================================
-
-                alert("📷 Calling extractTextFromFile...");
-
-                const ocrResult =
-                    await extractTextFromFile(file);
-
-                console.log("OCR RESULT:", ocrResult);
-
-                const extractedText =
-                    typeof ocrResult === 'string'
-                        ? ocrResult
-                        : (ocrResult.text || '');
-
-                alert(
-                    "📄 OCR text length: " +
-                    extractedText.length
-                );
-
-                console.log(
-                    "OCR TEXT:\n",
-                    extractedText
-                );
-
-                if (
-                    extractedText.length < 5
-                ) {
-
-                    alert(
-                        "⚠️ No text extracted (OCR failed)"
-                    );
-
+                if (!file)
                     return;
-                }
 
-                // =========================================
-                // PARSER
-                // =========================================
+                try {
 
-                alert("🔧 Parsing items...");
+                    const ocrResult =
+                        await extractTextFromFile(file);
 
-                const items =
-                    extractItemsFromText(
-                        ocrResult
+                    const items =
+                        extractItemsFromText(
+                            ocrResult
+                        );
+
+                    console.log(
+                        "Items Parsed:",
+                        items
                     );
 
-                console.log(
-                    "PARSED ITEMS:",
-                    items
-                );
+                    if (
+                        items.length === 0
+                    ) {
 
-                alert(
-                    "📦 Items parsed: " +
-                    items.length
-                );
+                        alert(
+                            "No valid part number found"
+                        );
 
-                if (
-                    items.length === 0
-                ) {
-
-                    alert(
-                        "⚠️ No part numbers found in OCR text."
-                    );
-
-                    return;
-                }
-
-                // =========================================
-                // PRODUCTS
-                // =========================================
-
-                if (
-                    !window.allProducts ||
-                    window.allProducts.length === 0
-                ) {
-
-                    alert(
-                        "❌ Product database not loaded"
-                    );
-
-                    return;
-                }
-
-                // =========================================
-                // MATCHING
-                // =========================================
-
-                alert("🎯 Matching products...");
-
-                const matches = [];
-
-                for (const item of items) {
-
-                    const match =
-                        matchProduct(item);
-
-                    if (match) {
-
-                        matches.push({
-                            ...item,
-                            product: match.product,
-                            confidence:
-                                match.confidence
-                        });
+                        return;
                     }
-                }
 
-                console.log(
-                    "MATCHES:",
-                    matches
-                );
+                    const matches = [];
 
-                alert(
-                    "✅ Matches ready: " +
-                    matches.length
-                );
+                    for (const item of items) {
 
-                if (
-                    matches.length === 0
-                ) {
+                        const match =
+                            matchProduct(item);
 
-                    alert(
-                        "⚠️ No matches found in product database"
+                        if (match) {
+
+                            matches.push({
+
+                                ...item,
+
+                                product:
+                                    match.product,
+
+                                confidence:
+                                    match.confidence
+                            });
+                        }
+                    }
+
+                    console.log(
+                        "Matches:",
+                        matches
                     );
 
-                    return;
+                    if (
+                        matches.length === 0
+                    ) {
+
+                        alert(
+                            "No matching products found"
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        typeof showReviewModal === 'function'
+                    ) {
+
+                        showReviewModal(matches);
+
+                    } else {
+
+                        alert(
+                            JSON.stringify(matches, null, 2)
+                        );
+                    }
+
+                } catch (err) {
+
+                    console.error(err);
+
+                    alert(
+                        "Scan error: " +
+                        err.message
+                    );
                 }
 
-                alert("🖼️ Opening review modal...");
+                fileInput.value = '';
+            };
 
-                showReviewModal(matches);
-
-            } catch(err) {
-
-                console.error(err);
-
-                alert(
-                    "❌ ERROR:\n" +
-                    (err?.message || err)
-                );
-            }
-
-            fileInput.value = '';
-        };
-
-        alert("🟢 AI Scan ready");
+        console.log(
+            "AI Scan Ready"
+        );
     }
 
-    // =====================================================
-    // WAIT PRODUCTS
-    // =====================================================
-
     function waitForProducts() {
-
-        alert(
-            "⏳ waitForProducts checking..."
-        );
 
         if (
             window.allProducts &&
             window.allProducts.length > 0
         ) {
 
-            alert(
-                "✅ Products loaded: " +
-                window.allProducts.length
-            );
+            buildNormalizedIndex();
 
-            if (
-                typeof buildNormalizedIndex === 'function'
-            ) {
-                buildNormalizedIndex();
-            }
-
-            if (
-                typeof initFuse === 'function'
-            ) {
-                initFuse();
-            }
+            initFuse();
 
             initAIScan();
 
-            if (
-                typeof bindModalEvents === 'function'
-            ) {
-                bindModalEvents();
-            }
+            console.log(
+                "AI SYSTEM READY"
+            );
 
         } else {
 
-            alert(
-                "⏳ allProducts not ready, retrying..."
+            console.log(
+                "Waiting for products..."
             );
 
             setTimeout(
