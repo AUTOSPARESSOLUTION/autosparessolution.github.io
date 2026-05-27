@@ -1,3 +1,5 @@
+console.log("NEW ai-parser.js LOADED");
+
 function extractItemsFromText(ocrResult) {
 
     const text =
@@ -70,29 +72,17 @@ function extractItemsFromText(ocrResult) {
             const hasDigit =
                 /\d/.test(token);
 
-            if (
-                /^\d+\.\d+$/.test(token)
-            ) {
+            if (/^\d+\.\d+$/.test(token))
                 continue;
-            }
 
-            if (
-                /^\d{10,}$/.test(token)
-            ) {
+            if (/^\d{10,}$/.test(token))
                 continue;
-            }
 
-            if (
-                /^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token)
-            ) {
+            if (/^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token))
                 continue;
-            }
 
-            if (
-                /^\d{1,3}$/.test(token)
-            ) {
+            if (/^\d{1,3}$/.test(token))
                 continue;
-            }
 
             const commonHSN = [
                 '7318',
@@ -102,11 +92,8 @@ function extractItemsFromText(ocrResult) {
                 '3926'
             ];
 
-            if (
-                commonHSN.includes(token)
-            ) {
+            if (commonHSN.includes(token))
                 continue;
-            }
 
             const validPart =
 
@@ -134,9 +121,8 @@ function extractItemsFromText(ocrResult) {
                     /^\d{4,6}[-]?(ZZ|RS|2RS)$/.test(token)
                 );
 
-            if (!validPart) {
+            if (!validPart)
                 continue;
-            }
 
             foundPart = token;
 
@@ -150,16 +136,11 @@ function extractItemsFromText(ocrResult) {
 
         for (const t of tokens) {
 
-            if (
-                /^[1-9][0-9]{0,2}$/.test(t)
-            ) {
+            if (/^[1-9][0-9]{0,2}$/.test(t)) {
 
-                const n =
-                    parseInt(t);
+                const n = parseInt(t);
 
-                if (
-                    n <= 200
-                ) {
+                if (n <= 200) {
 
                     qty = n;
 
@@ -181,7 +162,7 @@ function extractItemsFromText(ocrResult) {
     for (const item of items) {
 
         const key =
-            item.partRaw;
+            item.partRaw.replace(/^0+/, '');
 
         if (merged.has(key)) {
 
@@ -189,9 +170,19 @@ function extractItemsFromText(ocrResult) {
 
         } else {
 
-            merged.set(key, item);
+            merged.set(key, {
+
+                partRaw: item.partRaw,
+
+                qty: item.qty
+            });
         }
     }
+
+    console.log(
+        "FINAL PARSED:",
+        Array.from(merged.values())
+    );
 
     return Array.from(
         merged.values()
