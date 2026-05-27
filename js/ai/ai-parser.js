@@ -8,9 +8,6 @@ function extractItemsFromText(ocrResult) {
     if (!text)
         return [];
 
-    console.log("OCR TEXT:");
-    console.log(text);
-
     const lines =
         text
         .toUpperCase()
@@ -18,43 +15,15 @@ function extractItemsFromText(ocrResult) {
 
     const items = [];
 
-    // =============================================
-    // COMMON HSN CODES
-    // =============================================
-
-    const commonHSN = [
-
-        '7318',
-        '8482',
-        '8708',
-        '4011',
-        '3926',
-        '8501',
-        '8511',
-        '8421'
-    ];
-
-    // =============================================
-    // IGNORE WORDS
-    // =============================================
-
     const ignoreWords =
-        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE/i;
-
-    // =============================================
-    // TOKEN PATTERN
-    // =============================================
+        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE/i;
 
     const tokenPattern =
         /[A-Z0-9\-\/\.]{4,40}/g;
 
-    // =============================================
-    // PROCESS EACH LINE
-    // =============================================
-
     for (let rawLine of lines) {
 
-        const line =
+        let line =
             rawLine
             .trim()
             .replace(/\s+/g, ' ');
@@ -71,11 +40,28 @@ function extractItemsFromText(ocrResult) {
         if (tokens.length === 0)
             continue;
 
-        let bestToken = null;
-        let bestScore = 0;
+        // =========================================
+        // CHECK IF LINE LOOKS LIKE ITEM ROW
+        // =========================================
+
+        let hasHSN = false;
+
+        for (const t of tokens) {
+
+            if (/^\d{4,8}$/.test(t)) {
+
+                hasHSN = true;
+                break;
+            }
+        }
+
+        if (!hasHSN)
+            continue;
+
+        let foundPart = null;
 
         // =========================================
-        // CHECK ALL TOKENS
+        // CHECK TOKENS
         // =========================================
 
         for (let token of tokens) {
@@ -86,11 +72,17 @@ function extractItemsFromText(ocrResult) {
                 .replace(/O/g, '0')
                 .replace(/I/g, '1');
 
+            const hasLetter =
+                /[A-Z]/.test(token);
+
+            const hasDigit =
+                /\d/.test(token);
+
             // =====================================
             // REJECT BAD TOKENS
             // =====================================
 
-            // decimal price
+            // price
 
             if (
                 /^\d+\.\d+$/.test(token)
@@ -98,18 +90,10 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            // phone
+            // phone number
 
             if (
                 /^\d{10,}$/.test(token)
-            ) {
-                continue;
-            }
-
-            // tiny numbers
-
-            if (
-                /^\d{1,3}$/.test(token)
             ) {
                 continue;
             }
@@ -122,7 +106,24 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            // HSN
+            // small numbers
+
+            if (
+                /^\d{1,3}$/.test(token)
+            ) {
+                continue;
+            }
+
+            // common HSN
+
+            const commonHSN = [
+
+                '7318',
+                '8482',
+                '8708',
+                '4011',
+                '3926'
+            ];
 
             if (
                 commonHSN.includes(token)
@@ -130,96 +131,113 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            let score = 0;
-
             // =====================================
-            // PRIORITY 1
-            // MIXED LETTER + NUMBER
-            // Example:
-            // ABC123
-            // 6205ZZ
+            // VALID PART CHECK
             // =====================================
 
-            if (
-                /[A-Z]/.test(token) &&
-                /\d/.test(token)
-            ) {
+            const validPart =
 
-                score += 100;
+                // Mixed OEM
+                (
+                    hasLetter &&
+                    hasDigit &&
+                    token.length >= 5
+                )
+
+                ||
+
+                // Numeric OEM
+                (
+                    /^\d{5,12}$/.test(token)
+                )
+
+                ||
+
+                // Leading zero OEM
+                (
+                    /^0+\d{4,12}$/.test(token)
+                )
+
+                ||
+
+                // Bearing
+                (
+                    /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
+                )
+
+                ||
+
+                (
+                    /^\d{4,6}[-]?(ZZ|RS|2RS)$/.test(token)
+                );
+
+            if (!validPart) {
+                continue;
             }
 
             // =====================================
-            // PRIORITY 2
-            // LEADING ZERO OEM
-            // Example:
-            // 088630
+            // ZERO NORMALIZATION
             // =====================================
 
+            // Example:
+            // 088630 → 88630
+            // 00088630 → 88630
+
+            let compareToken =
+                token.replace(/^0+/, '');
+
             if (
-                /^0\d{4,12}$/.test(token)
+                compareToken.length === 0
             ) {
 
-                score += 95;
+                compareToken = token;
             }
 
             // =====================================
-            // PRIORITY 3
-            // PURE NUMERIC OEM
-            // Example:
-            // 88630
+            // SELECT BEST TOKEN
             // =====================================
 
-            if (
-                /^\d{5,12}$/.test(token)
-            ) {
+            if (!foundPart) {
 
-                score += 80;
-            }
+                foundPart = token;
 
-            // =====================================
-            // PRIORITY 4
-            // BEARING
-            // Example:
-            // 6205
-            // 6205ZZ
-            // =====================================
+            } else {
 
-            if (
-                /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
-            ) {
+                const oldCompare =
+                    foundPart.replace(/^0+/, '');
 
-                score += 70;
-            }
+                // same numeric value
 
-            // =====================================
-            // BONUS:
-            // LONGER TOKEN
-            // =====================================
+                if (
+                    compareToken === oldCompare
+                ) {
 
-            score += Math.min(
-                token.length,
-                10
-            );
+                    // keep longer original
 
-            // =====================================
-            // SELECT BEST
-            // =====================================
+                    if (
+                        token.length >
+                        foundPart.length
+                    ) {
 
-            if (
-                score > bestScore
-            ) {
+                        foundPart = token;
+                    }
 
-                bestScore = score;
+                } else {
 
-                bestToken = token;
+                    // prefer longer realistic OEM
+
+                    if (
+                        token.length >
+                        foundPart.length
+                    ) {
+
+                        foundPart = token;
+                    }
+                }
             }
         }
 
-        // =========================================
-        // NO PART FOUND
-        // =========================================
-
-        if (!bestToken)
+        if (!foundPart)
             continue;
 
         // =========================================
@@ -254,7 +272,7 @@ function extractItemsFromText(ocrResult) {
 
         items.push({
 
-            partRaw: bestToken,
+            partRaw: foundPart,
 
             qty: qty
         });
@@ -269,7 +287,8 @@ function extractItemsFromText(ocrResult) {
     for (const item of items) {
 
         const key =
-            item.partRaw;
+            item.partRaw
+            .replace(/^0+/, '');
 
         if (merged.has(key)) {
 
@@ -277,19 +296,16 @@ function extractItemsFromText(ocrResult) {
 
         } else {
 
-            merged.set(key, item);
+            merged.set(key, {
+
+                partRaw: item.partRaw,
+
+                qty: item.qty
+            });
         }
     }
 
-    const result =
-        Array.from(
-            merged.values()
-        );
-
-    console.log(
-        "FINAL ITEMS:",
-        result
+    return Array.from(
+        merged.values()
     );
-
-    return result;
 }
