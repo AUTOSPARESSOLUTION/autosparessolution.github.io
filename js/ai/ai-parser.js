@@ -8,9 +8,6 @@ function extractItemsFromText(ocrResult) {
     if (!text)
         return [];
 
-    console.log("OCR TEXT:");
-    console.log(text);
-
     const lines =
         text
         .toUpperCase()
@@ -18,23 +15,11 @@ function extractItemsFromText(ocrResult) {
 
     const items = [];
 
-    // =============================================
-    // TOKEN PATTERN
-    // =============================================
-
     const tokenPattern =
         /[A-Z0-9\-\/\.]{4,40}/g;
 
-    // =============================================
-    // IGNORE WORDS
-    // =============================================
-
     const ignoreWords =
         /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE/i;
-
-    // =============================================
-    // LOOP LINES
-    // =============================================
 
     for (let rawLine of lines) {
 
@@ -49,18 +34,16 @@ function extractItemsFromText(ocrResult) {
         if (ignoreWords.test(line))
             continue;
 
-        console.log("LINE:", line);
-
         const tokens =
             line.match(tokenPattern) || [];
 
         if (tokens.length === 0)
             continue;
 
-        let foundPart = null;
+        let candidates = [];
 
         // =========================================
-        // FIND BEST PART
+        // ANALYZE ALL TOKENS
         // =========================================
 
         for (let token of tokens) {
@@ -71,7 +54,7 @@ function extractItemsFromText(ocrResult) {
                 .replace(/O/g, '0')
                 .replace(/I/g, '1');
 
-            // Reject decimal prices
+            // reject prices
 
             if (
                 /^\d+\.\d+$/.test(token)
@@ -79,7 +62,7 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            // Reject phone numbers
+            // reject phones
 
             if (
                 /^\d{10,}$/.test(token)
@@ -87,7 +70,7 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            // Reject tiny numbers
+            // reject tiny numbers
 
             if (
                 /^\d{1,3}$/.test(token)
@@ -95,29 +78,37 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
+            // reject common HSN
+
+            const commonHSN = [
+                '7318',
+                '8482',
+                '8708',
+                '4011',
+                '3926'
+            ];
+
+            if (
+                commonHSN.includes(token)
+            ) {
+                continue;
+            }
+
+            let score = 0;
+
             // =====================================
-            // PRIORITY 1
-            // MIXED LETTER + DIGIT
+            // MIXED PART
             // =====================================
 
             if (
                 /[A-Z]/.test(token) &&
-                /\d/.test(token) &&
-                token.length >= 4
+                /\d/.test(token)
             ) {
 
-                foundPart = token;
-
-                console.log(
-                    "FOUND MIXED PART:",
-                    foundPart
-                );
-
-                break;
+                score += 100;
             }
 
             // =====================================
-            // PRIORITY 2
             // LEADING ZERO OEM
             // =====================================
 
@@ -125,18 +116,10 @@ function extractItemsFromText(ocrResult) {
                 /^0\d{4,12}$/.test(token)
             ) {
 
-                foundPart = token;
-
-                console.log(
-                    "FOUND ZERO OEM:",
-                    foundPart
-                );
-
-                break;
+                score += 90;
             }
 
             // =====================================
-            // PRIORITY 3
             // NUMERIC OEM
             // =====================================
 
@@ -144,52 +127,44 @@ function extractItemsFromText(ocrResult) {
                 /^\d{5,12}$/.test(token)
             ) {
 
-                const commonHSN = [
-                    '7318',
-                    '8482',
-                    '8708',
-                    '4011',
-                    '3926'
-                ];
-
-                if (
-                    commonHSN.includes(token)
-                ) {
-                    continue;
-                }
-
-                foundPart = token;
-
-                console.log(
-                    "FOUND NUMERIC OEM:",
-                    foundPart
-                );
-
-                break;
+                score += 80;
             }
 
             // =====================================
-            // PRIORITY 4
-            // BEARING TYPE
+            // BEARING
             // =====================================
 
             if (
                 /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
             ) {
 
-                foundPart = token;
+                score += 70;
+            }
 
-                console.log(
-                    "FOUND BEARING:",
-                    foundPart
-                );
+            if (score > 0) {
 
-                break;
+                candidates.push({
+
+                    token,
+
+                    score
+                });
             }
         }
 
-        if (!foundPart)
+        if (candidates.length === 0)
             continue;
+
+        // =========================================
+        // PICK BEST SCORE
+        // =========================================
+
+        candidates.sort(
+            (a, b) => b.score - a.score
+        );
+
+        const foundPart =
+            candidates[0].token;
 
         // =========================================
         // FIND QTY
@@ -246,15 +221,7 @@ function extractItemsFromText(ocrResult) {
         }
     }
 
-    const result =
-        Array.from(
-            merged.values()
-        );
-
-    console.log(
-        "FINAL ITEMS:",
-        result
+    return Array.from(
+        merged.values()
     );
-
-    return result;
-    }
+                }
