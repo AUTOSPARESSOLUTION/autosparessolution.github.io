@@ -8,6 +8,9 @@ function extractItemsFromText(ocrResult) {
     if (!text)
         return [];
 
+    console.log("OCR TEXT:");
+    console.log(text);
+
     const lines =
         text
         .toUpperCase()
@@ -16,26 +19,26 @@ function extractItemsFromText(ocrResult) {
     const items = [];
 
     // =============================================
-    // IGNORE NON-PRODUCT LINES
-    // =============================================
-
-    const ignoreWords =
-        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE/i;
-
-    // =============================================
-    // TOKEN PATTERN
+    // SIMPLE TOKEN PATTERN
     // =============================================
 
     const tokenPattern =
         /[A-Z0-9\-\/\.]{4,40}/g;
 
     // =============================================
-    // PROCESS EACH LINE
+    // IGNORE WORDS
+    // =============================================
+
+    const ignoreWords =
+        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE/i;
+
+    // =============================================
+    // LOOP LINES
     // =============================================
 
     for (let rawLine of lines) {
 
-        let line =
+        const line =
             rawLine
             .trim()
             .replace(/\s+/g, ' ');
@@ -46,6 +49,8 @@ function extractItemsFromText(ocrResult) {
         if (ignoreWords.test(line))
             continue;
 
+        console.log("LINE:", line);
+
         const tokens =
             line.match(tokenPattern) || [];
 
@@ -55,7 +60,7 @@ function extractItemsFromText(ocrResult) {
         let foundPart = null;
 
         // =========================================
-        // FIND VALID PART NUMBER
+        // FIND PART
         // =========================================
 
         for (let token of tokens) {
@@ -66,13 +71,7 @@ function extractItemsFromText(ocrResult) {
                 .replace(/O/g, '0')
                 .replace(/I/g, '1');
 
-            const hasLetter =
-                /[A-Z]/.test(token);
-
-            const hasDigit =
-                /\d/.test(token);
-
-            // Reject decimal prices
+            // reject decimal price
 
             if (
                 /^\d+\.\d+$/.test(token)
@@ -80,7 +79,7 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            // Reject phone numbers
+            // reject long phone numbers
 
             if (
                 /^\d{10,}$/.test(token)
@@ -88,15 +87,7 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            // Reject GSTIN
-
-            if (
-                /^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token)
-            ) {
-                continue;
-            }
-
-            // Reject tiny numbers
+            // reject tiny numbers
 
             if (
                 /^\d{1,3}$/.test(token)
@@ -104,45 +95,29 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
-            // Ignore common HSN numbers
-
-            const commonHSN = [
-                '7318',
-                '8482',
-                '8708',
-                '4011',
-                '3926'
-            ];
-
-            if (
-                commonHSN.includes(token)
-            ) {
-                continue;
-            }
-
             // =====================================
-            // VALID PART CONDITIONS
+            // VALID PARTS
             // =====================================
 
             const validPart =
 
                 // Mixed type
                 (
-                    hasLetter &&
-                    hasDigit &&
-                    token.length >= 5
+                    /[A-Z]/.test(token) &&
+                    /\d/.test(token) &&
+                    token.length >= 4
                 )
 
                 ||
 
-                // Numeric OEM part
+                // Numeric part
                 (
                     /^\d{4,12}$/.test(token)
                 )
 
                 ||
 
-                // Bearing type
+                // Bearing
                 (
                     /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
                 )
@@ -158,6 +133,11 @@ function extractItemsFromText(ocrResult) {
 
             foundPart = token;
 
+            console.log(
+                "FOUND PART:",
+                foundPart
+            );
+
             break;
         }
 
@@ -165,7 +145,7 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         // =========================================
-        // FIND QUANTITY
+        // FIND QTY
         // =========================================
 
         let qty = 1;
@@ -178,8 +158,6 @@ function extractItemsFromText(ocrResult) {
 
                 const n =
                     parseInt(t);
-
-                // Avoid prices / phone pieces
 
                 if (
                     n <= 200
@@ -201,7 +179,7 @@ function extractItemsFromText(ocrResult) {
     }
 
     // =============================================
-    // MERGE DUPLICATES
+    // REMOVE DUPLICATES
     // =============================================
 
     const merged = new Map();
@@ -221,7 +199,15 @@ function extractItemsFromText(ocrResult) {
         }
     }
 
-    return Array.from(
-        merged.values()
+    const result =
+        Array.from(
+            merged.values()
+        );
+
+    console.log(
+        "FINAL ITEMS:",
+        result
     );
-                        }
+
+    return result;
+                }
