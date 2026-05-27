@@ -1,26 +1,36 @@
-(function() {
+(function () {
 
-    alert("🔵 AI init: script loaded");
+    console.log("AI INIT LOADED");
+
+    // =========================================
+    // FALLBACK MODAL
+    // =========================================
 
     if (typeof showReviewModal !== 'function') {
 
-        window.showReviewModal = function(matches) {
+        window.showReviewModal = function (matches) {
 
-            let msg = "Add to cart?\n";
+            let msg = "Matched Products:\n\n";
 
-            for (let m of matches) {
+            for (const m of matches) {
 
                 if (m.product) {
 
-                    msg += `${m.partRaw} → ${m.product.part} x${m.qty}\n`;
+                    msg +=
+                        `${m.partRaw} → ${m.product.part} x${m.qty}\n`;
                 }
             }
 
-            if (confirm(msg + "\nClick OK to add all")) {
+            if (
+                confirm(
+                    msg +
+                    "\nAdd all to cart?"
+                )
+            ) {
 
                 let added = 0;
 
-                for (let m of matches) {
+                for (const m of matches) {
 
                     if (
                         m.product &&
@@ -41,36 +51,51 @@
                     added &&
                     typeof updateCartUI === 'function'
                 ) {
+
                     updateCartUI();
                 }
 
-                alert(`Added ${added} items to cart`);
+                alert(`Added ${added} items`);
             }
         };
 
-        window.confirmAddScannedItems = function() {};
-        window.bindModalEvents = function() {};
+        window.confirmAddScannedItems = function () {};
+        window.bindModalEvents = function () {};
     }
 
+    // =========================================
+    // MAIN SCAN INIT
+    // =========================================
+
     function initAIScan() {
+
+        console.log("initAIScan called");
 
         const fileInput =
             document.getElementById('ai-scan-input');
 
         if (!fileInput) {
 
-            alert("❌ File input not found!");
+            console.error(
+                "ai-scan-input not found"
+            );
 
             return;
         }
 
-        fileInput.onchange = async function(e) {
+        fileInput.onchange = async function (e) {
 
-            const file = e.target.files[0];
+            const file =
+                e.target.files[0];
 
-            if (!file) return;
+            if (!file)
+                return;
 
             try {
+
+                console.log(
+                    "Starting OCR..."
+                );
 
                 const ocrResult =
                     await extractTextFromFile(file);
@@ -80,25 +105,34 @@
                         ? ocrResult
                         : (ocrResult.text || '');
 
+                console.log(
+                    "OCR Length:",
+                    extractedText.length
+                );
+
                 if (
-                    extractedText.length < 3
+                    extractedText.length < 10
                 ) {
 
                     alert(
-                        "⚠️ No OCR text extracted"
+                        "No text extracted"
                     );
 
                     return;
                 }
+
+                // =====================================
+                // PARSER
+                // =====================================
 
                 const items =
                     extractItemsFromText(
                         ocrResult
                     );
 
-                alert(
-                    "Items parsed: " +
-                    items.length
+                console.log(
+                    "Items Parsed:",
+                    items
                 );
 
                 if (
@@ -106,11 +140,15 @@
                 ) {
 
                     alert(
-                        "⚠️ No valid part no found"
+                        "No valid part number found"
                     );
 
                     return;
                 }
+
+                // =====================================
+                // PRODUCT DB CHECK
+                // =====================================
 
                 if (
                     !window.allProducts ||
@@ -118,11 +156,15 @@
                 ) {
 
                     alert(
-                        "❌ Product database missing"
+                        "Product database not loaded"
                     );
 
                     return;
                 }
+
+                // =====================================
+                // MATCH PRODUCTS
+                // =====================================
 
                 const matches = [];
 
@@ -134,69 +176,124 @@
                     if (match) {
 
                         matches.push({
+
                             ...item,
-                            product: match.product,
+
+                            product:
+                                match.product,
+
                             confidence:
                                 match.confidence
                         });
                     }
                 }
 
+                console.log(
+                    "Matches:",
+                    matches
+                );
+
                 if (
                     matches.length === 0
                 ) {
 
                     alert(
-                        "⚠️ No matching products found"
+                        "No matching products found"
                     );
 
                     return;
                 }
 
+                // =====================================
+                // SHOW MODAL
+                // =====================================
+
                 showReviewModal(matches);
 
-            } catch(err) {
+            } catch (err) {
 
                 console.error(err);
 
                 alert(
-                    "❌ ERROR:\n" +
-                    (err?.message || err)
+                    "Scan error: " +
+                    err.message
                 );
             }
 
             fileInput.value = '';
         };
+
+        console.log(
+            "AI Scan Ready"
+        );
     }
 
+    // =========================================
+    // WAIT FOR PRODUCTS
+    // =========================================
+
     function waitForProducts() {
+
+        console.log(
+            "Checking products..."
+        );
 
         if (
             window.allProducts &&
             window.allProducts.length > 0
         ) {
 
+            console.log(
+                "Products Loaded:",
+                window.allProducts.length
+            );
+
+            // build exact index
+
             if (
                 typeof buildNormalizedIndex === 'function'
             ) {
+
                 buildNormalizedIndex();
+
+                console.log(
+                    "Normalized index built"
+                );
             }
+
+            // build fuse
 
             if (
                 typeof initFuse === 'function'
             ) {
+
                 initFuse();
+
+                console.log(
+                    "Fuse initialized"
+                );
             }
 
+            // init scan
+
             initAIScan();
+
+            // modal events
 
             if (
                 typeof bindModalEvents === 'function'
             ) {
+
                 bindModalEvents();
             }
 
         } else {
+
+            console.log(
+                "Waiting for products..."
+            );
+
+            // IMPORTANT FIX
 
             setTimeout(
                 waitForProducts,
@@ -204,6 +301,10 @@
             );
         }
     }
+
+    // =========================================
+    // START
+    // =========================================
 
     waitForProducts();
 
