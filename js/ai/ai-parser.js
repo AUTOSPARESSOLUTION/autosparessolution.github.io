@@ -5,156 +5,183 @@ function extractItemsFromText(ocrResult) {
             ? ocrResult
             : (ocrResult.text || '');
 
-    console.log("OCR TEXT:", text);
-
     if (!text)
         return [];
 
-    // ==================================================
-    // CLEAN TEXT
-    // ==================================================
-
-    const cleaned =
+    const lines =
         text
         .toUpperCase()
-        .replace(/\r/g, '\n')
-        .replace(/[|]/g, ' ')
-        .replace(/\s+/g, ' ');
-
-    console.log("CLEANED:", cleaned);
-
-    // ==================================================
-    // TOKENIZE
-    // ==================================================
-
-    const tokens =
-        cleaned.match(/[A-Z0-9\-\/\.]{4,40}/g) || [];
-
-    console.log("TOKENS:", tokens);
+        .split(/\r?\n/);
 
     const items = [];
 
-    for (let i = 0; i < tokens.length; i++) {
+    const ignoreWords =
+        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE/i;
 
-        let token = tokens[i];
+    const tokenPattern =
+        /[A-Z0-9\-\/\.]{4,40}/g;
 
-        if (!token)
+    for (let rawLine of lines) {
+
+        let line =
+            rawLine
+            .trim()
+            .replace(/\s+/g, ' ');
+
+        if (!line)
             continue;
 
-        token = token.trim();
-
-        // ==============================================
-        // OCR CORRECTION
-        // ==============================================
-
-        token = token
-            .replace(/O/g, '0')
-            .replace(/I/g, '1');
-
-        // ==============================================
-        // BASIC FILTERS
-        // ==============================================
-
-        if (token.length < 5)
+        if (ignoreWords.test(line))
             continue;
 
-        // Must contain BOTH letter and number
+        const tokens =
+            line.match(tokenPattern) || [];
 
-        if (!/[A-Z]/.test(token))
+        if (tokens.length === 0)
             continue;
 
-        if (!/\d/.test(token))
+        let hasHSN = false;
+
+        for (const t of tokens) {
+
+            if (/^\d{4,8}$/.test(t)) {
+
+                hasHSN = true;
+                break;
+            }
+        }
+
+        if (!hasHSN)
             continue;
 
-        // ==============================================
-        // REMOVE PRICE VALUES
-        // ==============================================
+        let foundPart = null;
 
-        // Reject decimal prices
+        for (let token of tokens) {
 
-        if (/^\d+\.\d+$/.test(token))
+            token =
+                token
+                .trim()
+                .replace(/O/g, '0')
+                .replace(/I/g, '1');
+
+            const hasLetter =
+                /[A-Z]/.test(token);
+
+            const hasDigit =
+                /\d/.test(token);
+
+            if (
+                /^\d+\.\d+$/.test(token)
+            ) {
+                continue;
+            }
+
+            if (
+                /^\d{10,}$/.test(token)
+            ) {
+                continue;
+            }
+
+            if (
+                /^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token)
+            ) {
+                continue;
+            }
+
+            if (
+                /^\d{1,3}$/.test(token)
+            ) {
+                continue;
+            }
+
+            const commonHSN = [
+                '7318',
+                '8482',
+                '8708',
+                '4011',
+                '3926'
+            ];
+
+            if (
+                commonHSN.includes(token)
+            ) {
+                continue;
+            }
+
+            const validPart =
+
+                (
+                    hasLetter &&
+                    hasDigit &&
+                    token.length >= 5
+                )
+
+                ||
+
+                (
+                    /^\d{5,12}$/.test(token)
+                )
+
+                ||
+
+                (
+                    /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
+                )
+
+                ||
+
+                (
+                    /^\d{4,6}[-]?(ZZ|RS|2RS)$/.test(token)
+                );
+
+            if (!validPart) {
+                continue;
+            }
+
+            foundPart = token;
+
+            break;
+        }
+
+        if (!foundPart)
             continue;
-
-        // Reject pure numeric
-
-        if (/^\d+$/.test(token))
-            continue;
-
-        // Reject date
-
-        if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(token))
-            continue;
-
-        // Reject GST/Invoice words
-
-        if (
-            /GST|CGST|SGST|TOTAL|AMOUNT|HSN|TAX|RATE|QTY|PCS|NOS|INVOICE/i.test(token)
-        )
-            continue;
-
-        // ==============================================
-        // MUST LOOK LIKE REAL PART NUMBER
-        // ==============================================
-
-        // Good examples:
-        // 0313AAB03061N
-        // MVS0305D020021N
-        // 426244700-0500
-
-        const looksLikePart =
-            (
-                /[A-Z]/.test(token) &&
-                /\d/.test(token)
-            ) ||
-            (
-                /\d{4,}[-\/]\d+/.test(token)
-            );
-
-        if (!looksLikePart)
-            continue;
-
-        // ==============================================
-        // QUANTITY DETECTION
-        // ==============================================
 
         let qty = 1;
 
-        const next =
-            tokens[i + 1] || '';
+        for (const t of tokens) {
 
-        const next2 =
-            tokens[i + 2] || '';
+            if (
+                /^[1-9][0-9]{0,2}$/.test(t)
+            ) {
 
-        if (/^\d{1,3}$/.test(next)) {
+                const n =
+                    parseInt(t);
 
-            qty = parseInt(next);
+                if (
+                    n <= 200
+                ) {
 
+                    qty = n;
+
+                    break;
+                }
+            }
         }
-        else if (/^\d{1,3}$/.test(next2)) {
-
-            qty = parseInt(next2);
-        }
-
-        // Prevent impossible qty
-
-        if (qty > 500)
-            qty = 1;
 
         items.push({
-            partRaw: token,
+
+            partRaw: foundPart,
+
             qty: qty
         });
     }
-
-    // ==================================================
-    // REMOVE DUPLICATES
-    // ==================================================
 
     const merged = new Map();
 
     for (const item of items) {
 
-        const key = item.partRaw;
+        const key =
+            item.partRaw;
 
         if (merged.has(key)) {
 
@@ -166,10 +193,7 @@ function extractItemsFromText(ocrResult) {
         }
     }
 
-    const result =
-        Array.from(merged.values());
-
-    console.log("FINAL ITEMS:", result);
-
-    return result;
-    }
+    return Array.from(
+        merged.values()
+    );
+                }
