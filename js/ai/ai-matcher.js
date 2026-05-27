@@ -1,128 +1,97 @@
-// ai-matcher.js
-// Exact DB match + OCR correction + leading zero support
+// ai-matcher.js – exact DB match + common OCR corrections + confidence scoring
 
 let normalizedIndex = new Map();
 let fuse = null;
 
-// =====================================================
-// NORMALIZE PART NUMBER
-// =====================================================
-
-function normalizePart(part) {
-
-    if (!part)
-        return '';
-
-    return part
-        .toString()
-        .toUpperCase()
-
-        // Remove spaces
-        .replace(/\s+/g, '')
-
-        // OCR corrections
-        .replace(/O/g, '0')
-        .replace(/I/g, '1')
-
-        // Remove special chars
-        .replace(/[^A-Z0-9]/g, '')
-
-        // REMOVE LEADING ZEROS
-        .replace(/^0+/, '');
-}
-
-// =====================================================
-// BUILD INDEX
-// =====================================================
-
 function buildNormalizedIndex() {
 
-    if (!window.allProducts)
-        return;
+    if (!window.allProducts) return;
 
     normalizedIndex.clear();
 
     for (const prod of window.allProducts) {
 
-        if (!prod)
-            continue;
+        const norm = normalizePart(prod.part);
 
-        const part =
-            prod.part ||
-            prod.partno ||
-            prod.code ||
-            '';
+        if (norm && !normalizedIndex.has(norm)) {
 
-        if (!part)
-            continue;
-
-        const norm =
-            normalizePart(part);
-
-        if (
-            norm &&
-            !normalizedIndex.has(norm)
-        ) {
-
-            normalizedIndex.set(
-                norm,
-                prod
-            );
+            normalizedIndex.set(norm, prod);
         }
     }
 
-    console.log(
-        `✅ Normalized index built (${normalizedIndex.size})`
-    );
+    console.log(`Normalized index built (${normalizedIndex.size})`);
 }
-
-// =====================================================
-// INIT FUSE
-// =====================================================
 
 function initFuse() {
 
-    if (!window.allProducts)
-        return;
+    if (!window.allProducts) return;
 
-    fuse = new Fuse(
-        window.allProducts,
-        {
-            keys: ['part'],
-            threshold: 0.18,
-            ignoreLocation: true,
-            includeScore: true
-        }
-    );
+    fuse = new Fuse(window.allProducts, {
 
-    console.log("✅ Fuse initialized");
+        keys: ['part'],
+
+        threshold: 0.18,
+
+        ignoreLocation: true,
+
+        includeScore: true
+    });
 }
 
 // =====================================================
-// OCR CORRECTION
+// NORMALIZE PART
+// =====================================================
+
+function normalizePart(part) {
+
+    if (!part) return '';
+
+    return part
+        .toString()
+        .toUpperCase()
+        .replace(/\s+/g, '')
+        .replace(/[^A-Z0-9]/g, '');
+}
+
+// =====================================================
+// COMMON OCR CORRECTIONS
 // =====================================================
 
 function attemptCorrection(part) {
 
-    const normalized =
-        normalizePart(part);
+    const normalized = normalizePart(part);
 
-    if (!normalized)
-        return null;
+    if (!normalized) return null;
 
     // =============================================
     // EXACT MATCH
     // =============================================
 
-    if (
-        normalizedIndex.has(normalized)
-    ) {
+    if (normalizedIndex.has(normalized)) {
 
         return normalizedIndex.get(normalized);
     }
 
     // =============================================
-    // OCR SWAP VARIANTS
+    // LEADING ZERO NUMERIC MATCH
+    // Example:
+    // 088630 == 88630
+    // 0097871 == 97871
+    // =============================================
+
+    if (/^0+\d+$/.test(normalized)) {
+
+        const withoutZero =
+            normalized.replace(/^0+/, '');
+
+        if (normalizedIndex.has(withoutZero)) {
+
+            return normalizedIndex.get(withoutZero);
+        }
+    }
+
+    // =============================================
+    // COMMON CHARACTER SWAPS
     // =============================================
 
     const variants = [
@@ -142,39 +111,9 @@ function attemptCorrection(part) {
 
     for (const v of variants) {
 
-        if (
-            normalizedIndex.has(v)
-        ) {
+        if (normalizedIndex.has(v)) {
 
             return normalizedIndex.get(v);
-        }
-    }
-
-    // =============================================
-    // LEADING ZERO SMART MATCH
-    // =============================================
-
-    for (
-        const [key, product]
-        of normalizedIndex.entries()
-    ) {
-
-        if (
-            key === normalized
-        ) {
-
-            return product;
-        }
-
-        // Example:
-        // 088630 == 88630
-
-        if (
-            key.endsWith(normalized) ||
-            normalized.endsWith(key)
-        ) {
-
-            return product;
         }
     }
 
@@ -187,60 +126,56 @@ function attemptCorrection(part) {
 
 function matchProduct(extractedItem) {
 
-    if (!extractedItem)
-        return null;
-
-    const rawPart =
-        extractedItem.partRaw || '';
+    const rawPart = extractedItem.partRaw;
 
     // =============================================
-    // EXACT + CORRECTION
+    // TRY EXACT MATCH + CORRECTION
     // =============================================
 
-    let product =
-        attemptCorrection(rawPart);
+    let product = attemptCorrection(rawPart);
 
     if (product) {
 
         return {
 
             product,
+
             confidence: 100
         };
     }
 
     // =============================================
-    // FUZZY SEARCH
+    // FUZZY FALLBACK
     // =============================================
 
     if (fuse) {
 
-        const results =
-            fuse.search(rawPart);
+        const results = fuse.search(rawPart);
 
         if (
+
             results.length > 0 &&
-            results[0].score < 0.10
+            results[0].score < 0.1
+
         ) {
 
             return {
 
-                product:
-                    results[0].item,
+                product: results[0].item,
 
                 confidence: 90
             };
-        }
 
-        else if (
+        } else if (
+
             results.length > 0 &&
             results[0].score < 0.18
+
         ) {
 
             return {
 
-                product:
-                    results[0].item,
+                product: results[0].item,
 
                 confidence: 75
             };
@@ -248,4 +183,4 @@ function matchProduct(extractedItem) {
     }
 
     return null;
-        }
+}
