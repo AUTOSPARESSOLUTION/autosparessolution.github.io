@@ -15,11 +15,23 @@ function extractItemsFromText(ocrResult) {
 
     const items = [];
 
+    // =============================================
+    // IGNORE NON-PRODUCT LINES
+    // =============================================
+
     const ignoreWords =
         /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE/i;
 
+    // =============================================
+    // TOKEN PATTERN
+    // =============================================
+
     const tokenPattern =
         /[A-Z0-9\-\/\.]{4,40}/g;
+
+    // =============================================
+    // PROCESS EACH LINE
+    // =============================================
 
     for (let rawLine of lines) {
 
@@ -40,21 +52,11 @@ function extractItemsFromText(ocrResult) {
         if (tokens.length === 0)
             continue;
 
-        let hasHSN = false;
-
-        for (const t of tokens) {
-
-            if (/^\d{4,8}$/.test(t)) {
-
-                hasHSN = true;
-                break;
-            }
-        }
-
-        if (!hasHSN)
-            continue;
-
         let foundPart = null;
+
+        // =========================================
+        // FIND VALID PART NUMBER
+        // =========================================
 
         for (let token of tokens) {
 
@@ -70,11 +72,15 @@ function extractItemsFromText(ocrResult) {
             const hasDigit =
                 /\d/.test(token);
 
+            // Reject decimal prices
+
             if (
                 /^\d+\.\d+$/.test(token)
             ) {
                 continue;
             }
+
+            // Reject phone numbers
 
             if (
                 /^\d{10,}$/.test(token)
@@ -82,17 +88,23 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
+            // Reject GSTIN
+
             if (
                 /^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token)
             ) {
                 continue;
             }
 
+            // Reject tiny numbers
+
             if (
                 /^\d{1,3}$/.test(token)
             ) {
                 continue;
             }
+
+            // Ignore common HSN numbers
 
             const commonHSN = [
                 '7318',
@@ -108,8 +120,13 @@ function extractItemsFromText(ocrResult) {
                 continue;
             }
 
+            // =====================================
+            // VALID PART CONDITIONS
+            // =====================================
+
             const validPart =
 
+                // Mixed type
                 (
                     hasLetter &&
                     hasDigit &&
@@ -118,12 +135,14 @@ function extractItemsFromText(ocrResult) {
 
                 ||
 
+                // Numeric OEM part
                 (
-                    /^\d{5,12}$/.test(token)
+                    /^\d{4,12}$/.test(token)
                 )
 
                 ||
 
+                // Bearing type
                 (
                     /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
                 )
@@ -134,9 +153,8 @@ function extractItemsFromText(ocrResult) {
                     /^\d{4,6}[-]?(ZZ|RS|2RS)$/.test(token)
                 );
 
-            if (!validPart) {
+            if (!validPart)
                 continue;
-            }
 
             foundPart = token;
 
@@ -145,6 +163,10 @@ function extractItemsFromText(ocrResult) {
 
         if (!foundPart)
             continue;
+
+        // =========================================
+        // FIND QUANTITY
+        // =========================================
 
         let qty = 1;
 
@@ -156,6 +178,8 @@ function extractItemsFromText(ocrResult) {
 
                 const n =
                     parseInt(t);
+
+                // Avoid prices / phone pieces
 
                 if (
                     n <= 200
@@ -175,6 +199,10 @@ function extractItemsFromText(ocrResult) {
             qty: qty
         });
     }
+
+    // =============================================
+    // MERGE DUPLICATES
+    // =============================================
 
     const merged = new Map();
 
@@ -196,4 +224,4 @@ function extractItemsFromText(ocrResult) {
     return Array.from(
         merged.values()
     );
-        }
+                        }
