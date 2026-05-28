@@ -851,6 +851,8 @@
     <!-- NEW AI MODULE SCRIPTS (must be created in /js/ai/ folder) -->
    <!-- Libraries required for AI scan -->
 
+<!-- Libraries required for AI scan -->
+
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -858,6 +860,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+
+<!-- SHEETJS FOR EXCEL EXPORT -->
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <!-- AI CONFIG -->
 
@@ -876,6 +882,8 @@ document.write('<script src="js/ai/ai-ocr.js?v=' + window.AI_VERSION + '"><\/scr
 document.write('<script src="js/ai/ai-parser.js?v=' + window.AI_VERSION + '"><\/script>');
 
 document.write('<script src="js/ai/ai-matcher.js?v=' + window.AI_VERSION + '"><\/script>');
+
+document.write('<script src="js/ai/ai-export.js?v=' + window.AI_VERSION + '"><\/script>');
 
 document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/script>');
 
