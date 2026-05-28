@@ -1,4 +1,4 @@
-console.log("SMART PDF ai-parser.js LOADED");
+console.log("HYBRID ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -10,18 +10,32 @@ function extractItemsFromText(ocrResult) {
     if (!text)
         return [];
 
+    const upperText =
+        text.toUpperCase();
+
     const lines =
-        text
-        .toUpperCase()
-        .split(/\r?\n/);
+        upperText.split(/\r?\n/);
 
     const items = [];
+
+    // =====================================
+    // IGNORE WORDS
+    // =====================================
 
     const ignoreWords =
         /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE|DISC|VALUE|RUPEES/i;
 
+    // =====================================
+    // TOKEN PATTERN
+    // =====================================
+
     const tokenPattern =
-        /[A-Z0-9\-\/\.]{2,40}/g;
+        /[A-Z0-9\-\/\.]{4,40}/g;
+
+    // =====================================
+    // STEP 1:
+    // EXCEL / CLEAN ROW PARSER
+    // =====================================
 
     for (let rawLine of lines) {
 
@@ -42,54 +56,13 @@ function extractItemsFromText(ocrResult) {
         if (tokens.length === 0)
             continue;
 
-        // =====================================
-        // SMART PDF TOKEN JOIN
-        // =====================================
-
-        const joinedTokens = [];
-
-        for (let i = 0; i < tokens.length; i++) {
-
-            let current =
-                tokens[i];
-
-            // join with next token if short split
-
-            if (
-                i < tokens.length - 1
-            ) {
-
-                const combined =
-                    current + tokens[i + 1];
-
-                if (
-
-                    /^[A-Z0-9]{5,25}$/.test(combined)
-
-                ) {
-
-                    joinedTokens.push(combined);
-
-                    i++;
-
-                    continue;
-                }
-            }
-
-            joinedTokens.push(current);
-        }
-
-        tokens = joinedTokens;
-
         let foundPart = null;
-
-        // =====================================
-        // FIND VALID PART
-        // =====================================
 
         for (let token of tokens) {
 
-            token = token.trim();
+            token =
+                token
+                .trim();
 
             // SMART OCR FIXES
 
@@ -106,19 +79,27 @@ function extractItemsFromText(ocrResult) {
             token =
                 token.replace(/\s+/g, '');
 
-            // SKIPS
+            // SKIP DECIMAL
 
             if (/^\d+\.\d+$/.test(token))
                 continue;
 
+            // SKIP HUGE NUMBER
+
             if (/^\d{10,}$/.test(token))
                 continue;
+
+            // SKIP GSTIN
 
             if (/^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token))
                 continue;
 
+            // SKIP SMALL NUMBER
+
             if (/^\d{1,3}$/.test(token))
                 continue;
+
+            // COMMON HSN
 
             const commonHSN = [
                 '7318',
@@ -175,7 +156,7 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         // =====================================
-        // QTY
+        // QTY DETECTION
         // =====================================
 
         let qty = 1;
@@ -186,6 +167,9 @@ function extractItemsFromText(ocrResult) {
             );
 
         if (numericTokens.length > 0) {
+
+            // TAKE LAST SMALL NUMBER
+            // usually qty column
 
             const reversed =
                 [...numericTokens].reverse();
@@ -213,6 +197,75 @@ function extractItemsFromText(ocrResult) {
 
             qty: qty
         });
+    }
+
+    // =====================================
+    // STEP 2:
+    // PDF GLOBAL SEARCH FALLBACK
+    // =====================================
+
+    // only if few matches found
+
+    if (
+        items.length < 5 &&
+        window.allProducts
+    ) {
+
+        console.log(
+            "Using PDF global fallback"
+        );
+
+        const normalizedText =
+
+            upperText
+            .replace(/[^A-Z0-9]/g, '');
+
+        for (const prod of window.allProducts) {
+
+            if (!prod.part)
+                continue;
+
+            let dbPart =
+                prod.part
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, '');
+
+            // remove leading zeros
+
+            let dbPartNoZero =
+                dbPart.replace(/^0+/, '');
+
+            // SEARCH GLOBAL OCR TEXT
+
+            if (
+
+                normalizedText.includes(dbPart)
+
+                ||
+
+                normalizedText.includes(dbPartNoZero)
+
+            ) {
+
+                const alreadyExists =
+                    items.find(x =>
+
+                        x.partRaw
+                        .replace(/^0+/, '') ===
+                        dbPartNoZero
+                    );
+
+                if (!alreadyExists) {
+
+                    items.push({
+
+                        partRaw: prod.part,
+
+                        qty: 1
+                    });
+                }
+            }
+        }
     }
 
     // =====================================
@@ -255,4 +308,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-                        }
+    }
