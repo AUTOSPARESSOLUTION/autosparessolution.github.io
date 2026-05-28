@@ -1,6 +1,6 @@
 (function () {
 
-    console.log("FINAL ai-init.js LOADED");
+    console.log("SAFE ai-init.js LOADED");
 
     function initAIScan() {
 
@@ -27,10 +27,6 @@
 
             try {
 
-                // =====================================
-                // BUTTON LOADING
-                // =====================================
-
                 const scanBtn =
                     document.getElementById('ai-scan-btn');
 
@@ -41,11 +37,6 @@
                     scanBtn.innerHTML =
                         '<i class="fas fa-spinner fa-spin"></i> Scanning...';
                 }
-
-                console.log(
-                    "Scanning file:",
-                    file.name
-                );
 
                 // =====================================
                 // OCR
@@ -59,7 +50,7 @@
                 );
 
                 // =====================================
-                // PARSE ITEMS
+                // PARSE
                 // =====================================
 
                 const items =
@@ -73,7 +64,7 @@
                 );
 
                 // =====================================
-                // EXPORT OCR ITEMS
+                // EXPORT OCR
                 // =====================================
 
                 if (
@@ -81,9 +72,11 @@
                     'function'
                 ) {
 
-                    exportOCRToExcel(
-                        items
-                    );
+                    setTimeout(() => {
+
+                        exportOCRToExcel(items);
+
+                    }, 500);
                 }
 
                 // =====================================
@@ -103,7 +96,7 @@
                 }
 
                 // =====================================
-                // MATCH PRODUCTS
+                // MATCH
                 // =====================================
 
                 const matches = [];
@@ -134,22 +127,7 @@
                 );
 
                 // =====================================
-                // NO MATCH
-                // =====================================
-
-                if (
-                    matches.length === 0
-                ) {
-
-                    alert(
-                        "OCR exported.\nNo matching products found."
-                    );
-
-                    return;
-                }
-
-                // =====================================
-                // EXPORT MATCHED PRODUCTS
+                // EXPORT MATCHED
                 // =====================================
 
                 if (
@@ -157,9 +135,13 @@
                     'function'
                 ) {
 
-                    exportScannedItemsToExcel(
-                        matches
-                    );
+                    setTimeout(() => {
+
+                        exportScannedItemsToExcel(
+                            matches
+                        );
+
+                    }, 1000);
                 }
 
                 // =====================================
@@ -187,10 +169,6 @@
 
             } finally {
 
-                // =====================================
-                // RESET BUTTON
-                // =====================================
-
                 const scanBtn =
                     document.getElementById('ai-scan-btn');
 
@@ -212,7 +190,7 @@
     }
 
     // =====================================
-    // WAIT FOR PRODUCTS
+    // WAIT PRODUCTS
     // =====================================
 
     function waitForProducts() {
@@ -229,10 +207,6 @@
                 window.allProducts.length
             );
 
-            // =====================================
-            // BUILD NORMALIZED INDEX
-            // =====================================
-
             if (
                 typeof buildNormalizedIndex ===
                 'function'
@@ -240,10 +214,6 @@
 
                 buildNormalizedIndex();
             }
-
-            // =====================================
-            // INIT FUSE
-            // =====================================
 
             if (
                 typeof initFuse ===
@@ -253,17 +223,9 @@
                 initFuse();
             }
 
-            // =====================================
-            // START AI SCAN
-            // =====================================
-
             initAIScan();
 
         } else {
-
-            console.log(
-                "Waiting for products..."
-            );
 
             setTimeout(
                 waitForProducts,
@@ -271,10 +233,6 @@
             );
         }
     }
-
-    // =====================================
-    // START
-    // =====================================
 
     waitForProducts();
 
