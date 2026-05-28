@@ -59,22 +59,7 @@
                 );
 
                 // =====================================
-                // ALWAYS EXPORT RAW OCR
-                // =====================================
-
-                if (
-                    typeof exportOCRToExcel ===
-                    'function'
-                ) {
-
-                    exportOCRToExcel(
-    items
-);
-                    );
-                }
-
-                // =====================================
-                // PARSE
+                // PARSE ITEMS
                 // =====================================
 
                 const items =
@@ -83,9 +68,27 @@
                     );
 
                 console.log(
-                    "Items parsed:",
+                    "Parsed items:",
                     items
                 );
+
+                // =====================================
+                // EXPORT OCR ITEMS
+                // =====================================
+
+                if (
+                    typeof exportOCRToExcel ===
+                    'function'
+                ) {
+
+                    exportOCRToExcel(
+                        items
+                    );
+                }
+
+                // =====================================
+                // NO ITEMS
+                // =====================================
 
                 if (
                     !items ||
@@ -93,14 +96,14 @@
                 ) {
 
                     alert(
-                        "OCR exported.\nNo valid part number found."
+                        "No valid part number found."
                     );
 
                     return;
                 }
 
                 // =====================================
-                // MATCH
+                // MATCH PRODUCTS
                 // =====================================
 
                 const matches = [];
@@ -227,7 +230,7 @@
             );
 
             // =====================================
-            // BUILD INDEX
+            // BUILD NORMALIZED INDEX
             // =====================================
 
             if (
@@ -251,7 +254,7 @@
             }
 
             // =====================================
-            // START AI
+            // START AI SCAN
             // =====================================
 
             initAIScan();
@@ -268,6 +271,10 @@
             );
         }
     }
+
+    // =====================================
+    // START
+    // =====================================
 
     waitForProducts();
 
