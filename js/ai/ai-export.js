@@ -1,4 +1,4 @@
-console.log("CLEAN OCR EXPORT ai-export.js LOADED");
+console.log("FINAL CLEAN ai-export.js LOADED");
 
 // =====================================
 // EXPORT OCR ITEMS ONLY
@@ -8,7 +8,7 @@ function exportOCRToExcel(items) {
 
     if (!items || items.length === 0) {
 
-        alert("No OCR items found");
+        console.log("No OCR items to export");
 
         return;
     }
@@ -27,8 +27,25 @@ function exportOCRToExcel(items) {
         });
     }
 
+    // =====================================
+    // CREATE SHEET
+    // =====================================
+
     const worksheet =
         XLSX.utils.json_to_sheet(rows);
+
+    // column width
+
+    worksheet['!cols'] = [
+
+        { wch: 25 },
+
+        { wch: 10 }
+    ];
+
+    // =====================================
+    // CREATE WORKBOOK
+    // =====================================
 
     const workbook =
         XLSX.utils.book_new();
@@ -42,11 +59,19 @@ function exportOCRToExcel(items) {
         "OCR Items"
     );
 
+    // =====================================
+    // DOWNLOAD
+    // =====================================
+
     XLSX.writeFile(
 
         workbook,
 
         "OCR_Extracted_Items.xlsx"
+    );
+
+    console.log(
+        "OCR Excel exported"
     );
 }
 
@@ -58,7 +83,7 @@ function exportScannedItemsToExcel(matches) {
 
     if (!matches || matches.length === 0) {
 
-        alert("No matched items");
+        console.log("No matched items");
 
         return;
     }
@@ -79,8 +104,23 @@ function exportScannedItemsToExcel(matches) {
         });
     }
 
+    // =====================================
+    // CREATE SHEET
+    // =====================================
+
     const worksheet =
         XLSX.utils.json_to_sheet(rows);
+
+    worksheet['!cols'] = [
+
+        { wch: 25 },
+
+        { wch: 10 }
+    ];
+
+    // =====================================
+    // CREATE WORKBOOK
+    // =====================================
 
     const workbook =
         XLSX.utils.book_new();
@@ -94,10 +134,18 @@ function exportScannedItemsToExcel(matches) {
         "Matched Items"
     );
 
+    // =====================================
+    // DOWNLOAD
+    // =====================================
+
     XLSX.writeFile(
 
         workbook,
 
         "Matched_Products.xlsx"
     );
-}
+
+    console.log(
+        "Matched Excel exported"
+    );
+        }
