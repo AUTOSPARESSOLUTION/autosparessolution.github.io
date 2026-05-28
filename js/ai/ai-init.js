@@ -68,7 +68,8 @@
                 ) {
 
                     exportOCRToExcel(
-                        ocrResult
+    items
+);
                     );
                 }
 
