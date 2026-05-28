@@ -1,26 +1,23 @@
-console.log("FINAL ai-init.js LOADED");
-
 (function () {
 
-    // =====================================
-    // INIT AI SCAN
-    // =====================================
+    console.log("NEW ai-init.js loaded");
 
     function initAIScan() {
-
-        console.log("initAIScan() started");
 
         const fileInput =
             document.getElementById('ai-scan-input');
 
         if (!fileInput) {
 
-            alert("ai-scan-input not found");
+            console.error(
+                "AI scan input not found"
+            );
 
             return;
         }
 
-        fileInput.onchange = async function (e) {
+        fileInput.onchange =
+            async function (e) {
 
             const file =
                 e.target.files[0];
@@ -30,87 +27,36 @@ console.log("FINAL ai-init.js LOADED");
 
             try {
 
-                // =====================================
-                // DEBUG FILE INFO
-                // =====================================
+                const scanBtn =
+                    document.getElementById('ai-scan-btn');
 
-                alert(
-                    "FILE:\n\n" +
-                    file.name +
-                    "\n\nTYPE:\n" +
-                    file.type
-                );
+                if (scanBtn) {
+
+                    scanBtn.disabled = true;
+
+                    scanBtn.innerHTML =
+                        '<i class="fas fa-spinner fa-spin"></i> Scanning...';
+                }
 
                 console.log(
-                    "Selected File:",
-                    file
+                    "Scanning file:",
+                    file.name
                 );
 
                 // =====================================
-                // OCR
+                // OCR / EXTRACT
                 // =====================================
-
-                alert("Starting OCR...");
 
                 const ocrResult =
                     await extractTextFromFile(file);
 
                 console.log(
-                    "FULL OCR RESULT:",
-                    ocrResult
+                    "OCR completed"
                 );
 
                 // =====================================
-                // OCR TEXT
+                // PARSE
                 // =====================================
-
-                const extractedText =
-
-                    typeof ocrResult === 'string'
-
-                        ? ocrResult
-
-                        : (ocrResult.text || '');
-
-                console.log(
-                    "OCR TEXT:",
-                    extractedText
-                );
-
-                alert(
-                    "OCR LENGTH: " +
-                    extractedText.length
-                );
-
-                // =====================================
-                // SHOW OCR PREVIEW
-                // =====================================
-
-                alert(
-                    "OCR PREVIEW:\n\n" +
-                    extractedText.substring(0, 1000)
-                );
-
-                // =====================================
-                // EMPTY OCR CHECK
-                // =====================================
-
-                if (
-                    extractedText.length < 5
-                ) {
-
-                    alert(
-                        "OCR FAILED - EMPTY TEXT"
-                    );
-
-                    return;
-                }
-
-                // =====================================
-                // PARSER
-                // =====================================
-
-                alert("Parsing items...");
 
                 const items =
                     extractItemsFromText(
@@ -118,41 +64,17 @@ console.log("FINAL ai-init.js LOADED");
                     );
 
                 console.log(
-                    "PARSED ITEMS:",
+                    "Items parsed:",
                     items
                 );
 
-                alert(
-                    "ITEMS PARSED: " +
-                    items.length
-                );
-
-                // =====================================
-                // NO ITEMS
-                // =====================================
-
                 if (
+                    !items ||
                     items.length === 0
                 ) {
 
                     alert(
-                        "NO VALID PART NUMBER FOUND"
-                    );
-
-                    return;
-                }
-
-                // =====================================
-                // PRODUCTS CHECK
-                // =====================================
-
-                if (
-                    !window.allProducts ||
-                    window.allProducts.length === 0
-                ) {
-
-                    alert(
-                        "PRODUCT DATABASE NOT LOADED"
+                        "No valid part number found"
                     );
 
                     return;
@@ -162,16 +84,9 @@ console.log("FINAL ai-init.js LOADED");
                 // MATCH PRODUCTS
                 // =====================================
 
-                alert("Matching products...");
-
                 const matches = [];
 
                 for (const item of items) {
-
-                    console.log(
-                        "Matching:",
-                        item
-                    );
 
                     const match =
                         matchProduct(item);
@@ -192,57 +107,41 @@ console.log("FINAL ai-init.js LOADED");
                 }
 
                 console.log(
-                    "FINAL MATCHES:",
+                    "Matches:",
                     matches
                 );
-
-                alert(
-                    "MATCHES FOUND: " +
-                    matches.length
-                );
-
-                // =====================================
-                // NO MATCHES
-                // =====================================
 
                 if (
                     matches.length === 0
                 ) {
 
                     alert(
-                        "NO MATCHING PRODUCTS FOUND"
+                        "No matching products found"
                     );
 
                     return;
                 }
 
                 // =====================================
-                // SHOW RESULTS
+                // EXPORT EXCEL
+                // =====================================
+
+                exportScannedItemsToExcel(
+                    matches
+                );
+
+                // =====================================
+                // REVIEW MODAL
                 // =====================================
 
                 if (
-                    typeof showReviewModal === 'function'
+                    typeof showReviewModal ===
+                    'function'
                 ) {
 
-                    showReviewModal(matches);
-
-                } else {
-
-                    let msg =
-                        "MATCHES:\n\n";
-
-                    for (const m of matches) {
-
-                        msg +=
-                            m.partRaw +
-                            " → " +
-                            (m.product?.part || 'NO PRODUCT') +
-                            " x" +
-                            m.qty +
-                            "\n";
-                    }
-
-                    alert(msg);
+                    showReviewModal(
+                        matches
+                    );
                 }
 
             } catch (err) {
@@ -250,16 +149,29 @@ console.log("FINAL ai-init.js LOADED");
                 console.error(err);
 
                 alert(
-                    "SCAN ERROR:\n\n" +
+                    "AI Scan Error:\n" +
                     err.message
                 );
-            }
 
-            fileInput.value = '';
+            } finally {
+
+                const scanBtn =
+                    document.getElementById('ai-scan-btn');
+
+                if (scanBtn) {
+
+                    scanBtn.disabled = false;
+
+                    scanBtn.innerHTML =
+                        '<i class="fas fa-camera"></i> Scan Order';
+                }
+
+                fileInput.value = '';
+            }
         };
 
         console.log(
-            "AI SCAN READY"
+            "AI Scan initialized"
         );
     }
 
@@ -269,59 +181,35 @@ console.log("FINAL ai-init.js LOADED");
 
     function waitForProducts() {
 
-        console.log(
-            "Checking products..."
-        );
-
         if (
+
             window.allProducts &&
             window.allProducts.length > 0
+
         ) {
 
             console.log(
-                "Products Loaded:",
+                "Products loaded:",
                 window.allProducts.length
             );
 
-            // =====================================
-            // BUILD INDEX
-            // =====================================
-
             if (
-                typeof buildNormalizedIndex === 'function'
+                typeof buildNormalizedIndex ===
+                'function'
             ) {
 
                 buildNormalizedIndex();
-
-                console.log(
-                    "Normalized index ready"
-                );
             }
 
-            // =====================================
-            // INIT FUSE
-            // =====================================
-
             if (
-                typeof initFuse === 'function'
+                typeof initFuse ===
+                'function'
             ) {
 
                 initFuse();
-
-                console.log(
-                    "Fuse ready"
-                );
             }
 
-            // =====================================
-            // START AI
-            // =====================================
-
             initAIScan();
-
-            console.log(
-                "AI SYSTEM READY"
-            );
 
         } else {
 
@@ -335,10 +223,6 @@ console.log("FINAL ai-init.js LOADED");
             );
         }
     }
-
-    // =====================================
-    // START SYSTEM
-    // =====================================
 
     waitForProducts();
 
