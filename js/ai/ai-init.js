@@ -52,6 +52,7 @@
 
                 console.log(
                     "OCR completed"
+                    exportOCRToExcel(ocrResult);
                 );
 
                 // =====================================
