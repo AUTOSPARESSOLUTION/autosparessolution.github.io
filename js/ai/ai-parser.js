@@ -58,13 +58,17 @@ function extractItemsFromText(ocrResult) {
 
         let foundPart = null;
 
+        // =====================================
+        // FIND PART
+        // =====================================
+
         for (let token of tokens) {
 
             token =
                 token
                 .trim();
 
-            // SMART OCR FIXES
+            // OCR FIXES
 
             token = token.replace(
                 /(?<=\d)O|O(?=\d)/g,
@@ -79,22 +83,16 @@ function extractItemsFromText(ocrResult) {
             token =
                 token.replace(/\s+/g, '');
 
-            // SKIP DECIMAL
+            // SKIPS
 
             if (/^\d+\.\d+$/.test(token))
                 continue;
 
-            // SKIP HUGE NUMBER
-
             if (/^\d{10,}$/.test(token))
                 continue;
 
-            // SKIP GSTIN
-
             if (/^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token))
                 continue;
-
-            // SKIP SMALL NUMBER
 
             if (/^\d{1,3}$/.test(token))
                 continue;
@@ -161,10 +159,34 @@ function extractItemsFromText(ocrResult) {
 
         let qty = 1;
 
-        // qty usually comes AFTER part number
+        // normalize for safe compare
 
-        const partIndex =
-            tokens.indexOf(foundPart);
+        const normalizedFoundPart =
+            foundPart
+            .replace(/[^A-Z0-9]/g, '');
+
+        let partIndex = -1;
+
+        // find actual token position
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            const normalizedToken =
+
+                tokens[i]
+                .replace(/[^A-Z0-9]/g, '');
+
+            if (
+                normalizedToken === normalizedFoundPart
+            ) {
+
+                partIndex = i;
+
+                break;
+            }
+        }
+
+        // qty usually after part
 
         if (partIndex >= 0) {
 
@@ -181,7 +203,7 @@ function extractItemsFromText(ocrResult) {
                 const t =
                     tokens[i];
 
-                // realistic qty
+                // qty candidate
 
                 if (
                     /^[0-9]{1,3}$/.test(t)
@@ -189,8 +211,6 @@ function extractItemsFromText(ocrResult) {
 
                     const val =
                         parseInt(t);
-
-                    // avoid HSN/rate
 
                     if (
                         val >= 1 &&
@@ -204,6 +224,17 @@ function extractItemsFromText(ocrResult) {
                 }
             }
         }
+
+        console.log(
+            "PART:",
+            foundPart,
+            "QTY:",
+            qty
+        );
+
+        // =====================================
+        // STORE ITEM
+        // =====================================
 
         items.push({
 
@@ -320,4 +351,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-            }
+                     }
