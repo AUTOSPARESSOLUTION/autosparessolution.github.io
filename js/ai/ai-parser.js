@@ -156,37 +156,51 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         // =====================================
-        // QTY DETECTION
+        // SMART QTY DETECTION
         // =====================================
 
         let qty = 1;
 
-        const numericTokens =
-            tokens.filter(t =>
-                /^[0-9]{1,3}$/.test(t)
-            );
+        // qty usually comes AFTER part number
 
-        if (numericTokens.length > 0) {
+        const partIndex =
+            tokens.indexOf(foundPart);
 
-            // TAKE LAST SMALL NUMBER
-            // usually qty column
+        if (partIndex >= 0) {
 
-            const reversed =
-                [...numericTokens].reverse();
+            for (
 
-            for (const n of reversed) {
+                let i = partIndex + 1;
 
-                const val =
-                    parseInt(n);
+                i < tokens.length;
+
+                i++
+
+            ) {
+
+                const t =
+                    tokens[i];
+
+                // realistic qty
 
                 if (
-                    val >= 1 &&
-                    val <= 200
+                    /^[0-9]{1,3}$/.test(t)
                 ) {
 
-                    qty = val;
+                    const val =
+                        parseInt(t);
 
-                    break;
+                    // avoid HSN/rate
+
+                    if (
+                        val >= 1 &&
+                        val <= 200
+                    ) {
+
+                        qty = val;
+
+                        break;
+                    }
                 }
             }
         }
@@ -203,8 +217,6 @@ function extractItemsFromText(ocrResult) {
     // STEP 2:
     // PDF GLOBAL SEARCH FALLBACK
     // =====================================
-
-    // only if few matches found
 
     if (
         items.length < 5 &&
@@ -308,4 +320,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-    }
+            }
