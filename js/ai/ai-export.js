@@ -1,41 +1,38 @@
-console.log("ai-export.js loaded");
+console.log("OCR Export ai-export.js loaded");
 
 // =====================================
-// EXPORT SCANNED ITEMS TO EXCEL
+// EXPORT RAW OCR TO EXCEL
 // =====================================
 
-function exportScannedItemsToExcel(matches) {
+function exportOCRToExcel(ocrResult) {
 
-    if (!matches || matches.length === 0) {
+    let text =
+        typeof ocrResult === 'string'
+            ? ocrResult
+            : (ocrResult.text || '');
 
-        alert("No scanned items to export");
+    if (!text) {
+
+        alert("No OCR text found");
 
         return;
     }
 
+    const lines =
+        text
+        .split(/\r?\n/)
+        .filter(x => x.trim());
+
     const rows = [];
 
-    for (const m of matches) {
+    for (let i = 0; i < lines.length; i++) {
 
         rows.push({
 
-            "Part No": m.product?.part || m.partRaw || "",
+            "Line No": i + 1,
 
-            "Scanned Part": m.partRaw || "",
-
-            "Quantity": m.qty || 1,
-
-            "Match Status":
-                m.product ? "Matched" : "Not Found",
-
-            "Description":
-                m.product?.description || "",
-
-            "Price":
-                m.product?.price || "",
-
-            "HSN":
-                m.product?.hsn || ""
+            "OCR Text":
+                lines[i]
         });
     }
 
@@ -46,13 +43,90 @@ function exportScannedItemsToExcel(matches) {
         XLSX.utils.book_new();
 
     XLSX.utils.book_append_sheet(
+
         workbook,
+
         worksheet,
-        "Scanned Order"
+
+        "OCR Raw Text"
     );
 
     XLSX.writeFile(
+
         workbook,
-        "Scanned_Order.xlsx"
+
+        "OCR_Raw_Output.xlsx"
     );
 }
+
+// =====================================
+// EXPORT MATCHED ITEMS
+// =====================================
+
+function exportScannedItemsToExcel(matches) {
+
+    if (!matches || matches.length === 0) {
+
+        alert("No matched items");
+
+        return;
+    }
+
+    const rows = [];
+
+    for (const m of matches) {
+
+        rows.push({
+
+            "Part No":
+                m.product?.part ||
+                m.partRaw ||
+                "",
+
+            "Scanned OCR":
+                m.partRaw || "",
+
+            "Qty":
+                m.qty || 1,
+
+            "Match Status":
+                m.product
+                    ? "Matched"
+                    : "Not Found",
+
+            "Description":
+                m.product?.description || "",
+
+            "Price":
+                m.product?.price || "",
+
+            "HSN":
+                m.product?.hsn || "",
+
+            "Confidence":
+                m.confidence || ""
+        });
+    }
+
+    const worksheet =
+        XLSX.utils.json_to_sheet(rows);
+
+    const workbook =
+        XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+
+        workbook,
+
+        worksheet,
+
+        "Matched Products"
+    );
+
+    XLSX.writeFile(
+
+        workbook,
+
+        "Matched_Products.xlsx"
+    );
+                }
