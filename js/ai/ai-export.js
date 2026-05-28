@@ -1,38 +1,29 @@
-console.log("OCR Export ai-export.js loaded");
+console.log("CLEAN OCR EXPORT ai-export.js LOADED");
 
 // =====================================
-// EXPORT RAW OCR TO EXCEL
+// EXPORT OCR ITEMS ONLY
 // =====================================
 
-function exportOCRToExcel(ocrResult) {
+function exportOCRToExcel(items) {
 
-    let text =
-        typeof ocrResult === 'string'
-            ? ocrResult
-            : (ocrResult.text || '');
+    if (!items || items.length === 0) {
 
-    if (!text) {
-
-        alert("No OCR text found");
+        alert("No OCR items found");
 
         return;
     }
 
-    const lines =
-        text
-        .split(/\r?\n/)
-        .filter(x => x.trim());
-
     const rows = [];
 
-    for (let i = 0; i < lines.length; i++) {
+    for (const item of items) {
 
         rows.push({
 
-            "Line No": i + 1,
+            "Part No":
+                item.partRaw || "",
 
-            "OCR Text":
-                lines[i]
+            "Qty":
+                item.qty || 1
         });
     }
 
@@ -48,19 +39,19 @@ function exportOCRToExcel(ocrResult) {
 
         worksheet,
 
-        "OCR Raw Text"
+        "OCR Items"
     );
 
     XLSX.writeFile(
 
         workbook,
 
-        "OCR_Raw_Output.xlsx"
+        "OCR_Extracted_Items.xlsx"
     );
 }
 
 // =====================================
-// EXPORT MATCHED ITEMS
+// EXPORT MATCHED PRODUCTS
 // =====================================
 
 function exportScannedItemsToExcel(matches) {
@@ -83,28 +74,8 @@ function exportScannedItemsToExcel(matches) {
                 m.partRaw ||
                 "",
 
-            "Scanned OCR":
-                m.partRaw || "",
-
             "Qty":
-                m.qty || 1,
-
-            "Match Status":
-                m.product
-                    ? "Matched"
-                    : "Not Found",
-
-            "Description":
-                m.product?.description || "",
-
-            "Price":
-                m.product?.price || "",
-
-            "HSN":
-                m.product?.hsn || "",
-
-            "Confidence":
-                m.confidence || ""
+                m.qty || 1
         });
     }
 
@@ -120,7 +91,7 @@ function exportScannedItemsToExcel(matches) {
 
         worksheet,
 
-        "Matched Products"
+        "Matched Items"
     );
 
     XLSX.writeFile(
@@ -129,4 +100,4 @@ function exportScannedItemsToExcel(matches) {
 
         "Matched_Products.xlsx"
     );
-                }
+}
