@@ -1,4 +1,4 @@
-console.log("FINAL STABLE ai-parser.js LOADED");
+console.log("ULTIMATE ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -26,6 +26,18 @@ function extractItemsFromText(ocrResult) {
         /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE|DISC|VALUE|RUPEES/i;
 
     // =====================================
+    // COMMON HSN
+    // =====================================
+
+    const commonHSN = [
+        '7318',
+        '8482',
+        '8708',
+        '4011',
+        '3926'
+    ];
+
+    // =====================================
     // TOKEN PATTERN
     // =====================================
 
@@ -33,7 +45,7 @@ function extractItemsFromText(ocrResult) {
         /[A-Z0-9\-\/\.]{4,40}/g;
 
     // =====================================
-    // MAIN LINE PARSER
+    // MAIN PARSER
     // =====================================
 
     for (let rawLine of lines) {
@@ -49,17 +61,45 @@ function extractItemsFromText(ocrResult) {
         if (ignoreWords.test(line))
             continue;
 
-        let tokens =
+        const tokens =
             line.match(tokenPattern) || [];
 
         if (tokens.length === 0)
             continue;
 
-        let foundPart = null;
+        // =====================================
+        // IMPORTANT PDF FILTER
+        // ONLY ROWS WITH HSN
+        // =====================================
+
+        let hasHSN = false;
+
+        for (const t of tokens) {
+
+            if (
+
+                /^\d{4,8}$/.test(t)
+
+                ||
+
+                commonHSN.includes(t)
+
+            ) {
+
+                hasHSN = true;
+
+                break;
+            }
+        }
+
+        if (!hasHSN)
+            continue;
 
         // =====================================
         // FIND PART NUMBER
         // =====================================
+
+        let foundPart = null;
 
         for (let token of tokens) {
 
@@ -67,7 +107,7 @@ function extractItemsFromText(ocrResult) {
                 token
                 .trim();
 
-            // OCR corrections
+            // OCR FIXES
 
             token = token.replace(
                 /(?<=\d)O|O(?=\d)/g,
@@ -82,35 +122,19 @@ function extractItemsFromText(ocrResult) {
             token =
                 token.replace(/\s+/g, '');
 
-            // skip decimal
+            // SKIPS
 
             if (/^\d+\.\d+$/.test(token))
                 continue;
 
-            // skip huge number
-
             if (/^\d{10,}$/.test(token))
                 continue;
-
-            // skip GSTIN
 
             if (/^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token))
                 continue;
 
-            // skip tiny numbers
-
             if (/^\d{1,3}$/.test(token))
                 continue;
-
-            // common HSN codes
-
-            const commonHSN = [
-                '7318',
-                '8482',
-                '8708',
-                '4011',
-                '3926'
-            ];
 
             if (commonHSN.includes(token))
                 continue;
@@ -164,8 +188,6 @@ function extractItemsFromText(ocrResult) {
 
         let qty = 1;
 
-        // take LAST small number from line
-
         const qtyMatches =
             line.match(/\b([1-9][0-9]{0,2})\b/g);
 
@@ -199,7 +221,7 @@ function extractItemsFromText(ocrResult) {
         );
 
         // =====================================
-        // STORE ITEM
+        // STORE
         // =====================================
 
         items.push({
@@ -211,69 +233,8 @@ function extractItemsFromText(ocrResult) {
     }
 
     // =====================================
-    // PDF GLOBAL FALLBACK
-    // =====================================
-
-    if (
-        items.length < 5 &&
-        window.allProducts
-    ) {
-
-        console.log(
-            "Using PDF global fallback"
-        );
-
-        const normalizedText =
-
-            upperText
-            .replace(/[^A-Z0-9]/g, '');
-
-        for (const prod of window.allProducts) {
-
-            if (!prod.part)
-                continue;
-
-            let dbPart =
-                prod.part
-                .toUpperCase()
-                .replace(/[^A-Z0-9]/g, '');
-
-            let dbPartNoZero =
-                dbPart.replace(/^0+/, '');
-
-            if (
-
-                normalizedText.includes(dbPart)
-
-                ||
-
-                normalizedText.includes(dbPartNoZero)
-
-            ) {
-
-                const alreadyExists =
-                    items.find(x =>
-
-                        x.partRaw
-                        .replace(/^0+/, '') ===
-                        dbPartNoZero
-                    );
-
-                if (!alreadyExists) {
-
-                    items.push({
-
-                        partRaw: prod.part,
-
-                        qty: 1
-                    });
-                }
-            }
-        }
-    }
-
-    // =====================================
     // MERGE DUPLICATES
+    // SUPPORT LEADING ZERO MATCH
     // =====================================
 
     const merged = new Map();
@@ -312,4 +273,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-                               }
+    }
