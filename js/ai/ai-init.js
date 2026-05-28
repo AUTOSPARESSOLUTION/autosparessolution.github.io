@@ -1,6 +1,6 @@
 (function () {
 
-    console.log("NEW ai-init.js loaded");
+    console.log("FINAL ai-init.js LOADED");
 
     function initAIScan() {
 
@@ -27,6 +27,10 @@
 
             try {
 
+                // =====================================
+                // BUTTON LOADING
+                // =====================================
+
                 const scanBtn =
                     document.getElementById('ai-scan-btn');
 
@@ -44,7 +48,7 @@
                 );
 
                 // =====================================
-                // OCR / EXTRACT
+                // OCR
                 // =====================================
 
                 const ocrResult =
@@ -52,8 +56,21 @@
 
                 console.log(
                     "OCR completed"
-                    exportOCRToExcel(ocrResult);
                 );
+
+                // =====================================
+                // ALWAYS EXPORT RAW OCR
+                // =====================================
+
+                if (
+                    typeof exportOCRToExcel ===
+                    'function'
+                ) {
+
+                    exportOCRToExcel(
+                        ocrResult
+                    );
+                }
 
                 // =====================================
                 // PARSE
@@ -75,14 +92,14 @@
                 ) {
 
                     alert(
-                        "No valid part number found"
+                        "OCR exported.\nNo valid part number found."
                     );
 
                     return;
                 }
 
                 // =====================================
-                // MATCH PRODUCTS
+                // MATCH
                 // =====================================
 
                 const matches = [];
@@ -112,24 +129,34 @@
                     matches
                 );
 
+                // =====================================
+                // NO MATCH
+                // =====================================
+
                 if (
                     matches.length === 0
                 ) {
 
                     alert(
-                        "No matching products found"
+                        "OCR exported.\nNo matching products found."
                     );
 
                     return;
                 }
 
                 // =====================================
-                // EXPORT EXCEL
+                // EXPORT MATCHED PRODUCTS
                 // =====================================
 
-                exportScannedItemsToExcel(
-                    matches
-                );
+                if (
+                    typeof exportScannedItemsToExcel ===
+                    'function'
+                ) {
+
+                    exportScannedItemsToExcel(
+                        matches
+                    );
+                }
 
                 // =====================================
                 // REVIEW MODAL
@@ -155,6 +182,10 @@
                 );
 
             } finally {
+
+                // =====================================
+                // RESET BUTTON
+                // =====================================
 
                 const scanBtn =
                     document.getElementById('ai-scan-btn');
@@ -194,6 +225,10 @@
                 window.allProducts.length
             );
 
+            // =====================================
+            // BUILD INDEX
+            // =====================================
+
             if (
                 typeof buildNormalizedIndex ===
                 'function'
@@ -202,6 +237,10 @@
                 buildNormalizedIndex();
             }
 
+            // =====================================
+            // INIT FUSE
+            // =====================================
+
             if (
                 typeof initFuse ===
                 'function'
@@ -209,6 +248,10 @@
 
                 initFuse();
             }
+
+            // =====================================
+            // START AI
+            // =====================================
 
             initAIScan();
 
