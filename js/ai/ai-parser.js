@@ -1,4 +1,4 @@
-console.log("HYBRID ai-parser.js LOADED");
+console.log("FINAL STABLE ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -33,8 +33,7 @@ function extractItemsFromText(ocrResult) {
         /[A-Z0-9\-\/\.]{4,40}/g;
 
     // =====================================
-    // STEP 1:
-    // EXCEL / CLEAN ROW PARSER
+    // MAIN LINE PARSER
     // =====================================
 
     for (let rawLine of lines) {
@@ -59,7 +58,7 @@ function extractItemsFromText(ocrResult) {
         let foundPart = null;
 
         // =====================================
-        // FIND PART
+        // FIND PART NUMBER
         // =====================================
 
         for (let token of tokens) {
@@ -68,7 +67,7 @@ function extractItemsFromText(ocrResult) {
                 token
                 .trim();
 
-            // OCR FIXES
+            // OCR corrections
 
             token = token.replace(
                 /(?<=\d)O|O(?=\d)/g,
@@ -83,21 +82,27 @@ function extractItemsFromText(ocrResult) {
             token =
                 token.replace(/\s+/g, '');
 
-            // SKIPS
+            // skip decimal
 
             if (/^\d+\.\d+$/.test(token))
                 continue;
 
+            // skip huge number
+
             if (/^\d{10,}$/.test(token))
                 continue;
+
+            // skip GSTIN
 
             if (/^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token))
                 continue;
 
+            // skip tiny numbers
+
             if (/^\d{1,3}$/.test(token))
                 continue;
 
-            // COMMON HSN
+            // common HSN codes
 
             const commonHSN = [
                 '7318',
@@ -154,74 +159,35 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         // =====================================
-        // SMART QTY DETECTION
+        // SIMPLE & STABLE QTY DETECTION
         // =====================================
 
         let qty = 1;
 
-        // normalize for safe compare
+        // take LAST small number from line
 
-        const normalizedFoundPart =
-            foundPart
-            .replace(/[^A-Z0-9]/g, '');
+        const qtyMatches =
+            line.match(/\b([1-9][0-9]{0,2})\b/g);
 
-        let partIndex = -1;
+        if (
+            qtyMatches &&
+            qtyMatches.length > 0
+        ) {
 
-        // find actual token position
+            const lastQty =
 
-        for (let i = 0; i < tokens.length; i++) {
-
-            const normalizedToken =
-
-                tokens[i]
-                .replace(/[^A-Z0-9]/g, '');
+                parseInt(
+                    qtyMatches[
+                        qtyMatches.length - 1
+                    ]
+                );
 
             if (
-                normalizedToken === normalizedFoundPart
+                lastQty >= 1 &&
+                lastQty <= 200
             ) {
 
-                partIndex = i;
-
-                break;
-            }
-        }
-
-        // qty usually after part
-
-        if (partIndex >= 0) {
-
-            for (
-
-                let i = partIndex + 1;
-
-                i < tokens.length;
-
-                i++
-
-            ) {
-
-                const t =
-                    tokens[i];
-
-                // qty candidate
-
-                if (
-                    /^[0-9]{1,3}$/.test(t)
-                ) {
-
-                    const val =
-                        parseInt(t);
-
-                    if (
-                        val >= 1 &&
-                        val <= 200
-                    ) {
-
-                        qty = val;
-
-                        break;
-                    }
-                }
+                qty = lastQty;
             }
         }
 
@@ -245,8 +211,7 @@ function extractItemsFromText(ocrResult) {
     }
 
     // =====================================
-    // STEP 2:
-    // PDF GLOBAL SEARCH FALLBACK
+    // PDF GLOBAL FALLBACK
     // =====================================
 
     if (
@@ -273,12 +238,8 @@ function extractItemsFromText(ocrResult) {
                 .toUpperCase()
                 .replace(/[^A-Z0-9]/g, '');
 
-            // remove leading zeros
-
             let dbPartNoZero =
                 dbPart.replace(/^0+/, '');
-
-            // SEARCH GLOBAL OCR TEXT
 
             if (
 
@@ -351,4 +312,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-                     }
+                               }
