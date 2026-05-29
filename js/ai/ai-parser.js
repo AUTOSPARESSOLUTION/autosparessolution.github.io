@@ -21,7 +21,7 @@ function extractItemsFromText(ocrResult) {
         /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE/i;
 
     const tokenPattern =
-        /[A-Z0-9\-\/\.]{4,40}/g;
+        /[A-Z0-9\-\/\.:%]{2,40}/g;
 
     for (let rawLine of lines) {
 
@@ -33,29 +33,6 @@ function extractItemsFromText(ocrResult) {
         if (!line)
             continue;
 
-        // =====================================
-        // SAFE PDF FILTER
-        // =====================================
-
-        const pdfProductRow =
-
-            /18\s?%/.test(line)
-
-            ||
-
-            /\b18\.00\b/.test(line);
-
-        if (pdfProductRow) {
-
-            const hasHSN =
-                /\b\d{4,8}\b/.test(line);
-
-            if (!hasHSN) {
-
-                continue;
-            }
-        }
-
         if (ignoreWords.test(line))
             continue;
 
@@ -64,6 +41,12 @@ function extractItemsFromText(ocrResult) {
 
         if (tokens.length === 0)
             continue;
+
+        // =====================================
+        // HSN CHECK
+        // SUPPORT:
+        // 4 / 6 / 8 DIGIT HSN
+        // =====================================
 
         let hasHSN = false;
 
@@ -83,7 +66,7 @@ function extractItemsFromText(ocrResult) {
 
         const whatsappStyle =
 
-            tokens.length <= 5
+            tokens.length <= 6
 
             &&
 
@@ -93,13 +76,15 @@ function extractItemsFromText(ocrResult) {
             !hasHSN
             &&
             !whatsappStyle
-        )
+        ) {
+
             continue;
+        }
 
         let foundPart = null;
 
         // =====================================
-        // FIND PART NUMBER
+        // PART NO DETECTION
         // =====================================
 
         for (let token of tokens) {
@@ -128,41 +113,42 @@ function extractItemsFromText(ocrResult) {
 
             if (
                 /^\d+\.\d+$/.test(token)
-            ) {
+            )
                 continue;
-            }
 
             if (
                 /^\d{10,}$/.test(token)
-            ) {
+            )
                 continue;
-            }
 
             if (
                 /^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token)
-            ) {
+            )
                 continue;
-            }
 
             if (
                 /^\d{1,3}$/.test(token)
-            ) {
+            )
                 continue;
-            }
+
+            // COMMON HSN
+            // ignore as part no
 
             const commonHSN = [
                 '7318',
                 '8482',
                 '8708',
                 '4011',
-                '3926'
+                '3926',
+                '870899',
+                '842139',
+                '848210'
             ];
 
             if (
                 commonHSN.includes(token)
-            ) {
+            )
                 continue;
-            }
 
             const validPart =
 
@@ -190,10 +176,8 @@ function extractItemsFromText(ocrResult) {
                     /^\d{4,6}[-]?(ZZ|RS|2RS)$/.test(token)
                 );
 
-            if (!validPart) {
-
+            if (!validPart)
                 continue;
-            }
 
             foundPart = token;
 
@@ -204,7 +188,7 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         // =====================================
-        // PROFESSIONAL QTY DETECTION
+        // FINAL SMART QTY DETECTION
         // =====================================
 
         let qty = 1;
@@ -216,10 +200,15 @@ function extractItemsFromText(ocrResult) {
             'NO',
             'SET',
             'SETS',
-            'KIT'
+            'KIT',
+            'UNIT',
+            'UNITS'
         ];
 
-        // find qty near UOM
+        // -------------------------------------
+        // PATTERN 1
+        // 2 PCS
+        // -------------------------------------
 
         for (let i = 0; i < tokens.length; i++) {
 
@@ -254,7 +243,106 @@ function extractItemsFromText(ocrResult) {
             }
         }
 
-        // fallback small number logic
+        // -------------------------------------
+        // PATTERN 2
+        // PCS 2
+        // -------------------------------------
+
+        if (qty === 1) {
+
+            for (let i = 0; i < tokens.length; i++) {
+
+                const current =
+                    tokens[i];
+
+                if (
+                    uomWords.includes(current)
+                ) {
+
+                    const next =
+                        tokens[i + 1];
+
+                    if (
+                        next &&
+                        /^[0-9]{1,3}$/.test(next)
+                    ) {
+
+                        const q =
+                            parseInt(next);
+
+                        if (
+                            q >= 1 &&
+                            q <= 200
+                        ) {
+
+                            qty = q;
+
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------
+        // PATTERN 3
+        // 2PCS
+        // -------------------------------------
+
+        if (qty === 1) {
+
+            for (const t of tokens) {
+
+                const compact =
+                    t.match(/^([0-9]{1,3})(PCS|NOS|NO|PC)$/);
+
+                if (compact) {
+
+                    const q =
+                        parseInt(compact[1]);
+
+                    if (
+                        q >= 1 &&
+                        q <= 200
+                    ) {
+
+                        qty = q;
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------
+        // PATTERN 4
+        // QTY:2
+        // -------------------------------------
+
+        if (qty === 1) {
+
+            const qtyMatch =
+                line.match(/QTY[:\-\s]*([0-9]{1,3})/);
+
+            if (qtyMatch) {
+
+                const q =
+                    parseInt(qtyMatch[1]);
+
+                if (
+                    q >= 1 &&
+                    q <= 200
+                ) {
+
+                    qty = q;
+                }
+            }
+        }
+
+        // -------------------------------------
+        // FALLBACK
+        // LAST SMALL NUMBER
+        // -------------------------------------
 
         if (qty === 1) {
 
@@ -316,7 +404,6 @@ function extractItemsFromText(ocrResult) {
 
     // =====================================
     // MERGE DUPLICATES
-    // SUPPORT LEADING ZERO MATCH
     // =====================================
 
     const merged = new Map();
@@ -348,4 +435,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-            }
+}
