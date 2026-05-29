@@ -1,4 +1,4 @@
-console.log("FINAL SAFE ai-parser.js LOADED");
+console.log("FINAL STABLE ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -35,7 +35,6 @@ function extractItemsFromText(ocrResult) {
 
         // =====================================
         // SAFE PDF FILTER
-        // ONLY FOR GST 18% ROWS
         // =====================================
 
         const pdfProductRow =
@@ -73,6 +72,7 @@ function extractItemsFromText(ocrResult) {
             if (/^\d{4,8}$/.test(t)) {
 
                 hasHSN = true;
+
                 break;
             }
         }
@@ -81,6 +81,10 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         let foundPart = null;
+
+        // =====================================
+        // FIND PART NUMBER
+        // =====================================
 
         for (let token of tokens) {
 
@@ -103,6 +107,8 @@ function extractItemsFromText(ocrResult) {
 
             const hasDigit =
                 /\d/.test(token);
+
+            // SKIPS
 
             if (
                 /^\d+\.\d+$/.test(token)
@@ -169,6 +175,7 @@ function extractItemsFromText(ocrResult) {
                 );
 
             if (!validPart) {
+
                 continue;
             }
 
@@ -181,34 +188,49 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         // =====================================
-        // SIMPLE & STABLE QTY DETECTION
+        // SMART QTY DETECTION
         // =====================================
 
         let qty = 1;
 
-        const qtyMatches =
-            line.match(/\b([1-9][0-9]{0,2})\b/g);
+        const qtyCandidates = [];
 
-        if (
-            qtyMatches &&
-            qtyMatches.length > 0
-        ) {
-
-            const lastQty =
-
-                parseInt(
-                    qtyMatches[
-                        qtyMatches.length - 1
-                    ]
-                );
+        for (const t of tokens) {
 
             if (
-                lastQty >= 1 &&
-                lastQty <= 200
+                /^[0-9]{1,3}$/.test(t)
             ) {
 
-                qty = lastQty;
+                const n =
+                    parseInt(t);
+
+                // realistic qty only
+
+                if (
+                    n >= 1 &&
+                    n <= 50
+                ) {
+
+                    // ignore GST %
+
+                    if (n === 18)
+                        continue;
+
+                    qtyCandidates.push(n);
+                }
             }
+        }
+
+        // usually qty is last usable number
+
+        if (
+            qtyCandidates.length > 0
+        ) {
+
+            qty =
+                qtyCandidates[
+                    qtyCandidates.length - 1
+                ];
         }
 
         console.log(
@@ -217,6 +239,10 @@ function extractItemsFromText(ocrResult) {
             "QTY:",
             qty
         );
+
+        // =====================================
+        // STORE
+        // =====================================
 
         items.push({
 
@@ -249,7 +275,15 @@ function extractItemsFromText(ocrResult) {
         }
     }
 
-    return Array.from(
-        merged.values()
+    const finalItems =
+        Array.from(
+            merged.values()
+        );
+
+    console.log(
+        "FINAL ITEMS:",
+        finalItems
     );
-            }
+
+    return finalItems;
+        }
