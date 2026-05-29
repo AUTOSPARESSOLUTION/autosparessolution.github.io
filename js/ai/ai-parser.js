@@ -1,4 +1,4 @@
-console.log("ULTIMATE ai-parser.js LOADED");
+console.log("FINAL INDUSTRIAL ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -19,11 +19,11 @@ function extractItemsFromText(ocrResult) {
     const items = [];
 
     // =====================================
-    // IGNORE WORDS
+    // STRICT IGNORE WORDS
     // =====================================
 
     const ignoreWords =
-        /GST|CGST|SGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PIN|INVOICE|TAX|RATE|DISC|VALUE|RUPEES/i;
+        /GST|CGST|SGST|IGST|TOTAL|AMOUNT|BANK|EMAIL|PHONE|MOBILE|ADDRESS|STATE|PINCODE|PIN|INVOICE|TAX|RATE|DISC|VALUE|RUPEES|IFSC|ACCOUNT|BRANCH|HSBC|SBIN|KOLKATA/i;
 
     // =====================================
     // COMMON HSN
@@ -58,7 +58,32 @@ function extractItemsFromText(ocrResult) {
         if (!line)
             continue;
 
+        // =====================================
+        // STRICT FILTER
+        // =====================================
+
         if (ignoreWords.test(line))
+            continue;
+
+        // MUST START WITH SL NO
+
+        const hasSlNo =
+            /^\d{1,3}[\/\.\-\s]/.test(line);
+
+        if (!hasSlNo)
+            continue;
+
+        // MUST HAVE GST 18%
+
+        const hasGST18 =
+
+            /18\s?%/.test(line)
+
+            ||
+
+            /\b18\.00\b/.test(line);
+
+        if (!hasGST18)
             continue;
 
         const tokens =
@@ -67,10 +92,7 @@ function extractItemsFromText(ocrResult) {
         if (tokens.length === 0)
             continue;
 
-        // =====================================
-        // IMPORTANT PDF FILTER
-        // ONLY ROWS WITH HSN
-        // =====================================
+        // MUST HAVE HSN
 
         let hasHSN = false;
 
@@ -107,6 +129,14 @@ function extractItemsFromText(ocrResult) {
                 token
                 .trim();
 
+            // REMOVE SERIAL PREFIX
+
+            token =
+                token.replace(
+                    /^\d+[\/\-]/,
+                    ''
+                );
+
             // OCR FIXES
 
             token = token.replace(
@@ -127,17 +157,19 @@ function extractItemsFromText(ocrResult) {
             if (/^\d+\.\d+$/.test(token))
                 continue;
 
+            if (/^\d{1,4}$/.test(token))
+                continue;
+
             if (/^\d{10,}$/.test(token))
                 continue;
 
             if (/^[0-9]{2}[A-Z]{5}[0-9]{4}/.test(token))
                 continue;
 
-            if (/^\d{1,3}$/.test(token))
-                continue;
-
             if (commonHSN.includes(token))
                 continue;
+
+            // MUST CONTAIN BOTH LETTER & DIGIT
 
             const hasLetter =
                 /[A-Z]/.test(token);
@@ -145,34 +177,22 @@ function extractItemsFromText(ocrResult) {
             const hasDigit =
                 /\d/.test(token);
 
-            const validPart =
+            if (
+                !hasLetter ||
+                !hasDigit
+            ) {
 
-                (
-                    hasLetter &&
-                    hasDigit &&
-                    token.length >= 5
-                )
-
-                ||
-
-                (
-                    /^\d{5,12}$/.test(token)
-                )
-
-                ||
-
-                (
-                    /^\d{4,6}(ZZ|RS|2RS)?$/.test(token)
-                )
-
-                ||
-
-                (
-                    /^\d{4,6}[-]?(ZZ|RS|2RS)$/.test(token)
-                );
-
-            if (!validPart)
                 continue;
+            }
+
+            // LENGTH CHECK
+
+            if (
+                token.length < 6
+            ) {
+
+                continue;
+            }
 
             foundPart = token;
 
@@ -183,7 +203,7 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         // =====================================
-        // SIMPLE & STABLE QTY DETECTION
+        // QTY DETECTION
         // =====================================
 
         let qty = 1;
@@ -195,6 +215,8 @@ function extractItemsFromText(ocrResult) {
             qtyMatches &&
             qtyMatches.length > 0
         ) {
+
+            // LAST SMALL NUMBER
 
             const lastQty =
 
@@ -234,7 +256,6 @@ function extractItemsFromText(ocrResult) {
 
     // =====================================
     // MERGE DUPLICATES
-    // SUPPORT LEADING ZERO MATCH
     // =====================================
 
     const merged = new Map();
@@ -273,4 +294,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-    }
+                       }
