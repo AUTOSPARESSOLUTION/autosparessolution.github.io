@@ -1,4 +1,4 @@
-console.log("FINAL STABLE ai-parser.js LOADED");
+console.log("FINAL PROFESSIONAL ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -233,6 +233,79 @@ function extractItemsFromText(ocrResult) {
                 ];
         }
 
+        // =====================================
+        // SMART BACK CALCULATION
+        // USING RATE × QTY = VALUE
+        // =====================================
+
+        const numericValues = [];
+
+        for (const t of tokens) {
+
+            if (
+                /^\d+(\.\d+)?$/.test(t)
+            ) {
+
+                const n =
+                    parseFloat(t);
+
+                if (n > 0) {
+
+                    numericValues.push(n);
+                }
+            }
+        }
+
+        // Try back calculation
+
+        if (
+            numericValues.length >= 3
+        ) {
+
+            for (
+                let i = 0;
+                i < numericValues.length - 1;
+                i++
+            ) {
+
+                const rate =
+                    numericValues[i];
+
+                const value =
+                    numericValues[i + 1];
+
+                if (
+                    rate > 0 &&
+                    value > rate
+                ) {
+
+                    const calcQty =
+                        value / rate;
+
+                    // realistic integer qty
+
+                    if (
+
+                        Number.isInteger(calcQty)
+
+                        &&
+
+                        calcQty >= 1
+
+                        &&
+
+                        calcQty <= 50
+
+                    ) {
+
+                        qty = calcQty;
+
+                        break;
+                    }
+                }
+            }
+        }
+
         console.log(
             "PART:",
             foundPart,
@@ -286,4 +359,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-        }
+                                 }
