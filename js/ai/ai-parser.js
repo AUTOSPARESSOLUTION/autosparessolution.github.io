@@ -1,4 +1,4 @@
-console.log("FINAL PROFESSIONAL ai-parser.js LOADED");
+console.log("FINAL UNIVERSAL ai-parser.js LOADED");
 
 function extractItemsFromText(ocrResult) {
 
@@ -77,7 +77,23 @@ function extractItemsFromText(ocrResult) {
             }
         }
 
-        if (!hasHSN)
+        // =====================================
+        // WHATSAPP ORDER SUPPORT
+        // =====================================
+
+        const whatsappStyle =
+
+            tokens.length <= 5
+
+            &&
+
+            /[A-Z]+\d+|\d+[A-Z]+/.test(line);
+
+        if (
+            !hasHSN
+            &&
+            !whatsappStyle
+        )
             continue;
 
         let foundPart = null;
@@ -188,121 +204,94 @@ function extractItemsFromText(ocrResult) {
             continue;
 
         // =====================================
-        // SMART QTY DETECTION
+        // PROFESSIONAL QTY DETECTION
         // =====================================
 
         let qty = 1;
 
-        const qtyCandidates = [];
+        const uomWords = [
+            'PCS',
+            'PC',
+            'NOS',
+            'NO',
+            'SET',
+            'SETS',
+            'KIT'
+        ];
 
-        for (const t of tokens) {
+        // find qty near UOM
 
-            if (
-                /^[0-9]{1,3}$/.test(t)
-            ) {
+        for (let i = 0; i < tokens.length; i++) {
 
-                const n =
-                    parseInt(t);
-
-                // realistic qty only
-
-                if (
-                    n >= 1 &&
-                    n <= 50
-                ) {
-
-                    // ignore GST %
-
-                    if (n === 18)
-                        continue;
-
-                    qtyCandidates.push(n);
-                }
-            }
-        }
-
-        // usually qty is last usable number
-
-        if (
-            qtyCandidates.length > 0
-        ) {
-
-            qty =
-                qtyCandidates[
-                    qtyCandidates.length - 1
-                ];
-        }
-
-        // =====================================
-        // SMART BACK CALCULATION
-        // USING RATE × QTY = VALUE
-        // =====================================
-
-        const numericValues = [];
-
-        for (const t of tokens) {
+            const current =
+                tokens[i];
 
             if (
-                /^\d+(\.\d+)?$/.test(t)
+                uomWords.includes(current)
             ) {
 
-                const n =
-                    parseFloat(t);
-
-                if (n > 0) {
-
-                    numericValues.push(n);
-                }
-            }
-        }
-
-        // Try back calculation
-
-        if (
-            numericValues.length >= 3
-        ) {
-
-            for (
-                let i = 0;
-                i < numericValues.length - 1;
-                i++
-            ) {
-
-                const rate =
-                    numericValues[i];
-
-                const value =
-                    numericValues[i + 1];
+                const prev =
+                    tokens[i - 1];
 
                 if (
-                    rate > 0 &&
-                    value > rate
+                    prev &&
+                    /^[0-9]{1,3}$/.test(prev)
                 ) {
 
-                    const calcQty =
-                        value / rate;
-
-                    // realistic integer qty
+                    const q =
+                        parseInt(prev);
 
                     if (
-
-                        Number.isInteger(calcQty)
-
-                        &&
-
-                        calcQty >= 1
-
-                        &&
-
-                        calcQty <= 50
-
+                        q >= 1 &&
+                        q <= 200
                     ) {
 
-                        qty = calcQty;
+                        qty = q;
 
                         break;
                     }
                 }
+            }
+        }
+
+        // fallback small number logic
+
+        if (qty === 1) {
+
+            const qtyCandidates = [];
+
+            for (const t of tokens) {
+
+                if (
+                    /^[0-9]{1,3}$/.test(t)
+                ) {
+
+                    const n =
+                        parseInt(t);
+
+                    if (
+
+                        n >= 1 &&
+
+                        n <= 50 &&
+
+                        n !== 18
+
+                    ) {
+
+                        qtyCandidates.push(n);
+                    }
+                }
+            }
+
+            if (
+                qtyCandidates.length > 0
+            ) {
+
+                qty =
+                    qtyCandidates[
+                        qtyCandidates.length - 1
+                    ];
             }
         }
 
@@ -359,4 +348,4 @@ function extractItemsFromText(ocrResult) {
     );
 
     return finalItems;
-                                 }
+            }
