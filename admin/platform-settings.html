@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Settings – Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #0f172a; color: #e2e8f0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 2rem; }
+        .card { background: #1e293b; padding: 1.5rem; border-radius: 0.5rem; }
+        h1 { color: #facc15; }
+        label { display: block; margin: 1rem 0 0.5rem; }
+        select, input { width: 100%; padding: 0.5rem; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 0.5rem; }
+        .btn { background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; cursor: pointer; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+<div class="container"><div class="card"><h1><i class="fas fa-sliders-h"></i> Platform Fee Settings</h1>
+<form id="feeForm"><label>Fee Type</label><select id="feeType"><option value="percentage">Percentage (%)</option><option value="fixed">Fixed Amount (₹)</option></select>
+<label>Fee Value</label><input type="number" id="feeValue" step="0.01" placeholder="2 for 2% or 50 for ₹50">
+<label>Minimum Fee (₹)</label><input type="number" id="minFee" value="10"><label>Maximum Fee (₹)</label><input type="number" id="maxFee" value="500">
+<label>GST on Fee (%)</label><input type="number" id="feeGST" value="18"><button type="submit" class="btn">Save Settings</button></form></div></div>
+<script>
+    function loadSettings() { const s = JSON.parse(localStorage.getItem('platform_settings') || '{}'); document.getElementById('feeType').value = s.type || 'percentage'; document.getElementById('feeValue').value = s.value || 2; document.getElementById('minFee').value = s.minFee || 10; document.getElementById('maxFee').value = s.maxFee || 500; document.getElementById('feeGST').value = s.gst || 18; }
+    document.getElementById('feeForm').addEventListener('submit', (e) => { e.preventDefault(); localStorage.setItem('platform_settings', JSON.stringify({ type: document.getElementById('feeType').value, value: parseFloat(document.getElementById('feeValue').value), minFee: parseFloat(document.getElementById('minFee').value), maxFee: parseFloat(document.getElementById('maxFee').value), gst: parseFloat(document.getElementById('feeGST').value) })); alert('Saved!'); });
+    loadSettings();
+</script>
+</body>
+</html>
