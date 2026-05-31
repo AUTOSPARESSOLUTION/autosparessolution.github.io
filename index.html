@@ -953,5 +953,146 @@ document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/sc
         };
     }
     </script>
+    <script>
+    // ========== DEALER RECOGNITION & UI CONTROL ==========
+    
+    // Function to get current user type
+    function getCurrentUserType() {
+        const user = JSON.parse(localStorage.getItem('currentUser'));
+        const dealer = JSON.parse(localStorage.getItem('currentDealer'));
+        
+        if (user && user.email === 'dipankar@autosparessolution.com') {
+            return 'admin';
+        } else if (dealer) {
+            return 'dealer';
+        } else if (user) {
+            return 'customer';
+        } else {
+            return 'guest';
+        }
+    }
+    
+    // Function to update UI based on user type
+    function updateUIByUserType() {
+        const userType = getCurrentUserType();
+        
+        // Find the "Generate Invoice" button (manual invoice generation)
+        const generateBtn = document.querySelector('.btn-block[onclick="generateDocument()"]');
+        const generateBtnAlt = document.querySelector('#generateDocumentBtn');
+        
+        if (userType === 'admin') {
+            // Admin can see manual generate button
+            if (generateBtn) generateBtn.style.display = 'inline-flex';
+            if (generateBtnAlt) generateBtnAlt.style.display = 'block';
+        } else {
+            // Customers and dealers CANNOT generate manual invoices
+            if (generateBtn) generateBtn.style.display = 'none';
+            if (generateBtnAlt) generateBtnAlt.style.display = 'none';
+        }
+        
+        // Show/Hide Dealer Portal Button
+        let dealerPortalBtn = document.getElementById('dealerPortalBtn');
+        
+        if (userType === 'dealer') {
+            // Show floating dealer portal button if not exists
+            if (!dealerPortalBtn) {
+                dealerPortalBtn = document.createElement('a');
+                dealerPortalBtn.id = 'dealerPortalBtn';
+                dealerPortalBtn.href = 'dealer/dashboard.html';
+                dealerPortalBtn.className = 'btn';
+                dealerPortalBtn.style.cssText = `
+                    position: fixed;
+                    bottom: 100px;
+                    right: 20px;
+                    background: #6c5ce7;
+                    color: white;
+                    padding: 12px 20px;
+                    border-radius: 50px;
+                    z-index: 1000;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    text-decoration: none;
+                    font-weight: bold;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                    transition: transform 0.2s;
+                `;
+                dealerPortalBtn.innerHTML = '<i class="fas fa-store"></i> Go to Dealer Portal';
+                dealerPortalBtn.onmouseover = () => dealerPortalBtn.style.transform = 'scale(1.05)';
+                dealerPortalBtn.onmouseout = () => dealerPortalBtn.style.transform = 'scale(1)';
+                document.body.appendChild(dealerPortalBtn);
+            }
+        } else {
+            // Remove dealer portal button if exists
+            if (dealerPortalBtn) {
+                dealerPortalBtn.remove();
+            }
+        }
+        
+        // Optional: Show toast message for dealers
+        if (userType === 'dealer' && !sessionStorage.getItem('dealerWelcomeShown')) {
+            setTimeout(() => {
+                if (typeof showToast === 'function') {
+                    showToast('Welcome Dealer! Click the button below to access your ERP portal.', false);
+                }
+                sessionStorage.setItem('dealerWelcomeShown', 'true');
+            }, 2000);
+        }
+    }
+    
+    // Function to sync dealer login from main site (optional)
+    function syncDealerLogin() {
+        const user = JSON.parse(localStorage.getItem('currentUser'));
+        const dealer = JSON.parse(localStorage.getItem('currentDealer'));
+        
+        // If a dealer logged into main site with same email, sync session
+        if (user && !dealer) {
+            const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
+            const matchedDealer = dealers.find(d => d.email === user.email);
+            if (matchedDealer) {
+                localStorage.setItem('currentDealer', JSON.stringify(matchedDealer));
+                if (typeof showToast === 'function') {
+                    showToast('Dealer account detected! Use the Dealer Portal for advanced features.', false);
+                }
+                setTimeout(() => {
+                    updateUIByUserType();
+                }, 500);
+            }
+        }
+    }
+    
+    // Override login function to check for dealer status after login
+    const originalLogin = window.login;
+    if (typeof originalLogin === 'function') {
+        window.login = function() {
+            originalLogin();
+            setTimeout(() => {
+                syncDealerLogin();
+                updateUIByUserType();
+            }, 500);
+        };
+    }
+    
+    // Override logout function to clear dealer session
+    const originalLogout = window.logout;
+    if (typeof originalLogout === 'function') {
+        window.logout = function() {
+            originalLogout();
+            localStorage.removeItem('currentDealer');
+            updateUIByUserType();
+        };
+    }
+    
+    // Initialize UI on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        syncDealerLogin();
+        updateUIByUserType();
+    });
+    
+    // Also run after products load (to ensure cart UI is ready)
+    setTimeout(() => {
+        updateUIByUserType();
+    }, 2000);
+</script>
 </body>
     </html>
