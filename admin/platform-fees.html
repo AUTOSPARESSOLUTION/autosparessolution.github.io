@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Fees – Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #0f172a; color: #e2e8f0; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        h1 { color: #facc15; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { border: 1px solid #334155; padding: 0.5rem; text-align: left; }
+        th { background: #facc15; color: #0f172a; }
+        .summary { background: #1e293b; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex; gap: 2rem; flex-wrap: wrap; }
+        .btn { background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; cursor: pointer; }
+        .btn-success { background: #22c55e; }
+        .status-pending { color: #eab308; }
+        .status-paid { color: #4ade80; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-percent"></i> Platform Fee Management</h1>
+    <div class="summary">
+        <div><strong>Total Platform Fee Collected:</strong> ₹<span id="totalCollected">0</span></div>
+        <div><strong>Total Platform Fee Pending:</strong> ₹<span id="totalPending">0</span></div>
+        <div><strong>Total GST on Fee:</strong> ₹<span id="totalGST">0</span></div>
+    </div>
+    <div style="overflow-x: auto;">
+        <table id="feesTable">
+            <thead><tr><th>ID</th><th>Date</th><th>Buyer</th><th>Seller</th><th>Part</th><th>Qty</th><th>Order Amount</th><th>Platform Fee</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+<script>
+    function loadFees() {
+        const fees = JSON.parse(localStorage.getItem('platform_fees') || '[]');
+        let totalCollected = 0, totalPending = 0, totalGST = 0;
+        const tbody = document.querySelector('#feesTable tbody');
+        tbody.innerHTML = '';
+        for (const fee of fees.reverse()) {
+            totalGST += fee.platformFeeGST || 0;
+            if (fee.status === 'paid') totalCollected += fee.totalFee;
+            else totalPending += fee.totalFee;
+            const row = tbody.insertRow();
+            row.insertCell(0).innerText = fee.id;
+            row.insertCell(1).innerText = new Date(fee.date).toLocaleString();
+            row.insertCell(2).innerText = fee.buyerName;
+            row.insertCell(3).innerText = fee.sellerEmail;
+            row.insertCell(4).innerText = fee.part;
+            row.insertCell(5).innerText = fee.quantity;
+            row.insertCell(6).innerText = `₹${fee.orderAmount}`;
+            row.insertCell(7).innerText = `₹${fee.totalFee}`;
+            row.insertCell(8).innerHTML = `<span class="status-${fee.status}">${fee.status}</span>`;
+            row.insertCell(9).innerHTML = fee.status === 'pending' ? `<button class="btn btn-success" onclick="markPaid('${fee.id}')">Mark Paid</button>` : '✓';
+        }
+        document.getElementById('totalCollected').innerText = totalCollected.toFixed(2);
+        document.getElementById('totalPending').innerText = totalPending.toFixed(2);
+        document.getElementById('totalGST').innerText = totalGST.toFixed(2);
+    }
+    function markPaid(id) {
+        let fees = JSON.parse(localStorage.getItem('platform_fees') || '[]');
+        const index = fees.findIndex(f => f.id === id);
+        if (index !== -1) { fees[index].status = 'paid'; localStorage.setItem('platform_fees', JSON.stringify(fees)); loadFees(); alert('Marked as paid!'); }
+    }
+    loadFees();
+</script>
+</body>
+  </html>
