@@ -926,5 +926,32 @@ document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/sc
     <!-- Dealer Reorder Memory scripts -->
     <script src="js/reorder-history.js"></script>
     <script src="js/reorder-ui.js"></script>
+    <script>
+    // Show admin panel only when admin is logged in
+    function showAdminPanel() {
+        const user = JSON.parse(localStorage.getItem('currentUser'));
+        const adminNav = document.getElementById('adminNavGroup');
+        if (adminNav) {
+            if (user && user.email === 'dipankar@autosparessolution.com') {
+                adminNav.style.display = 'block';
+            } else {
+                adminNav.style.display = 'none';
+            }
+        }
+    }
+    
+    // Run on page load and after login
+    document.addEventListener('DOMContentLoaded', showAdminPanel);
+    setTimeout(showAdminPanel, 2000);
+    
+    // Override login function to refresh admin panel
+    const originalLogin = window.login;
+    if (typeof originalLogin === 'function') {
+        window.login = function() {
+            originalLogin();
+            setTimeout(showAdminPanel, 500);
+        };
+    }
+    </script>
 </body>
     </html>
