@@ -6,32 +6,35 @@
     let currentOffers = []; // Offers from intelligence system
 
     // Load dealer master from Excel
-    async function loadDealerMaster() {
-        try {
-            const response = await fetch('data/dealer-master.xlsx');
-            if (!response.ok) throw new Error('Dealer master not found');
-            const arrayBuffer = await response.arrayBuffer();
-            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(sheet);
-            
-            dealerMaster = rows.map(row => ({
-                name: row['Dealer Name'] || row['dealer'] || row['name'],
-                address: row['Address'] || row['address'] || '',
-                phone: row['Phone'] || row['phone'] || '',
-                email: row['Email'] || row['email'] || '',
-                gstin: row['GSTIN'] || row['gstin'] || '',
-                city: row['City'] || row['city'] || '',
-                pincode: row['Pincode'] || row['pincode'] || '',
-                logo: row['Logo'] || row['logo'] || ''
-            }));
-            console.log(`✅ Loaded ${dealerMaster.length} dealers from master file`);
-            return dealerMaster;
-        } catch(err) {
-            console.warn("Dealer master not loaded:", err);
-            return [];
-        }
+    // Load Dealer Master from Excel (contact info for flyers)
+async function loadDealerMaster() {
+    try {
+        const response = await fetch('data/dealer-master.xlsx');
+        if (!response.ok) throw new Error('Dealer master not found');
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet);
+        
+        dealerMaster = rows.map(row => ({
+            // Map your retailers master columns
+            name: row['Retailer Name'] || row['Dealer Name'] || row['name'],
+            address: row['Address'] || row['address'] || '',
+            phone: row['Mobile No'] || row['Phone'] || row['phone'] || '',
+            email: row['Email'] || row['email'] || '',
+            city: row['District'] || row['City'] || row['city'] || '',
+            ownerName: row['Owner Name'] || '',
+            rlpCode: row['RLP Code'] || '',
+            customerType: row['Customer Type'] || '',
+            subDist: row['Sub Dist Dsc'] || ''
+        }));
+        console.log(`✅ Loaded ${dealerMaster.length} dealers from master file`);
+        return dealerMaster;
+    } catch(err) {
+        console.warn("Dealer master not loaded:", err);
+        return [];
     }
+}
 
     // Load offers from intelligence system
     function loadOffers() {
