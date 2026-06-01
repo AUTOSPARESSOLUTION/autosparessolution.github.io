@@ -1,4 +1,4 @@
-// dealer-intelligence.js – Working version with district fix
+// dealer-intelligence.js – Working with your Excel format
 (function() {
     console.log("Dealer Intelligence System loaded");
 
@@ -49,15 +49,18 @@
         return distributorStock;
     }
 
+    // ========== YOUR EXCEL FORMAT IS HERE ==========
     async function loadRetailerOfftakeAuto() {
         const rows = await loadExcelFile('data/retailer-offtake.xlsx');
         const dealerPartMap = new Map();
         
         for (const row of rows) {
+            // Your exact column names
             const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'];
             const part = row['Part No'] || row['part_no'] || row['Part Number'];
             const district = row['Retailer District'] || row['District'] || row['district'] || '';
             
+            // Your month columns
             let totalQty = 0;
             let monthCount = 0;
             const months = ['JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER'];
@@ -67,6 +70,7 @@
                 totalQty += qty;
             }
             
+            // Optional Grand Total
             const grandTotal = parseFloat(row['Grand Total']) || 0;
             if (grandTotal > 0 && totalQty === 0) {
                 totalQty = grandTotal;
@@ -91,10 +95,12 @@
                 dealer: val.dealer,
                 part: val.part,
                 avgQty: val.count > 0 ? val.totalQty / val.count : 0,
-                district: val.district
+                district: val.district,
+                phone: '',
+                email: ''
             });
         }
-        console.log(`✅ Loaded ${dealerData.length} dealer-part combinations`);
+        console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from Excel`);
         return dealerData;
     }
 
@@ -148,7 +154,7 @@
             const [dealer, part] = key.split('|');
             dealerPartAverages.set(key, { dealer, part, avgQty });
         }
-        console.log(`✅ Analysed ${dealerPartAverages.size} dealer-part combinations`);
+        console.log(`✅ Analysed ${dealerPartAverages.size} dealer-part combinations from invoices`);
     }
 
     function calculateOffer(dealer, part, avgQty, district) {
@@ -173,8 +179,8 @@
         if (!offerType && avgQty === 0) return null;
         
         return {
-            dealer, part, avgQty, district,
-            myStock: stock, totalStock,
+            dealer, part, avgQty, district: district || '',
+            myStock: stock, totalStock: totalStock,
             discount, offerType, minQty,
             originalPrice,
             offerPrice: originalPrice * (1 - discount/100)
@@ -214,7 +220,7 @@
         offers.sort((a,b) => b.discount - a.discount);
         activeOffers = offers;
         localStorage.setItem('dealerOffers', JSON.stringify({ generatedAt: new Date().toISOString(), offers: activeOffers }));
-        console.log(`✅ Generated ${offers.length} offers`);
+        console.log(`✅ Generated ${offers.length} offers (${offers.filter(o => o.source === 'Invoice History').length} from invoices, ${offers.filter(o => o.source === 'Excel Only').length} from Excel)`);
         return offers;
     }
 
@@ -222,7 +228,7 @@
         if (activeOffers.length === 0) return null;
         let csv = "Dealer,Part No,Avg Monthly Qty,District,Stock,Discount %,Offer Type,Min Order,Original Price,Offer Price,Source\n";
         for (const o of activeOffers) {
-            csv += `"${o.dealer}",${o.part},${o.avgQty.toFixed(1)},${o.district || ''},${o.totalStock},${o.discount},${o.offerType},${o.minQty},${o.originalPrice},${o.offerPrice.toFixed(2)},${o.source || ''}\n`;
+            csv += `"${o.dealer}",${o.part},${o.avgQty.toFixed(1)},${o.district || ''},${o.totalStock},${o.discount},${o.offerType},${o.minQty},${o.originalPrice},${o.offerPrice.toFixed(2)},${o.source}\n`;
         }
         return csv;
     }
