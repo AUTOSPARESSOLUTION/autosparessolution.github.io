@@ -128,7 +128,20 @@ async function loadRetailerOfftakeAuto() {
     console.log(`   Sample:`, dealerData.slice(0, 3));
     return dealerData;
 }
-
+// When processing area demand, use district from off-take file
+function updateAreaFromOfftake() {
+    for (const dealer of dealerData) {
+        if (dealer.district) {
+            if (!areaDemand.has(dealer.district)) {
+                areaDemand.set(dealer.district, { totalQty: 0, partWise: new Map(), dealerCount: new Set() });
+            }
+            const area = areaDemand.get(dealer.district);
+            area.totalQty += dealer.avgQty;
+            area.dealerCount.add(dealer.dealer);
+            area.partWise.set(dealer.part, (area.partWise.get(dealer.part) || 0) + dealer.avgQty);
+        }
+    }
+}
     // Load stock from prices.csv
     async function loadMyStock() {
         try {
