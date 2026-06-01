@@ -63,43 +63,45 @@
     }
 
     // Load Retailer Off-take Data from Excel
-    async function loadRetailerOfftakeAuto() {
-        const rows = await loadExcelFile('data/retailer-offtake.xlsx');
-        const dealerPartMap = new Map();
+    // Load Retailer Off-take Data from Excel (purchase history)
+async function loadRetailerOfftakeAuto() {
+    const rows = await loadExcelFile('data/retailer-offtake.xlsx');
+    const dealerPartMap = new Map();
+    
+    for (const row of rows) {
+        // Map your columns - only these are needed for off-take calculation
+        const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'];
+        const part = row['Part No'] || row['part_no'] || row['Part Number'];
+        const qty = parseFloat(row['Monthly Off-take Qty'] || row['qty'] || 0);
         
-        for (const row of rows) {
-            const dealer = row['Dealer Name'] || row['dealer'] || row['Dealer'];
-            const part = row['Part No'] || row['part_no'] || row['Part Number'];
-            const qty = parseFloat(row['Monthly Off-take Qty'] || row['qty'] || row['Monthly Quantity'] || 0);
-            const phone = row['Phone'] || row['phone'] || '';
-            const email = row['Email'] || row['email'] || '';
-            const gstin = row['GSTIN'] || row['gstin'] || '';
-            
-            if (!dealer || !part) continue;
-            
-            const key = `${dealer}|${part}`;
-            if (!dealerPartMap.has(key)) {
-                dealerPartMap.set(key, { dealer, part, totalQty: 0, count: 0, phone, email, gstin });
-            }
-            const entry = dealerPartMap.get(key);
-            entry.totalQty += qty;
-            entry.count++;
-        }
+        // Optional - if phone is present in off-take file (not required)
+        const phone = row['Mobile No'] || row['Phone'] || '';
         
-        dealerData = [];
-        for (const [key, val] of dealerPartMap) {
-            dealerData.push({
-                dealer: val.dealer,
-                part: val.part,
-                avgQty: val.totalQty / val.count,
-                phone: val.phone,
-                email: val.email,
-                gstin: val.gstin
-            });
+        if (!dealer || !part) continue;
+        
+        const key = `${dealer}|${part}`;
+        if (!dealerPartMap.has(key)) {
+            dealerPartMap.set(key, { dealer, part, totalQty: 0, count: 0, phone });
         }
-        console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from retailer off-take`);
-        return dealerData;
+        const entry = dealerPartMap.get(key);
+        entry.totalQty += qty;
+        entry.count++;
     }
+    
+    dealerData = [];
+    for (const [key, val] of dealerPartMap) {
+        dealerData.push({
+            dealer: val.dealer,
+            part: val.part,
+            avgQty: val.totalQty / val.count,
+            phone: val.phone,
+            email: '',
+            gstin: ''
+        });
+    }
+    console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from off-take file`);
+    return dealerData;
+}
 
     // Load stock from prices.csv
     async function loadMyStock() {
