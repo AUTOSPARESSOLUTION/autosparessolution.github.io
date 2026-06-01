@@ -63,44 +63,84 @@
         return distributorStock;
     }
 
-    // Load Retailer Off-take Data from Excel
-    async function loadRetailerOfftakeAuto() {
-        const rows = await loadExcelFile('data/retailer-offtake.xlsx');
-        const dealerPartMap = new Map();
+    // Load Retailer Off-take Data from Excel (monthly columns format)
+async function loadRetailerOfftakeAuto() {
+    const rows = await loadExcelFile('data/retailer-offtake.xlsx');
+    const dealerPartMap = new Map();
+    
+    // Month columns to sum
+    const monthColumns = ['JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER'];
+    
+    for (const row of rows) {
+        // Map your columns
+        const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'];
+        const part = row['Part No'] || row['part_no'] || row['Part Number'];
+        const district = row['Retailer District'] || row['District'] || '';
         
-        for (const row of rows) {
-            const dealer = row['Dealer Name'] || row['dealer'] || row['Dealer'];
-            const part = row['Part No'] || row['part_no'] || row['Part Number'];
-            const qty = parseFloat(row['Monthly Off-take Qty'] || row['qty'] || row['Monthly Quantity'] || 0);
-            const phone = row['Phone'] || row['phone'] || '';
-            const email = row['Email'] || row['email'] || '';
-            const gstin = row['GSTIN'] || row['gstin'] || '';
-            
-            if (!dealer || !part) continue;
-            
-            const key = `${dealer}|${part}`;
-            if (!dealerPartMap.has(key)) {
-                dealerPartMap.set(key, { dealer, part, totalQty: 0, count: 0, phone, email, gstin });
-            }
-            const entry = dealerPartMap.get(key);
-            entry.totalQty += qty;
-            entry.count++;
+        // Calculate total quantity from monthly columns
+        let totalQty = 0;
+        for (const month of monthColumns) {
+            const qty = parseFloat(row[month]) || 0;
+            totalQty += qty;
         }
         
-        dealerData = [];
-        for (const [key, val] of dealerPartMap) {
-            dealerData.push({
-                dealer: val.dealer,
-                part: val.part,
-                avgQty: val.totalQty / val.count,
-                phone: val.phone,
-                email: val.email,
-                gstin: val.gstin
+        // Also check if there's a Grand Total column
+        const grandTotal = parseFloat(row['Grand Total']) || 0;
+        if (grandTotal > 0 && totalQty === 0) {
+            totalQty = grandTotal;
+        }
+        
+        // Count number of months with data (for average calculation)
+        let monthCount = 0;
+        for (const month of monthColumns) {
+            if (parseFloat(row[month]) > 0) monthCount++;
+        }
+        if (monthCount === 0 && totalQty > 0) monthCount = 1;
+        
+        if (!dealer || !part) continue;
+        
+        const key = `${dealer}|${part}`;
+        if (!dealerPartMap.has(key)) {
+            dealerPartMap.set(key, { 
+                dealer, part, totalQty: 0, count: 0, 
+                district: district,
+                phone: '', email: ''
             });
         }
-        console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from retailer off-take`);
-        return dealerData;
+        const entry = dealerPartMap.get(key);
+        entry.totalQty += totalQty;
+        entry.count += monthCount;
     }
+    
+    dealerData = [];
+    for (const [key, val] of dealerPartMap) {
+        dealerData.push({
+            dealer: val.dealer,
+            part: val.part,
+            avgQty: val.count > 0 ? val.totalQty / val.count : 0,
+            phone: val.phone,
+            email: val.email,
+            district: val.district
+        });
+    }
+    console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from off-take file`);
+    console.log(`   Sample:`, dealerData.slice(0, 3));
+    return dealerData;
+}
+    // When processing area demand, use district from off-take file
+function updateAreaFromOfftake() {
+    for (const dealer of dealerData) {
+        if (dealer.district) {
+            if (!areaDemand.has(dealer.district)) {
+                areaDemand.set(dealer.district, { totalQty: 0, partWise: new Map(), dealerCount: new Set() });
+            }
+            const area = areaDemand.get(dealer.district);
+            area.totalQty += dealer.avgQty;
+            area.dealerCount.add(dealer.dealer);
+            area.partWise.set(dealer.part, (area.partWise.get(dealer.part) || 0) + dealer.avgQty);
+        }
+    }
+}
 
     // Load stock from prices.csv
     async function loadMyStock() {
@@ -251,6 +291,25 @@
         await loadMyStock();
         await loadDistributorStockAuto();
         await loadRetailerOfftakeAuto();
+        // Update area demand using district from off-take file
+function updateAreaFromOfftake() {
+    for (const dealer of dealerData) {
+        if (dealer.district) {
+            if (!areaDemand.has(dealer.district)) {
+                areaDemand.set(dealer.district, { 
+                    totalQty: 0, 
+                    partWise: new Map(), 
+                    dealerCount: new Set() 
+                });
+            }
+            const area = areaDemand.get(dealer.district);
+            area.totalQty += dealer.avgQty;
+            area.dealerCount.add(dealer.dealer);
+            area.partWise.set(dealer.part, (area.partWise.get(dealer.part) || 0) + dealer.avgQty);
+        }
+    }
+    console.log(`✅ Area demand updated from off-take data: ${areaDemand.size} districts`);
+}
         analyseInvoices();
         
         const offers = [];
