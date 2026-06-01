@@ -1,4 +1,4 @@
-// dealer-intelligence.js – Auto-learning dealer offer system with file auto-load
+// dealer-intelligence.js – Auto-learning dealer offer system
 (function() {
     console.log("Dealer Intelligence System loaded");
 
@@ -29,7 +29,7 @@
     let distributorStock = [];
     let dealerData = [];
 
-    // ========== AUTO-LOAD EXCEL FILES ==========
+    // Helper to load Excel files
     async function loadExcelFile(url) {
         try {
             const response = await fetch(url);
@@ -62,86 +62,64 @@
         return distributorStock;
     }
 
-    // Load Retailer Off-take Data from Excel
-    // Load Retailer Off-take Data from Excel (purchase history)
-// Load Retailer Off-take Data from Excel (monthly columns format)
-async function loadRetailerOfftakeAuto() {
-    const rows = await loadExcelFile('data/retailer-offtake.xlsx');
-    const dealerPartMap = new Map();
-    
-    // Month columns to sum
-    const monthColumns = ['JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER'];
-    
-    for (const row of rows) {
-        // Map your columns
-        const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'];
-        const part = row['Part No'] || row['part_no'] || row['Part Number'];
-        const district = row['Retailer District'] || row['District'] || '';
+    // Load Retailer Off-take Data from Excel (monthly columns format)
+    async function loadRetailerOfftakeAuto() {
+        const rows = await loadExcelFile('data/retailer-offtake.xlsx');
+        const dealerPartMap = new Map();
         
-        // Calculate total quantity from monthly columns
-        let totalQty = 0;
-        for (const month of monthColumns) {
-            const qty = parseFloat(row[month]) || 0;
-            totalQty += qty;
+        const monthColumns = ['JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER'];
+        
+        for (const row of rows) {
+            const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'];
+            const part = row['Part No'] || row['part_no'] || row['Part Number'];
+            const district = row['Retailer District'] || row['District'] || row['district'] || '';
+            
+            let totalQty = 0;
+            let monthCount = 0;
+            for (const month of monthColumns) {
+                const qty = parseFloat(row[month]) || 0;
+                if (qty > 0) monthCount++;
+                totalQty += qty;
+            }
+            
+            const grandTotal = parseFloat(row['Grand Total']) || 0;
+            if (grandTotal > 0 && totalQty === 0) {
+                totalQty = grandTotal;
+                monthCount = 1;
+            }
+            
+            if (!dealer || !part) continue;
+            
+            const key = `${dealer}|${part}`;
+            if (!dealerPartMap.has(key)) {
+                dealerPartMap.set(key, { 
+                    dealer, part, totalQty: 0, count: 0, 
+                    district: district,
+                    phone: '', email: ''
+                });
+            }
+            const entry = dealerPartMap.get(key);
+            entry.totalQty += totalQty;
+            entry.count += monthCount;
+            if (!entry.district && district) entry.district = district;
         }
         
-        // Also check if there's a Grand Total column
-        const grandTotal = parseFloat(row['Grand Total']) || 0;
-        if (grandTotal > 0 && totalQty === 0) {
-            totalQty = grandTotal;
-        }
-        
-        // Count number of months with data (for average calculation)
-        let monthCount = 0;
-        for (const month of monthColumns) {
-            if (parseFloat(row[month]) > 0) monthCount++;
-        }
-        if (monthCount === 0 && totalQty > 0) monthCount = 1;
-        
-        if (!dealer || !part) continue;
-        
-        const key = `${dealer}|${part}`;
-        if (!dealerPartMap.has(key)) {
-            dealerPartMap.set(key, { 
-                dealer, part, totalQty: 0, count: 0, 
-                district: district,
-                phone: '', email: ''
+        dealerData = [];
+        for (const [key, val] of dealerPartMap) {
+            dealerData.push({
+                dealer: val.dealer,
+                part: val.part,
+                avgQty: val.count > 0 ? val.totalQty / val.count : 0,
+                phone: val.phone,
+                email: val.email,
+                district: val.district
             });
         }
-        const entry = dealerPartMap.get(key);
-        entry.totalQty += totalQty;
-        entry.count += monthCount;
+        console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from off-take file`);
+        console.log(`   Sample district:`, dealerData.find(d => d.district)?.district || 'No district found');
+        return dealerData;
     }
-    
-    dealerData = [];
-    for (const [key, val] of dealerPartMap) {
-        dealerData.push({
-            dealer: val.dealer,
-            part: val.part,
-            avgQty: val.count > 0 ? val.totalQty / val.count : 0,
-            phone: val.phone,
-            email: val.email,
-            district: val.district
-        });
-    }
-    console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from off-take file`);
-    console.log(`   Sample:`, dealerData.slice(0, 3));
-    return dealerData;
-}
-// When processing area demand, use district from off-take file
-function updateAreaFromOfftake() {
-    for (const dealer of dealerData) {
-        if (dealer.district) {
-            if (!areaDemand.has(dealer.district)) {
-                areaDemand.set(dealer.district, { totalQty: 0, partWise: new Map(), dealerCount: new Set() });
-            }
-            const area = areaDemand.get(dealer.district);
-            area.totalQty += dealer.avgQty;
-            area.dealerCount.add(dealer.dealer);
-            area.partWise.set(dealer.part, (area.partWise.get(dealer.part) || 0) + dealer.avgQty);
-        }
-    }
-}
+
     // Load stock from prices.csv
     async function loadMyStock() {
         try {
@@ -166,18 +144,46 @@ function updateAreaFromOfftake() {
         }
     }
 
-    // Analyse sales invoices from localStorage
+    // Update area demand using district from off-take file
+    function updateAreaFromOfftake() {
+        let districtCount = 0;
+        for (const dealer of dealerData) {
+            if (dealer.district && dealer.district.trim() !== '') {
+                districtCount++;
+                if (!areaDemand.has(dealer.district)) {
+                    areaDemand.set(dealer.district, { 
+                        totalQty: 0, 
+                        partWise: new Map(), 
+                        dealerCount: new Set() 
+                    });
+                }
+                const area = areaDemand.get(dealer.district);
+                area.totalQty += dealer.avgQty;
+                area.dealerCount.add(dealer.dealer);
+                area.partWise.set(dealer.part, (area.partWise.get(dealer.part) || 0) + dealer.avgQty);
+            }
+        }
+        console.log(`✅ Area demand updated: ${areaDemand.size} districts, ${districtCount} dealers with district info`);
+    }
+
+    // Analyse sales invoices from localStorage (skip Guest)
     function analyseInvoices() {
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        console.log(`📊 Analysing ${allInvoices.length} invoices`);
+        
+        const validInvoices = allInvoices.filter(inv => 
+            inv.customerName && 
+            inv.customerName !== 'Guest' && 
+            inv.customerName !== 'guest'
+        );
+        
+        console.log(`📊 Analysing ${validInvoices.length} valid invoices (skipped ${allInvoices.length - validInvoices.length} guest invoices)`);
         
         dealerPartAverages.clear();
-        areaDemand.clear();
         
         const dealerPartTransactions = new Map();
         
-        for (const inv of allInvoices) {
-            const dealerName = inv.customerName || inv.customerEmail || 'Guest';
+        for (const inv of validInvoices) {
+            const dealerName = inv.customerName;
             const invoiceDate = new Date(inv.date);
             const pincode = inv.customerPincode || inv.shippingPincode || '';
             
@@ -225,8 +231,7 @@ function updateAreaFromOfftake() {
             });
         }
         
-        console.log(`✅ Analysed ${dealerPartAverages.size} dealer-part combinations`);
-        console.log(`✅ Analysed ${areaDemand.size} pincode areas`);
+        console.log(`✅ Analysed ${dealerPartAverages.size} dealer-part combinations from invoices`);
         return { dealerCount: dealerPartAverages.size, areaCount: areaDemand.size };
     }
 
@@ -239,11 +244,10 @@ function updateAreaFromOfftake() {
         return CONFIG.areaMultipliers.low;
     }
 
-    function calculateOffer(dealer, part, avgQty, pincode) {
+    function calculateOffer(dealer, part, avgQty, pincode, source = 'auto') {
         const stock = currentStock.get(part)?.stock || 0;
         const originalPrice = currentStock.get(part)?.price || 0;
         
-        // Combine with distributor stock
         const distStock = distributorStock.filter(d => d.part === part);
         const totalDistStock = distStock.reduce((sum, d) => sum + d.stock, 0);
         const totalStock = stock + totalDistStock;
@@ -255,14 +259,26 @@ function updateAreaFromOfftake() {
                 break;
             }
         }
-        if (!volumeTier) return null;
+        
+        if (!volumeTier && avgQty === 0) return null;
+        
+        let discount = 0;
+        let offerType = "";
+        let minQty = 1;
+        
+        if (volumeTier) {
+            discount = volumeTier.discount;
+            offerType = volumeTier.label;
+            minQty = volumeTier.min;
+        } else if (avgQty > 0) {
+            discount = 2;
+            offerType = "Welcome Offer";
+            minQty = 1;
+        }
         
         const areaMultiplier = getAreaDemandMultiplier(pincode, part);
-        let finalDiscount = volumeTier.discount * areaMultiplier;
+        let finalDiscount = discount * areaMultiplier;
         finalDiscount = Math.min(finalDiscount, 25);
-        
-        let offerType = volumeTier.label;
-        let minQty = volumeTier.min;
         
         if (totalStock < CONFIG.lowStockThreshold && totalStock > 0) {
             offerType = "Limited Stock";
@@ -291,27 +307,48 @@ function updateAreaFromOfftake() {
         await loadMyStock();
         await loadDistributorStockAuto();
         await loadRetailerOfftakeAuto();
+        
+        updateAreaFromOfftake();
         analyseInvoices();
         
         const offers = [];
+        const processedDealerParts = new Set();
+        
+        // Offers from invoice history
         for (const [key, data] of dealerPartAverages) {
-            const offer = calculateOffer(data.dealer, data.part, data.avgQty, data.pincode);
-            if (offer && offer.discount > 0) offers.push(offer);
+            const offer = calculateOffer(data.dealer, data.part, data.avgQty, data.pincode, 'invoice');
+            if (offer && offer.discount > 0) {
+                offer.source = 'Invoice History';
+                offers.push(offer);
+                processedDealerParts.add(`${data.dealer}|${data.part}`);
+            }
         }
         
-        // Also generate offers from retailer off-take data (if no invoice history)
+        // Offers from Excel only
         for (const retailer of dealerData) {
-            const existing = offers.find(o => o.dealer === retailer.dealer && o.part === retailer.part);
-            if (!existing) {
-                const offer = calculateOffer(retailer.dealer, retailer.part, retailer.avgQty, '');
-                if (offer && offer.discount > 0) offers.push(offer);
+            const key = `${retailer.dealer}|${retailer.part}`;
+            if (processedDealerParts.has(key)) continue;
+            
+            const hasInvoiceHistory = Array.from(dealerPartAverages.keys()).some(k => k.startsWith(`${retailer.dealer}|`));
+            const offer = calculateOffer(retailer.dealer, retailer.part, retailer.avgQty, retailer.district, 'excel');
+            if (offer && offer.discount > 0) {
+                offer.source = hasInvoiceHistory ? 'Excel (Supplement)' : 'Excel Only (Prospective)';
+                offer.isProspective = !hasInvoiceHistory;
+                offers.push(offer);
             }
         }
         
         offers.sort((a,b) => b.discount - a.discount);
         activeOffers = offers;
         saveOffersToStorage();
-        console.log(`✅ Generated ${offers.length} offers`);
+        
+        const existingCount = offers.filter(o => o.source === 'Invoice History').length;
+        const prospectiveCount = offers.filter(o => o.source === 'Excel Only (Prospective)').length;
+        
+        console.log(`✅ Generated ${offers.length} offers:`);
+        console.log(`   - ${existingCount} from invoice history`);
+        console.log(`   - ${prospectiveCount} from Excel only`);
+        
         return offers;
     }
 
@@ -325,9 +362,9 @@ function updateAreaFromOfftake() {
 
     function exportOffersCSV() {
         if (activeOffers.length === 0) return null;
-        let csv = "Dealer,Part No,Avg Monthly Qty,Pincode,My Stock,Distributor Stock,Total Stock,Discount %,Offer Type,Min Order,Original Price,Offer Price\n";
+        let csv = "Dealer,Part No,Avg Monthly Qty,Pincode/District,My Stock,Total Stock,Discount %,Offer Type,Min Order,Original Price,Offer Price,Source\n";
         for (const o of activeOffers) {
-            csv += `"${o.dealer}",${o.part},${o.avgQty.toFixed(1)},${o.pincode},${o.myStock},${o.distributorStock},${o.totalStock},${o.discount},${o.offerType},${o.minQty},${o.originalPrice},${o.offerPrice.toFixed(2)}\n`;
+            csv += `"${o.dealer}",${o.part},${o.avgQty.toFixed(1)},${o.pincode || ''},${o.myStock},${o.totalStock},${o.discount},${o.offerType},${o.minQty},${o.originalPrice},${o.offerPrice.toFixed(2)},${o.source || ''}\n`;
         }
         return csv;
     }
@@ -381,11 +418,6 @@ function updateAreaFromOfftake() {
         };
     }
 
-    // Auto-run on page load
-    setTimeout(async () => {
-        await runFullAnalysis();
-    }, 3000);
-
     // Expose globally
     window.DealerIntelligence = {
         runFullAnalysis,
@@ -396,4 +428,8 @@ function updateAreaFromOfftake() {
         generateWhatsAppMessage,
         CONFIG
     };
+    
+    setTimeout(async () => {
+        await runFullAnalysis();
+    }, 3000);
 })();
