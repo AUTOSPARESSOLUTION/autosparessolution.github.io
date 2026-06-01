@@ -1,4 +1,4 @@
-// dealer-intelligence.js – Working with your Excel format
+// dealer-intelligence.js – Auto-learning dealer offer system
 (function() {
     console.log("Dealer Intelligence System loaded");
 
@@ -23,13 +23,21 @@
     let distributorStock = [];
     let dealerData = [];
 
-    async function loadExcelFile(url) {
+    async function loadExcelFile(url, sheetName = null) {
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`Failed to load ${url}`);
             const arrayBuffer = await response.arrayBuffer();
             const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            
+            let sheet;
+            if (sheetName && workbook.SheetNames.includes(sheetName)) {
+                sheet = workbook.Sheets[sheetName];
+                console.log(`✅ Loaded sheet: ${sheetName}`);
+            } else {
+                sheet = workbook.Sheets[workbook.SheetNames[0]];
+                console.log(`✅ Loaded first sheet: ${workbook.SheetNames[0]}`);
+            }
             return XLSX.utils.sheet_to_json(sheet);
         } catch(err) {
             console.warn(`Could not load ${url}:`, err);
@@ -49,21 +57,60 @@
         return distributorStock;
     }
 
-    // ========== YOUR EXCEL FORMAT IS HERE ==========
+    // ========== YOUR EXCEL FILE WITH TWO SHEETS ==========
     async function loadRetailerOfftakeAuto() {
-        const rows = await loadExcelFile('data/retailer-offtake.xlsx');
+        // Your exact file name
+        const fileName = 'data/Retailer Wise Part Line Wise Sale.xlsx';
+        
+        // Try both sheets: AD and LMM
+        let rows = [];
+        let loadedFrom = '';
+        
+        // Try AD sheet first
+        let adRows = await loadExcelFile(fileName, 'AD');
+        if (adRows.length > 0) {
+            rows = adRows;
+            loadedFrom = 'AD sheet';
+            console.log(`✅ Loaded ${rows.length} rows from AD sheet`);
+        }
+        
+        // If AD sheet empty, try LMM sheet
+        if (rows.length === 0) {
+            let lmmRows = await loadExcelFile(fileName, 'LMM');
+            if (lmmRows.length > 0) {
+                rows = lmmRows;
+                loadedFrom = 'LMM sheet';
+                console.log(`✅ Loaded ${rows.length} rows from LMM sheet`);
+            }
+        }
+        
+        // If still empty, try first sheet
+        if (rows.length === 0) {
+            let anyRows = await loadExcelFile(fileName);
+            if (anyRows.length > 0) {
+                rows = anyRows;
+                loadedFrom = 'first sheet';
+                console.log(`✅ Loaded ${rows.length} rows from first sheet`);
+            }
+        }
+        
+        if (rows.length === 0) {
+            console.error('❌ Could not load retailer off-take data. Make sure file exists at: data/Retailer Wise Part Line Wise Sale.xlsx');
+            return [];
+        }
+        
         const dealerPartMap = new Map();
         
         for (const row of rows) {
-            // Your exact column names
-            const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'];
-            const part = row['Part No'] || row['part_no'] || row['Part Number'];
-            const district = row['Retailer District'] || row['District'] || row['district'] || '';
+            // Try multiple column name variations
+            const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'] || row['Retailer'] || row['Dealer'];
+            const part = row['Part No'] || row['part_no'] || row['Part Number'] || row['Part'];
+            const district = row['Retailer District'] || row['District'] || row['district'] || row['Zone'] || '';
             
-            // Your month columns
+            // Month columns (both uppercase and capitalized)
             let totalQty = 0;
             let monthCount = 0;
-            const months = ['JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER'];
+            const months = ['JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'July', 'August', 'September', 'October'];
             for (const m of months) {
                 const qty = parseFloat(row[m]) || 0;
                 if (qty > 0) monthCount++;
@@ -71,7 +118,7 @@
             }
             
             // Optional Grand Total
-            const grandTotal = parseFloat(row['Grand Total']) || 0;
+            const grandTotal = parseFloat(row['Grand Total']) || parseFloat(row['Total']) || 0;
             if (grandTotal > 0 && totalQty === 0) {
                 totalQty = grandTotal;
                 monthCount = 1;
@@ -100,7 +147,7 @@
                 email: ''
             });
         }
-        console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from Excel`);
+        console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from Excel (${loadedFrom})`);
         return dealerData;
     }
 
@@ -220,7 +267,10 @@
         offers.sort((a,b) => b.discount - a.discount);
         activeOffers = offers;
         localStorage.setItem('dealerOffers', JSON.stringify({ generatedAt: new Date().toISOString(), offers: activeOffers }));
-        console.log(`✅ Generated ${offers.length} offers (${offers.filter(o => o.source === 'Invoice History').length} from invoices, ${offers.filter(o => o.source === 'Excel Only').length} from Excel)`);
+        
+        const invoiceCount = offers.filter(o => o.source === 'Invoice History').length;
+        const excelCount = offers.filter(o => o.source === 'Excel Only').length;
+        console.log(`✅ Generated ${offers.length} offers (${invoiceCount} from invoices, ${excelCount} from Excel)`);
         return offers;
     }
 
@@ -248,6 +298,7 @@
     }
 
     async function runFullAnalysis() {
+        console.log("Running full analysis...");
         const offers = await generateOffers();
         return {
             offersGenerated: offers.length,
