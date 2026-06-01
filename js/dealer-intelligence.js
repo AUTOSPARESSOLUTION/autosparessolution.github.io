@@ -1,7 +1,35 @@
-// dealer-intelligence.js – Auto-learning dealer offer system
+// dealer-intelligence.js – Production-grade dealer offer system
 (function() {
     console.log("Dealer Intelligence System loaded");
 
+    // ========== HELPER FUNCTIONS ==========
+    
+    // Normalize part number (standardize comparison)
+    function normalizePart(part) {
+        if (!part) return '';
+        return String(part)
+            .trim()
+            .toUpperCase()
+            .replace(/^0+/, '');  // Remove leading zeros
+    }
+    
+    // Clean number from Excel (remove ₹, commas, etc.)
+    function cleanNumber(val) {
+        if (val === undefined || val === null) return 0;
+        const cleaned = String(val).replace(/[^\d.-]/g, '');
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? 0 : num;
+    }
+    
+    // Sanitize CSV export (prevent Excel formula injection)
+    function sanitizeCSV(value) {
+        const str = String(value || '');
+        if (/^[=+\-@]/.test(str)) {
+            return "'" + str;
+        }
+        return str;
+    }
+    
     // Configuration
     const CONFIG = {
         volumeTiers: [
@@ -25,11 +53,11 @@
     let dealerPartAverages = new Map();
     let areaDemand = new Map();
     let currentStock = new Map();
+    let distributorStockMap = new Map();  // Indexed for fast lookup
     let activeOffers = [];
-    let distributorStock = [];
     let dealerData = [];
 
-    // Helper to load Excel files with specific sheet name
+    // ========== LOAD EXCEL FILES WITH PAPA PARSE ==========
     async function loadExcelFile(url, sheetName = null) {
         try {
             const response = await fetch(url);
@@ -52,22 +80,36 @@
         }
     }
 
-    // Load Distributor Stock from Excel
+    // Load Distributor Stock with Indexing
     async function loadDistributorStockAuto() {
+        distributorStockMap.clear();
         const rows = await loadExcelFile('data/distributor-stock.xlsx');
-        distributorStock = [];
+        
         for (const row of rows) {
-            const part = row['Part No'] || row['part_no'] || row['Part Number'];
-            const stock = parseFloat(row['Available Stock'] || row['stock'] || 0);
-            if (part) distributorStock.push({ part, stock });
+            const part = normalizePart(row['Part No'] || row['part_no'] || row['Part Number']);
+            const stock = cleanNumber(row['Available Stock'] || row['stock'] || 0);
+            const price = cleanNumber(row['Price'] || row['price'] || 0);
+            const leadTime = cleanNumber(row['Lead Time (Days)'] || row['leadTime'] || 3);
+            
+            if (part) {
+                if (!distributorStockMap.has(part)) {
+                    distributorStockMap.set(part, []);
+                }
+                distributorStockMap.get(part).push({ 
+                    part, 
+                    distributor: row['Distributor Name'] || row['distributor'] || '',
+                    stock, 
+                    price, 
+                    leadTime 
+                });
+            }
         }
-        console.log(`✅ Loaded ${distributorStock.length} distributor stock entries`);
-        return distributorStock;
+        console.log(`✅ Loaded ${distributorStockMap.size} distributor parts with stock`);
+        return distributorStockMap;
     }
 
-    // ========== YOUR EXCEL FILE WITH TWO SHEETS ==========
+    // Load Retailer Off-take from your Excel file
     async function loadRetailerOfftakeAuto() {
-        // Your exact file name
         const fileName = 'data/Retailer Wise Part Line Wise Sale.xlsx';
         
         let rows = [];
@@ -81,7 +123,6 @@
             console.log(`✅ Loaded ${rows.length} rows from AD sheet`);
         }
         
-        // If AD sheet empty, try LMM sheet
         if (rows.length === 0) {
             let lmmRows = await loadExcelFile(fileName, 'LMM');
             if (lmmRows.length > 0) {
@@ -96,32 +137,29 @@
             return [];
         }
         
-        const dealerPartMap = new Map();
-        
-        // Print first row to see available columns (for debugging)
         if (rows.length > 0) {
-            console.log("First row columns:", Object.keys(rows[0]));
-            console.log("First row sample:", rows[0]);
+            console.log("📊 First row columns:", Object.keys(rows[0]));
         }
         
+        const dealerPartMap = new Map();
+        
         for (const row of rows) {
-            // Try multiple column name variations
-            const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'] || row['Retailer'] || row['Dealer'];
-            const part = row['Part No'] || row['part_no'] || row['Part Number'] || row['Part'];
-            const district = row['Retailer District'] || row['District'] || row['district'] || row['Zone'] || '';
+            const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'] || row['Retailer'];
+            const partRaw = row['Part No'] || row['part_no'] || row['Part Number'] || row['Part'];
+            const part = normalizePart(partRaw);
+            const district = row['Retailer District'] || row['District'] || row['district'] || '';
             
-            // Month columns (both uppercase and capitalized)
+            // Calculate total from monthly columns
             let totalQty = 0;
             let monthCount = 0;
             const months = ['JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'July', 'August', 'September', 'October'];
             for (const m of months) {
-                const qty = parseFloat(row[m]) || 0;
+                const qty = cleanNumber(row[m]);
                 if (qty > 0) monthCount++;
                 totalQty += qty;
             }
             
-            // Optional Grand Total
-            const grandTotal = parseFloat(row['Grand Total']) || parseFloat(row['Total']) || 0;
+            const grandTotal = cleanNumber(row['Grand Total'] || row['Total']);
             if (grandTotal > 0 && totalQty === 0) {
                 totalQty = grandTotal;
                 monthCount = 1;
@@ -132,9 +170,9 @@
             const key = `${dealer}|${part}`;
             if (!dealerPartMap.has(key)) {
                 dealerPartMap.set(key, { 
-                    dealer, part, totalQty: 0, count: 0, 
-                    district: district,
-                    phone: '', email: ''
+                    dealer, part, totalQty: 0, count: 0, district,
+                    phone: row['Phone'] || row['Mobile No'] || '',
+                    email: row['Email'] || ''
                 });
             }
             const entry = dealerPartMap.get(key);
@@ -155,35 +193,47 @@
             });
         }
         console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from ${loadedFrom}`);
-        console.log(`   Sample district:`, dealerData.find(d => d.district)?.district || 'No district found');
         return dealerData;
     }
 
-    // Load stock from prices.csv
+    // Load stock from prices.csv using PapaParse (handles commas in fields)
     async function loadMyStock() {
-        try {
-            const response = await fetch('prices.csv');
-            const csvText = await response.text();
-            const rows = csvText.split('\n').slice(1);
-            currentStock.clear();
-            for (const row of rows) {
-                const cols = row.split(',');
-                if (cols[0]) {
-                    const part = cols[0].trim();
-                    const stock = parseInt(cols[7]) || 0;
-                    const price = parseFloat(cols[6]) || 0;
-                    currentStock.set(part, { stock, price });
-                }
-            }
-            console.log(`✅ My stock loaded: ${currentStock.size} parts`);
-            return true;
-        } catch(err) {
-            console.error("Failed to load prices.csv", err);
-            return false;
-        }
+        return new Promise((resolve, reject) => {
+            fetch('prices.csv')
+                .then(response => response.text())
+                .then(csvText => {
+                    currentStock.clear();
+                    
+                    Papa.parse(csvText, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            for (const row of results.data) {
+                                const part = normalizePart(row['Part No'] || row['part'] || row['Part']);
+                                const stock = cleanNumber(row['Stock'] || row['stock'] || row['Qty'] || 0);
+                                const price = cleanNumber(row['Price'] || row['price'] || row['Our Price'] || 0);
+                                
+                                if (part) {
+                                    currentStock.set(part, { stock, price });
+                                }
+                            }
+                            console.log(`✅ My stock loaded: ${currentStock.size} parts`);
+                            resolve(true);
+                        },
+                        error: function(err) {
+                            console.error("PapaParse error:", err);
+                            resolve(false);
+                        }
+                    });
+                })
+                .catch(err => {
+                    console.error("Failed to load prices.csv", err);
+                    resolve(false);
+                });
+        });
     }
 
-    // Update area demand using district from off-take file
+    // Update area demand (cleared before use)
     function updateAreaFromOfftake() {
         let districtCount = 0;
         for (const dealer of dealerData) {
@@ -205,73 +255,63 @@
         console.log(`✅ Area demand updated: ${areaDemand.size} districts, ${districtCount} dealers with district info`);
     }
 
-    // Analyse sales invoices from localStorage (skip Guest)
+    // Analyse sales invoices (monthly average calculation)
     function analyseInvoices() {
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        
-        const validInvoices = allInvoices.filter(inv => 
-            inv.customerName && 
-            inv.customerName !== 'Guest' && 
-            inv.customerName !== 'guest'
-        );
-        
-        console.log(`📊 Analysing ${validInvoices.length} valid invoices (skipped ${allInvoices.length - validInvoices.length} guest invoices)`);
+        const validInvoices = allInvoices.filter(inv => inv.customerName && inv.customerName !== 'Guest');
+        console.log(`📊 Analysing ${validInvoices.length} valid invoices`);
         
         dealerPartAverages.clear();
         
-        const dealerPartTransactions = new Map();
+        // Group by month for proper monthly average
+        const monthlyData = new Map(); // key: dealer|part|yearMonth
         
         for (const inv of validInvoices) {
+            // Skip malformed invoices
+            if (!Array.isArray(inv.items)) continue;
+            
             const dealerName = inv.customerName;
-            const invoiceDate = new Date(inv.date);
-            const pincode = inv.customerPincode || inv.shippingPincode || '';
+            const invDate = new Date(inv.date);
+            const yearMonth = `${invDate.getFullYear()}-${invDate.getMonth() + 1}`;
             
             for (const item of inv.items) {
-                const part = item.part;
-                const qty = item.qty;
-                const key = `${dealerName}|${part}`;
+                const part = normalizePart(item.part);
+                const qty = cleanNumber(item.qty);
+                const key = `${dealerName}|${part}|${yearMonth}`;
                 
-                if (!dealerPartTransactions.has(key)) {
-                    dealerPartTransactions.set(key, []);
+                if (!monthlyData.has(key)) {
+                    monthlyData.set(key, { dealer: dealerName, part, yearMonth, totalQty: 0 });
                 }
-                dealerPartTransactions.get(key).push({
-                    qty: qty,
-                    date: inv.date,
-                    pincode: pincode
-                });
-                
-                if (pincode) {
-                    if (!areaDemand.has(pincode)) {
-                        areaDemand.set(pincode, { totalQty: 0, partWise: new Map(), dealerCount: new Set() });
-                    }
-                    const area = areaDemand.get(pincode);
-                    area.totalQty += qty;
-                    area.dealerCount.add(dealerName);
-                    area.partWise.set(part, (area.partWise.get(part) || 0) + qty);
-                }
+                monthlyData.get(key).totalQty += qty;
             }
+        }
+        
+        // Calculate averages across months
+        const dealerPartMonthly = new Map(); // key: dealer|part -> array of monthly totals
+        
+        for (const [key, data] of monthlyData) {
+            const dpKey = `${data.dealer}|${data.part}`;
+            if (!dealerPartMonthly.has(dpKey)) {
+                dealerPartMonthly.set(dpKey, []);
+            }
+            dealerPartMonthly.get(dpKey).push(data.totalQty);
         }
         
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - CONFIG.analysisMonths);
         
-        for (const [key, transactions] of dealerPartTransactions) {
-            const recent = transactions.filter(t => new Date(t.date) >= sixMonthsAgo);
-            if (recent.length === 0) continue;
+        for (const [dpKey, monthlyQtys] of dealerPartMonthly) {
+            const avgQty = monthlyQtys.reduce((a, b) => a + b, 0) / monthlyQtys.length;
+            const [dealer, part] = dpKey.split('|');
             
-            const totalQty = recent.reduce((sum, t) => sum + t.qty, 0);
-            const avgQty = totalQty / recent.length;
-            const lastOrderDate = recent.sort((a,b) => new Date(b.date) - new Date(a.date))[0].date;
-            const pincode = recent[0].pincode;
-            
-            const [dealer, part] = key.split('|');
-            dealerPartAverages.set(key, {
-                dealer, part, avgQty, lastOrderDate, pincode, phone: '', email: ''
+            dealerPartAverages.set(dpKey, {
+                dealer, part, avgQty,
+                monthsCount: monthlyQtys.length
             });
         }
         
         console.log(`✅ Analysed ${dealerPartAverages.size} dealer-part combinations from invoices`);
-        return { dealerCount: dealerPartAverages.size, areaCount: areaDemand.size };
+        return dealerPartAverages.size;
     }
 
     function getAreaDemandMultiplier(pincode, part) {
@@ -283,11 +323,13 @@
         return CONFIG.areaMultipliers.low;
     }
 
-    function calculateOffer(dealer, part, avgQty, pincode, source = 'auto') {
-        const stock = currentStock.get(part)?.stock || 0;
-        const originalPrice = currentStock.get(part)?.price || 0;
+    function calculateOffer(dealer, part, avgQty, pincode) {
+        const stockData = currentStock.get(part) || { stock: 0, price: 0 };
+        const stock = stockData.stock;
+        const originalPrice = stockData.price;
         
-        const distStock = distributorStock.filter(d => d.part === part);
+        // Fast indexed lookup
+        const distStock = distributorStockMap.get(part) || [];
         const totalDistStock = distStock.reduce((sum, d) => sum + d.stock, 0);
         const totalStock = stock + totalDistStock;
         
@@ -329,6 +371,11 @@
             minQty = 1;
         }
         
+        // Prevent NaN
+        const offerPrice = originalPrice > 0 
+            ? originalPrice * (1 - finalDiscount / 100) 
+            : 0;
+        
         return {
             dealer, part, avgQty, pincode,
             myStock: stock,
@@ -337,15 +384,21 @@
             discount: Math.round(finalDiscount),
             offerType, minQty,
             originalPrice,
-            offerPrice: originalPrice * (1 - finalDiscount/100),
+            offerPrice: offerPrice,
             areaMultiplier: areaMultiplier.toFixed(1)
         };
     }
 
     async function generateOffers() {
-        await loadMyStock();
-        await loadDistributorStockAuto();
-        await loadRetailerOfftakeAuto();
+        // Clear areaDemand before each run to prevent accumulation
+        areaDemand.clear();
+        
+        // Parallel loading for better performance
+        await Promise.all([
+            loadMyStock(),
+            loadDistributorStockAuto(),
+            loadRetailerOfftakeAuto()
+        ]);
         
         updateAreaFromOfftake();
         analyseInvoices();
@@ -355,55 +408,77 @@
         
         // Offers from invoice history
         for (const [key, data] of dealerPartAverages) {
-            const offer = calculateOffer(data.dealer, data.part, data.avgQty, data.pincode, 'invoice');
-            if (offer && offer.discount > 0) {
-                offer.source = 'Invoice History';
-                offers.push(offer);
-                processedDealerParts.add(`${data.dealer}|${data.part}`);
+            try {
+                const offer = calculateOffer(data.dealer, data.part, data.avgQty, '');
+                if (offer && offer.discount > 0) {
+                    offer.source = 'Invoice History';
+                    offers.push(offer);
+                    processedDealerParts.add(`${data.dealer}|${data.part}`);
+                }
+            } catch(err) {
+                console.error("Error calculating offer:", err);
             }
         }
         
         // Offers from Excel only
         for (const retailer of dealerData) {
-            const key = `${retailer.dealer}|${retailer.part}`;
-            if (processedDealerParts.has(key)) continue;
-            
-            const hasInvoiceHistory = Array.from(dealerPartAverages.keys()).some(k => k.startsWith(`${retailer.dealer}|`));
-            const offer = calculateOffer(retailer.dealer, retailer.part, retailer.avgQty, retailer.district, 'excel');
-            if (offer && offer.discount > 0) {
-                offer.source = hasInvoiceHistory ? 'Excel (Supplement)' : 'Excel Only (Prospective)';
-                offer.isProspective = !hasInvoiceHistory;
-                offers.push(offer);
+            try {
+                const key = `${retailer.dealer}|${retailer.part}`;
+                if (processedDealerParts.has(key)) continue;
+                
+                const offer = calculateOffer(retailer.dealer, retailer.part, retailer.avgQty, retailer.district);
+                if (offer && offer.discount > 0) {
+                    offer.source = 'Excel Only';
+                    offers.push(offer);
+                }
+            } catch(err) {
+                console.error("Error calculating Excel offer:", err);
             }
         }
         
         offers.sort((a,b) => b.discount - a.discount);
         activeOffers = offers;
-        saveOffersToStorage();
         
-        const existingCount = offers.filter(o => o.source === 'Invoice History').length;
-        const prospectiveCount = offers.filter(o => o.source === 'Excel Only (Prospective)').length;
+        // Limit storage size to prevent localStorage quota issues
+        const storageData = {
+            generatedAt: new Date().toISOString(),
+            offerCount: activeOffers.length,
+            offers: activeOffers.slice(0, 500)  // Limit to 500 offers
+        };
         
-        console.log(`✅ Generated ${offers.length} offers:`);
-        console.log(`   - ${existingCount} from invoice history`);
-        console.log(`   - ${prospectiveCount} from Excel only`);
+        try {
+            localStorage.setItem('dealerOffers', JSON.stringify(storageData));
+        } catch(err) {
+            console.error("localStorage quota exceeded, saving only first 100 offers");
+            storageData.offers = activeOffers.slice(0, 100);
+            localStorage.setItem('dealerOffers', JSON.stringify(storageData));
+        }
+        
+        const invoiceCount = offers.filter(o => o.source === 'Invoice History').length;
+        const excelCount = offers.filter(o => o.source === 'Excel Only').length;
+        console.log(`✅ Generated ${offers.length} offers (${invoiceCount} from invoices, ${excelCount} from Excel)`);
         
         return offers;
     }
 
-    function saveOffersToStorage() {
-        localStorage.setItem('dealerOffers', JSON.stringify({
-            generatedAt: new Date().toISOString(),
-            offerCount: activeOffers.length,
-            offers: activeOffers
-        }));
-    }
-
     function exportOffersCSV() {
         if (activeOffers.length === 0) return null;
-        let csv = "Dealer,Part No,Avg Monthly Qty,Pincode/District,My Stock,Total Stock,Discount %,Offer Type,Min Order,Original Price,Offer Price,Source\n";
+        
+        let csv = "Dealer,Part No,Avg Monthly Qty,District,My Stock,Total Stock,Discount %,Offer Type,Min Order,Original Price,Offer Price,Source\n";
+        
         for (const o of activeOffers) {
-            csv += `"${o.dealer}",${o.part},${o.avgQty.toFixed(1)},${o.pincode || ''},${o.myStock},${o.totalStock},${o.discount},${o.offerType},${o.minQty},${o.originalPrice},${o.offerPrice.toFixed(2)},${o.source || ''}\n`;
+            csv += `"${sanitizeCSV(o.dealer)}",`;
+            csv += `"${sanitizeCSV(o.part)}",`;
+            csv += `${o.avgQty.toFixed(1)},`;
+            csv += `"${sanitizeCSV(o.pincode || '')}",`;
+            csv += `${o.myStock},`;
+            csv += `${o.totalStock},`;
+            csv += `${o.discount},`;
+            csv += `"${sanitizeCSV(o.offerType)}",`;
+            csv += `${o.minQty},`;
+            csv += `${o.originalPrice},`;
+            csv += `${o.offerPrice.toFixed(2)},`;
+            csv += `"${sanitizeCSV(o.source || '')}"\n`;
         }
         return csv;
     }
@@ -436,7 +511,9 @@
                 pincode,
                 totalDemand: data.totalQty,
                 dealerCount: data.dealerCount.size,
-                topParts: Array.from(data.partWise.entries()).sort((a,b) => b[1] - a[1]).slice(0, 5)
+                topParts: Array.from(data.partWise.entries())
+                    .sort((a,b) => b[1] - a[1])
+                    .slice(0, 5)
             });
         }
         return insights.sort((a,b) => b.totalDemand - a.totalDemand);
@@ -444,17 +521,28 @@
 
     async function runFullAnalysis() {
         console.log("Running full dealer intelligence analysis...");
-        const offers = await generateOffers();
-        const insights = getAreaInsights();
-        return {
-            timestamp: new Date().toISOString(),
-            offersGenerated: offers.length,
-            highDiscountOffers: offers.filter(o => o.discount >= 10).length,
-            lowStockAlerts: offers.filter(o => o.totalStock < CONFIG.lowStockThreshold).length,
-            areasAnalysed: insights.length,
-            topAreas: insights.slice(0, 5),
-            offers: offers.slice(0, 20)
-        };
+        try {
+            const offers = await generateOffers();
+            const insights = getAreaInsights();
+            return {
+                timestamp: new Date().toISOString(),
+                offersGenerated: offers.length,
+                highDiscountOffers: offers.filter(o => o.discount >= 10).length,
+                lowStockAlerts: offers.filter(o => o.totalStock < CONFIG.lowStockThreshold).length,
+                areasAnalysed: insights.length,
+                topAreas: insights.slice(0, 5),
+                offers: offers.slice(0, 20)
+            };
+        } catch(err) {
+            console.error("Analysis failed:", err);
+            return {
+                offersGenerated: 0,
+                highDiscountOffers: 0,
+                lowStockAlerts: 0,
+                areasAnalysed: 0,
+                offers: []
+            };
+        }
     }
 
     // Expose globally
@@ -465,10 +553,13 @@
         getAreaInsights,
         exportOffersCSV,
         generateWhatsAppMessage,
-        CONFIG
+        CONFIG,
+        normalizePart,
+        cleanNumber
     };
     
-    setTimeout(async () => {
+    // Wait for full page load before auto-run
+    window.addEventListener('load', async () => {
         await runFullAnalysis();
-    }, 3000);
+    });
 })();
