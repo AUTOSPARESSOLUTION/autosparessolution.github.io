@@ -2,41 +2,45 @@
 (function() {
     console.log("Brochure Generator loaded");
 
-    let dealerMaster = [];  // Dealer data from Excel
-    let currentOffers = []; // Offers from intelligence system
+    let dealerMaster = [];
+    let currentOffers = [];
 
-    // Load dealer master from Excel
-    // Load Dealer Master from Excel (contact info for flyers)
-async function loadDealerMaster() {
-    try {
-        const response = await fetch('data/dealer-master.xlsx');
-        if (!response.ok) throw new Error('Dealer master not found');
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet);
-        
-        dealerMaster = rows.map(row => ({
-            // Map your retailers master columns
-            name: row['Retailer Name'] || row['Dealer Name'] || row['name'],
-            address: row['Address'] || row['address'] || '',
-            phone: row['Mobile No'] || row['Phone'] || row['phone'] || '',
-            email: row['Email'] || row['email'] || '',
-            city: row['District'] || row['City'] || row['city'] || '',
-            ownerName: row['Owner Name'] || '',
-            rlpCode: row['RLP Code'] || '',
-            customerType: row['Customer Type'] || '',
-            subDist: row['Sub Dist Dsc'] || ''
-        }));
-        console.log(`✅ Loaded ${dealerMaster.length} dealers from master file`);
-        return dealerMaster;
-    } catch(err) {
-        console.warn("Dealer master not loaded:", err);
-        return [];
+    async function loadExcelFile(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Failed to load ${url}`);
+            const arrayBuffer = await response.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            return XLSX.utils.sheet_to_json(sheet);
+        } catch(err) {
+            console.warn(`Could not load ${url}:`, err);
+            return [];
+        }
     }
-}
 
-    // Load offers from intelligence system
+    async function loadDealerMaster() {
+        try {
+            const rows = await loadExcelFile('data/dealer-master.xlsx');
+            dealerMaster = rows.map(row => ({
+                name: row['Retailer Name'] || row['Dealer Name'] || row['dealer'] || row['name'],
+                address: row['Address'] || row['address'] || '',
+                phone: row['Mobile No'] || row['Phone'] || row['phone'] || '',
+                email: row['Email'] || row['email'] || '',
+                city: row['District'] || row['City'] || row['city'] || '',
+                ownerName: row['Owner Name'] || '',
+                rlpCode: row['RLP Code'] || '',
+                customerType: row['Customer Type'] || '',
+                subDist: row['Sub Dist Dsc'] || ''
+            }));
+            console.log(`✅ Loaded ${dealerMaster.length} dealers from master file`);
+            return dealerMaster;
+        } catch(err) {
+            console.warn("Dealer master not loaded:", err);
+            return [];
+        }
+    }
+
     function loadOffers() {
         const offersData = JSON.parse(localStorage.getItem('dealerOffers') || '{}');
         currentOffers = offersData.offers || [];
@@ -44,7 +48,6 @@ async function loadDealerMaster() {
         return currentOffers;
     }
 
-    // Generate HTML flyer for a specific dealer
     function generateFlyerHTML(dealer, offers) {
         const dealerOffers = offers.filter(o => o.dealer === dealer.name);
         const topOffers = dealerOffers.slice(0, 5);
@@ -99,70 +102,18 @@ async function loadDealerMaster() {
                     padding: 20px;
                     text-align: center;
                 }
-                .flyer-header h1 {
-                    color: #facc15;
-                    font-size: 24px;
-                    margin-bottom: 5px;
-                }
-                .flyer-header p {
-                    font-size: 12px;
-                    opacity: 0.8;
-                }
-                .dealer-info {
-                    background: #f8f9fa;
-                    padding: 15px;
-                    border-bottom: 1px solid #e0e0e0;
-                }
-                .dealer-name {
-                    font-size: 20px;
-                    font-weight: bold;
-                    color: #0a2e3a;
-                }
-                .dealer-address {
-                    font-size: 12px;
-                    color: #666;
-                    margin-top: 5px;
-                }
-                .offers-section {
-                    padding: 20px;
-                }
-                .section-title {
-                    font-size: 18px;
-                    font-weight: bold;
-                    color: #0a2e3a;
-                    margin-bottom: 15px;
-                    border-left: 4px solid #facc15;
-                    padding-left: 10px;
-                }
-                .cta-section {
-                    background: #facc15;
-                    padding: 15px;
-                    text-align: center;
-                }
-                .cta-section a {
-                    display: inline-block;
-                    background: #25D366;
-                    color: white;
-                    text-decoration: none;
-                    padding: 12px 30px;
-                    border-radius: 50px;
-                    font-weight: bold;
-                    margin: 5px;
-                }
-                .cta-section .call-btn {
-                    background: #3b82f6;
-                }
-                .footer {
-                    background: #1e293b;
-                    color: #94a3b8;
-                    text-align: center;
-                    padding: 12px;
-                    font-size: 10px;
-                }
-                @media print {
-                    body { background: white; padding: 0; }
-                    .flyer { box-shadow: none; }
-                }
+                .flyer-header h1 { color: #facc15; font-size: 24px; margin-bottom: 5px; }
+                .flyer-header p { font-size: 12px; opacity: 0.8; }
+                .dealer-info { background: #f8f9fa; padding: 15px; border-bottom: 1px solid #e0e0e0; }
+                .dealer-name { font-size: 20px; font-weight: bold; color: #0a2e3a; }
+                .dealer-address { font-size: 12px; color: #666; margin-top: 5px; }
+                .offers-section { padding: 20px; }
+                .section-title { font-size: 18px; font-weight: bold; color: #0a2e3a; margin-bottom: 15px; border-left: 4px solid #facc15; padding-left: 10px; }
+                .cta-section { background: #facc15; padding: 15px; text-align: center; }
+                .cta-section a { display: inline-block; background: #25D366; color: white; text-decoration: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; margin: 5px; }
+                .cta-section .call-btn { background: #3b82f6; }
+                .footer { background: #1e293b; color: #94a3b8; text-align: center; padding: 12px; font-size: 10px; }
+                @media print { body { background: white; padding: 0; } .flyer { box-shadow: none; } }
             </style>
         </head>
         <body>
@@ -173,7 +124,7 @@ async function loadDealerMaster() {
                 </div>
                 <div class="dealer-info">
                     <div class="dealer-name">${dealer.name}</div>
-                    <div class="dealer-address">${dealer.address || ''} | ${dealer.city || ''} - ${dealer.pincode || ''}</div>
+                    <div class="dealer-address">${dealer.address || ''} | ${dealer.city || ''}</div>
                     <div class="dealer-address">📞 ${dealer.phone || ''} | 📧 ${dealer.email || ''}</div>
                 </div>
                 <div class="offers-section">
@@ -181,12 +132,8 @@ async function loadDealerMaster() {
                     ${offersHtml}
                 </div>
                 <div class="cta-section">
-                    <a href="https://wa.me/${dealer.phone || '919830300193'}?text=I%20want%20to%20place%20order" target="_blank">
-                        📱 Order on WhatsApp
-                    </a>
-                    <a href="tel:${dealer.phone || '9830300193'}" class="call-btn">
-                        📞 Call Now
-                    </a>
+                    <a href="https://wa.me/${dealer.phone || '919830300193'}?text=I%20want%20to%20place%20order" target="_blank">📱 Order on WhatsApp</a>
+                    <a href="tel:${dealer.phone || '9830300193'}" class="call-btn">📞 Call Now</a>
                 </div>
                 <div class="footer">
                     Auto Spares Solution | contact@autosparessolution.com | 9830300193
@@ -196,30 +143,7 @@ async function loadDealerMaster() {
         </html>`;
     }
 
-    // Download flyer as PDF (using html2pdf)
-    async function downloadFlyerAsPDF(dealer, offers) {
-        const flyerHtml = generateFlyerHTML(dealer, offers);
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-        
-        iframe.contentDocument.open();
-        iframe.contentDocument.write(flyerHtml);
-        iframe.contentDocument.close();
-        
-        // Wait for fonts to load
-        setTimeout(() => {
-            iframe.contentWindow.print();
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 1000);
-        }, 500);
-    }
-
-    // Send flyer via WhatsApp
     function sendFlyerWhatsApp(dealer, offers) {
-        const flyerHtml = generateFlyerHTML(dealer, offers);
-        // Create a text version for WhatsApp
         const dealerOffers = offers.filter(o => o.dealer === dealer.name);
         let message = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
         message += `*Dear ${dealer.name},*\n\n`;
@@ -237,38 +161,13 @@ async function loadDealerMaster() {
             message += `   📦 Stock: ${offer.totalStock}\n\n`;
         }
         
-        message += `\n📞 Contact: 9830300193\n`;
-        message += `🌐 autosparessolution.com\n\n`;
+        message += `\n📞 Contact: 9830300193\n🌐 autosparessolution.com\n\n`;
         message += `_Reply YES to place order_`;
         
         const encodedMsg = encodeURIComponent(message);
         window.open(`https://wa.me/${dealer.phone || '919830300193'}?text=${encodedMsg}`, '_blank');
     }
 
-    // Generate bulk flyers for all dealers
-    async function generateBulkFlyers() {
-        await loadDealerMaster();
-        const offers = loadOffers();
-        const results = [];
-        
-        for (const dealer of dealerMaster) {
-            const dealerOffers = offers.filter(o => o.dealer === dealer.name);
-            if (dealerOffers.length > 0) {
-                const flyerHtml = generateFlyerHTML(dealer, offers);
-                results.push({
-                    dealer: dealer.name,
-                    phone: dealer.phone,
-                    hasOffers: true,
-                    offerCount: dealerOffers.length
-                });
-            }
-        }
-        
-        console.log(`Generated flyers for ${results.length} dealers`);
-        return results;
-    }
-
-    // Display flyer preview in a modal
     function showFlyerPreview(dealer, offers) {
         const flyerHtml = generateFlyerHTML(dealer, offers);
         const modal = window.open('', '_blank', 'width=600,height=800');
@@ -276,23 +175,15 @@ async function loadDealerMaster() {
         modal.document.close();
     }
 
-    // Export all flyers as ZIP (using JSZip – optional)
     async function exportAllFlyers() {
         await loadDealerMaster();
         const offers = loadOffers();
-        const flyers = {};
-        
+        let combinedHtml = '<html><head><title>All Flyers</title></head><body>';
         for (const dealer of dealerMaster) {
             const dealerOffers = offers.filter(o => o.dealer === dealer.name);
             if (dealerOffers.length > 0) {
-                flyers[`flyer_${dealer.name.replace(/[^a-z0-9]/gi, '_')}.html`] = generateFlyerHTML(dealer, offers);
+                combinedHtml += `<hr><div style="page-break-after: always;">${generateFlyerHTML(dealer, offers)}</div>`;
             }
-        }
-        
-        // Create download link for combined HTML (or use JSZip)
-        let combinedHtml = '<html><head><title>All Flyers</title></head><body>';
-        for (const [name, content] of Object.entries(flyers)) {
-            combinedHtml += `<h2>${name}</h2>${content}<hr>`;
         }
         combinedHtml += '</body></html>';
         
@@ -303,18 +194,13 @@ async function loadDealerMaster() {
         a.download = `all_flyers_${new Date().toISOString().split('T')[0]}.html`;
         a.click();
         URL.revokeObjectURL(url);
-        
-        console.log(`Exported ${Object.keys(flyers).length} flyers`);
     }
 
-    // Expose functions globally
     window.BrochureGenerator = {
         loadDealerMaster,
         loadOffers,
         generateFlyerHTML,
-        downloadFlyerAsPDF,
         sendFlyerWhatsApp,
-        generateBulkFlyers,
         showFlyerPreview,
         exportAllFlyers,
         getDealerMaster: () => dealerMaster,
