@@ -64,28 +64,53 @@
 
     // Load Retailer Off-take Data from Excel
     // Load Retailer Off-take Data from Excel (purchase history)
+// Load Retailer Off-take Data from Excel (monthly columns format)
 async function loadRetailerOfftakeAuto() {
     const rows = await loadExcelFile('data/retailer-offtake.xlsx');
     const dealerPartMap = new Map();
     
+    // Month columns to sum
+    const monthColumns = ['JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER'];
+    
     for (const row of rows) {
-        // Map your columns - only these are needed for off-take calculation
+        // Map your columns
         const dealer = row['Retailer Name'] || row['Dealer Name'] || row['dealer'];
         const part = row['Part No'] || row['part_no'] || row['Part Number'];
-        const qty = parseFloat(row['Monthly Off-take Qty'] || row['qty'] || 0);
+        const district = row['Retailer District'] || row['District'] || '';
         
-        // Optional - if phone is present in off-take file (not required)
-        const phone = row['Mobile No'] || row['Phone'] || '';
+        // Calculate total quantity from monthly columns
+        let totalQty = 0;
+        for (const month of monthColumns) {
+            const qty = parseFloat(row[month]) || 0;
+            totalQty += qty;
+        }
+        
+        // Also check if there's a Grand Total column
+        const grandTotal = parseFloat(row['Grand Total']) || 0;
+        if (grandTotal > 0 && totalQty === 0) {
+            totalQty = grandTotal;
+        }
+        
+        // Count number of months with data (for average calculation)
+        let monthCount = 0;
+        for (const month of monthColumns) {
+            if (parseFloat(row[month]) > 0) monthCount++;
+        }
+        if (monthCount === 0 && totalQty > 0) monthCount = 1;
         
         if (!dealer || !part) continue;
         
         const key = `${dealer}|${part}`;
         if (!dealerPartMap.has(key)) {
-            dealerPartMap.set(key, { dealer, part, totalQty: 0, count: 0, phone });
+            dealerPartMap.set(key, { 
+                dealer, part, totalQty: 0, count: 0, 
+                district: district,
+                phone: '', email: ''
+            });
         }
         const entry = dealerPartMap.get(key);
-        entry.totalQty += qty;
-        entry.count++;
+        entry.totalQty += totalQty;
+        entry.count += monthCount;
     }
     
     dealerData = [];
@@ -93,13 +118,14 @@ async function loadRetailerOfftakeAuto() {
         dealerData.push({
             dealer: val.dealer,
             part: val.part,
-            avgQty: val.totalQty / val.count,
+            avgQty: val.count > 0 ? val.totalQty / val.count : 0,
             phone: val.phone,
-            email: '',
-            gstin: ''
+            email: val.email,
+            district: val.district
         });
     }
     console.log(`✅ Loaded ${dealerData.length} dealer-part combinations from off-take file`);
+    console.log(`   Sample:`, dealerData.slice(0, 3));
     return dealerData;
 }
 
