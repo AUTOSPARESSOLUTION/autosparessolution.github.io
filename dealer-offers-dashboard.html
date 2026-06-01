@@ -55,7 +55,6 @@
         .btn-warning { background: #eab308; color: #0f172a; }
         .btn-whatsapp { background: #25D366; }
         .btn-purple { background: #8b5cf6; }
-        .btn-danger { background: #ef4444; }
         
         .stats-grid {
             display: grid;
@@ -130,15 +129,13 @@
     <h1><i class="fas fa-chart-line"></i> Dealer Intelligence Dashboard</h1>
     <p>Auto-learning offer system powered by AI | Auto-loads data from /data/ folder</p>
 
-    <!-- Stats Cards -->
     <div class="stats-grid" id="statsGrid">
         <div class="stat-card"><div class="stat-number" id="totalOffers">-</div><div>Total Offers</div></div>
         <div class="stat-card"><div class="stat-number" id="highDiscount">-</div><div>High Discount (10%+)</div></div>
         <div class="stat-card"><div class="stat-number" id="lowStockCount">-</div><div>Low Stock Alerts</div></div>
-        <div class="stat-card"><div class="stat-number" id="areasCount">-</div><div>Pincode Areas</div></div>
+        <div class="stat-card"><div class="stat-number" id="areasCount">-</div><div>Districts Analysed</div></div>
     </div>
 
-    <!-- Action Buttons -->
     <div class="flex" style="margin-bottom: 1rem;">
         <button class="btn btn-success" onclick="runAnalysis()"><i class="fas fa-sync"></i> Run Analysis</button>
         <button class="btn" onclick="exportOffersCSV()"><i class="fas fa-file-excel"></i> Export Offers CSV</button>
@@ -146,22 +143,19 @@
         <button class="btn btn-warning" onclick="enableAutoRun()"><i class="fas fa-calendar-week"></i> Enable Auto-Run</button>
     </div>
 
-    <!-- Offers Table -->
-    <h2><i class="fas fa-gift"></i> Active Offers (Top 50)</h2>
+    <h2><i class="fas fa-gift"></i> Active Offers</h2>
     <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
         <table id="offersTable">
             <thead>
-                <tr><th>Dealer</th><th>Part No</th><th>Avg Monthly</th><th>Pincode</th><th>Stock</th><th>Discount</th><th>Offer Type</th><th>Offer Price</th><th>Action</th></tr>
+                <tr><th>Dealer</th><th>Part No</th><th>Avg Monthly</th><th>District</th><th>Stock</th><th>Discount</th><th>Offer Type</th><th>Offer Price</th><th>Source</th><th>Action</th></tr>
             </thead>
             <tbody id="offersTbody"></tbody>
         </table>
     </div>
 
-    <!-- Area Insights -->
-    <h2><i class="fas fa-map-marker-alt"></i> Pincode Area Insights</h2>
+    <h2><i class="fas fa-map-marker-alt"></i> District Area Insights</h2>
     <div class="flex" id="areaInsights"></div>
 
-    <!-- Marketing & Brochure Section -->
     <div class="upload-section" style="margin-top: 1rem;">
         <h3><i class="fas fa-brochure"></i> Marketing Materials (Flyers / Brochures)</h3>
         <div class="flex">
@@ -173,17 +167,14 @@
         <div id="flyerList" class="flex" style="margin-top: 0.5rem;"></div>
     </div>
 
-    <!-- WhatsApp Log -->
     <h2><i class="fab fa-whatsapp"></i> WhatsApp Alert Log</h2>
     <div id="whatsappLog" class="log-container"></div>
 </div>
 
 <script>
-    // Global variables
     let currentMatches = [];
     let whatsappLog = [];
 
-    // Run analysis
     async function runAnalysis() {
         showToast("Running analysis...");
         try {
@@ -210,7 +201,7 @@
         const tbody = document.getElementById('offersTbody');
         tbody.innerHTML = '';
         if (!offers || offers.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">No offers generated. Run analysis first.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">No offers generated. Run analysis first.</td></tr>';
             return;
         }
         for (const o of offers.slice(0, 50)) {
@@ -225,7 +216,8 @@
             row.insertCell(5).innerHTML = `<span class="badge ${o.discount >= 10 ? 'badge-high' : (o.discount >= 5 ? 'badge-mid' : 'badge-low')}">${o.discount}%</span>`;
             row.insertCell(6).innerText = o.offerType;
             row.insertCell(7).innerText = `₹${o.offerPrice.toFixed(2)}`;
-            row.insertCell(8).innerHTML = `<button class="btn btn-whatsapp" style="padding:0.2rem 0.5rem;" onclick="sendSingleWhatsApp('${o.dealer}', '${o.part}')"><i class="fab fa-whatsapp"></i></button>`;
+            row.insertCell(8).innerText = o.source || (o.isProspective ? 'Excel' : 'Invoice');
+            row.insertCell(9).innerHTML = `<button class="btn btn-whatsapp" style="padding:0.2rem 0.5rem;" onclick="sendSingleWhatsApp('${o.dealer}', '${o.part}')"><i class="fab fa-whatsapp"></i></button>`;
         }
     }
 
@@ -238,7 +230,7 @@
         let html = '';
         for (const area of areas) {
             html += `<div class="area-card">
-                <strong>📍 Pincode: ${area.pincode}</strong><br>
+                <strong>📍 ${area.pincode}</strong><br>
                 Total Demand: ${area.totalDemand} units<br>
                 Dealers: ${area.dealerCount}<br>
                 Top Parts: ${area.topParts.map(p => `${p[0]} (${p[1]})`).join(', ')}
@@ -312,7 +304,6 @@
         setTimeout(() => { toast.style.display = 'none'; }, 3000);
     }
 
-    // ========== BROCHURE FUNCTIONS ==========
     async function generateAllFlyers() {
         const resultDiv = document.getElementById('flyerStatus');
         resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating flyers...';
@@ -381,8 +372,7 @@
         alert(`Opened WhatsApp for ${count} dealers. Send messages manually.`);
     }
 
-    // Auto-run on page load
     setTimeout(runAnalysis, 2000);
 </script>
 </body>
-  </html>
+</html>
