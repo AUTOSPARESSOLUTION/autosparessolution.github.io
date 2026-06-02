@@ -1,5 +1,5 @@
 // js/brochure-generator.js
-// FINAL STABLE VERSION
+// FINAL COMPLETE VERSION
 
 (function () {
 
@@ -110,8 +110,7 @@
 
             phone:
                 cleanPhone(
-                    r['Mobile No'] ||
-                    ''
+                    r['Mobile No'] || ''
                 ),
 
             district:
@@ -278,7 +277,7 @@
     }
 
     // =========================
-    // PREVIEW
+    // SHOW PREVIEW
     // =========================
     function showFlyerPreview(dealerName) {
 
@@ -373,7 +372,7 @@
     }
 
     // =========================
-    // EXPORT ALL
+    // EXPORT ALL FLYERS
     // =========================
     async function exportAllFlyers() {
 
@@ -481,7 +480,7 @@
     }
 
     // =========================
-    // GET DEALERS WITH OFFERS
+    // DEALERS WITH OFFERS
     // =========================
     async function getDealersWithOffers() {
 
@@ -525,6 +524,37 @@
     }
 
     // =========================
+    // BULK WHATSAPP
+    // =========================
+    async function sendBulkFlyersToWhatsApp() {
+
+        const dealers =
+            await getDealersWithOffers();
+
+        let count = 0;
+
+        for (const dealer of dealers) {
+
+            if (dealer.phone) {
+
+                sendFlyerWhatsApp(
+                    dealer.name
+                );
+
+                count++;
+
+                await new Promise(r =>
+                    setTimeout(r, 1500)
+                );
+            }
+        }
+
+        alert(
+            `Opened WhatsApp for ${count} dealers`
+        );
+    }
+
+    // =========================
     // GLOBAL EXPORT
     // =========================
     window.BrochureGenerator = {
@@ -543,6 +573,8 @@
         exportAllFlyers,
 
         getDealersWithOffers,
+
+        sendBulkFlyersToWhatsApp,
 
         getDealerMaster() {
             return dealerMaster;
