@@ -452,19 +452,27 @@
     // =========================
     // EXPORT GLOBAL
     // =========================
-    window.BrochureGenerator = {
+    // Export globally
+window.BrochureGenerator = {
+    loadDealerMaster,
+    loadOffers,
+    getAllDealerOffers,
+    generateWhatsAppFlyerMessage,
+    generateFullBrochureHTML,
+    sendFlyerToWhatsApp,
+    sendBulkFlyersToWhatsApp,
+    getDealersWithOffers,
+    showBrochurePreview,
+    exportAllBrochures,
 
-        loadDealerMaster,
+    // IMPORTANT FIX
+    getDealerMaster: function() {
+        return dealerMaster;
+    },
 
-        loadOffers,
-
-        getAllDealerOffers,
-
-        getDealersWithOffers,
-
-        sendFlyerToWhatsApp,
-
-        showBrochurePreview
-    };
+    getCurrentOffers: function() {
+        return currentOffers;
+    }
+};
 
 })();
