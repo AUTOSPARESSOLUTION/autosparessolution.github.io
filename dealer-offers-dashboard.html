@@ -305,72 +305,130 @@
     }
 
     async function generateAllFlyers() {
-        const resultDiv = document.getElementById('flyerStatus');
-        resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating flyers...';
-        try {
-            await BrochureGenerator.loadDealerMaster();
-            const offers = BrochureGenerator.loadOffers();
-            const dealers = BrochureGenerator.getDealerMaster();
-            const flyerList = [];
-            for (const dealer of dealers) {
-                const dealerOffers = offers.filter(o => o.dealer === dealer.name);
-                if (dealerOffers.length > 0) {
-                    flyerList.push({ name: dealer.name, phone: dealer.phone, offers: dealerOffers.length });
-                }
-            }
-            displayFlyerList(flyerList);
-            resultDiv.innerHTML = `✅ Generated flyers for ${flyerList.length} dealers with active offers. Click "Preview" to view.`;
-        } catch(err) {
-            resultDiv.innerHTML = `❌ Error: ${err.message}`;
-        }
-    }
+    const resultDiv = document.getElementById('flyerStatus');
 
-    function displayFlyerList(flyers) {
-        const container = document.getElementById('flyerList');
-        if (!container) return;
-        if (flyers.length === 0) {
-            container.innerHTML = '<div>No dealers with active offers found.</div>';
-            return;
-        }
-        let html = '';
-        for (const f of flyers) {
-            html += `<button class="btn" onclick="previewFlyer('${f.name.replace(/'/g, "\\'")}')">
-                        <i class="fas fa-eye"></i> ${f.name} (${f.offers} offers)
-                    </button>`;
-        }
-        container.innerHTML = html;
-    }
+    resultDiv.innerHTML =
+        '<i class="fas fa-spinner fa-spin"></i> Generating flyers...';
 
-    async function previewFlyer(dealerName) {
+    try {
+
         await BrochureGenerator.loadDealerMaster();
-        const offers = BrochureGenerator.loadOffers();
-        const dealer = BrochureGenerator.getDealerMaster().find(d => d.name === dealerName);
-        if (dealer) {
-            BrochureGenerator.showFlyerPreview(dealer, offers);
-        } else {
-            alert("Dealer not found");
+
+        BrochureGenerator.loadOffers();
+
+        const dealers =
+            await BrochureGenerator.getDealersWithOffers();
+
+        displayFlyerList(dealers);
+
+        resultDiv.innerHTML =
+            `✅ Generated flyers for ${dealers.length} dealers with active offers.`;
+
+    } catch(err) {
+
+        console.error(err);
+
+        resultDiv.innerHTML =
+            `❌ Error: ${err.message}`;
+    }
+}
+
+function displayFlyerList(flyers) {
+
+    const container =
+        document.getElementById('flyerList');
+
+    if (!container) return;
+
+    if (flyers.length === 0) {
+
+        container.innerHTML =
+            '<div>No dealers with active offers found.</div>';
+
+        return;
+    }
+
+    let html = '';
+
+    for (const f of flyers) {
+
+        html += `
+        <div style="margin:5px;">
+
+            <button class="btn"
+                onclick="previewFlyer('${f.name.replace(/'/g,"\\'")}')">
+
+                <i class="fas fa-eye"></i>
+                ${f.name} (${f.offerCount})
+
+            </button>
+
+            <button class="btn btn-whatsapp"
+                onclick="sendFlyer('${f.name.replace(/'/g,"\\'")}')">
+
+                <i class="fab fa-whatsapp"></i>
+
+            </button>
+
+        </div>
+        `;
+    }
+
+    container.innerHTML = html;
+}
+
+async function previewFlyer(dealerName) {
+
+    await BrochureGenerator.loadDealerMaster();
+
+    BrochureGenerator.loadOffers();
+
+    BrochureGenerator.showBrochurePreview(dealerName);
+}
+
+async function exportAllFlyersHTML() {
+
+    await BrochureGenerator.exportAllBrochures();
+}
+
+async function sendFlyer(dealerName) {
+
+    await BrochureGenerator.loadDealerMaster();
+
+    BrochureGenerator.loadOffers();
+
+    BrochureGenerator.sendFlyerToWhatsApp(dealerName);
+}
+
+async function sendBulkWhatsAppFlyers() {
+
+    await BrochureGenerator.loadDealerMaster();
+
+    BrochureGenerator.loadOffers();
+
+    const dealers =
+        await BrochureGenerator.getDealersWithOffers();
+
+    let count = 0;
+
+    for (const dealer of dealers) {
+
+        if (dealer.phone) {
+
+            BrochureGenerator.sendFlyerToWhatsApp(
+                dealer.name
+            );
+
+            count++;
+
+            await new Promise(r => setTimeout(r, 1500));
         }
     }
 
-    async function exportAllFlyersHTML() {
-        await BrochureGenerator.exportAllFlyers();
-    }
-
-    async function sendBulkWhatsAppFlyers() {
-        await BrochureGenerator.loadDealerMaster();
-        const offers = BrochureGenerator.loadOffers();
-        const dealers = BrochureGenerator.getDealerMaster();
-        let count = 0;
-        for (const dealer of dealers) {
-            const dealerOffers = offers.filter(o => o.dealer === dealer.name);
-            if (dealerOffers.length > 0 && dealer.phone) {
-                BrochureGenerator.sendFlyerWhatsApp(dealer, offers);
-                count++;
-                await new Promise(r => setTimeout(r, 1500));
-            }
-        }
-        alert(`Opened WhatsApp for ${count} dealers. Send messages manually.`);
-    }
+    alert(
+        `Opened WhatsApp for ${count} dealers`
+    );
+}
 
     setTimeout(runAnalysis, 2000);
 </script>
