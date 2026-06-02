@@ -202,17 +202,91 @@ function getAllDealerOffers(dealerName) {
 }
 
 // =====================================
-// FIND DEALER INFO
+// FIND DEALER INFO (SMART MATCH)
 // =====================================
 function findDealerInfo(dealerName) {
 
-    const normalized =
-        normalizeDealerName(dealerName);
+const normalized =
+    normalizeDealerName(dealerName);
 
-    return dealerMaster.find(d =>
+// =================================
+// 1. EXACT MATCH
+// =================================
+let dealer =
+    dealerMaster.find(d =>
 
         d.normalizedName === normalized
     );
+
+if (dealer) {
+    return dealer;
+}
+
+// =================================
+// 2. CONTAINS MATCH
+// =================================
+dealer =
+    dealerMaster.find(d =>
+
+        d.normalizedName.includes(normalized) ||
+
+        normalized.includes(d.normalizedName)
+    );
+
+if (dealer) {
+
+    console.log(
+        '⚠ Partial dealer match:',
+        dealerName,
+        '=>',
+        dealer.name
+    );
+
+    return dealer;
+}
+
+// =================================
+// 3. REMOVE SPECIAL CHARACTERS
+// =================================
+const cleanInput =
+    normalized.replace(/[^A-Z0-9 ]/g, '');
+
+dealer =
+    dealerMaster.find(d => {
+
+        const cleanDealer =
+            d.normalizedName.replace(
+                /[^A-Z0-9 ]/g,
+                ''
+            );
+
+        return (
+            cleanDealer === cleanInput
+        );
+    });
+
+if (dealer) {
+
+    console.log(
+        '⚠ Cleaned dealer match:',
+        dealerName,
+        '=>',
+        dealer.name
+    );
+
+    return dealer;
+}
+
+// =================================
+// NOT FOUND
+// =================================
+console.warn(
+    '❌ Dealer not found:',
+    dealerName
+);
+
+return null;
+
 }
 
 // =====================================
