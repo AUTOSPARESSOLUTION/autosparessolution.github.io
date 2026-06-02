@@ -1,343 +1,416 @@
-// js/brochure-generator.js
-// FINAL COMPLETE VERSION
-
+// brochure-generator.js – FINAL WORKING VERSION
 (function () {
 
-    console.log("✅ Brochure Generator Loaded");
+console.log("✅ BrochureGenerator Loaded");
 
-    let dealerMaster = [];
-    let currentOffers = [];
+let dealerMaster = [];
+let currentOffers = [];
 
-    // =========================
-    // NORMALIZE TEXT
-    // =========================
-    function normalizeText(txt) {
+// ==========================================
+// NORMALIZE TEXT
+// ==========================================
+function normalizeText(text) {
 
-        return String(txt || '')
-            .trim()
-            .toUpperCase()
-            .replace(/\s+/g, ' ')
-            .replace(/[^A-Z0-9 ]/g, '');
+    return String(text || '')
+        .toUpperCase()
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/[^A-Z0-9 ]/g, '');
+}
+
+// ==========================================
+// CLEAN PHONE
+// ==========================================
+function cleanPhone(phone) {
+
+    let p = String(phone || '')
+        .replace(/\D/g, '');
+
+    if (!p) return '';
+
+    // remove leading zero
+    if (p.startsWith('0')) {
+        p = p.substring(1);
     }
 
-    // =========================
-    // CLEAN PHONE
-    // =========================
-    function cleanPhone(phone) {
-
-        let p = String(phone || '')
-            .replace(/\D/g, '');
-
-        if (p.startsWith('0')) {
-            p = p.substring(1);
-        }
-
-        if (p.length === 10) {
-            p = '91' + p;
-        }
-
-        return p;
+    // convert to whatsapp format
+    if (p.length === 10) {
+        p = '91' + p;
     }
 
-    // =========================
-    // LOAD EXCEL
-    // =========================
-    async function loadExcelFile(url, sheetName = null) {
+    return p;
+}
 
-        try {
+// ==========================================
+// LOAD EXCEL
+// ==========================================
+async function loadExcelFile(url, sheetName = null) {
 
-            const response = await fetch(url);
+    try {
 
-            if (!response.ok) {
-                throw new Error(url);
-            }
+        const response = await fetch(url);
 
-            const buffer = await response.arrayBuffer();
-
-            const workbook = XLSX.read(buffer, {
-                type: 'array'
-            });
-
-            let sheet;
-
-            if (
-                sheetName &&
-                workbook.SheetNames.includes(sheetName)
-            ) {
-
-                sheet = workbook.Sheets[sheetName];
-
-            } else {
-
-                sheet = workbook.Sheets[
-                    workbook.SheetNames[0]
-                ];
-            }
-
-            return XLSX.utils.sheet_to_json(sheet);
-
-        } catch (err) {
-
-            console.error("Excel load error:", err);
-
-            return [];
+        if (!response.ok) {
+            throw new Error(url);
         }
+
+        const buffer = await response.arrayBuffer();
+
+        const workbook = XLSX.read(buffer, {
+            type: 'array'
+        });
+
+        let sheet;
+
+        if (
+            sheetName &&
+            workbook.SheetNames.includes(sheetName)
+        ) {
+            sheet = workbook.Sheets[sheetName];
+        } else {
+            sheet = workbook.Sheets[workbook.SheetNames[0]];
+        }
+
+        return XLSX.utils.sheet_to_json(sheet);
+
+    } catch (err) {
+
+        console.error("Excel Load Error:", err);
+
+        return [];
     }
+}
 
-    // =========================
-    // LOAD DEALER MASTER
-    // =========================
-    async function loadDealerMaster() {
+// ==========================================
+// LOAD DEALERS
+// ==========================================
+async function loadDealerMaster() {
 
-        const rows = await loadExcelFile(
-            'data/RETAILER data details.xlsx',
-            'SAPUI5 Export'
-        );
+    const rows = await loadExcelFile(
+        'data/RETAILER data details.xlsx',
+        'SAPUI5 Export'
+    );
 
-        dealerMaster = rows.map(r => ({
+    dealerMaster = rows.map(r => ({
 
-            name:
+        name:
+            r['Retailer Name'] ||
+            r['Customer Name'] ||
+            '',
+
+        normalized:
+            normalizeText(
                 r['Retailer Name'] ||
                 r['Customer Name'] ||
-                '',
+                ''
+            ),
 
-            normalizedName:
-                normalizeText(
-                    r['Retailer Name'] ||
-                    r['Customer Name'] ||
-                    ''
-                ),
+        phone:
+            cleanPhone(
+                r['Mobile No'] ||
+                ''
+            ),
 
-            phone:
-                cleanPhone(
-                    r['Mobile No'] || ''
-                ),
+        district:
+            r['District'] || '',
 
-            district:
-                r['District'] || '',
+        owner:
+            r['Owner Name'] || '',
 
-            owner:
-                r['Owner Name'] || '',
+        rlp:
+            r['RLP Code'] || ''
 
-            customerType:
-                r['Customer Type'] || '',
+    }));
 
-            rlpCode:
-                r['RLP Code'] || ''
+    console.log(
+        "✅ Dealer Master Loaded:",
+        dealerMaster.length
+    );
 
-        }));
+    return dealerMaster;
+}
 
-        console.log(
-            `✅ Dealer master loaded: ${dealerMaster.length}`
+// ==========================================
+// LOAD OFFERS
+// ==========================================
+function loadOffers() {
+
+    const data = JSON.parse(
+        localStorage.getItem('dealerOffers') || '{}'
+    );
+
+    currentOffers = data.offers || [];
+
+    console.log(
+        "✅ Offers Loaded:",
+        currentOffers.length
+    );
+
+    return currentOffers;
+}
+
+// ==========================================
+// FIND DEALER
+// ==========================================
+function findDealer(dealerName) {
+
+    const target = normalizeText(dealerName);
+
+    // exact
+    let found = dealerMaster.find(d =>
+        d.normalized === target
+    );
+
+    if (found) return found;
+
+    // contains
+    found = dealerMaster.find(d =>
+        d.normalized.includes(target) ||
+        target.includes(d.normalized)
+    );
+
+    return found || null;
+}
+
+// ==========================================
+// GET DEALER OFFERS
+// ==========================================
+function getDealerOffers(dealerName) {
+
+    const target = normalizeText(dealerName);
+
+    return currentOffers.filter(o => {
+
+        const offerDealer =
+            normalizeText(o.dealer);
+
+        return (
+            offerDealer === target ||
+            offerDealer.includes(target) ||
+            target.includes(offerDealer)
+        );
+    });
+}
+
+// ==========================================
+// WHATSAPP MESSAGE
+// ==========================================
+function generateWhatsAppMessage(dealerName) {
+
+    const offers = getDealerOffers(dealerName);
+
+    let msg = '';
+
+    msg += '⚡ AUTO SPARES SOLUTION ⚡\n\n';
+
+    msg += 'Special Offer List\n\n';
+
+    offers.forEach((o, index) => {
+
+        msg += `${index + 1}. ${o.part}\n`;
+
+        msg += `Offer Price: Rs ${o.offerPrice.toFixed(2)}\n`;
+
+        msg += `Discount: ${o.discount}%\n`;
+
+        msg += `Stock: ${o.totalStock}\n\n`;
+    });
+
+    msg += 'Reply with required parts.\n\n';
+
+    msg += '9830300193';
+
+    return msg;
+}
+
+// ==========================================
+// SEND WHATSAPP
+// ==========================================
+function sendFlyerWhatsApp(dealerName) {
+
+    const dealer = findDealer(dealerName);
+
+    if (!dealer) {
+
+        alert(
+            'Dealer not found:\n' + dealerName
         );
 
-        return dealerMaster;
+        return;
     }
 
-    // =========================
-    // LOAD OFFERS
-    // =========================
-    function loadOffers() {
+    if (!dealer.phone) {
 
-        try {
+        alert(
+            'Phone missing for:\n' + dealerName
+        );
 
-            const stored =
-                JSON.parse(
-                    localStorage.getItem('dealerOffers') || '{}'
-                );
-
-            currentOffers = stored.offers || [];
-
-            console.log(
-                `✅ Offers loaded: ${currentOffers.length}`
-            );
-
-            return currentOffers;
-
-        } catch (err) {
-
-            console.error(err);
-
-            currentOffers = [];
-
-            return [];
-        }
+        return;
     }
 
-    // =========================
-    // FIND DEALER
-    // =========================
-    function findDealer(dealerName) {
+    const msg =
+        generateWhatsAppMessage(dealerName);
 
-        const normalized =
-            normalizeText(dealerName);
+    const url =
+        `https://wa.me/${dealer.phone}?text=${encodeURIComponent(msg)}`;
 
-        return dealerMaster.find(d => {
+    window.open(url, '_blank');
+}
 
-            return (
-                d.normalizedName === normalized ||
-                normalized.includes(d.normalizedName) ||
-                d.normalizedName.includes(normalized)
-            );
-        });
-    }
+// ==========================================
+// GET DEALERS WITH OFFERS
+// ==========================================
+async function getDealersWithOffers() {
 
-    // =========================
-    // GET DEALER OFFERS
-    // =========================
-    function getDealerOffers(dealerName) {
+    await loadDealerMaster();
 
-        const normalized =
-            normalizeText(dealerName);
+    loadOffers();
 
-        return currentOffers.filter(o => {
+    const result = [];
 
-            const offerDealer =
-                normalizeText(o.dealer);
+    const uniqueDealers =
+        [...new Set(
+            currentOffers.map(o => o.dealer)
+        )];
 
-            return (
-                offerDealer === normalized ||
-                offerDealer.includes(normalized) ||
-                normalized.includes(offerDealer)
-            );
-        });
-    }
-
-    // =========================
-    // GENERATE MESSAGE
-    // =========================
-    function generateWhatsAppFlyerMessage(dealerName) {
+    uniqueDealers.forEach(name => {
 
         const offers =
-            getDealerOffers(dealerName);
+            getDealerOffers(name);
 
-        let msg = '';
-
-        msg += '⚡ AUTO SPARES SOLUTION ⚡\n\n';
-
-        msg += `Dear ${dealerName},\n\n`;
-
-        msg += 'Special Offer List\n\n';
-
-        offers.forEach((o, i) => {
-
-            msg += `${i + 1}. ${o.part}\n`;
-
-            msg += `Offer Price: Rs.${Number(o.offerPrice || 0).toFixed(2)}\n`;
-
-            msg += `Discount: ${o.discount || 0}%\n`;
-
-            msg += `Stock: ${o.totalStock || 0}\n\n`;
-        });
-
-        msg += 'Reply with required part numbers.\n\n';
-
-        msg += 'Auto Spares Solution\n9830300193';
-
-        return msg;
-    }
-
-    // =========================
-    // SEND WHATSAPP
-    // =========================
-    function sendFlyerWhatsApp(dealerName) {
+        if (offers.length === 0) return;
 
         const dealer =
-            findDealer(dealerName);
+            findDealer(name);
 
-        if (!dealer) {
+        result.push({
 
-            alert(
-                'Dealer not found:\n' +
-                dealerName
-            );
+            name: name,
 
-            return;
-        }
+            phone:
+                dealer?.phone || '',
 
-        if (!dealer.phone) {
+            district:
+                dealer?.district || '',
 
-            alert(
-                'Phone missing for:\n' +
-                dealerName
-            );
+            offers:
+                offers.length
+        });
+    });
 
-            return;
-        }
+    console.log(
+        "✅ Dealers With Offers:",
+        result.length
+    );
 
-        const msg =
-            generateWhatsAppFlyerMessage(
-                dealerName
-            );
+    return result;
+}
 
-        const url =
-            `https://wa.me/${dealer.phone}?text=${encodeURIComponent(msg)}`;
+// ==========================================
+// SHOW BROCHURE
+// ==========================================
+function showFlyerPreview(dealerName) {
 
-        window.open(url, '_blank');
+    const offers =
+        getDealerOffers(dealerName);
+
+    let html = `
+    <html>
+    <head>
+    <title>${dealerName}</title>
+
+    <style>
+
+    body{
+        font-family:Arial;
+        padding:20px;
     }
 
-    // =========================
-    // SHOW PREVIEW
-    // =========================
-    function showFlyerPreview(dealerName) {
+    table{
+        width:100%;
+        border-collapse:collapse;
+    }
+
+    th,td{
+        border:1px solid #ccc;
+        padding:8px;
+    }
+
+    th{
+        background:#f4f4f4;
+    }
+
+    </style>
+
+    </head>
+
+    <body>
+
+    <h2>AUTO SPARES SOLUTION</h2>
+
+    <h3>${dealerName}</h3>
+
+    <table>
+
+    <tr>
+        <th>Part No</th>
+        <th>Offer Price</th>
+        <th>Discount</th>
+        <th>Stock</th>
+    </tr>
+    `;
+
+    offers.forEach(o => {
+
+        html += `
+        <tr>
+            <td>${o.part}</td>
+            <td>Rs ${o.offerPrice.toFixed(2)}</td>
+            <td>${o.discount}%</td>
+            <td>${o.totalStock}</td>
+        </tr>
+        `;
+    });
+
+    html += `
+    </table>
+
+    </body>
+    </html>
+    `;
+
+    const win =
+        window.open('', '_blank');
+
+    win.document.write(html);
+
+    win.document.close();
+}
+
+// ==========================================
+// EXPORT ALL
+// ==========================================
+async function exportAllFlyers() {
+
+    const dealers =
+        await getDealersWithOffers();
+
+    let html = `
+    <html>
+    <body>
+    `;
+
+    dealers.forEach(d => {
 
         const offers =
-            getDealerOffers(dealerName);
+            getDealerOffers(d.name);
 
-        const dealer =
-            findDealer(dealerName);
-
-        let html = `
-        <html>
-        <head>
-        <meta charset="UTF-8">
-
-        <title>${dealerName}</title>
-
-        <style>
-
-        body{
-            font-family:Arial;
-            padding:20px;
-        }
-
-        table{
-            width:100%;
-            border-collapse:collapse;
-        }
-
-        th,td{
-            border:1px solid #ccc;
-            padding:8px;
-        }
-
-        th{
-            background:#f4f4f4;
-        }
-
-        h1{
-            color:#0f172a;
-        }
-
-        </style>
-
-        </head>
-
-        <body>
-
-        <h1>AUTO SPARES SOLUTION</h1>
-
-        <h2>${dealerName}</h2>
-
-        <p>
-        Phone:
-        ${dealer?.phone || ''}
-        </p>
-
-        <table>
+        html += `
+        <h2>${d.name}</h2>
+        <table border="1" cellspacing="0" cellpadding="5">
 
         <tr>
-            <th>Part No</th>
+            <th>Part</th>
             <th>Offer Price</th>
             <th>Discount</th>
             <th>Stock</th>
@@ -349,240 +422,61 @@
             html += `
             <tr>
                 <td>${o.part}</td>
-                <td>Rs.${Number(o.offerPrice || 0).toFixed(2)}</td>
-                <td>${o.discount || 0}%</td>
-                <td>${o.totalStock || 0}</td>
+                <td>Rs ${o.offerPrice.toFixed(2)}</td>
+                <td>${o.discount}%</td>
+                <td>${o.totalStock}</td>
             </tr>
             `;
         });
 
         html += `
         </table>
-
-        </body>
-        </html>
+        <br><br>
         `;
+    });
 
-        const win =
-            window.open('', '_blank');
+    html += `
+    </body>
+    </html>
+    `;
 
-        win.document.write(html);
-
-        win.document.close();
-    }
-
-    // =========================
-    // EXPORT ALL FLYERS
-    // =========================
-    async function exportAllFlyers() {
-
-        await loadDealerMaster();
-
-        loadOffers();
-
-        const uniqueDealers =
-            [...new Set(
-                currentOffers.map(o => o.dealer)
-            )];
-
-        let html = `
-        <html>
-        <head>
-        <meta charset="UTF-8">
-        <title>All Flyers</title>
-        </head>
-        <body>
-        `;
-
-        uniqueDealers.forEach(name => {
-
-            const offers =
-                getDealerOffers(name);
-
-            if (offers.length === 0) return;
-
-            html += `
-            <div style="page-break-after:always;padding:20px;">
-            `;
-
-            html += `
-            <h1>AUTO SPARES SOLUTION</h1>
-            `;
-
-            html += `
-            <h2>${name}</h2>
-            `;
-
-            html += `
-            <table border="1" cellpadding="5" cellspacing="0" width="100%">
-            `;
-
-            html += `
-            <tr>
-                <th>Part</th>
-                <th>Offer Price</th>
-                <th>Discount</th>
-                <th>Stock</th>
-            </tr>
-            `;
-
-            offers.forEach(o => {
-
-                html += `
-                <tr>
-                    <td>${o.part}</td>
-                    <td>Rs.${Number(o.offerPrice || 0).toFixed(2)}</td>
-                    <td>${o.discount || 0}%</td>
-                    <td>${o.totalStock || 0}</td>
-                </tr>
-                `;
-            });
-
-            html += `
-            </table>
-            </div>
-            `;
+    const blob =
+        new Blob([html], {
+            type: 'text/html'
         });
 
-        html += `
-        </body>
-        </html>
-        `;
+    const url =
+        URL.createObjectURL(blob);
 
-        const blob =
-            new Blob(
-                [html],
-                {
-                    type: 'text/html;charset=utf-8'
-                }
-            );
+    const a =
+        document.createElement('a');
 
-        const url =
-            URL.createObjectURL(blob);
+    a.href = url;
 
-        const a =
-            document.createElement('a');
+    a.download =
+        'dealer_flyers.html';
 
-        a.href = url;
+    a.click();
 
-        a.download =
-            'dealer_flyers.html';
+    URL.revokeObjectURL(url);
+}
 
-        document.body.appendChild(a);
+// ==========================================
+// GLOBAL EXPORT
+// ==========================================
+window.BrochureGenerator = {
 
-        a.click();
+    loadDealerMaster,
+    loadOffers,
+    getDealersWithOffers,
+    getDealerOffers,
+    sendFlyerWhatsApp,
+    showFlyerPreview,
+    exportAllFlyers,
 
-        document.body.removeChild(a);
+    getDealerMaster: () => dealerMaster,
 
-        URL.revokeObjectURL(url);
-
-        alert('✅ Flyers exported');
-    }
-
-    // =========================
-    // DEALERS WITH OFFERS
-    // =========================
-    async function getDealersWithOffers() {
-
-        await loadDealerMaster();
-
-        loadOffers();
-
-        const uniqueDealers =
-            [...new Set(
-                currentOffers.map(o => o.dealer)
-            )];
-
-        const result = [];
-
-        uniqueDealers.forEach(name => {
-
-            const offers =
-                getDealerOffers(name);
-
-            if (offers.length === 0) return;
-
-            const dealer =
-                findDealer(name);
-
-            result.push({
-
-                name: name,
-
-                phone:
-                    dealer?.phone || '',
-
-                district:
-                    dealer?.district || '',
-
-                offerCount:
-                    offers.length
-            });
-        });
-
-        return result;
-    }
-
-    // =========================
-    // BULK WHATSAPP
-    // =========================
-    async function sendBulkFlyersToWhatsApp() {
-
-        const dealers =
-            await getDealersWithOffers();
-
-        let count = 0;
-
-        for (const dealer of dealers) {
-
-            if (dealer.phone) {
-
-                sendFlyerWhatsApp(
-                    dealer.name
-                );
-
-                count++;
-
-                await new Promise(r =>
-                    setTimeout(r, 1500)
-                );
-            }
-        }
-
-        alert(
-            `Opened WhatsApp for ${count} dealers`
-        );
-    }
-
-    // =========================
-    // GLOBAL EXPORT
-    // =========================
-    window.BrochureGenerator = {
-
-        loadDealerMaster,
-        loadOffers,
-
-        getDealerOffers,
-
-        generateWhatsAppFlyerMessage,
-
-        sendFlyerWhatsApp,
-
-        showFlyerPreview,
-
-        exportAllFlyers,
-
-        getDealersWithOffers,
-
-        sendBulkFlyersToWhatsApp,
-
-        getDealerMaster() {
-            return dealerMaster;
-        },
-
-        getCurrentOffers() {
-            return currentOffers;
-        }
-    };
+    getCurrentOffers: () => currentOffers
+};
 
 })();
