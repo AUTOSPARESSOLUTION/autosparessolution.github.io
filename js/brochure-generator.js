@@ -8,9 +8,9 @@ console.log("✅ BrochureGenerator Loaded");
 let dealerMaster = [];
 let currentOffers = [];
 
-// =====================================================
+// ========================================
 // NORMALIZE TEXT
-// =====================================================
+// ========================================
 function normalizeText(text) {
 
     return String(text || '')
@@ -20,9 +20,9 @@ function normalizeText(text) {
         .replace(/[^A-Z0-9 ]/g, '');
 }
 
-// =====================================================
+// ========================================
 // CLEAN PHONE
-// =====================================================
+// ========================================
 function cleanPhone(phone) {
 
     let p = String(phone || '')
@@ -30,12 +30,10 @@ function cleanPhone(phone) {
 
     if (!p) return '';
 
-    // remove leading zero
     if (p.startsWith('0')) {
         p = p.substring(1);
     }
 
-    // convert 10 digit to whatsapp format
     if (p.length === 10) {
         p = '91' + p;
     }
@@ -43,9 +41,9 @@ function cleanPhone(phone) {
     return p;
 }
 
-// =====================================================
+// ========================================
 // LOAD EXCEL FILE
-// =====================================================
+// ========================================
 async function loadExcelFile(url, sheetName = null) {
 
     try {
@@ -53,7 +51,7 @@ async function loadExcelFile(url, sheetName = null) {
         const response = await fetch(url);
 
         if (!response.ok) {
-            throw new Error(`Failed to load ${url}`);
+            throw new Error(url);
         }
 
         const arrayBuffer =
@@ -86,15 +84,18 @@ async function loadExcelFile(url, sheetName = null) {
 
     } catch (err) {
 
-        console.error(err);
+        console.error(
+            'Excel Load Error:',
+            err
+        );
 
         return [];
     }
 }
 
-// =====================================================
+// ========================================
 // LOAD DEALER MASTER
-// =====================================================
+// ========================================
 async function loadDealerMaster() {
 
     const rows =
@@ -126,27 +127,21 @@ async function loadDealerMaster() {
             row['District'] || '',
 
         owner:
-            row['Owner Name'] || '',
-
-        customerType:
-            row['Customer Type'] || '',
-
-        rlpCode:
-            row['RLP Code'] || ''
+            row['Owner Name'] || ''
 
     }));
 
     console.log(
-        "✅ Dealer Master Loaded:",
+        '✅ Dealer Master Loaded:',
         dealerMaster.length
     );
 
     return dealerMaster;
 }
 
-// =====================================================
+// ========================================
 // LOAD OFFERS
-// =====================================================
+// ========================================
 function loadOffers() {
 
     try {
@@ -162,7 +157,7 @@ function loadOffers() {
             data.offers || [];
 
         console.log(
-            "✅ Offers Loaded:",
+            '✅ Offers Loaded:',
             currentOffers.length
         );
 
@@ -178,9 +173,9 @@ function loadOffers() {
     }
 }
 
-// =====================================================
+// ========================================
 // FIND DEALER
-// =====================================================
+// ========================================
 function findDealer(dealerName) {
 
     const target =
@@ -191,6 +186,7 @@ function findDealer(dealerName) {
         dealerMaster.find(d =>
 
             d.normalized.includes(target) ||
+
             target.includes(d.normalized)
         );
 
@@ -222,9 +218,9 @@ function findDealer(dealerName) {
     return found;
 }
 
-// =====================================================
+// ========================================
 // GET DEALER OFFERS
-// =====================================================
+// ========================================
 function getDealerOffers(dealerName) {
 
     const target =
@@ -246,9 +242,9 @@ function getDealerOffers(dealerName) {
     });
 }
 
-// =====================================================
+// ========================================
 // GENERATE WHATSAPP MESSAGE
-// =====================================================
+// ========================================
 function generateWhatsAppMessage(dealerName) {
 
     const offers =
@@ -295,9 +291,9 @@ function generateWhatsAppMessage(dealerName) {
     return msg;
 }
 
-// =====================================================
-// SEND TO WHATSAPP
-// =====================================================
+// ========================================
+// SEND SINGLE WHATSAPP
+// ========================================
 function sendFlyerWhatsApp(dealerName) {
 
     const dealer =
@@ -327,9 +323,40 @@ function sendFlyerWhatsApp(dealerName) {
     window.open(url, '_blank');
 }
 
-// =====================================================
-// SHOW BROCHURE PREVIEW
-// =====================================================
+// ========================================
+// SEND BULK WHATSAPP
+// ========================================
+async function sendBulkFlyersToWhatsApp() {
+
+    const dealers =
+        await getDealersWithOffers();
+
+    let count = 0;
+
+    for (const dealer of dealers) {
+
+        if (dealer.phone) {
+
+            sendFlyerWhatsApp(
+                dealer.name
+            );
+
+            count++;
+
+            await new Promise(r =>
+                setTimeout(r, 1200)
+            );
+        }
+    }
+
+    alert(
+        `Opened WhatsApp for ${count} dealers`
+    );
+}
+
+// ========================================
+// SHOW FLYER PREVIEW
+// ========================================
 function showFlyerPreview(dealerName) {
 
     const offers =
@@ -426,9 +453,9 @@ function showFlyerPreview(dealerName) {
     win.document.close();
 }
 
-// =====================================================
+// ========================================
 // GET DEALERS WITH OFFERS
-// =====================================================
+// ========================================
 async function getDealersWithOffers() {
 
     await loadDealerMaster();
@@ -472,16 +499,16 @@ async function getDealersWithOffers() {
     });
 
     console.log(
-        "✅ Dealers With Offers:",
+        '✅ Dealers With Offers:',
         result.length
     );
 
     return result;
 }
 
-// =====================================================
+// ========================================
 // EXPORT ALL FLYERS
-// =====================================================
+// ========================================
 async function exportAllFlyers() {
 
     const dealers =
@@ -539,7 +566,9 @@ async function exportAllFlyers() {
     const blob =
         new Blob(
             [html],
-            { type: 'text/html' }
+            {
+                type: 'text/html'
+            }
         );
 
     const url =
@@ -558,9 +587,9 @@ async function exportAllFlyers() {
     URL.revokeObjectURL(url);
 }
 
-// =====================================================
+// ========================================
 // GLOBAL EXPORT
-// =====================================================
+// ========================================
 window.BrochureGenerator = {
 
     loadDealerMaster,
@@ -568,6 +597,7 @@ window.BrochureGenerator = {
     getDealerOffers,
     getDealersWithOffers,
     sendFlyerWhatsApp,
+    sendBulkFlyersToWhatsApp,
     showFlyerPreview,
     exportAllFlyers,
 
