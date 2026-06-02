@@ -1,25 +1,41 @@
-// dealer-intelligence.js – Final Integrated Dealer Intelligence System
+// dealer-intelligence.js
 (function () {
 
     console.log("Dealer Intelligence System loaded");
 
+    // ===================================================
+    // CONFIGURATION
+    // ===================================================
+
     const CONFIG = {
+
+        // MAX EXTRA OFFER = 6%
+
         volumeTiers: [
-            { min: 50, discount: 15, label: "Premium Bulk" },
-            { min: 30, discount: 12, label: "High Volume" },
-            { min: 20, discount: 10, label: "Large Volume" },
-            { min: 10, discount: 7, label: "Medium Volume" },
-            { min: 5, discount: 5, label: "Regular" },
-            { min: 2, discount: 3, label: "Occasional" }
+
+            { min: 50, discount: 6, label: "Strategic Dealer" },
+            { min: 20, discount: 5, label: "Bulk Dealer" },
+            { min: 10, discount: 4, label: "Regular Dealer" },
+            { min: 5, discount: 3, label: "Growing Dealer" },
+            { min: 2, discount: 2, label: "Active Dealer" },
+            { min: 0, discount: 1, label: "Welcome Offer" }
+
         ],
+
         areaMultipliers: {
-            high: 1.5,
-            medium: 1.2,
+            high: 1.2,
+            medium: 1.1,
             low: 1.0
         },
+
         lowStockThreshold: 10,
+
         analysisMonths: 6
     };
+
+    // ===================================================
+    // GLOBAL DATA
+    // ===================================================
 
     let dealerPartAverages = new Map();
     let areaDemand = new Map();
@@ -29,12 +45,14 @@
     let dealerData = [];
     let retailerMaster = new Map();
 
-    // =========================================================
-    // LOAD EXCEL
-    // =========================================================
+    // ===================================================
+    // LOAD EXCEL FILE
+    // ===================================================
 
     async function loadExcelFile(url, sheetName = null) {
+
         try {
+
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -49,23 +67,31 @@
 
             let sheet;
 
-            if (sheetName && workbook.SheetNames.includes(sheetName)) {
+            if (
+                sheetName &&
+                workbook.SheetNames.includes(sheetName)
+            ) {
+
                 sheet = workbook.Sheets[sheetName];
+
             } else {
+
                 sheet = workbook.Sheets[workbook.SheetNames[0]];
             }
 
             return XLSX.utils.sheet_to_json(sheet);
 
         } catch (err) {
+
             console.warn(`Could not load ${url}`, err);
+
             return [];
         }
     }
 
-    // =========================================================
+    // ===================================================
     // LOAD RETAILER MASTER
-    // =========================================================
+    // ===================================================
 
     async function loadRetailerMaster() {
 
@@ -79,42 +105,39 @@
         for (const row of rows) {
 
             const dealer =
-                row['Retailer Name'] ||
-                '';
+                String(
+                    row['Retailer Name'] || ''
+                ).trim();
 
             if (!dealer) continue;
 
-            retailerMaster.set(dealer.trim(), {
+            retailerMaster.set(dealer, {
 
-                dealer: dealer.trim(),
-
-                rlpCode:
-                    row['RLP Code'] || '',
-
-                customerType:
-                    row['Customer Type'] || '',
-
-                ownerName:
-                    row['Owner Name'] || '',
-
-                subDistrict:
-                    row['Sub Dist Dsc'] || '',
+                dealer: dealer,
 
                 district:
                     row['District'] || '',
 
                 mobile:
-                    row['Mobile No'] || ''
+                    row['Mobile No'] || '',
 
+                ownerName:
+                    row['Owner Name'] || '',
+
+                customerType:
+                    row['Customer Type'] || '',
+
+                rlpCode:
+                    row['RLP Code'] || ''
             });
         }
 
         console.log(`✅ Retailer master loaded: ${retailerMaster.size}`);
     }
 
-    // =========================================================
+    // ===================================================
     // LOAD DISTRIBUTOR STOCK
-    // =========================================================
+    // ===================================================
 
     async function loadDistributorStockAuto() {
 
@@ -138,40 +161,31 @@
                 part: String(part).trim(),
 
                 distributor:
-                    row['Distributor Name'] ||
-                    row['distributor'] ||
-                    '',
+                    row['Distributor Name'] || '',
 
                 stock:
                     parseFloat(
-                        row['Available Stock'] ||
-                        row['stock'] ||
-                        0
+                        row['Available Stock'] || 0
                     ),
 
                 price:
                     parseFloat(
-                        row['Price'] ||
-                        row['price'] ||
-                        0
+                        row['Price'] || 0
                     ),
 
                 leadTime:
                     parseFloat(
-                        row['Lead Time (Days)'] ||
-                        row['leadTime'] ||
-                        3
+                        row['Lead Time (Days)'] || 3
                     )
-
             });
         }
 
         console.log(`✅ Distributor stock loaded`);
     }
 
-    // =========================================================
-    // LOAD RETAILER SALES DATA
-    // =========================================================
+    // ===================================================
+    // LOAD RETAILER SALES
+    // ===================================================
 
     async function loadRetailerOfftakeAuto() {
 
@@ -186,21 +200,22 @@
                 sheetName
             );
 
-            const dealerPartMap = new Map();
-
             for (const row of rows) {
 
                 const dealer =
-                    row['Retailer Name'] || '';
+                    String(
+                        row['Retailer Name'] || ''
+                    ).trim();
 
                 const part =
-                    row['Part No'] || '';
+                    String(
+                        row['Part No'] || ''
+                    ).trim();
 
                 if (!dealer || !part) continue;
 
                 const district =
-                    row['Retailer District'] ||
-                    '';
+                    row['Retailer District'] || '';
 
                 const months = [
                     'JULY',
@@ -225,73 +240,52 @@
                 }
 
                 const grandTotal =
-                    parseFloat(row['Grand Total']) || 0;
+                    parseFloat(
+                        row['Grand Total']
+                    ) || 0;
 
-                if (grandTotal > 0 && totalQty === 0) {
+                if (
+                    grandTotal > 0 &&
+                    totalQty === 0
+                ) {
+
                     totalQty = grandTotal;
                 }
 
-                if (monthCount === 0 && totalQty > 0) {
+                if (
+                    monthCount === 0 &&
+                    totalQty > 0
+                ) {
+
                     monthCount = 1;
                 }
 
-                const key =
-                    `${dealer}|${part}`;
-
-                if (!dealerPartMap.has(key)) {
-
-                    dealerPartMap.set(key, {
-
-                        dealer,
-                        part,
-                        district,
-                        totalQty: 0,
-                        count: 0
-
-                    });
-                }
-
-                const entry =
-                    dealerPartMap.get(key);
-
-                entry.totalQty += totalQty;
-                entry.count += monthCount;
-            }
-
-            for (const [key, val] of dealerPartMap) {
+                const avgQty =
+                    monthCount > 0
+                        ? totalQty / monthCount
+                        : 0;
 
                 const master =
-                    retailerMaster.get(
-                        val.dealer.trim()
-                    ) || {};
+                    retailerMaster.get(dealer) || {};
 
                 dealerData.push({
 
-                    dealer: val.dealer,
+                    dealer: dealer,
 
-                    part: val.part,
+                    part: part,
 
-                    avgQty:
-                        val.count > 0
-                            ? val.totalQty / val.count
-                            : 0,
+                    avgQty: avgQty,
 
                     district:
-                        val.district ||
+                        district ||
                         master.district ||
                         '',
 
                     mobile:
                         master.mobile || '',
 
-                    customerType:
-                        master.customerType || '',
-
-                    ownerName:
-                        master.ownerName || '',
-
-                    sourceSheet:
-                        sheetName
+                    source:
+                        'Excel Offtake'
                 });
             }
         }
@@ -299,9 +293,9 @@
         console.log(`✅ Retailer sales loaded: ${dealerData.length}`);
     }
 
-    // =========================================================
-    // LOAD STOCK
-    // =========================================================
+    // ===================================================
+    // LOAD MY STOCK
+    // ===================================================
 
     async function loadMyStock() {
 
@@ -320,8 +314,7 @@
 
             for (const row of rows) {
 
-                const cols =
-                    row.split(',');
+                const cols = row.split(',');
 
                 if (!cols[0]) continue;
 
@@ -340,18 +333,17 @@
                 });
             }
 
-            console.log(`✅ Stock loaded`);
+            console.log(`✅ My stock loaded: ${currentStock.size}`);
 
         } catch (err) {
 
             console.error(err);
-
         }
     }
 
-    // =========================================================
+    // ===================================================
     // AREA DEMAND
-    // =========================================================
+    // ===================================================
 
     function updateAreaFromOfftake() {
 
@@ -367,9 +359,10 @@
                 areaDemand.set(district, {
 
                     totalQty: 0,
-                    partWise: new Map(),
-                    dealerCount: new Set()
 
+                    partWise: new Map(),
+
+                    dealerCount: new Set()
                 });
             }
 
@@ -383,7 +376,9 @@
             );
 
             area.partWise.set(
+
                 dealer.part,
+
                 (
                     area.partWise.get(
                         dealer.part
@@ -395,9 +390,9 @@
         console.log(`✅ Area demand updated`);
     }
 
-    // =========================================================
+    // ===================================================
     // ANALYSE INVOICES
-    // =========================================================
+    // ===================================================
 
     function analyseInvoices() {
 
@@ -415,30 +410,13 @@
             }
 
             let dealerName =
-                inv.customerName ||
-                '';
+                inv.customerName || '';
 
-            if (
-                !dealerName &&
-                inv.customerEmail
-            ) {
+            if (!dealerName) {
 
-                const email =
-                    inv.customerEmail;
-
-                const matched =
-                    Array.from(
-                        retailerMaster.values()
-                    ).find(r =>
-                        r.mobile === inv.customerPhone
-                    );
-
-                if (matched) {
-                    dealerName =
-                        matched.dealer;
-                } else {
-                    dealerName = email;
-                }
+                dealerName =
+                    inv.customerEmail ||
+                    'Guest';
             }
 
             for (const item of inv.items) {
@@ -452,13 +430,13 @@
 
                     part: item.part,
 
-                    avgQty: item.qty,
+                    avgQty:
+                        parseFloat(item.qty) || 0,
 
                     pincode:
                         inv.customerPincode || '',
 
-                    district:
-                        '',
+                    district: '',
 
                     source:
                         'Invoice History'
@@ -469,9 +447,9 @@
         console.log(`✅ Invoice analysis complete`);
     }
 
-    // =========================================================
+    // ===================================================
     // AREA MULTIPLIER
-    // =========================================================
+    // ===================================================
 
     function getAreaDemandMultiplier(area) {
 
@@ -493,9 +471,9 @@
         return CONFIG.areaMultipliers.low;
     }
 
-    // =========================================================
+    // ===================================================
     // CALCULATE OFFER
-    // =========================================================
+    // ===================================================
 
     function calculateOffer(
         dealer,
@@ -508,24 +486,16 @@
         const stock =
             currentStock.get(part)?.stock || 0;
 
+        // ONLY OFFER AVAILABLE STOCK
+
+        if (stock <= 0) {
+            return null;
+        }
+
         const originalPrice =
             currentStock.get(part)?.price || 0;
 
-        const distStock =
-            distributorStock.filter(
-                d => d.part === part
-            );
-
-        const totalDistStock =
-            distStock.reduce(
-                (sum, d) => sum + d.stock,
-                0
-            );
-
-        const totalStock =
-            stock + totalDistStock;
-
-        let volumeTier = null;
+        let volumeTier = CONFIG.volumeTiers[5];
 
         for (const tier of CONFIG.volumeTiers) {
 
@@ -535,10 +505,6 @@
 
                 break;
             }
-        }
-
-        if (!volumeTier) {
-            return null;
         }
 
         let discount =
@@ -552,71 +518,56 @@
         discount =
             Math.min(
                 discount * multiplier,
-                25
+                6
             );
 
-        let offerType =
-            volumeTier.label;
+        discount =
+            Math.round(discount);
 
-        if (
-            totalStock <
-            CONFIG.lowStockThreshold &&
-            totalStock > 0
-        ) {
-
-            offerType =
-                'Limited Stock';
-
-            discount =
-                Math.min(discount, 8);
-
-        }
-
-        if (totalStock === 0) {
-
-            offerType =
-                'Out of Stock – Pre-order';
-
-            discount = 5;
-        }
+        const offerPrice =
+            originalPrice *
+            (1 - discount / 100);
 
         return {
 
             dealer,
+
             part,
+
             avgQty,
 
-            district,
+            pincode: district,
+
+            district: district,
 
             myStock: stock,
 
-            distributorStock:
-                totalDistStock,
+            distributorStock: 0,
 
-            totalStock,
+            totalStock: stock,
 
-            discount:
-                Math.round(discount),
+            discount: discount,
 
-            offerType,
+            offerType:
+                volumeTier.label,
+
+            minQty: 1,
 
             originalPrice,
 
-            offerPrice:
-                originalPrice *
-                (
-                    1 - discount / 100
-                ),
+            offerPrice,
 
             source
         };
     }
 
-    // =========================================================
+    // ===================================================
     // GENERATE OFFERS
-    // =========================================================
+    // ===================================================
 
     async function generateOffers() {
+
+        areaDemand.clear();
 
         await loadRetailerMaster();
 
@@ -632,13 +583,17 @@
 
         const offers = [];
 
-        // Invoice offers
+        const processed = new Set();
+
+        // ==========================================
+        // INVOICE RETAILERS
+        // ==========================================
 
         for (const [key, data] of dealerPartAverages) {
 
             const master =
                 retailerMaster.get(
-                    data.dealer.trim()
+                    String(data.dealer).trim()
                 ) || {};
 
             const offer =
@@ -656,22 +611,27 @@
                 );
 
             if (offer) {
+
                 offers.push(offer);
+
+                processed.add(
+                    `${offer.dealer}|${offer.part}`
+                );
             }
         }
 
-        // Excel offers
+        // ==========================================
+        // EXCEL RETAILERS
+        // ==========================================
 
         for (const retailer of dealerData) {
 
-            const exists =
-                offers.find(
-                    o =>
-                        o.dealer === retailer.dealer &&
-                        o.part === retailer.part
-                );
+            const uniqueKey =
+                `${retailer.dealer}|${retailer.part}`;
 
-            if (exists) continue;
+            if (processed.has(uniqueKey)) {
+                continue;
+            }
 
             const offer =
                 calculateOffer(
@@ -688,7 +648,10 @@
                 );
 
             if (offer) {
+
                 offers.push(offer);
+
+                processed.add(uniqueKey);
             }
         }
 
@@ -706,13 +669,14 @@
         return offers;
     }
 
-    // =========================================================
+    // ===================================================
     // SAVE
-    // =========================================================
+    // ===================================================
 
     function saveOffersToStorage() {
 
         localStorage.setItem(
+
             'dealerOffers',
 
             JSON.stringify({
@@ -729,9 +693,9 @@
         );
     }
 
-    // =========================================================
-    // EXPORT
-    // =========================================================
+    // ===================================================
+    // EXPORT CSV
+    // ===================================================
 
     function exportOffersCSV() {
 
@@ -745,23 +709,32 @@
         for (const o of activeOffers) {
 
             csv +=
+
                 `"${o.dealer}",` +
+
                 `${o.part},` +
+
                 `${o.avgQty.toFixed(1)},` +
+
                 `"${o.district}",` +
+
                 `${o.totalStock},` +
+
                 `${o.discount},` +
+
                 `"${o.offerType}",` +
+
                 `${o.offerPrice.toFixed(2)},` +
+
                 `"${o.source}"\n`;
         }
 
         return csv;
     }
 
-    // =========================================================
-    // WHATSAPP
-    // =========================================================
+    // ===================================================
+    // WHATSAPP MESSAGE
+    // ===================================================
 
     function generateWhatsAppMessage(offer) {
 
@@ -770,17 +743,17 @@ Dear ${offer.dealer},
 
 🎉 Special Offer for ${offer.part}
 
-Average Monthly Demand:
-${offer.avgQty.toFixed(1)}
-
-Discount:
+Extra Discount:
 ${offer.discount}% OFF
 
 Offer Price:
 ₹${offer.offerPrice.toFixed(2)}
 
+Available Stock:
+${offer.totalStock}
+
 District:
-${offer.district}
+${offer.district || 'N/A'}
 
 Reply YES to confirm order.
 
@@ -789,9 +762,9 @@ https://autosparessolution.com
 `;
     }
 
-    // =========================================================
+    // ===================================================
     // AREA INSIGHTS
-    // =========================================================
+    // ===================================================
 
     function getAreaInsights() {
 
@@ -824,13 +797,13 @@ https://autosparessolution.com
         );
     }
 
-    // =========================================================
+    // ===================================================
     // RUN
-    // =========================================================
+    // ===================================================
 
     async function runFullAnalysis() {
 
-        console.log("Running analysis...");
+        console.log("Running full analysis...");
 
         const offers =
             await generateOffers();
@@ -843,10 +816,29 @@ https://autosparessolution.com
             offersGenerated:
                 offers.length,
 
+            highDiscountOffers:
+                offers.filter(
+                    o => o.discount >= 5
+                ).length,
+
+            lowStockAlerts:
+                offers.filter(
+                    o =>
+                        o.totalStock <
+                        CONFIG.lowStockThreshold
+                ).length,
+
+            areasAnalysed:
+                areaDemand.size,
+
             offers:
                 offers.slice(0, 20)
         };
     }
+
+    // ===================================================
+    // AUTO RUN
+    // ===================================================
 
     setTimeout(async () => {
 
@@ -854,9 +846,9 @@ https://autosparessolution.com
 
     }, 3000);
 
-    // =========================================================
+    // ===================================================
     // GLOBAL
-    // =========================================================
+    // ===================================================
 
     window.DealerIntelligence = {
 
