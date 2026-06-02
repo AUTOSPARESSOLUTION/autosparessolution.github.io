@@ -15,7 +15,7 @@
         .summary-card h3 { margin: 0; font-size: 14px; color: #6c757d; }
         .summary-card .amount { font-size: 24px; font-weight: bold; color: #0a7c71; margin-top: 5px; }
         .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
-        .filter-group { flex: 1; min-width: 200px; }
+        .filter-group { flex: 1; min-width: 180px; }
         label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #495057; }
         select, input { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 6px; }
         button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin: 0 5px 5px 0; }
@@ -26,6 +26,7 @@
         .export-btn { background: #6c757d; }
         .export-btn:hover { background: #5a6268; }
         .empty-message { text-align: center; padding: 40px; color: #6c757d; }
+        .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; display: none; font-family: monospace; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -70,14 +71,18 @@
         <div class="filter-group">
             <button onclick="loadPurchases()"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
+            <button onclick="toggleDebug()" class="export-btn"><i class="fas fa-bug"></i> Debug</button>
         </div>
     </div>
+    
+    <!-- Debug Panel -->
+    <div id="debugPanel" class="debug"></div>
     
     <!-- Purchase Table -->
     <div id="purchaseTableContainer">
         <table id="purchaseTable">
             <thead>
-                <tr><th>PO No</th><th>Date</th><th>Supplier</th><th>Part No</th><th>Qty</th><th>Rate (₹)</th><th>GST (18%)</th><th>Total (₹)</th></tr>
+                <tr><th>PO/Invoice No</th><th>Date</th><th>Supplier</th><th>Part No</th><th>Qty</th><th>Rate (₹)</th><th>GST (18%)</th><th>Total (₹)</th></tr>
             </thead>
             <tbody id="purchaseTbody"></tbody>
         </table>
@@ -86,47 +91,31 @@
 
 <script>
     let allPurchases = [];
+    let suppliers = [];
     
-    // Helper function to get all purchase invoices from localStorage
-    function getPurchaseInvoices() {
-        const purchases = [];
-        
-        // Method 1: Check for 'allPurchases' (set by generateDocument)
-        const allPurchasesStorage = JSON.parse(localStorage.getItem('allPurchases') || '[]');
-        allPurchasesStorage.forEach(po => {
-            purchases.push({
-                poNo: po.poNo,
-                date: po.date,
-                supplierName: po.supplierName,
-                items: po.items || []
-            });
-        });
-        
-        // Method 2: Check for 'purchaseInvoices' (used by stock ledger)
+    // Load purchases from localStorage
+    function loadPurchases() {
+        // Read from purchaseInvoices (main storage used by purchase-invoice-stock.html)
         const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
-        purchaseInvoices.forEach(inv => {
-            purchases.push({
-                poNo: inv.invoiceNo || inv.poNo || 'PO-' + Date.now(),
-                date: inv.date,
-                supplierName: inv.supplierName || 'Supplier',
-                items: inv.items || []
-            });
-        });
         
-        // Remove duplicates by PO number
+        // Also read from allPurchases (fallback)
+        const allPurchasesStorage = JSON.parse(localStorage.getItem('allPurchases') || '[]');
+        
+        // Read suppliers for supplier names
+        suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+        
+        // Combine both sources
+        allPurchases = [...purchaseInvoices, ...allPurchasesStorage];
+        
+        // Remove duplicates by invoice number
         const unique = new Map();
-        for (const p of purchases) {
-            if (p.poNo && !unique.has(p.poNo)) {
-                unique.set(p.poNo, p);
+        for (const p of allPurchases) {
+            const invNo = p.invoiceNo || p.poNo;
+            if (invNo && !unique.has(invNo)) {
+                unique.set(invNo, p);
             }
         }
-        
-        return Array.from(unique.values());
-    }
-    
-    // Load and display purchases
-    function loadPurchases() {
-        allPurchases = getPurchaseInvoices();
+        allPurchases = Array.from(unique.values());
         
         // Apply filters
         const supplierFilter = document.getElementById('supplierFilter').value.toLowerCase();
@@ -137,12 +126,18 @@
         let filtered = allPurchases;
         
         if (supplierFilter) {
-            filtered = filtered.filter(p => p.supplierName?.toLowerCase().includes(supplierFilter));
+            filtered = filtered.filter(p => {
+                const supplier = getSupplierName(p);
+                return supplier.toLowerCase().includes(supplierFilter);
+            });
         }
         
         if (partFilter) {
             filtered = filtered.filter(p => 
-                p.items.some(item => item.part?.toLowerCase().includes(partFilter))
+                (p.items || []).some(item => {
+                    const part = item.part || item.productId || '';
+                    return part.toLowerCase().includes(partFilter);
+                })
             );
         }
         
@@ -156,6 +151,22 @@
         
         displayPurchases(filtered);
         populateSupplierFilter();
+        
+        // Debug info
+        console.log(`Total purchases loaded: ${allPurchases.length}`);
+        console.log('First purchase:', allPurchases[0]);
+    }
+    
+    function getSupplierName(purchase) {
+        // Try to get supplier name from various possible fields
+        if (purchase.supplierName) return purchase.supplierName;
+        if (purchase.supplierEmail) {
+            const supplier = suppliers.find(s => s.email === purchase.supplierEmail);
+            if (supplier) return supplier.name;
+            return purchase.supplierEmail;
+        }
+        if (purchase.supplier?.name) return purchase.supplier.name;
+        return 'Unknown';
     }
     
     function displayPurchases(purchases) {
@@ -173,22 +184,29 @@
         let totalPurchase = 0, totalGST = 0, grandTotal = 0;
         
         for (const po of purchases) {
-            const date = new Date(po.date).toLocaleDateString('en-IN');
-            for (const item of po.items) {
-                const subtotal = item.price * item.qty;
+            const date = po.date ? new Date(po.date).toLocaleDateString('en-IN') : '-';
+            const supplierName = getSupplierName(po);
+            const items = po.items || [];
+            
+            for (const item of items) {
+                const part = item.part || item.productId || item.sku || '-';
+                const qty = item.quantity || item.qty || 0;
+                const rate = item.cost || item.price || 0;
+                const subtotal = rate * qty;
                 const gst = subtotal * 0.18;
                 const lineTotal = subtotal + gst;
+                
                 totalPurchase += subtotal;
                 totalGST += gst;
                 grandTotal += lineTotal;
                 
                 const row = tbody.insertRow();
-                row.insertCell(0).innerText = po.poNo || 'N/A';
+                row.insertCell(0).innerText = po.invoiceNo || po.poNo || 'N/A';
                 row.insertCell(1).innerText = date;
-                row.insertCell(2).innerText = po.supplierName || 'Unknown';
-                row.insertCell(3).innerText = item.part || '-';
-                row.insertCell(4).innerText = item.qty;
-                row.insertCell(5).innerText = `₹${item.price.toFixed(2)}`;
+                row.insertCell(2).innerText = supplierName;
+                row.insertCell(3).innerText = part;
+                row.insertCell(4).innerText = qty;
+                row.insertCell(5).innerText = `₹${rate.toFixed(2)}`;
                 row.insertCell(6).innerText = `₹${gst.toFixed(2)}`;
                 row.insertCell(7).innerText = `₹${lineTotal.toFixed(2)}`;
             }
@@ -200,14 +218,15 @@
     }
     
     function populateSupplierFilter() {
-        const suppliers = new Set();
+        const suppliersSet = new Set();
         allPurchases.forEach(p => {
-            if (p.supplierName) suppliers.add(p.supplierName);
+            const name = getSupplierName(p);
+            if (name && name !== 'Unknown') suppliersSet.add(name);
         });
         const select = document.getElementById('supplierFilter');
         const currentValue = select.value;
         select.innerHTML = '<option value="">-- All Suppliers --</option>';
-        [...suppliers].sort().forEach(s => {
+        [...suppliersSet].sort().forEach(s => {
             select.innerHTML += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
         });
         select.value = currentValue;
@@ -220,13 +239,13 @@
             return;
         }
         
-        let csv = "PO No,Date,Supplier,Part No,Qty,Rate (₹),GST (18%),Total (₹)\n";
+        let csv = "PO/Invoice No,Date,Supplier,Part No,Qty,Rate (₹),GST (18%),Total (₹)\n";
         const rows = tbody.querySelectorAll('tr');
         
         for (const row of rows) {
             const cols = row.querySelectorAll('td');
             if (cols.length === 8) {
-                csv += `${cols[0].innerText},${cols[1].innerText},${cols[2].innerText},${cols[3].innerText},${cols[4].innerText},${cols[5].innerText},${cols[6].innerText},${cols[7].innerText}\n`;
+                csv += `"${cols[0].innerText}",${cols[1].innerText},"${cols[2].innerText}","${cols[3].innerText}",${cols[4].innerText},${cols[5].innerText},${cols[6].innerText},${cols[7].innerText}\n`;
             }
         }
         
@@ -237,6 +256,17 @@
         a.download = `purchase_register_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
+    }
+    
+    function toggleDebug() {
+        const panel = document.getElementById('debugPanel');
+        if (panel.style.display === 'none' || !panel.style.display) {
+            panel.innerHTML = `<strong>Raw purchaseInvoices (first 3):</strong><br><pre>${JSON.stringify(allPurchases.slice(0, 3), null, 2)}</pre>
+            <strong>Suppliers:</strong><br><pre>${JSON.stringify(suppliers.slice(0, 3), null, 2)}</pre>`;
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
     }
     
     function escapeHtml(str) {
@@ -253,4 +283,4 @@
     loadPurchases();
 </script>
 </body>
-</html>
+    </html>
