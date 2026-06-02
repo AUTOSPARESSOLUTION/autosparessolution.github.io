@@ -1,4 +1,4 @@
-// brochure-generator.js – FINAL INTELLIGENT VERSION
+// brochure-generator.js – FINAL WORKING VERSION
 (function () {
 
     console.log("✅ Brochure Generator Loaded");
@@ -67,12 +67,10 @@
 
         if (!p) return '';
 
-        // remove leading zero
         if (p.startsWith('0')) {
             p = p.substring(1);
         }
 
-        // convert 10 digit to whatsapp format
         if (p.length === 10) {
             p = '91' + p;
         }
@@ -452,27 +450,29 @@
     // =========================
     // EXPORT GLOBAL
     // =========================
-    // Export globally
-window.BrochureGenerator = {
-    loadDealerMaster,
-    loadOffers,
-    getAllDealerOffers,
-    generateWhatsAppFlyerMessage,
-    generateFullBrochureHTML,
-    sendFlyerToWhatsApp,
-    sendBulkFlyersToWhatsApp,
-    getDealersWithOffers,
-    showBrochurePreview,
-    exportAllBrochures,
+    window.BrochureGenerator = {
 
-    // IMPORTANT FIX
-    getDealerMaster: function() {
-        return dealerMaster;
-    },
+        loadDealerMaster,
 
-    getCurrentOffers: function() {
-        return currentOffers;
-    }
-};
+        loadOffers,
+
+        getAllDealerOffers,
+
+        generateWhatsAppFlyerMessage,
+
+        sendFlyerToWhatsApp,
+
+        getDealersWithOffers,
+
+        showBrochurePreview,
+
+        getDealerMaster: function () {
+            return dealerMaster;
+        },
+
+        getCurrentOffers: function () {
+            return currentOffers;
+        }
+    };
 
 })();
