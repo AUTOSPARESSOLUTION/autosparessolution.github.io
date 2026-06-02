@@ -3,55 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Purchase Register</title>
+    <title>Purchase Register – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: 'Roboto', sans-serif; background: #0f172a; color: #e2e8f0; padding: 1rem; }
-        .container { max-width: 1400px; margin: 0 auto; background: #1e293b; padding: 1.5rem; border-radius: 1rem; }
-        h1 { color: #facc15; }
-        .summary { background: #0f172a; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex; gap: 2rem; flex-wrap: wrap; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1rem; overflow-x: auto; display: block; }
-        th, td { border: 1px solid #334155; padding: 0.5rem; text-align: left; }
-        th { background: #0f172a; color: #facc15; }
-        .btn { background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; cursor: pointer; }
-        .empty-message { text-align: center; padding: 2rem; color: #94a3b8; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #0a7c71; }
+        .summary { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 30px; flex-wrap: wrap; }
+        .summary-card { flex: 1; min-width: 150px; text-align: center; }
+        .summary-card h3 { margin: 0; font-size: 14px; color: #6c757d; }
+        .summary-card .amount { font-size: 24px; font-weight: bold; color: #0a7c71; margin-top: 5px; }
+        .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
+        .filter-group { flex: 1; min-width: 200px; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #495057; }
+        select, input { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin: 0 5px 5px 0; }
+        button:hover { background: #09645a; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
+        th { background: #0a7c71; color: white; position: sticky; top: 0; }
+        .export-btn { background: #6c757d; }
+        .export-btn:hover { background: #5a6268; }
+        .empty-message { text-align: center; padding: 40px; color: #6c757d; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1><i class="fas fa-truck"></i> Purchase Register</h1>
+    
+    <!-- Summary Cards -->
     <div class="summary">
-        <div><strong>Total Purchase (Taxable):</strong> ₹<span id="totalPurchase">0</span></div>
-        <div><strong>Total GST Paid:</strong> ₹<span id="totalGST">0</span></div>
-        <div><strong>Grand Total:</strong> ₹<span id="grandTotal">0</span></div>
+        <div class="summary-card">
+            <h3>Total Purchase (Taxable)</h3>
+            <div class="amount" id="totalPurchase">₹0</div>
+        </div>
+        <div class="summary-card">
+            <h3>Total GST Paid</h3>
+            <div class="amount" id="totalGST">₹0</div>
+        </div>
+        <div class="summary-card">
+            <h3>Grand Total</h3>
+            <div class="amount" id="grandTotal">₹0</div>
+        </div>
     </div>
-    <div style="overflow-x: auto;" id="tableContainer">
+    
+    <!-- Filters -->
+    <div class="filter-box">
+        <div class="filter-group">
+            <label>Filter by Supplier</label>
+            <select id="supplierFilter">
+                <option value="">-- All Suppliers --</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Filter by Part No</label>
+            <input type="text" id="partFilter" placeholder="Enter part number...">
+        </div>
+        <div class="filter-group">
+            <label>Date Range</label>
+            <div style="display: flex; gap: 5px;">
+                <input type="date" id="fromDate" placeholder="From">
+                <input type="date" id="toDate" placeholder="To">
+            </div>
+        </div>
+        <div class="filter-group">
+            <button onclick="loadPurchases()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
+        </div>
+    </div>
+    
+    <!-- Purchase Table -->
+    <div id="purchaseTableContainer">
         <table id="purchaseTable">
             <thead>
-                <tr><th>PO No</th><th>Date</th><th>Supplier</th><th>Part No</th><th>Qty</th><th>Rate</th><th>GST</th><th>Total</th></tr>
+                <tr><th>PO No</th><th>Date</th><th>Supplier</th><th>Part No</th><th>Qty</th><th>Rate (₹)</th><th>GST (18%)</th><th>Total (₹)</th></tr>
             </thead>
-            <tbody></tbody>
+            <tbody id="purchaseTbody"></tbody>
         </table>
     </div>
-    <button class="btn" onclick="exportToCSV()"><i class="fas fa-file-excel"></i> Export CSV</button>
 </div>
+
 <script>
+    let allPurchases = [];
+    
+    // Helper function to get all purchase invoices from localStorage
+    function getPurchaseInvoices() {
+        const purchases = [];
+        
+        // Method 1: Check for 'allPurchases' (set by generateDocument)
+        const allPurchasesStorage = JSON.parse(localStorage.getItem('allPurchases') || '[]');
+        allPurchasesStorage.forEach(po => {
+            purchases.push({
+                poNo: po.poNo,
+                date: po.date,
+                supplierName: po.supplierName,
+                items: po.items || []
+            });
+        });
+        
+        // Method 2: Check for 'purchaseInvoices' (used by stock ledger)
+        const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        purchaseInvoices.forEach(inv => {
+            purchases.push({
+                poNo: inv.invoiceNo || inv.poNo || 'PO-' + Date.now(),
+                date: inv.date,
+                supplierName: inv.supplierName || 'Supplier',
+                items: inv.items || []
+            });
+        });
+        
+        // Remove duplicates by PO number
+        const unique = new Map();
+        for (const p of purchases) {
+            if (p.poNo && !unique.has(p.poNo)) {
+                unique.set(p.poNo, p);
+            }
+        }
+        
+        return Array.from(unique.values());
+    }
+    
+    // Load and display purchases
     function loadPurchases() {
-        const allPurchases = JSON.parse(localStorage.getItem('allPurchases') || '[]');
-        const tbody = document.querySelector('#purchaseTable tbody');
+        allPurchases = getPurchaseInvoices();
+        
+        // Apply filters
+        const supplierFilter = document.getElementById('supplierFilter').value.toLowerCase();
+        const partFilter = document.getElementById('partFilter').value.toLowerCase();
+        const fromDate = document.getElementById('fromDate').value;
+        const toDate = document.getElementById('toDate').value;
+        
+        let filtered = allPurchases;
+        
+        if (supplierFilter) {
+            filtered = filtered.filter(p => p.supplierName?.toLowerCase().includes(supplierFilter));
+        }
+        
+        if (partFilter) {
+            filtered = filtered.filter(p => 
+                p.items.some(item => item.part?.toLowerCase().includes(partFilter))
+            );
+        }
+        
+        if (fromDate) {
+            filtered = filtered.filter(p => new Date(p.date) >= new Date(fromDate));
+        }
+        
+        if (toDate) {
+            filtered = filtered.filter(p => new Date(p.date) <= new Date(toDate));
+        }
+        
+        displayPurchases(filtered);
+        populateSupplierFilter();
+    }
+    
+    function displayPurchases(purchases) {
+        const tbody = document.getElementById('purchaseTbody');
         tbody.innerHTML = '';
         
-        if (allPurchases.length === 0) {
-            const container = document.getElementById('tableContainer');
-            container.innerHTML = '<div class="empty-message"><i class="fas fa-info-circle"></i> No purchase invoices found.<br><br>Generate a purchase invoice from the main website to see data here.</div>';
-            document.getElementById('totalPurchase').innerText = '0';
-            document.getElementById('totalGST').innerText = '0';
-            document.getElementById('grandTotal').innerText = '0';
+        if (purchases.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-message">No purchase invoices found.<br><br>Generate a purchase invoice from the main website to see data here.</td></tr>';
+            document.getElementById('totalPurchase').innerHTML = '₹0';
+            document.getElementById('totalGST').innerHTML = '₹0';
+            document.getElementById('grandTotal').innerHTML = '₹0';
             return;
         }
         
         let totalPurchase = 0, totalGST = 0, grandTotal = 0;
-        for (const po of allPurchases) {
+        
+        for (const po of purchases) {
             const date = new Date(po.date).toLocaleDateString('en-IN');
             for (const item of po.items) {
                 const subtotal = item.price * item.qty;
@@ -60,42 +181,75 @@
                 totalPurchase += subtotal;
                 totalGST += gst;
                 grandTotal += lineTotal;
+                
                 const row = tbody.insertRow();
                 row.insertCell(0).innerText = po.poNo || 'N/A';
                 row.insertCell(1).innerText = date;
                 row.insertCell(2).innerText = po.supplierName || 'Unknown';
-                row.insertCell(3).innerText = item.part;
+                row.insertCell(3).innerText = item.part || '-';
                 row.insertCell(4).innerText = item.qty;
                 row.insertCell(5).innerText = `₹${item.price.toFixed(2)}`;
                 row.insertCell(6).innerText = `₹${gst.toFixed(2)}`;
                 row.insertCell(7).innerText = `₹${lineTotal.toFixed(2)}`;
             }
         }
-        document.getElementById('totalPurchase').innerText = totalPurchase.toFixed(2);
-        document.getElementById('totalGST').innerText = totalGST.toFixed(2);
-        document.getElementById('grandTotal').innerText = grandTotal.toFixed(2);
+        
+        document.getElementById('totalPurchase').innerHTML = `₹${totalPurchase.toFixed(2)}`;
+        document.getElementById('totalGST').innerHTML = `₹${totalGST.toFixed(2)}`;
+        document.getElementById('grandTotal').innerHTML = `₹${grandTotal.toFixed(2)}`;
+    }
+    
+    function populateSupplierFilter() {
+        const suppliers = new Set();
+        allPurchases.forEach(p => {
+            if (p.supplierName) suppliers.add(p.supplierName);
+        });
+        const select = document.getElementById('supplierFilter');
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">-- All Suppliers --</option>';
+        [...suppliers].sort().forEach(s => {
+            select.innerHTML += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
+        });
+        select.value = currentValue;
     }
     
     function exportToCSV() {
-        const allPurchases = JSON.parse(localStorage.getItem('allPurchases') || '[]');
-        if (allPurchases.length === 0) { alert('No data to export'); return; }
-        let csv = "PO No,Date,Supplier,Part No,Qty,Rate,GST,Total\n";
-        for (const po of allPurchases) {
-            const date = new Date(po.date).toLocaleDateString();
-            for (const item of po.items) {
-                const gst = (item.price * item.qty) * 0.18;
-                csv += `${po.poNo},${date},${po.supplierName},${item.part},${item.qty},${item.price},${gst.toFixed(2)},${((item.price * item.qty) + gst).toFixed(2)}\n`;
+        const tbody = document.getElementById('purchaseTbody');
+        if (tbody.children.length === 0 || tbody.innerHTML.includes('No purchase invoices')) {
+            alert('No data to export');
+            return;
+        }
+        
+        let csv = "PO No,Date,Supplier,Part No,Qty,Rate (₹),GST (18%),Total (₹)\n";
+        const rows = tbody.querySelectorAll('tr');
+        
+        for (const row of rows) {
+            const cols = row.querySelectorAll('td');
+            if (cols.length === 8) {
+                csv += `${cols[0].innerText},${cols[1].innerText},${cols[2].innerText},${cols[3].innerText},${cols[4].innerText},${cols[5].innerText},${cols[6].innerText},${cols[7].innerText}\n`;
             }
         }
+        
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'purchase_register.csv';
+        a.download = `purchase_register_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
     }
     
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+    
+    // Load on page load
     loadPurchases();
 </script>
 </body>
