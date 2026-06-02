@@ -1,209 +1,673 @@
-// brochure-generator.js – Generate personalised flyers, brochures, WhatsApp messages
+// brochure-generator.js – Complete Brochure + WhatsApp + Correct Excel Dealer Data
 (function() {
-    console.log("Brochure Generator loaded");
 
-    let dealerMaster = [];
-    let currentOffers = [];
+console.log("Brochure Generator loaded");
 
-    async function loadExcelFile(url) {
-        try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`Failed to load ${url}`);
-            const arrayBuffer = await response.arrayBuffer();
-            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            return XLSX.utils.sheet_to_json(sheet);
-        } catch(err) {
-            console.warn(`Could not load ${url}:`, err);
-            return [];
+let dealerMaster = [];
+let currentOffers = [];
+
+// =========================
+// LOAD EXCEL FILE
+// =========================
+async function loadExcelFile(url, sheetName = null) {
+
+    try {
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load ${url}`);
         }
-    }
 
-    async function loadDealerMaster() {
-        try {
-            const rows = await loadExcelFile('data/dealer-master.xlsx');
-            dealerMaster = rows.map(row => ({
-                name: row['Retailer Name'] || row['Dealer Name'] || row['dealer'] || row['name'],
-                address: row['Address'] || row['address'] || '',
-                phone: row['Mobile No'] || row['Phone'] || row['phone'] || '',
-                email: row['Email'] || row['email'] || '',
-                city: row['District'] || row['City'] || row['city'] || '',
-                ownerName: row['Owner Name'] || '',
-                rlpCode: row['RLP Code'] || '',
-                customerType: row['Customer Type'] || '',
-                subDist: row['Sub Dist Dsc'] || ''
-            }));
-            console.log(`✅ Loaded ${dealerMaster.length} dealers from master file`);
-            return dealerMaster;
-        } catch(err) {
-            console.warn("Dealer master not loaded:", err);
-            return [];
+        const arrayBuffer = await response.arrayBuffer();
+
+        const workbook = XLSX.read(arrayBuffer, {
+            type: 'array'
+        });
+
+        let sheet;
+
+        if (sheetName && workbook.SheetNames.includes(sheetName)) {
+
+            sheet = workbook.Sheets[sheetName];
+
+            console.log(`✅ Loaded sheet: ${sheetName}`);
+
+        } else {
+
+            sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            console.log(`✅ Loaded first sheet: ${workbook.SheetNames[0]}`);
         }
-    }
 
-    function loadOffers() {
-        const offersData = JSON.parse(localStorage.getItem('dealerOffers') || '{}');
+        return XLSX.utils.sheet_to_json(sheet);
+
+    } catch(err) {
+
+        console.warn(`Could not load ${url}:`, err);
+
+        return [];
+    }
+}
+
+// =========================
+// LOAD DEALER MASTER
+// =========================
+async function loadDealerMaster() {
+
+    try {
+
+        let masterData = [];
+
+        // MAIN FILE
+        let sapRows = await loadExcelFile(
+            'data/RETAILER data details.xlsx',
+            'SAPUI5 Export'
+        );
+
+        if (sapRows.length > 0) {
+
+            masterData = sapRows;
+
+            console.log(`✅ Loaded retailer master from SAPUI5 Export`);
+        }
+
+        // FALLBACK
+        if (masterData.length === 0) {
+
+            console.warn("⚠️ Retailer master not found. Using demo data.");
+
+            masterData = [{
+                'Retailer Name': 'Demo Dealer',
+                'Mobile No': '919830300193',
+                'District': 'Kolkata'
+            }];
+        }
+
+        dealerMaster = masterData.map(row => {
+
+            const cleanName = (
+                row['Retailer Name'] ||
+                row['Dealer Name'] ||
+                row['dealer'] ||
+                row['name'] ||
+                row['Name'] ||
+                ''
+            ).toString().trim();
+
+            let cleanPhone = (
+                row['Mobile No'] ||
+                row['Phone'] ||
+                row['phone'] ||
+                ''
+            ).toString();
+
+            // REMOVE SPECIAL CHARS
+            cleanPhone = cleanPhone.replace(/\D/g, '');
+
+            // ADD INDIA CODE
+            if (cleanPhone.length === 10) {
+                cleanPhone = '91' + cleanPhone;
+            }
+
+            return {
+
+                name: cleanName,
+
+                address:
+                    row['Address'] ||
+                    '',
+
+                phone: cleanPhone,
+
+                email:
+                    row['Email'] ||
+                    '',
+
+                city:
+                    row['District'] ||
+                    row['City'] ||
+                    '',
+
+                ownerName:
+                    row['Owner Name'] ||
+                    '',
+
+                rlpCode:
+                    row['RLP Code'] ||
+                    '',
+
+                customerType:
+                    row['Customer Type'] ||
+                    '',
+
+                subDist:
+                    row['Sub Dist Dsc'] ||
+                    ''
+            };
+        });
+
+        // REMOVE BLANK
+        dealerMaster = dealerMaster.filter(d => d.name);
+
+        console.log(`✅ Loaded ${dealerMaster.length} dealers`);
+
+        return dealerMaster;
+
+    } catch(err) {
+
+        console.error("Dealer master error:", err);
+
+        dealerMaster = [{
+            name: "Demo Dealer",
+            phone: "919830300193",
+            address: "Demo Address",
+            city: "Kolkata"
+        }];
+
+        return dealerMaster;
+    }
+}
+
+// =========================
+// LOAD OFFERS
+// =========================
+function loadOffers() {
+
+    try {
+
+        const offersData = JSON.parse(
+            localStorage.getItem('dealerOffers') || '{}'
+        );
+
         currentOffers = offersData.offers || [];
+
         console.log(`✅ Loaded ${currentOffers.length} offers`);
+
         return currentOffers;
+
+    } catch(err) {
+
+        console.error("Failed to load offers:", err);
+
+        currentOffers = [];
+
+        return [];
+    }
+}
+
+// =========================
+// MATCH DEALER OFFERS
+// =========================
+function getAllDealerOffers(dealerName) {
+
+    const cleanDealer = dealerName
+        .toString()
+        .trim()
+        .toLowerCase();
+
+    return currentOffers.filter(o => {
+
+        const offerDealer = (o.dealer || '')
+            .toString()
+            .trim()
+            .toLowerCase();
+
+        return offerDealer === cleanDealer;
+    });
+}
+
+// =========================
+// ESCAPE HTML
+// =========================
+function escapeHtml(str) {
+
+    if (!str) return '';
+
+    return str.replace(/[&<>]/g, function(m) {
+
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+
+        return m;
+    });
+}
+
+// =========================
+// WHATSAPP MESSAGE
+// =========================
+function generateWhatsAppFlyerMessage(dealer, offers) {
+
+    const dealerOffers = getAllDealerOffers(dealer.name);
+
+    const sortedOffers = [...dealerOffers]
+        .sort((a,b) => b.discount - a.discount)
+        .slice(0, 30);
+
+    let message = `*⚡ AUTO SPARES SOLUTION ⚡*\\n\\n`;
+
+    message += `Dear ${dealer.name},\\n\\n`;
+
+    if (sortedOffers.length === 0) {
+
+        message += `No active offers available now.\\n\\n`;
+
+    } else {
+
+        message += `*SPECIAL OFFERS FOR YOU*\\n`;
+        message += `━━━━━━━━━━━━━━━━━━\\n\\n`;
+
+        for (const offer of sortedOffers) {
+
+            message += `🔹 *${offer.part}*\\n`;
+
+            message += `📊 Avg: ${offer.avgQty.toFixed(1)} units/month\\n`;
+
+            if (offer.discount > 0) {
+
+                message += `✨ ${offer.discount}% OFF\\n`;
+            }
+
+            message += `💰 Offer Price: ₹${offer.offerPrice.toFixed(2)}\\n`;
+
+            message += `📦 Stock: ${offer.totalStock}\\n\\n`;
+        }
     }
 
-    function generateFlyerHTML(dealer, offers) {
-        const dealerOffers = offers.filter(o => o.dealer === dealer.name);
-        const topOffers = dealerOffers.slice(0, 5);
-        
-        let offersHtml = '';
-        for (const offer of topOffers) {
-            offersHtml += `
-                <div style="background: rgba(241,196,15,0.1); padding: 12px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #facc15;">
-                    <div style="font-size: 16px; font-weight: bold;">🎯 ${offer.part}</div>
-                    <div style="font-size: 14px;">Your monthly average: ${offer.avgQty.toFixed(1)} units</div>
-                    <div style="font-size: 18px; color: #facc15; margin-top: 5px;">
-                        ${offer.discount > 0 ? `${offer.discount}% OFF` : '⚠️ Low Stock Alert'}
-                    </div>
-                    <div>💰 Offer Price: ₹${offer.offerPrice.toFixed(2)} (was ₹${offer.originalPrice.toFixed(2)})</div>
-                    <div>📦 Stock Available: ${offer.totalStock} units</div>
+    message += `━━━━━━━━━━━━━━━━━━\\n`;
+
+    message += `📞 9830300193\\n`;
+
+    message += `🌐 autosparessolution.com\\n\\n`;
+
+    message += `Reply YES with part numbers to place order.`;
+
+    return message;
+}
+
+// =========================
+// HTML BROCHURE
+// =========================
+function generateFullBrochureHTML(dealer, offers) {
+
+    const dealerOffers = getAllDealerOffers(dealer.name);
+
+    const sortedOffers = [...dealerOffers]
+        .sort((a,b) => b.discount - a.discount)
+        .slice(0, 30);
+
+    let offersHtml = '';
+
+    for (const offer of sortedOffers) {
+
+        offersHtml += `
+            <div style="
+                background:#f8fafc;
+                padding:12px;
+                margin:10px 0;
+                border-radius:8px;
+                border-left:4px solid #facc15;
+            ">
+                <div style="font-weight:bold;font-size:16px;">
+                    ${escapeHtml(offer.part)}
                 </div>
-            `;
-        }
-        
-        if (topOffers.length === 0) {
-            offersHtml = '<div style="padding: 20px; text-align: center;">No active offers at this time.</div>';
-        }
-        
-        return `<!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Special Offer for ${dealer.name}</title>
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body {
-                    font-family: 'Roboto', 'Segoe UI', sans-serif;
-                    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    min-height: 100vh;
-                    padding: 20px;
-                }
-                .flyer {
-                    max-width: 600px;
-                    width: 100%;
-                    background: #ffffff;
-                    border-radius: 20px;
-                    overflow: hidden;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-                }
-                .flyer-header {
-                    background: linear-gradient(135deg, #0a2e3a, #0a4b5e);
-                    color: white;
-                    padding: 20px;
-                    text-align: center;
-                }
-                .flyer-header h1 { color: #facc15; font-size: 24px; margin-bottom: 5px; }
-                .flyer-header p { font-size: 12px; opacity: 0.8; }
-                .dealer-info { background: #f8f9fa; padding: 15px; border-bottom: 1px solid #e0e0e0; }
-                .dealer-name { font-size: 20px; font-weight: bold; color: #0a2e3a; }
-                .dealer-address { font-size: 12px; color: #666; margin-top: 5px; }
-                .offers-section { padding: 20px; }
-                .section-title { font-size: 18px; font-weight: bold; color: #0a2e3a; margin-bottom: 15px; border-left: 4px solid #facc15; padding-left: 10px; }
-                .cta-section { background: #facc15; padding: 15px; text-align: center; }
-                .cta-section a { display: inline-block; background: #25D366; color: white; text-decoration: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; margin: 5px; }
-                .cta-section .call-btn { background: #3b82f6; }
-                .footer { background: #1e293b; color: #94a3b8; text-align: center; padding: 12px; font-size: 10px; }
-                @media print { body { background: white; padding: 0; } .flyer { box-shadow: none; } }
-            </style>
-        </head>
-        <body>
-            <div class="flyer">
-                <div class="flyer-header">
-                    <h1>⚡ AUTO SPARES SOLUTION ⚡</h1>
-                    <p>Premium Auto Parts Wholesaler</p>
+
+                <div>
+                    Avg Monthly:
+                    ${offer.avgQty.toFixed(1)}
                 </div>
-                <div class="dealer-info">
-                    <div class="dealer-name">${dealer.name}</div>
-                    <div class="dealer-address">${dealer.address || ''} | ${dealer.city || ''}</div>
-                    <div class="dealer-address">📞 ${dealer.phone || ''} | 📧 ${dealer.email || ''}</div>
+
+                <div>
+                    Discount:
+                    ${offer.discount}%
                 </div>
-                <div class="offers-section">
-                    <div class="section-title">🎁 Exclusive Offers For You</div>
-                    ${offersHtml}
+
+                <div>
+                    Offer Price:
+                    ₹${offer.offerPrice.toFixed(2)}
                 </div>
-                <div class="cta-section">
-                    <a href="https://wa.me/${dealer.phone || '919830300193'}?text=I%20want%20to%20place%20order" target="_blank">📱 Order on WhatsApp</a>
-                    <a href="tel:${dealer.phone || '9830300193'}" class="call-btn">📞 Call Now</a>
-                </div>
-                <div class="footer">
-                    Auto Spares Solution | contact@autosparessolution.com | 9830300193
+
+                <div>
+                    Stock:
+                    ${offer.totalStock}
                 </div>
             </div>
+        `;
+    }
+
+    if (sortedOffers.length === 0) {
+
+        offersHtml = `
+            <div style="padding:20px;text-align:center;">
+                No active offers available.
+            </div>
+        `;
+    }
+
+    return `
+    <!DOCTYPE html>
+
+    <html>
+
+    <head>
+
+        <meta charset="UTF-8">
+
+        <meta name="viewport"
+              content="width=device-width, initial-scale=1.0">
+
+        <title>${escapeHtml(dealer.name)}</title>
+
+    </head>
+
+    <body style="
+        font-family:Arial,sans-serif;
+        background:#f1f5f9;
+        padding:20px;
+    ">
+
+        <div style="
+            max-width:800px;
+            margin:auto;
+            background:white;
+            border-radius:15px;
+            overflow:hidden;
+            box-shadow:0 5px 20px rgba(0,0,0,0.15);
+        ">
+
+            <div style="
+                background:#0f172a;
+                color:white;
+                padding:25px;
+                text-align:center;
+            ">
+
+                <h1 style="color:#facc15;">
+                    ⚡ AUTO SPARES SOLUTION ⚡
+                </h1>
+
+                <div>
+                    Premium Auto Parts Wholesaler
+                </div>
+            </div>
+
+            <div style="padding:20px;">
+
+                <h2>
+                    ${escapeHtml(dealer.name)}
+                </h2>
+
+                <div>
+                    📍 ${escapeHtml(dealer.city || '')}
+                </div>
+
+                <div>
+                    📞 ${dealer.phone || ''}
+                </div>
+
+                <div>
+                    📧 ${dealer.email || ''}
+                </div>
+
+                <hr style="margin:20px 0;">
+
+                <h3>
+                    🎁 Special Offers
+                </h3>
+
+                ${offersHtml}
+
+            </div>
+
+            <div style="
+                background:#facc15;
+                text-align:center;
+                padding:20px;
+            ">
+
+                <a href="https://wa.me/${dealer.phone || '919830300193'}"
+                   target="_blank"
+                   style="
+                        background:#25D366;
+                        color:white;
+                        text-decoration:none;
+                        padding:12px 25px;
+                        border-radius:50px;
+                        display:inline-block;
+                        font-weight:bold;
+                   ">
+
+                    📱 Order on WhatsApp
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </body>
+
+    </html>
+    `;
+}
+
+// =========================
+// SEND SINGLE WHATSAPP
+// =========================
+function sendFlyerToWhatsApp(dealer, offers) {
+
+    const message = generateWhatsAppFlyerMessage(dealer, offers);
+
+    const encodedMsg = encodeURIComponent(message);
+
+    let phone = dealer.phone || '919830300193';
+
+    phone = phone.toString().replace(/\D/g, '');
+
+    if (phone.length === 10) {
+        phone = '91' + phone;
+    }
+
+    window.open(
+        `https://wa.me/${phone}?text=${encodedMsg}`,
+        '_blank'
+    );
+}
+
+// =========================
+// SEND BULK WHATSAPP
+// =========================
+async function sendBulkFlyersToWhatsApp() {
+
+    await loadDealerMaster();
+
+    const offers = loadOffers();
+
+    let count = 0;
+
+    for (const dealer of dealerMaster) {
+
+        const dealerOffers =
+            getAllDealerOffers(dealer.name);
+
+        if (
+            dealerOffers.length > 0 &&
+            dealer.phone
+        ) {
+
+            sendFlyerToWhatsApp(dealer, offers);
+
+            count++;
+
+            await new Promise(r => setTimeout(r, 1500));
+        }
+    }
+
+    alert(`✅ Opened WhatsApp for ${count} dealers`);
+}
+
+// =========================
+// GET DEALERS WITH OFFERS
+// =========================
+async function getDealersWithOffers() {
+
+    await loadDealerMaster();
+
+    loadOffers();
+
+    const result = [];
+
+    for (const dealer of dealerMaster) {
+
+        const dealerOffers =
+            getAllDealerOffers(dealer.name);
+
+        if (dealerOffers.length > 0) {
+
+            result.push({
+
+                name: dealer.name,
+
+                phone: dealer.phone,
+
+                city: dealer.city,
+
+                offerCount: dealerOffers.length,
+
+                maxDiscount: Math.max(
+                    ...dealerOffers.map(o => o.discount),
+                    0
+                )
+            });
+        }
+    }
+
+    return result;
+}
+
+// =========================
+// PREVIEW
+// =========================
+function showBrochurePreview(dealer, offers) {
+
+    const html =
+        generateFullBrochureHTML(dealer, offers);
+
+    const previewWindow = window.open(
+        '',
+        '_blank',
+        'width=800,height=900'
+    );
+
+    if (previewWindow) {
+
+        previewWindow.document.write(html);
+
+        previewWindow.document.close();
+
+    } else {
+
+        alert("Popup blocked! Please allow popups.");
+    }
+}
+
+// =========================
+// EXPORT ALL
+// =========================
+async function exportAllBrochures() {
+
+    await loadDealerMaster();
+
+    const offers = loadOffers();
+
+    let combinedHtml = `
+        <html>
+        <head>
+            <title>All Brochures</title>
+        </head>
+        <body>
+    `;
+
+    let count = 0;
+
+    for (const dealer of dealerMaster) {
+
+        const dealerOffers =
+            getAllDealerOffers(dealer.name);
+
+        if (dealerOffers.length > 0) {
+
+            combinedHtml += `
+                <div style="page-break-after:always;">
+                    ${generateFullBrochureHTML(dealer, offers)}
+                </div>
+            `;
+
+            count++;
+        }
+    }
+
+    combinedHtml += `
         </body>
-        </html>`;
-    }
+        </html>
+    `;
 
-    function sendFlyerWhatsApp(dealer, offers) {
-        const dealerOffers = offers.filter(o => o.dealer === dealer.name);
-        let message = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
-        message += `*Dear ${dealer.name},*\n\n`;
-        message += `*Exclusive Offers for You:*\n\n`;
-        
-        for (const offer of dealerOffers.slice(0, 5)) {
-            message += `🔹 *${offer.part}*\n`;
-            message += `   Your avg: ${offer.avgQty.toFixed(1)} units/month\n`;
-            if (offer.discount > 0) {
-                message += `   ✨ ${offer.discount}% OFF\n`;
-                message += `   Offer: ₹${offer.offerPrice.toFixed(2)} (was ₹${offer.originalPrice.toFixed(2)})\n`;
-            } else {
-                message += `   ⚠️ Low stock: ${offer.totalStock} units left\n`;
-            }
-            message += `   📦 Stock: ${offer.totalStock}\n\n`;
-        }
-        
-        message += `\n📞 Contact: 9830300193\n🌐 autosparessolution.com\n\n`;
-        message += `_Reply YES to place order_`;
-        
-        const encodedMsg = encodeURIComponent(message);
-        window.open(`https://wa.me/${dealer.phone || '919830300193'}?text=${encodedMsg}`, '_blank');
-    }
+    const blob = new Blob(
+        [combinedHtml],
+        { type: 'text/html' }
+    );
 
-    function showFlyerPreview(dealer, offers) {
-        const flyerHtml = generateFlyerHTML(dealer, offers);
-        const modal = window.open('', '_blank', 'width=600,height=800');
-        modal.document.write(flyerHtml);
-        modal.document.close();
-    }
+    const url = URL.createObjectURL(blob);
 
-    async function exportAllFlyers() {
-        await loadDealerMaster();
-        const offers = loadOffers();
-        let combinedHtml = '<html><head><title>All Flyers</title></head><body>';
-        for (const dealer of dealerMaster) {
-            const dealerOffers = offers.filter(o => o.dealer === dealer.name);
-            if (dealerOffers.length > 0) {
-                combinedHtml += `<hr><div style="page-break-after: always;">${generateFlyerHTML(dealer, offers)}</div>`;
-            }
-        }
-        combinedHtml += '</body></html>';
-        
-        const blob = new Blob([combinedHtml], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `all_flyers_${new Date().toISOString().split('T')[0]}.html`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
+    const a = document.createElement('a');
 
-    window.BrochureGenerator = {
-        loadDealerMaster,
-        loadOffers,
-        generateFlyerHTML,
-        sendFlyerWhatsApp,
-        showFlyerPreview,
-        exportAllFlyers,
-        getDealerMaster: () => dealerMaster,
-        getCurrentOffers: () => currentOffers
-    };
+    a.href = url;
+
+    a.download =
+        `all_brochures_${new Date()
+            .toISOString()
+            .split('T')[0]}.html`;
+
+    document.body.appendChild(a);
+
+    a.click();
+
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+
+    alert(`✅ Exported ${count} brochures`);
+}
+
+// =========================
+// GLOBAL
+// =========================
+window.BrochureGenerator = {
+
+    loadDealerMaster,
+
+    loadOffers,
+
+    getAllDealerOffers,
+
+    generateWhatsAppFlyerMessage,
+
+    generateFullBrochureHTML,
+
+    sendFlyerToWhatsApp,
+
+    sendBulkFlyersToWhatsApp,
+
+    getDealersWithOffers,
+
+    showBrochurePreview,
+
+    exportAllBrochures,
+
+    getDealerMaster: () => dealerMaster,
+
+    getCurrentOffers: () => currentOffers
+};
+
 })();
