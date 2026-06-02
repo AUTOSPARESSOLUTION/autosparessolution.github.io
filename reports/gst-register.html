@@ -1,5 +1,358 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>GST Register</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"><style>body{font-family:'Roboto',sans-serif;background:#0f172a;color:#e2e8f0;padding:1rem}.container{max-width:800px;margin:0 auto;background:#1e293b;padding:1.5rem;border-radius:1rem}h1{color:#facc15}.gst-box{background:#0f172a;padding:1rem;border-radius:0.5rem;margin:1rem 0;text-align:center}</style></head>
-<body><div class="container"><h1><i class="fas fa-percent"></i> GST Register</h1><div class="gst-box"><h3>Output GST (Sales)</h3><p id="outputGST">₹0</p></div><div class="gst-box"><h3>Input GST (Purchase)</h3><p id="inputGST">₹0</p></div><div class="gst-box"><h3>GST Payable</h3><p id="gstPayable">₹0</p></div></div>
-<script>const inv=JSON.parse(localStorage.getItem('allInvoices')||'[]');const po=JSON.parse(localStorage.getItem('allPurchases')||'[]');let out=0,inp=0;for(const i of inv)for(const it of i.items)out+=(it.price*it.qty)*0.18;for(const p of po)for(const it of p.items)inp+=(it.price*it.qty)*0.18;document.getElementById('outputGST').innerHTML=`₹${out.toFixed(2)}`;document.getElementById('inputGST').innerHTML=`₹${inp.toFixed(2)}`;document.getElementById('gstPayable').innerHTML=`₹${(out-inp).toFixed(2)}`;</script></body></html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GST Register – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="js/data-manager.js"></script>
+    <script src="js/gst-calculator.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #0a7c71; }
+        .period-selector { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
+        .period-group { display: flex; gap: 10px; align-items: center; }
+        input, select { padding: 8px; border: 1px solid #ced4da; border-radius: 6px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        .gst-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .gst-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #0a7c71; }
+        .gst-card h3 { margin: 0; font-size: 14px; color: #6c757d; }
+        .gst-card .amount { font-size: 24px; font-weight: bold; color: #0a7c71; }
+        .gst-card .negative { color: #dc3545; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        .export-btn { background: #6c757d; margin-left: 10px; }
+        .tab { overflow: hidden; border-bottom: 1px solid #dee2e6; margin-bottom: 20px; }
+        .tab button { background: #f8f9fa; color: #495057; border: none; padding: 10px 20px; cursor: pointer; float: left; margin-right: 5px; border-radius: 8px 8px 0 0; }
+        .tab button.active { background: #0a7c71; color: white; }
+        .tabcontent { display: none; }
+        .tabcontent.active { display: block; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-file-invoice-dollar"></i> GST Register</h1>
+    
+    <!-- Period Selector -->
+    <div class="period-selector">
+        <div class="period-group">
+            <label>From Date:</label>
+            <input type="date" id="fromDate">
+        </div>
+        <div class="period-group">
+            <label>To Date:</label>
+            <input type="date" id="toDate">
+        </div>
+        <div class="period-group">
+            <label>GSTIN:</label>
+            <input type="text" id="gstin" placeholder="19ANOPD3300R1ZO" value="19ANOPD3300R1ZO">
+        </div>
+        <button onclick="calculateGST()"><i class="fas fa-calculator"></i> Calculate</button>
+        <button onclick="exportGSTR1()" class="export-btn"><i class="fas fa-download"></i> Export GSTR-1</button>
+        <button onclick="exportGSTR3B()" class="export-btn"><i class="fas fa-download"></i> Export GSTR-3B</button>
+    </div>
+    
+    <!-- Tabs -->
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'Summary')">Summary</button>
+        <button class="tablinks" onclick="openTab(event, 'OutputGST')">Output GST (Sales)</button>
+        <button class="tablinks" onclick="openTab(event, 'InputGST')">Input GST (Purchases)</button>
+        <button class="tablinks" onclick="openTab(event, 'StockMovement')">Stock Movement</button>
+    </div>
+    
+    <!-- Summary Tab -->
+    <div id="Summary" class="tabcontent active">
+        <div class="gst-summary" id="summaryCards"></div>
+        <h2>GST Payable Summary</h2>
+        <div id="payableTable"></div>
+    </div>
+    
+    <!-- Output GST Tab -->
+    <div id="OutputGST" class="tabcontent">
+        <h2>Output GST (Sales)</h2>
+        <div style="overflow-x: auto;">
+            <table id="outputGSTTable">
+                <thead>
+                    <tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Part No</th><th>Qty</th><th>Taxable Value</th><th>GST Rate</th><th>CGST</th><th>SGST</th><th>Total GST</th></tr>
+                </thead>
+                <tbody id="outputGSTBody"></tbody>
+                <tfoot id="outputGSTFooter"></tfoot>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Input GST Tab -->
+    <div id="InputGST" class="tabcontent">
+        <h2>Input GST (Purchases)</h2>
+        <div style="overflow-x: auto;">
+            <table id="inputGSTTable">
+                <thead>
+                    <tr><th>Invoice No</th><th>Date</th><th>Supplier</th><th>Part No</th><th>Qty</th><th>Taxable Value</th><th>GST Rate</th><th>CGST</th><th>SGST</th><th>Total GST</th></tr>
+                </thead>
+                <tbody id="inputGSTBody"></tbody>
+                <tfoot id="inputGSTFooter"></tfoot>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Stock Movement Tab -->
+    <div id="StockMovement" class="tabcontent">
+        <h2>Stock Movement for GST Reconciliation</h2>
+        <div style="overflow-x: auto;">
+            <table id="stockMovementTable">
+                <thead>
+                    <tr><th>Part No</th><th>Description</th><th>Opening Stock</th><th>Purchases (Qty)</th><th>Sales (Qty)</th><th>Closing Stock</th><th>Purchase Value</th><th>Sales Value</th></tr>
+                </thead>
+                <tbody id="stockMovementBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentOutputGST = null;
+    let currentInputGST = null;
+    let currentStockMovement = null;
+    
+    async function calculateGST() {
+        const fromDate = document.getElementById('fromDate').value;
+        const toDate = document.getElementById('toDate').value;
+        
+        if (!fromDate || !toDate) {
+            alert('Please select both From and To dates');
+            return;
+        }
+        
+        // Wait for data manager to load
+        await DataManager.refreshAllData();
+        
+        const salesInvoices = DataManager.salesInvoices;
+        const purchaseInvoices = DataManager.purchaseInvoices;
+        const products = DataManager.products;
+        
+        // Calculate GST
+        currentOutputGST = GSTCalculator.calculateOutputGST(salesInvoices, fromDate, toDate);
+        currentInputGST = GSTCalculator.calculateInputGST(purchaseInvoices, fromDate, toDate);
+        currentStockMovement = GSTCalculator.calculateStockMovement(products, purchaseInvoices, salesInvoices, fromDate, toDate);
+        
+        const gstPayable = GSTCalculator.calculateGSTPayable(currentOutputGST, currentInputGST);
+        
+        // Display Summary Cards
+        displaySummary(currentOutputGST, currentInputGST, gstPayable);
+        
+        // Display Output GST Table
+        displayOutputGSTTable(currentOutputGST);
+        
+        // Display Input GST Table
+        displayInputGSTTable(currentInputGST);
+        
+        // Display Stock Movement
+        displayStockMovement(currentStockMovement);
+        
+        // Display Payable Table
+        displayPayableTable(gstPayable);
+    }
+    
+    function displaySummary(outputGST, inputGST, gstPayable) {
+        const summaryHtml = `
+            <div class="gst-card">
+                <h3>Output GST (Sales)</h3>
+                <div class="amount">₹${outputGST.totalGST.toFixed(2)}</div>
+                <small>Taxable: ₹${outputGST.taxableValue.toFixed(2)}</small>
+            </div>
+            <div class="gst-card">
+                <h3>Input GST (Purchases)</h3>
+                <div class="amount">₹${inputGST.totalGST.toFixed(2)}</div>
+                <small>Taxable: ₹${inputGST.taxableValue.toFixed(2)}</small>
+            </div>
+            <div class="gst-card">
+                <h3>ITC Available</h3>
+                <div class="amount">₹${gstPayable.itcAvailable.total.toFixed(2)}</div>
+                <small>CGST: ₹${gstPayable.itcAvailable.cgst.toFixed(2)} | SGST: ₹${gstPayable.itcAvailable.sgst.toFixed(2)}</small>
+            </div>
+            <div class="gst-card">
+                <h3>GST Payable</h3>
+                <div class="amount ${gstPayable.totalPayable > 0 ? '' : 'negative'}">₹${gstPayable.totalPayable.toFixed(2)}</div>
+                <small>CGST: ₹${gstPayable.cgstPayable.toFixed(2)} | SGST: ₹${gstPayable.sgstPayable.toFixed(2)}</small>
+            </div>
+        `;
+        document.getElementById('summaryCards').innerHTML = summaryHtml;
+    }
+    
+    function displayOutputGSTTable(outputGST) {
+        const tbody = document.getElementById('outputGSTBody');
+        tbody.innerHTML = '';
+        
+        if (outputGST.details.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No sales transactions in selected period</td></tr>';
+        } else {
+            for (const item of outputGST.details) {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = item.invoiceNo;
+                row.insertCell(1).innerText = item.date;
+                row.insertCell(2).innerText = item.customer;
+                row.insertCell(3).innerText = item.part;
+                row.insertCell(4).innerText = item.qty;
+                row.insertCell(5).innerText = `₹${item.taxableValue.toFixed(2)}`;
+                row.insertCell(6).innerText = `${item.gstRate}%`;
+                row.insertCell(7).innerText = `₹${item.cgst.toFixed(2)}`;
+                row.insertCell(8).innerText = `₹${item.sgst.toFixed(2)}`;
+                row.insertCell(9).innerText = `₹${item.totalGST.toFixed(2)}`;
+            }
+        }
+        
+        const footer = document.getElementById('outputGSTFooter');
+        footer.innerHTML = `
+            <tr style="background: #f8f9fa; font-weight: bold;">
+                <td colspan="5">TOTAL</td>
+                <td>₹${outputGST.taxableValue.toFixed(2)}</td>
+                <td></td>
+                <td>₹${outputGST.cgst.toFixed(2)}</td>
+                <td>₹${outputGST.sgst.toFixed(2)}</td>
+                <td>₹${outputGST.totalGST.toFixed(2)}</td>
+            </tr>
+        `;
+    }
+    
+    function displayInputGSTTable(inputGST) {
+        const tbody = document.getElementById('inputGSTBody');
+        tbody.innerHTML = '';
+        
+        if (inputGST.details.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No purchase transactions in selected period</td></tr>';
+        } else {
+            for (const item of inputGST.details) {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = item.invoiceNo;
+                row.insertCell(1).innerText = item.date;
+                row.insertCell(2).innerText = item.supplier;
+                row.insertCell(3).innerText = item.part;
+                row.insertCell(4).innerText = item.qty;
+                row.insertCell(5).innerText = `₹${item.taxableValue.toFixed(2)}`;
+                row.insertCell(6).innerText = `${item.gstRate}%`;
+                row.insertCell(7).innerText = `₹${item.cgst.toFixed(2)}`;
+                row.insertCell(8).innerText = `₹${item.sgst.toFixed(2)}`;
+                row.insertCell(9).innerText = `₹${item.totalGST.toFixed(2)}`;
+            }
+        }
+        
+        const footer = document.getElementById('inputGSTFooter');
+        footer.innerHTML = `
+            <tr style="background: #f8f9fa; font-weight: bold;">
+                <td colspan="5">TOTAL</td>
+                <td>₹${inputGST.taxableValue.toFixed(2)}</td>
+                <td></td>
+                <td>₹${inputGST.cgst.toFixed(2)}</td>
+                <td>₹${inputGST.sgst.toFixed(2)}</td>
+                <td>₹${inputGST.totalGST.toFixed(2)}</td>
+            </tr>
+        `;
+    }
+    
+    function displayStockMovement(stockMovement) {
+        const tbody = document.getElementById('stockMovementBody');
+        tbody.innerHTML = '';
+        
+        if (stockMovement.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8">No stock data available</td></tr>';
+        } else {
+            for (const item of stockMovement) {
+                if (item.purchases > 0 || item.sales > 0) {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).innerText = item.part;
+                    row.insertCell(1).innerText = item.description;
+                    row.insertCell(2).innerText = item.openingStock;
+                    row.insertCell(3).innerText = item.purchases;
+                    row.insertCell(4).innerText = item.sales;
+                    row.insertCell(5).innerText = item.closingStock;
+                    row.insertCell(6).innerText = `₹${item.purchaseValue.toFixed(2)}`;
+                    row.insertCell(7).innerText = `₹${item.salesValue.toFixed(2)}`;
+                }
+            }
+        }
+    }
+    
+    function displayPayableTable(gstPayable) {
+        const tableHtml = `
+            <table>
+                <thead><tr><th>Component</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th></tr></thead>
+                <tbody>
+                    <tr><td>Output GST</td><td>${currentOutputGST.cgst.toFixed(2)}</td><td>${currentOutputGST.sgst.toFixed(2)}</td><td>${currentOutputGST.totalGST.toFixed(2)}</td></tr>
+                    <tr><td>Input GST (ITC)</td><td>${currentInputGST.cgst.toFixed(2)}</td><td>${currentInputGST.sgst.toFixed(2)}</td><td>${currentInputGST.totalGST.toFixed(2)}</td></tr>
+                    <tr style="background: #f8f9fa; font-weight: bold;"><td>GST Payable</td><td>${gstPayable.cgstPayable.toFixed(2)}</td><td>${gstPayable.sgstPayable.toFixed(2)}</td><td>${gstPayable.totalPayable.toFixed(2)}</td></tr>
+                </tbody>
+            </table>
+        `;
+        document.getElementById('payableTable').innerHTML = tableHtml;
+    }
+    
+    function exportGSTR1() {
+        const fromDate = document.getElementById('fromDate').value;
+        const toDate = document.getElementById('toDate').value;
+        const gstin = document.getElementById('gstin').value;
+        
+        if (!fromDate || !toDate) {
+            alert('Please select date range first');
+            return;
+        }
+        
+        const gstr1Data = GSTCalculator.generateGSTR1(DataManager.salesInvoices, fromDate, toDate, gstin);
+        const blob = new Blob([JSON.stringify(gstr1Data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `GSTR1_${fromDate}_to_${toDate}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        alert('GSTR-1 JSON exported!');
+    }
+    
+    function exportGSTR3B() {
+        if (!currentOutputGST || !currentInputGST) {
+            alert('Please calculate GST first');
+            return;
+        }
+        
+        const fromDate = document.getElementById('fromDate').value;
+        const gstin = document.getElementById('gstin').value;
+        
+        const gstr3bData = GSTCalculator.generateGSTR3B(currentOutputGST, currentInputGST, fromDate, gstin);
+        const blob = new Blob([JSON.stringify(gstr3bData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `GSTR3B_${fromDate.slice(0,7)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        alert('GSTR-3B JSON exported!');
+    }
+    
+    function openTab(evt, tabName) {
+        const tabcontents = document.getElementsByClassName('tabcontent');
+        for (let i = 0; i < tabcontents.length; i++) {
+            tabcontents[i].classList.remove('active');
+        }
+        const tablinks = document.getElementsByClassName('tablinks');
+        for (let i = 0; i < tablinks.length; i++) {
+            tablinks[i].classList.remove('active');
+        }
+        document.getElementById(tabName).classList.add('active');
+        evt.currentTarget.classList.add('active');
+    }
+    
+    // Set default dates (current month)
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('fromDate').value = firstDay.toISOString().split('T')[0];
+    document.getElementById('toDate').value = today.toISOString().split('T')[0];
+    
+    // Auto-calculate on load
+    setTimeout(() => {
+        calculateGST();
+    }, 2000);
+</script>
+</body>
+</html>
