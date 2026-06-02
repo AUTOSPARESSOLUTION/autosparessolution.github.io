@@ -3,33 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Ledger – Auto Spares</title>
+    <title>Stock Report – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
         .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; }
+        .summary { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 30px; flex-wrap: wrap; }
+        .summary-card { flex: 1; min-width: 150px; text-align: center; }
+        .summary-card h3 { margin: 0; font-size: 14px; color: #6c757d; }
+        .summary-card .amount { font-size: 24px; font-weight: bold; color: #0a7c71; margin-top: 5px; }
         .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
-        .filter-group { flex: 1; min-width: 180px; }
+        .filter-group { flex: 1; min-width: 160px; }
         label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #495057; }
         select, input { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 6px; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin: 0 5px 5px 0; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 5px; }
         button:hover { background: #09645a; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; position: sticky; top: 0; }
-        .in { color: #28a745; font-weight: bold; }
-        .out { color: #dc3545; font-weight: bold; }
+        .low-stock { background-color: #fff3cd; }
+        .out-of-stock { background-color: #f8d7da; }
         .export-btn { background: #6c757d; }
         .export-btn:hover { background: #5a6268; }
-        .empty-message { text-align: center; padding: 40px; color: #6c757d; }
         .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; display: none; font-family: monospace; font-size: 12px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1><i class="fas fa-boxes"></i> Stock Ledger</h1>
+    <h1><i class="fas fa-boxes"></i> Stock Report</h1>
+    
+    <!-- Summary Cards -->
+    <div class="summary">
+        <div class="summary-card">
+            <h3>Total Products</h3>
+            <div class="amount" id="totalProducts">0</div>
+        </div>
+        <div class="summary-card">
+            <h3>Total Stock Value</h3>
+            <div class="amount" id="totalValue">₹0</div>
+        </div>
+        <div class="summary-card">
+            <h3>Low Stock Items</h3>
+            <div class="amount" id="lowStockCount">0</div>
+        </div>
+        <div class="summary-card">
+            <h3>Out of Stock</h3>
+            <div class="amount" id="outOfStockCount">0</div>
+        </div>
+    </div>
     
     <!-- Filters -->
     <div class="filter-box">
@@ -40,26 +63,20 @@
             </select>
         </div>
         <div class="filter-group">
-            <label>Filter by Make</label>
-            <select id="makeFilter">
-                <option value="">-- All Makes --</option>
+            <label>Stock Status</label>
+            <select id="stockStatusFilter">
+                <option value="">-- All --</option>
+                <option value="low">Low Stock (≤10)</option>
+                <option value="out">Out of Stock (0)</option>
+                <option value="normal">Normal Stock (>10)</option>
             </select>
         </div>
         <div class="filter-group">
-            <label>Or Select a Product</label>
-            <select id="productFilter">
-                <option value="">-- All Products --</option>
-            </select>
+            <label>Search Part No</label>
+            <input type="text" id="partFilter" placeholder="Enter part number...">
         </div>
         <div class="filter-group">
-            <label>Date Range</label>
-            <div style="display: flex; gap: 5px;">
-                <input type="date" id="fromDate" placeholder="From">
-                <input type="date" id="toDate" placeholder="To">
-            </div>
-        </div>
-        <div class="filter-group">
-            <button onclick="loadLedger()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button onclick="refreshReport()"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
             <button onclick="toggleDebug()" class="export-btn"><i class="fas fa-bug"></i> Debug</button>
         </div>
@@ -68,14 +85,15 @@
     <!-- Debug Panel -->
     <div id="debugPanel" class="debug"></div>
     
-    <!-- Stock Ledger Table -->
-    <div id="ledgerTable">Loading...</div>
+    <!-- Stock Table -->
+    <div id="stockTableContainer">
+        <div id="stockTable">Loading...</div>
+    </div>
 </div>
 
 <script>
     let products = [];
     let stockTransactions = [];
-    let allProductsRaw = [];
 
     // Convert any date to YYYY-MM-DD for sorting
     function toISODate(dateStr) {
@@ -96,21 +114,22 @@
             const response = await fetch('prices.csv');
             const csv = await response.text();
             const rows = csv.split('\n').slice(1);
-            allProductsRaw = [];
+            products = [];
             for (const row of rows) {
                 const cols = row.split(',');
                 if (cols[0]) {
-                    allProductsRaw.push({
-                        id: cols[0].trim(),
-                        sku: cols[0].trim(),
-                        name: cols[1]?.trim() || '',
+                    products.push({
+                        part: cols[0].trim(),
+                        desc: cols[1]?.trim() || '',
                         brand: cols[10]?.trim() || '',
                         make: cols[11]?.trim() || '',
-                        currentStock: parseInt(cols[7]) || 0
+                        price: parseFloat(cols[6]) || 0,
+                        stock: parseInt(cols[7]) || 0,
+                        hsn: cols[23]?.trim() || ''
                     });
                 }
             }
-            console.log(`✅ Loaded ${allProductsRaw.length} products`);
+            console.log(`✅ Loaded ${products.length} products from prices.csv`);
             return true;
         } catch(err) {
             console.error("Failed to load prices.csv", err);
@@ -118,50 +137,48 @@
         }
     }
 
-    // Build stock transactions
+    // Build stock transactions from invoices
     function buildStockTransactions() {
         stockTransactions = [];
 
-        // 1. Purchase invoices (stock IN)
+        // Purchase invoices (stock IN)
         const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         purchaseInvoices.forEach(inv => {
             const items = inv.items || [];
             items.forEach(item => {
-                let productId = item.productId || item.part || item.sku;
-                if (!productId) return;
-                productId = String(productId);
+                let partNo = item.part || item.productId || item.sku;
+                if (!partNo) return;
+                partNo = String(partNo);
                 const qty = parseFloat(item.quantity) || parseFloat(item.qty) || 0;
                 if (qty === 0) return;
                 stockTransactions.push({
                     date: inv.date,
-                    productId: productId,
+                    partNo: partNo,
                     type: 'Purchase',
                     inQty: qty,
                     outQty: 0,
-                    ref: inv.invoiceNo || inv.poNo || 'PO',
-                    balance: 0
+                    ref: inv.invoiceNo || inv.poNo
                 });
             });
         });
 
-        // 2. Sales invoices (stock OUT)
+        // Sales invoices (stock OUT)
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         allInvoices.forEach(inv => {
             const items = inv.items || [];
             items.forEach(item => {
-                let productId = item.part || item.productId || item.sku;
-                if (!productId) return;
-                productId = String(productId);
+                let partNo = item.part || item.productId || item.sku;
+                if (!partNo) return;
+                partNo = String(partNo);
                 const qty = parseFloat(item.qty) || 0;
                 if (qty === 0) return;
                 stockTransactions.push({
                     date: inv.date,
-                    productId: productId,
+                    partNo: partNo,
                     type: 'Sales',
                     inQty: 0,
                     outQty: qty,
-                    ref: inv.invoiceNo || 'INV',
-                    balance: 0
+                    ref: inv.invoiceNo
                 });
             });
         });
@@ -173,18 +190,27 @@
         console.log(`✅ Built ${stockTransactions.length} stock transactions`);
     }
 
-    // Get product by ID or SKU
-    function getProduct(productId) {
-        return allProductsRaw.find(p => p.id === productId || p.sku === productId);
+    // Calculate dynamic stock based on transactions
+    function calculateDynamicStock() {
+        const stockMap = new Map();
+        
+        // Initialize with current stock from prices.csv
+        for (const p of products) {
+            stockMap.set(p.part, p.stock);
+        }
+        
+        // If there are transactions, adjust (but current stock already reflects final)
+        // For display, we'll use the stock from prices.csv as it's the source of truth
+        // But we can also compute from transactions for verification
+        
+        return stockMap;
     }
 
     // Populate filter dropdowns
     function populateFilters() {
         const brands = new Set();
-        const makes = new Set();
-        allProductsRaw.forEach(p => {
+        products.forEach(p => {
             if (p.brand) brands.add(p.brand);
-            if (p.make) makes.add(p.make);
         });
         
         const brandSelect = document.getElementById('brandFilter');
@@ -192,190 +218,164 @@
         [...brands].sort().forEach(b => {
             brandSelect.innerHTML += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
         });
-        
-        const makeSelect = document.getElementById('makeFilter');
-        makeSelect.innerHTML = '<option value="">-- All Makes --</option>';
-        [...makes].sort().forEach(m => {
-            makeSelect.innerHTML += `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`;
-        });
-        
-        const productSelect = document.getElementById('productFilter');
-        productSelect.innerHTML = '<option value="">-- All Products --</option>';
-        allProductsRaw.forEach(p => {
-            productSelect.innerHTML += `<option value="${p.id}">${escapeHtml(p.name)} (${p.sku})</option>`;
-        });
     }
 
-    // Get filtered products based on user selection
-    function getFilteredProducts() {
+    // Refresh report
+    function refreshReport() {
         const brand = document.getElementById('brandFilter').value;
-        const make = document.getElementById('makeFilter').value;
-        const productId = document.getElementById('productFilter').value;
-        const fromDate = document.getElementById('fromDate').value;
-        const toDate = document.getElementById('toDate').value;
+        const stockStatus = document.getElementById('stockStatusFilter').value;
+        const partFilter = document.getElementById('partFilter').value.toLowerCase();
         
-        let filtered = allProductsRaw;
+        let filtered = [...products];
         
-        if (productId) {
-            filtered = filtered.filter(p => p.id === productId);
-        } else {
-            if (brand) filtered = filtered.filter(p => p.brand === brand);
-            if (make) filtered = filtered.filter(p => p.make === make);
+        // Apply brand filter
+        if (brand) {
+            filtered = filtered.filter(p => p.brand === brand);
         }
         
-        return { products: filtered, fromDate, toDate };
-    }
-
-    // Display ledger
-    function displayLedger() {
-        const { products: filteredProducts, fromDate, toDate } = getFilteredProducts();
+        // Apply part filter
+        if (partFilter) {
+            filtered = filtered.filter(p => p.part.toLowerCase().includes(partFilter));
+        }
         
-        if (filteredProducts.length === 0) {
-            document.getElementById('ledgerTable').innerHTML = '<div class="empty-message">No products match the filter.</div>';
+        // Apply stock status filter
+        if (stockStatus === 'low') {
+            filtered = filtered.filter(p => p.stock > 0 && p.stock <= 10);
+        } else if (stockStatus === 'out') {
+            filtered = filtered.filter(p => p.stock === 0);
+        } else if (stockStatus === 'normal') {
+            filtered = filtered.filter(p => p.stock > 10);
+        }
+        
+        // Sort by part number
+        filtered.sort((a,b) => a.part.localeCompare(b.part));
+        
+        displayStockTable(filtered);
+        updateSummary(filtered);
+    }
+    
+    function displayStockTable(productsList) {
+        if (productsList.length === 0) {
+            document.getElementById('stockTable').innerHTML = '<div class="empty-message">No products match the filter.</div>';
             return;
         }
         
         let html = `<div style="overflow-x: auto;">
-            <table class="ledger-table">
+            <table>
                 <thead>
                     <tr>
-                        <th>Product</th><th>SKU</th><th>Brand</th><th>Make</th>
-                        <th>Date</th><th>Transaction Type</th><th>In (+)</th><th>Out (-)</th>
-                        <th>Running Balance</th><th>Reference</th>
+                        <th>Part No</th>
+                        <th>Description</th>
+                        <th>Brand</th>
+                        <th>Make</th>
+                        <th>Stock</th>
+                        <th>Price (₹)</th>
+                        <th>Value (₹)</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>`;
         
-        for (let prod of filteredProducts) {
-            // Get transactions for this product
-            let prodTrans = stockTransactions.filter(t => 
-                t.productId === prod.id || t.productId === prod.sku
-            );
+        for (const p of productsList) {
+            const value = p.stock * p.price;
+            let statusClass = '';
+            let statusText = '';
             
-            // Apply date filters
-            if (fromDate) {
-                prodTrans = prodTrans.filter(t => t.isoDate >= fromDate);
-            }
-            if (toDate) {
-                prodTrans = prodTrans.filter(t => t.isoDate <= toDate);
+            if (p.stock === 0) {
+                statusClass = 'out-of-stock';
+                statusText = '<i class="fas fa-times-circle"></i> Out of Stock';
+            } else if (p.stock <= 10) {
+                statusClass = 'low-stock';
+                statusText = '<i class="fas fa-exclamation-triangle"></i> Low Stock';
+            } else {
+                statusText = '<i class="fas fa-check-circle"></i> In Stock';
             }
             
-            if (prodTrans.length === 0) {
-                // Show product with opening stock only
-                html += `<tr>
-                    <td><strong>${escapeHtml(prod.name)}</strong></td>
-                    <td><strong>${escapeHtml(prod.sku)}</strong></td>
-                    <td>${escapeHtml(prod.brand || '-')}</td>
-                    <td>${escapeHtml(prod.make || '-')}</td>
-                    <td colspan="6">No transactions in selected period</td>
+            html += `
+                <tr class="${statusClass}">
+                    <td><strong>${escapeHtml(p.part)}</strong></td>
+                    <td>${escapeHtml(p.desc)}</strong></td>
+                    <td>${escapeHtml(p.brand || '-')}</td>
+                    <td>${escapeHtml(p.make || '-')}</td>
+                    <td><strong>${p.stock}</strong></td>
+                    <td>₹${p.price.toFixed(2)}</strong></td>
+                    <td>₹${value.toFixed(2)}</strong></td>
+                    <td>${statusText}</td>
                 </tr>`;
-                continue;
-            }
-            
-            // Sort by date
-            prodTrans.sort((a,b) => a.isoDate.localeCompare(b.isoDate));
-            
-            // Calculate running balance (starting from current stock, going backwards)
-            // First calculate total in/out to get opening balance
-            let totalIn = prodTrans.reduce((sum, t) => sum + t.inQty, 0);
-            let totalOut = prodTrans.reduce((sum, t) => sum + t.outQty, 0);
-            let closingBalance = prod.currentStock;
-            let openingBalance = closingBalance - totalIn + totalOut;
-            let balance = openingBalance;
-            
-            for (let t of prodTrans) {
-                balance += t.inQty - t.outQty;
-                const displayDate = t.date ? new Date(t.date).toLocaleDateString('en-IN') : '-';
-                const typeLabel = t.type === 'Purchase' ? 'Purchase' : 'Sales';
-                const inQty = t.inQty > 0 ? t.inQty : '-';
-                const outQty = t.outQty > 0 ? t.outQty : '-';
-                
-                html += `<tr>
-                    <td><strong>${escapeHtml(prod.name)}</strong></td>
-                    <td><strong>${escapeHtml(prod.sku)}</strong></td>
-                    <td>${escapeHtml(prod.brand || '-')}</td>
-                    <td>${escapeHtml(prod.make || '-')}</td>
-                    <td>${displayDate}</td>
-                    <td>${typeLabel}</td>
-                    <td class="in">${inQty}</td>
-                    <td class="out">${outQty}</td>
-                    <td>${balance}</td>
-                    <td>${escapeHtml(t.ref || '-')}</td>
-                </tr>`;
-            }
-            
-            // Add separator between products
-            html += '<tr style="background:#f1f3f5;"><td colspan="10" style="padding:2px;"></td></td>';
         }
         
-        html += '</tbody></table></div>';
-        document.getElementById('ledgerTable').innerHTML = html;
+        html += `</tbody>
+            </table>
+        </div>`;
+        
+        document.getElementById('stockTable').innerHTML = html;
     }
-
-    // Main function to load all data
-    async function loadLedger() {
-        document.getElementById('ledgerTable').innerHTML = '<div class="empty-message">Loading...</div>';
-        await loadProducts();
-        buildStockTransactions();
-        populateFilters();
-        displayLedger();
+    
+    function updateSummary(productsList) {
+        const totalProducts = productsList.length;
+        const totalValue = productsList.reduce((sum, p) => sum + (p.stock * p.price), 0);
+        const lowStockCount = productsList.filter(p => p.stock > 0 && p.stock <= 10).length;
+        const outOfStockCount = productsList.filter(p => p.stock === 0).length;
+        
+        document.getElementById('totalProducts').innerText = totalProducts;
+        document.getElementById('totalValue').innerHTML = `₹${totalValue.toFixed(2)}`;
+        document.getElementById('lowStockCount').innerText = lowStockCount;
+        document.getElementById('outOfStockCount').innerText = outOfStockCount;
     }
-
-    // Export to CSV
+    
     function exportToCSV() {
-        const { products: filteredProducts, fromDate, toDate } = getFilteredProducts();
-        if (filteredProducts.length === 0) {
-            alert('No data to export');
-            return;
-        }
+        const brand = document.getElementById('brandFilter').value;
+        const stockStatus = document.getElementById('stockStatusFilter').value;
+        const partFilter = document.getElementById('partFilter').value.toLowerCase();
         
-        let csv = "Product Name,SKU,Brand,Make,Date,Transaction Type,In,Out,Running Balance,Reference\n";
+        let filtered = [...products];
         
-        for (let prod of filteredProducts) {
-            let prodTrans = stockTransactions.filter(t => 
-                t.productId === prod.id || t.productId === prod.sku
-            );
+        if (brand) filtered = filtered.filter(p => p.brand === brand);
+        if (partFilter) filtered = filtered.filter(p => p.part.toLowerCase().includes(partFilter));
+        if (stockStatus === 'low') filtered = filtered.filter(p => p.stock > 0 && p.stock <= 10);
+        else if (stockStatus === 'out') filtered = filtered.filter(p => p.stock === 0);
+        else if (stockStatus === 'normal') filtered = filtered.filter(p => p.stock > 10);
+        
+        filtered.sort((a,b) => a.part.localeCompare(b.part));
+        
+        let csv = "Part No,Description,Brand,Make,Stock,Price (₹),Value (₹),Status\n";
+        
+        for (const p of filtered) {
+            let status = '';
+            if (p.stock === 0) status = 'Out of Stock';
+            else if (p.stock <= 10) status = 'Low Stock';
+            else status = 'In Stock';
             
-            if (fromDate) {
-                prodTrans = prodTrans.filter(t => t.isoDate >= fromDate);
-            }
-            if (toDate) {
-                prodTrans = prodTrans.filter(t => t.isoDate <= toDate);
-            }
-            
-            if (prodTrans.length === 0) continue;
-            
-            prodTrans.sort((a,b) => a.isoDate.localeCompare(b.isoDate));
-            let totalIn = prodTrans.reduce((sum, t) => sum + t.inQty, 0);
-            let totalOut = prodTrans.reduce((sum, t) => sum + t.outQty, 0);
-            let balance = prod.currentStock - totalIn + totalOut;
-            
-            for (let t of prodTrans) {
-                balance += t.inQty - t.outQty;
-                csv += `"${escapeCsv(prod.name)}","${escapeCsv(prod.sku)}","${escapeCsv(prod.brand || '')}","${escapeCsv(prod.make || '')}",${t.date},${t.type},${t.inQty},${t.outQty},${balance},"${escapeCsv(t.ref || '')}"\n`;
-            }
+            csv += `"${escapeCsv(p.part)}","${escapeCsv(p.desc)}","${escapeCsv(p.brand || '')}","${escapeCsv(p.make || '')}",${p.stock},${p.price},${(p.stock * p.price).toFixed(2)},"${status}"\n`;
         }
         
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `stock_ledger_${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `stock_report_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
     }
     
-    // Debug function
     function toggleDebug() {
         const panel = document.getElementById('debugPanel');
         if (panel.style.display === 'none' || !panel.style.display) {
-            panel.innerHTML = `<strong>Products:</strong> ${allProductsRaw.length}<br>
-            <strong>Transactions:</strong> ${stockTransactions.length}<br>
-            <strong>Sample Transaction:</strong><br><pre>${JSON.stringify(stockTransactions[0], null, 2)}</pre>`;
+            panel.innerHTML = `<strong>Products loaded:</strong> ${products.length}<br>
+            <strong>Sample product:</strong><br><pre>${JSON.stringify(products[0], null, 2)}</pre>
+            <strong>Transactions:</strong> ${stockTransactions.length}`;
             panel.style.display = 'block';
         } else {
             panel.style.display = 'none';
         }
+    }
+    
+    async function loadAllData() {
+        document.getElementById('stockTable').innerHTML = '<div class="empty-message">Loading...</div>';
+        await loadProducts();
+        buildStockTransactions();
+        populateFilters();
+        refreshReport();
     }
     
     function escapeHtml(str) {
@@ -389,11 +389,11 @@
     }
     
     function escapeCsv(s) {
-        return `"${(s || '').replace(/"/g, '""')}"`;
+        return String(s || '').replace(/"/g, '""');
     }
     
     // Load on page load
-    loadLedger();
+    loadAllData();
 </script>
 </body>
 </html>
