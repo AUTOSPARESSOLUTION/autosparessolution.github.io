@@ -1,314 +1,73 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dealer Intelligence Dashboard – Auto Spares Solution</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="js/dealer-intelligence.js"></script>
-    <script src="js/brochure-generator.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            color: #e2e8f0;
-            padding: 1rem;
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: rgba(30, 41, 59, 0.95);
-            padding: 1.5rem;
-            border-radius: 1rem;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-        h1, h2, h3 { color: #facc15; margin-bottom: 0.5rem; }
-        h1 { font-size: 1.8rem; display: flex; align-items: center; gap: 0.5rem; }
-        h2 { font-size: 1.3rem; margin-top: 1rem; border-left: 3px solid #facc15; padding-left: 0.5rem; }
-        
-        .upload-section {
-            background: rgba(15, 23, 42, 0.8);
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            border: 1px solid #334155;
-        }
-        .btn {
-            background: #3b82f6;
-            color: white;
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            margin: 0.25rem;
-            font-size: 0.85rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: transform 0.2s;
-        }
-        .btn:hover { transform: translateY(-2px); }
-        .btn-success { background: #22c55e; }
-        .btn-warning { background: #eab308; color: #0f172a; }
-        .btn-whatsapp { background: #25D366; }
-        .btn-purple { background: #8b5cf6; }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .stat-card {
-            background: rgba(15, 23, 42, 0.8);
-            padding: 1rem;
-            border-radius: 0.5rem;
-            text-align: center;
-            border-left: 3px solid #facc15;
-        }
-        .stat-number { font-size: 2rem; font-weight: bold; color: #4ade80; }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-            overflow-x: auto;
-            display: block;
-        }
-        th, td {
-            border: 1px solid #334155;
-            padding: 0.5rem;
-            text-align: left;
-            vertical-align: top;
-        }
-        th { background: #0f172a; color: #facc15; }
-        .offer-high { background: rgba(74, 222, 128, 0.15); }
-        .offer-medium { background: rgba(250, 204, 21, 0.15); }
-        .stock-warning { color: #f87171; font-weight: bold; }
-        .flex { display: flex; gap: 1rem; flex-wrap: wrap; }
-        .area-card {
-            background: #0f172a;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            margin-bottom: 0.5rem;
-            flex: 1;
-            min-width: 200px;
-        }
-        .log-container {
-            background: #0f172a;
-            padding: 0.5rem;
-            border-radius: 0.5rem;
-            max-height: 150px;
-            overflow-y: auto;
-            font-size: 0.8rem;
-            font-family: monospace;
-        }
-        .badge {
-            display: inline-block;
-            padding: 0.2rem 0.5rem;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: bold;
-        }
-        .badge-high { background: #22c55e; color: #0f172a; }
-        .badge-mid { background: #eab308; color: #0f172a; }
-        .badge-low { background: #ef4444; }
-        
-        @media (max-width: 768px) {
-            .container { padding: 1rem; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            th, td { font-size: 0.75rem; }
-        }
-    </style>
-</head>
-<body>
-<div class="container">
-    <h1><i class="fas fa-chart-line"></i> Dealer Intelligence Dashboard</h1>
-    <p>Auto-learning offer system powered by AI | Auto-loads data from /data/ folder</p>
+<!-- ========================================= -->
+<!-- MARKETING MATERIALS SECTION -->
+<!-- ========================================= -->
 
-    <div class="stats-grid" id="statsGrid">
-        <div class="stat-card"><div class="stat-number" id="totalOffers">-</div><div>Total Offers</div></div>
-        <div class="stat-card"><div class="stat-number" id="highDiscount">-</div><div>High Discount (10%+)</div></div>
-        <div class="stat-card"><div class="stat-number" id="lowStockCount">-</div><div>Low Stock Alerts</div></div>
-        <div class="stat-card"><div class="stat-number" id="areasCount">-</div><div>Districts Analysed</div></div>
+<div class="upload-section" style="margin-top: 1rem;">
+
+    <h3>
+        <i class="fas fa-brochure"></i>
+        Marketing Materials (Flyers / Brochures)
+    </h3>
+
+    <div class="flex">
+
+        <button class="btn btn-purple"
+            onclick="generateAllFlyers()">
+
+            <i class="fas fa-file-alt"></i>
+            Generate Flyers
+        </button>
+
+        <button class="btn"
+            onclick="exportAllFlyersHTML()">
+
+            <i class="fas fa-download"></i>
+            Download HTML
+        </button>
+
+        <button class="btn btn-warning"
+            onclick="exportAllFlyersPDF()">
+
+            <i class="fas fa-file-pdf"></i>
+            Download PDF
+        </button>
+
+        <button class="btn btn-whatsapp"
+            onclick="sendBulkWhatsAppFlyers()">
+
+            <i class="fab fa-whatsapp"></i>
+            Send to All Dealers
+        </button>
+
     </div>
 
-    <div class="flex" style="margin-bottom: 1rem;">
-        <button class="btn btn-success" onclick="runAnalysis()"><i class="fas fa-sync"></i> Run Analysis</button>
-        <button class="btn" onclick="exportOffersCSV()"><i class="fas fa-file-excel"></i> Export Offers CSV</button>
-        <button class="btn btn-whatsapp" onclick="sendBulkWhatsApp()"><i class="fab fa-whatsapp"></i> Send Top Offers</button>
-        <button class="btn btn-warning" onclick="enableAutoRun()"><i class="fas fa-calendar-week"></i> Enable Auto-Run</button>
+    <div id="flyerStatus"
+        style="margin-top:0.5rem;font-size:0.85rem;">
     </div>
 
-    <h2><i class="fas fa-gift"></i> Active Offers</h2>
-    <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
-        <table id="offersTable">
-            <thead>
-                <tr><th>Dealer</th><th>Part No</th><th>Avg Monthly</th><th>District</th><th>Stock</th><th>Discount</th><th>Offer Type</th><th>Offer Price</th><th>Source</th><th>Action</th></tr>
-            </thead>
-            <tbody id="offersTbody"></tbody>
-        </table>
+    <div id="flyerList"
+        class="flex"
+        style="margin-top:0.5rem;">
     </div>
 
-    <h2><i class="fas fa-map-marker-alt"></i> District Area Insights</h2>
-    <div class="flex" id="areaInsights"></div>
-
-    <div class="upload-section" style="margin-top: 1rem;">
-        <h3><i class="fas fa-brochure"></i> Marketing Materials (Flyers / Brochures)</h3>
-        <div class="flex">
-            <button class="btn btn-purple" onclick="generateAllFlyers()"><i class="fas fa-file-alt"></i> Generate Flyers</button>
-            <button class="btn" onclick="exportAllFlyersHTML()"><i class="fas fa-download"></i> Download All Flyers</button>
-            <button class="btn btn-whatsapp" onclick="sendBulkWhatsAppFlyers()"><i class="fab fa-whatsapp"></i> Send to All Dealers</button>
-        </div>
-        <div id="flyerStatus" style="margin-top: 0.5rem; font-size: 0.85rem;"></div>
-        <div id="flyerList" class="flex" style="margin-top: 0.5rem;"></div>
-    </div>
-
-    <h2><i class="fab fa-whatsapp"></i> WhatsApp Alert Log</h2>
-    <div id="whatsappLog" class="log-container"></div>
 </div>
 
+<!-- ========================================= -->
+<!-- FLYER FUNCTIONS -->
+<!-- ========================================= -->
+
 <script>
-    let currentMatches = [];
-    let whatsappLog = [];
 
-    async function runAnalysis() {
-        showToast("Running analysis...");
-        try {
-            const result = await DealerIntelligence.runFullAnalysis();
-            currentMatches = result.offers || [];
-            displayStats(result);
-            displayOffers(currentMatches);
-            displayAreaInsights(result.topAreas);
-            showToast(`✅ Generated ${result.offersGenerated} offers`);
-        } catch(err) {
-            console.error(err);
-            showToast("Error: " + err.message);
-        }
-    }
+// =======================================
+// GENERATE ALL FLYERS
+// =======================================
+async function generateAllFlyers() {
 
-    function displayStats(data) {
-        document.getElementById('totalOffers').innerText = data.offersGenerated || 0;
-        document.getElementById('highDiscount').innerText = data.highDiscountOffers || 0;
-        document.getElementById('lowStockCount').innerText = data.lowStockAlerts || 0;
-        document.getElementById('areasCount').innerText = data.areasAnalysed || 0;
-    }
-
-    function displayOffers(offers) {
-        const tbody = document.getElementById('offersTbody');
-        tbody.innerHTML = '';
-        if (!offers || offers.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">No offers generated. Run analysis first.</td></tr>';
-            return;
-        }
-        for (const o of offers.slice(0, 50)) {
-            const rowClass = o.discount >= 10 ? 'offer-high' : (o.discount >= 5 ? 'offer-medium' : '');
-            const row = tbody.insertRow();
-            row.className = rowClass;
-            row.insertCell(0).innerText = o.dealer;
-            row.insertCell(1).innerText = o.part;
-            row.insertCell(2).innerText = o.avgQty.toFixed(1);
-            row.insertCell(3).innerText = o.pincode || '-';
-            row.insertCell(4).innerHTML = `<span class="${o.totalStock < 10 ? 'stock-warning' : ''}">${o.totalStock}</span>`;
-            row.insertCell(5).innerHTML = `<span class="badge ${o.discount >= 10 ? 'badge-high' : (o.discount >= 5 ? 'badge-mid' : 'badge-low')}">${o.discount}%</span>`;
-            row.insertCell(6).innerText = o.offerType;
-            row.insertCell(7).innerText = `₹${o.offerPrice.toFixed(2)}`;
-            row.insertCell(8).innerText = o.source || (o.isProspective ? 'Excel' : 'Invoice');
-            row.insertCell(9).innerHTML = `<button class="btn btn-whatsapp" style="padding:0.2rem 0.5rem;" onclick="sendSingleWhatsApp('${o.dealer}', '${o.part}')"><i class="fab fa-whatsapp"></i></button>`;
-        }
-    }
-
-    function displayAreaInsights(areas) {
-        const container = document.getElementById('areaInsights');
-        if (!areas || areas.length === 0) {
-            container.innerHTML = '<div>Run analysis to see area insights.</div>';
-            return;
-        }
-        let html = '';
-        for (const area of areas) {
-            html += `<div class="area-card">
-                <strong>📍 ${area.pincode}</strong><br>
-                Total Demand: ${area.totalDemand} units<br>
-                Dealers: ${area.dealerCount}<br>
-                Top Parts: ${area.topParts.map(p => `${p[0]} (${p[1]})`).join(', ')}
-            </div>`;
-        }
-        container.innerHTML = html;
-    }
-
-    async function sendSingleWhatsApp(dealer, part) {
-        const offer = currentMatches.find(o => o.dealer === dealer && o.part === part);
-        if (!offer) return;
-        const message = DealerIntelligence.generateWhatsAppMessage(offer);
-        const phone = prompt("Enter dealer phone number:", offer.phone || "91");
-        if (phone) {
-            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
-            logWhatsApp(dealer, part, phone);
-        }
-    }
-
-    async function sendBulkWhatsApp() {
-        const topOffers = currentMatches.filter(o => o.discount >= 10).slice(0, 5);
-        if (topOffers.length === 0) { alert("No high-discount offers"); return; }
-        for (const o of topOffers) {
-            const msg = DealerIntelligence.generateWhatsAppMessage(o);
-            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-            logWhatsApp(o.dealer, o.part, 'Bulk');
-            await new Promise(r => setTimeout(r, 1000));
-        }
-        alert(`Opened WhatsApp for ${topOffers.length} offers. Send manually.`);
-    }
-
-    function logWhatsApp(dealer, part, phone) {
-        const timestamp = new Date().toLocaleString();
-        whatsappLog.unshift({ timestamp, dealer, part, phone });
-        if (whatsappLog.length > 20) whatsappLog.pop();
-        const logDiv = document.getElementById('whatsappLog');
-        logDiv.innerHTML = whatsappLog.map(log => 
-            `<div style="border-bottom:1px solid #334155; padding:0.25rem;">
-                <small>${log.timestamp}</small> - ${log.dealer} - ${log.part} - ${log.phone}
-            </div>`
-        ).join('');
-    }
-
-    function exportOffersCSV() {
-        const csv = DealerIntelligence.exportOffersCSV();
-        if (!csv) { alert("No offers to export"); return; }
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `dealer_offers_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
-    function enableAutoRun() {
-        localStorage.setItem('dealer_offers_automatic', 'true');
-        alert("Weekly auto-run enabled. System will analyse invoices every Monday.");
-    }
-
-    function showToast(msg) {
-        let toast = document.getElementById('toast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'toast';
-            toast.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#facc15; color:#0f172a; padding:10px 20px; border-radius:10px; z-index:1000; display:none;';
-            document.body.appendChild(toast);
-        }
-        toast.innerText = msg;
-        toast.style.display = 'block';
-        setTimeout(() => { toast.style.display = 'none'; }, 3000);
-    }
-
-    async function generateAllFlyers() {
-    const resultDiv = document.getElementById('flyerStatus');
+    const resultDiv =
+        document.getElementById('flyerStatus');
 
     resultDiv.innerHTML =
-        '<i class="fas fa-spinner fa-spin"></i> Generating flyers...';
+        'Generating flyers...';
 
     try {
 
@@ -322,9 +81,9 @@
         displayFlyerList(dealers);
 
         resultDiv.innerHTML =
-            `✅ Generated flyers for ${dealers.length} dealers with active offers.`;
+            `✅ Generated flyers for ${dealers.length} dealers`;
 
-    } catch(err) {
+    } catch (err) {
 
         console.error(err);
 
@@ -333,6 +92,9 @@
     }
 }
 
+// =======================================
+// DISPLAY FLYER LIST
+// =======================================
 function displayFlyerList(flyers) {
 
     const container =
@@ -340,10 +102,10 @@ function displayFlyerList(flyers) {
 
     if (!container) return;
 
-    if (flyers.length === 0) {
+    if (!flyers || flyers.length === 0) {
 
         container.innerHTML =
-            '<div>No dealers with active offers found.</div>';
+            '<div>No dealers with offers found</div>';
 
         return;
     }
@@ -353,22 +115,53 @@ function displayFlyerList(flyers) {
     for (const f of flyers) {
 
         html += `
-        <div style="margin:5px;">
 
-            <button class="btn"
-                onclick="previewFlyer('${f.name.replace(/'/g,"\\'")}')">
+        <div style="
+            background:#0f172a;
+            padding:12px;
+            border-radius:10px;
+            margin:5px;
+            min-width:260px;
+            border:1px solid #334155;
+        ">
 
-                <i class="fas fa-eye"></i>
-                ${f.name} (${f.offerCount})
+            <div style="
+                color:#facc15;
+                font-weight:bold;
+                margin-bottom:6px;
+                font-size:15px;
+            ">
+                ${f.name}
+            </div>
 
-            </button>
+            <div style="font-size:13px;">
+                📞 ${f.phone || 'No Phone'}
+            </div>
 
-            <button class="btn btn-whatsapp"
-                onclick="sendFlyer('${f.name.replace(/'/g,"\\'")}')">
+            <div style="font-size:13px;">
+                🎁 ${f.offerCount} Offers
+            </div>
 
-                <i class="fab fa-whatsapp"></i>
+            <div style="
+                margin-top:10px;
+                display:flex;
+                gap:6px;
+                flex-wrap:wrap;
+            ">
 
-            </button>
+                <button class="btn"
+                    onclick="previewFlyer('${String(f.name).replace(/'/g, "\\'")}')">
+
+                    👁 Preview
+                </button>
+
+                <button class="btn btn-whatsapp"
+                    onclick="sendDealerWhatsApp('${String(f.name).replace(/'/g, "\\'")}')">
+
+                    WhatsApp
+                </button>
+
+            </div>
 
         </div>
         `;
@@ -377,60 +170,48 @@ function displayFlyerList(flyers) {
     container.innerHTML = html;
 }
 
-async function previewFlyer(dealerName) {
+// =======================================
+// PREVIEW FLYER
+// =======================================
+function previewFlyer(dealerName) {
 
-    await BrochureGenerator.loadDealerMaster();
-
-    BrochureGenerator.loadOffers();
-
-    BrochureGenerator.showBrochurePreview(dealerName);
-}
-
-async function exportAllFlyersHTML() {
-
-    await BrochureGenerator.exportAllBrochures();
-}
-
-async function sendFlyer(dealerName) {
-
-    await BrochureGenerator.loadDealerMaster();
-
-    BrochureGenerator.loadOffers();
-
-    BrochureGenerator.sendFlyerToWhatsApp(dealerName);
-}
-
-async function sendBulkWhatsAppFlyers() {
-
-    await BrochureGenerator.loadDealerMaster();
-
-    BrochureGenerator.loadOffers();
-
-    const dealers =
-        await BrochureGenerator.getDealersWithOffers();
-
-    let count = 0;
-
-    for (const dealer of dealers) {
-
-        if (dealer.phone) {
-
-            BrochureGenerator.sendFlyerToWhatsApp(
-                dealer.name
-            );
-
-            count++;
-
-            await new Promise(r => setTimeout(r, 1500));
-        }
-    }
-
-    alert(
-        `Opened WhatsApp for ${count} dealers`
+    BrochureGenerator.showFlyerPreview(
+        dealerName
     );
 }
 
-    setTimeout(runAnalysis, 2000);
-</script>
-</body>
-</html>
+// =======================================
+// SINGLE WHATSAPP
+// =======================================
+function sendDealerWhatsApp(dealerName) {
+
+    BrochureGenerator.sendFlyerWhatsApp(
+        dealerName
+    );
+}
+
+// =======================================
+// DOWNLOAD HTML
+// =======================================
+async function exportAllFlyersHTML() {
+
+    await BrochureGenerator.exportAllFlyers();
+}
+
+// =======================================
+// DOWNLOAD PDF
+// =======================================
+async function exportAllFlyersPDF() {
+
+    await BrochureGenerator.exportAllFlyersPDF();
+}
+
+// =======================================
+// BULK WHATSAPP
+// =======================================
+async function sendBulkWhatsAppFlyers() {
+
+    await BrochureGenerator.sendBulkWhatsAppFlyers();
+}
+
+                                                                    </script>
