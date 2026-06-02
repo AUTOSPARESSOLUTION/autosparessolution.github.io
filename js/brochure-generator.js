@@ -770,20 +770,122 @@
     // =========================================
     window.BrochureGenerator = {
 
-        loadDealerMaster,
-        loadOffers,
-        findDealerInfo,
-        getAllDealerOffers,
-        generateWhatsAppFlyerMessage,
-        sendFlyerWhatsApp,
-        sendBulkWhatsAppFlyers,
-        getDealersWithOffers,
-        showFlyerPreview,
-        exportAllFlyers,
-        exportAllFlyersPDF,
+    // LOADERS
+    loadDealerMaster,
+    loadOffers,
 
-        getDealerMaster: () => dealerMaster,
-        getCurrentOffers: () => currentOffers
-    };
+    // DATA
+    getAllDealerOffers,
+    getDealersWithOffers,
+    findDealerInfo,
+
+    // WHATSAPP
+    generateWhatsAppFlyerMessage,
+
+    // OLD NAME SUPPORT
+    sendFlyerToWhatsApp: sendFlyerWhatsApp,
+    sendFlyerWhatsApp,
+
+    // PREVIEW SUPPORT
+    showBrochurePreview: showFlyerPreview,
+    showFlyerPreview,
+
+    // EXPORT SUPPORT
+    exportAllBrochures: exportAllFlyers,
+    exportAllFlyers,
+
+    // HTML GENERATOR
+    generateFullBrochureHTML: function(dealerName){
+
+        const offers =
+            getAllDealerOffers(dealerName);
+
+        const dealer =
+            findDealerInfo(dealerName);
+
+        let html = `
+        <div style="
+            font-family:Arial;
+            padding:20px;
+            background:white;
+            color:black;
+            width:800px;
+        ">
+
+        <h1 style="color:#0f172a;">
+            AUTO SPARES SOLUTION
+        </h1>
+
+        <h2>
+            ${dealerName}
+        </h2>
+
+        <p>
+            Phone:
+            ${dealer?.phone || ''}
+        </p>
+
+        <table style="
+            width:100%;
+            border-collapse:collapse;
+        ">
+
+        <tr>
+            <th style="border:1px solid #ccc;padding:8px;">
+                Part No
+            </th>
+
+            <th style="border:1px solid #ccc;padding:8px;">
+                Offer Price
+            </th>
+
+            <th style="border:1px solid #ccc;padding:8px;">
+                Discount
+            </th>
+
+            <th style="border:1px solid #ccc;padding:8px;">
+                Stock
+            </th>
+        </tr>
+        `;
+
+        offers.forEach(o => {
+
+            html += `
+            <tr>
+
+                <td style="border:1px solid #ccc;padding:8px;">
+                    ${o.part || ''}
+                </td>
+
+                <td style="border:1px solid #ccc;padding:8px;">
+                    ₹${Number(o.offerPrice || 0).toFixed(2)}
+                </td>
+
+                <td style="border:1px solid #ccc;padding:8px;">
+                    ${o.discount || 0}%
+                </td>
+
+                <td style="border:1px solid #ccc;padding:8px;">
+                    ${o.totalStock || 0}
+                </td>
+
+            </tr>
+            `;
+        });
+
+        html += `
+        </table>
+
+        </div>
+        `;
+
+        return html;
+    },
+
+    // MEMORY
+    getDealerMaster: () => dealerMaster,
+    getCurrentOffers: () => currentOffers
+};
 
 })();
