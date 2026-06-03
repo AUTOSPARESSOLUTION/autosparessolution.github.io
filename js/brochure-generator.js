@@ -355,88 +355,102 @@ function sendFlyerToWhatsApp(
     window.open(url, '_blank');
 }
 
-// =========================================
-// DEALERS WITH OFFERS
-// =========================================
 async function getDealersWithOffers() {
 
-    await loadDealerMaster();
+await loadDealerMaster();
 
-    loadOffers();
+loadOffers();
 
-    const result = [];
+const result = [];
 
-    const uniqueDealers =
-        [
-            ...new Set(
-                currentOffers.map(o =>
-                    normalizeText(
-                        o.dealer ||
-                        o.customer ||
-                        o.customerName ||
-                        ''
+console.log(
+    "Current Offers:",
+    currentOffers
+);
+
+console.log(
+    "Dealer Master:",
+    dealerMaster
+);
+
+// DO NOT MATCH STRICTLY
+// DIRECTLY USE OFFER DEALERS
+
+const uniqueDealers =
+    [...new Set(
+        currentOffers.map(o =>
+
+            String(
+                o.dealer ||
+                o.customer ||
+                o.customerName ||
+                ''
+            ).trim()
+
+        )
+    )];
+
+console.log(
+    "Unique Dealers:",
+    uniqueDealers
+);
+
+for (const dealerName of uniqueDealers) {
+
+    if (!dealerName)
+        continue;
+
+    const offers =
+        getAllDealerOffers(
+            dealerName
+        );
+
+    if (offers.length === 0)
+        continue;
+
+    // OPTIONAL MATCH
+    const dealer =
+        findDealerInfo(
+            dealerName
+        ) || {};
+
+    result.push({
+
+        name:
+            dealerName,
+
+        phone:
+            dealer.phone || '',
+
+        district:
+            dealer.district || '',
+
+        owner:
+            dealer.ownerName || '',
+
+        offerCount:
+            offers.length,
+
+        maxDiscount:
+            Math.max(
+                ...offers.map(x =>
+                    Number(
+                        x.discount || 0
                     )
-                )
+                ),
+                0
             )
-        ];
-
-    for (const normalized of uniqueDealers) {
-
-        const dealer =
-            dealerMaster.find(
-                d =>
-                d.normalizedName ===
-                normalized
-            );
-
-        if (!dealer) continue;
-
-        const offers =
-            getAllDealerOffers(
-                dealer.name
-            );
-
-        if (offers.length === 0)
-            continue;
-
-        result.push({
-
-            name:
-                dealer.name,
-
-            phone:
-                dealer.phone || '',
-
-            district:
-                dealer.district || '',
-
-            owner:
-                dealer.ownerName || '',
-
-            offerCount:
-                offers.length,
-
-            maxDiscount:
-                Math.max(
-                    ...offers.map(
-                        x =>
-                        Number(
-                            x.discount || 0
-                        )
-                    ),
-                    0
-                )
-        });
-    }
-
-    console.log(
-        '✅ Dealers With Offers:',
-        result.length
-    );
-
-    return result;
+    });
 }
 
+console.log(
+    "✅ FINAL DEALERS:",
+    result
+);
+
+return result;
+
+}
 // =========================================
 // PREVIEW
 // =========================================
