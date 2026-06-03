@@ -434,12 +434,35 @@ async function generateAllFlyers(){
 
                     </button>
 
-                    <button class="btn btn-whatsapp"
-                    onclick="BrochureGenerator.sharePDFToWhatsApp('${d.name}')">
+                    <div class="flyer-buttons">
 
-                    <i class="fab fa-whatsapp"></i>
+    <!-- DIRECT MESSAGE -->
+    <button class="btn btn-whatsapp"
+    onclick="sendSingleWhatsApp('${d.name}')">
 
-                    </button>
+    <i class="fab fa-whatsapp"></i>
+    Msg
+
+    </button>
+
+    <!-- PDF SHARE -->
+    <button class="btn btn-purple"
+    onclick="BrochureGenerator.sharePDFToWhatsApp('${d.name}')">
+
+    <i class="fas fa-file-pdf"></i>
+    PDF
+
+    </button>
+
+    <!-- PREVIEW -->
+    <button class="btn"
+    onclick="previewFlyer('${d.name}')">
+
+    👁 Preview
+
+    </button>
+
+</div>
 
                 </div>
 
