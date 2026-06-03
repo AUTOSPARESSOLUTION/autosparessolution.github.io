@@ -117,15 +117,6 @@ th{
     gap:10px;
 }
 
-.log-container{
-    background:#0f172a;
-    padding:10px;
-    border-radius:10px;
-    max-height:200px;
-    overflow:auto;
-    font-size:12px;
-}
-
 .flyer-card{
     background:#0f172a;
     border-radius:12px;
@@ -192,10 +183,10 @@ Run Analysis
 
 </button>
 
-<button class="btn btn-whatsapp"
-onclick="sendBulkWhatsAppFlyers()">
+<button class="btn"
+onclick="generateAllFlyers()">
 
-Send Flyers
+Generate Flyers
 
 </button>
 
@@ -206,10 +197,10 @@ Download PDF
 
 </button>
 
-<button class="btn"
-onclick="generateAllFlyers()">
+<button class="btn btn-whatsapp"
+onclick="sendBulkWhatsAppFlyers()">
 
-Generate Flyers
+Send Flyers
 
 </button>
 
@@ -256,11 +247,18 @@ INIT
 ========================= */
 window.addEventListener('load', async () => {
 
-    if(window.BrochureGenerator?.init){
+    try{
 
-        await BrochureGenerator.init();
+        if(window.BrochureGenerator?.init){
 
-        console.log("✅ BrochureGenerator Initialized");
+            await BrochureGenerator.init();
+
+            console.log("✅ BrochureGenerator Initialized");
+        }
+
+    }catch(err){
+
+        console.error(err);
     }
 });
 
@@ -292,7 +290,7 @@ async function runAnalysis(){
 
         console.error(err);
 
-        alert(err.message);
+        alert(err.message || err);
     }
 }
 
@@ -308,23 +306,26 @@ function displayOffers(offers){
 
     offers.slice(0,50).forEach(o => {
 
+        const dealerSafe =
+            JSON.stringify(o.dealer || '');
+
         const row =
             tbody.insertRow();
 
         row.insertCell(0).innerText =
-            o.dealer;
+            o.dealer || '';
 
         row.insertCell(1).innerText =
-            o.part;
+            o.part || '';
 
         row.insertCell(2).innerText =
             o.pincode || '-';
 
         row.insertCell(3).innerText =
-            o.totalStock;
+            o.totalStock || 0;
 
         row.insertCell(4).innerText =
-            o.discount + '%';
+            (o.discount || 0) + '%';
 
         row.insertCell(5).innerText =
             '₹' + Number(o.offerPrice || 0).toFixed(2);
@@ -332,7 +333,7 @@ function displayOffers(offers){
         row.insertCell(6).innerHTML = `
 
         <button class="btn btn-whatsapp"
-        onclick="sendSingleWhatsApp('${o.dealer}')">
+        onclick='sendSingleWhatsApp(${dealerSafe})'>
 
         <i class="fab fa-whatsapp"></i>
 
@@ -347,13 +348,22 @@ WHATSAPP
 ========================= */
 async function sendSingleWhatsApp(dealerName){
 
-    await BrochureGenerator.loadDealerMaster();
+    try{
 
-    BrochureGenerator.loadOffers();
+        await BrochureGenerator.loadDealerMaster();
 
-    BrochureGenerator.sendFlyerToWhatsApp(
-        dealerName
-    );
+        BrochureGenerator.loadOffers();
+
+        BrochureGenerator.sendFlyerToWhatsApp(
+            dealerName
+        );
+
+    }catch(err){
+
+        console.error(err);
+
+        alert(err.message || err);
+    }
 }
 
 /* =========================
@@ -361,61 +371,88 @@ GENERATE ALL FLYERS
 ========================= */
 async function generateAllFlyers(){
 
-    await BrochureGenerator.loadDealerMaster();
+    try{
 
-    BrochureGenerator.loadOffers();
+        await BrochureGenerator.loadDealerMaster();
 
-    const dealers =
-        await BrochureGenerator.getDealersWithOffers();
+        BrochureGenerator.loadOffers();
 
-    const div =
-        document.getElementById('flyerList');
+        const dealers =
+            await BrochureGenerator.getDealersWithOffers();
 
-    div.innerHTML = '';
+        const div =
+            document.getElementById('flyerList');
 
-    dealers.forEach(d => {
+        div.innerHTML = '';
 
-        div.innerHTML += `
+        if(!dealers.length){
 
-        <div class="flyer-card">
-
-            <div class="flyer-title">
-                ${d.name}
+            div.innerHTML = `
+            <div style="
+                color:#facc15;
+                padding:20px;
+            ">
+                No flyers found.
+                Run Analysis first.
             </div>
+            `;
 
-            <div>
-                Total Offers:
-                ${d.offerCount}
+            return;
+        }
+
+        dealers.forEach(d => {
+
+            const dealerSafe =
+                JSON.stringify(d.name || '');
+
+            div.innerHTML += `
+
+            <div class="flyer-card">
+
+                <div class="flyer-title">
+                    ${d.name || ''}
+                </div>
+
+                <div>
+                    Total Offers:
+                    ${d.offerCount || 0}
+                </div>
+
+                <div class="flyer-buttons">
+
+                    <button class="btn"
+                    onclick='previewFlyer(${dealerSafe})'>
+
+                    👁 Preview
+
+                    </button>
+
+                    <button class="btn btn-purple"
+                    onclick='downloadSinglePDF(${dealerSafe})'>
+
+                    📄 PDF
+
+                    </button>
+
+                    <button class="btn btn-whatsapp"
+                    onclick='sendSingleWhatsApp(${dealerSafe})'>
+
+                    <i class="fab fa-whatsapp"></i>
+
+                    </button>
+
+                </div>
+
             </div>
+            `;
+        });
 
-            <div class="flyer-buttons">
+    }catch(err){
 
-                <button class="btn"
-                onclick="previewFlyer('${d.name}')">
+        console.error(err);
 
-                👁 Preview
-
-                </button>
-
-                <button class="btn btn-purple"
-                onclick="downloadSinglePDF('${d.name}')">
-
-                📄 PDF
-
-                </button>
-
-                <button class="btn btn-whatsapp"
-                onclick="sendSingleWhatsApp('${d.name}')">
-
-                <i class="fab fa-whatsapp"></i>
-
-                </button>
-
-            </div>
-
-        </div>
-        `;
-    });
+        alert(err.message || err);
+    }
 }
 
 /* =========================
@@ -423,13 +460,22 @@ PREVIEW
 ========================= */
 async function previewFlyer(dealerName){
 
-    await BrochureGenerator.loadDealerMaster();
+    try{
 
-    BrochureGenerator.loadOffers();
+        await BrochureGenerator.loadDealerMaster();
 
-    BrochureGenerator.showBrochurePreview(
-        dealerName
-    );
+        BrochureGenerator.loadOffers();
+
+        BrochureGenerator.showBrochurePreview(
+            dealerName
+        );
+
+    }catch(err){
+
+        console.error(err);
+
+        alert(err.message || err);
+    }
 }
 
 /* =========================
@@ -437,66 +483,91 @@ PDF DOWNLOAD
 ========================= */
 async function downloadSinglePDF(dealerName){
 
-    const html =
-        BrochureGenerator.generateFullBrochureHTML(
-            dealerName
+    try{
+
+        const html =
+            BrochureGenerator.generateFullBrochureHTML(
+                dealerName
+            );
+
+        if(!html){
+
+            alert('No flyer found');
+
+            return;
+        }
+
+        const div =
+            document.createElement('div');
+
+        div.innerHTML = html;
+
+        div.style.position = 'fixed';
+        div.style.left = '-9999px';
+        div.style.top = '0';
+        div.style.width = '800px';
+        div.style.background = 'white';
+        div.style.padding = '20px';
+
+        document.body.appendChild(div);
+
+        await new Promise(r =>
+            setTimeout(r, 700)
         );
 
-    const div =
-        document.createElement('div');
+        const canvas =
+            await html2canvas(div,{
+                scale:2,
+                useCORS:true
+            });
 
-    div.innerHTML = html;
+        const img =
+            canvas.toDataURL('image/png');
 
-    div.style.position = 'fixed';
-    div.style.left = '-9999px';
-    div.style.background = 'white';
+        const jsPDF =
+            window.jspdf?.jsPDF;
 
-    document.body.appendChild(div);
+        if(!jsPDF){
 
-    await new Promise(r =>
-        setTimeout(r, 500)
-    );
+            alert('PDF library missing');
 
-    const canvas =
-        await html2canvas(div,{
-            scale:2,
-            useCORS:true
-        });
+            return;
+        }
 
-    const img =
-        canvas.toDataURL('image/png');
+        const pdf =
+            new jsPDF(
+                'p',
+                'mm',
+                'a4'
+            );
 
-    const jsPDF =
-        window.jspdf?.jsPDF;
+        const pdfWidth = 190;
 
-    if(!jsPDF){
+        const pdfHeight =
+            (canvas.height * pdfWidth)
+            / canvas.width;
 
-        alert('PDF library missing');
+        pdf.addImage(
+            img,
+            'PNG',
+            10,
+            10,
+            pdfWidth,
+            pdfHeight
+        );
 
-        return;
+        pdf.save(
+            dealerName + '.pdf'
+        );
+
+        document.body.removeChild(div);
+
+    }catch(err){
+
+        console.error(err);
+
+        alert(err.message || err);
     }
-
-    const pdf =
-        new jsPDF(
-            'p',
-            'mm',
-            'a4'
-        );
-
-    pdf.addImage(
-        img,
-        'PNG',
-        5,
-        5,
-        200,
-        280
-    );
-
-    pdf.save(
-        dealerName + '.pdf'
-    );
-
-    document.body.removeChild(div);
 }
 
 /* =========================
@@ -504,14 +575,23 @@ DOWNLOAD ALL PDF
 ========================= */
 async function downloadAllFlyersPDF(){
 
-    const dealers =
-        await BrochureGenerator.getDealersWithOffers();
+    try{
 
-    for(const d of dealers){
+        const dealers =
+            await BrochureGenerator.getDealersWithOffers();
 
-        await downloadSinglePDF(
-            d.name
-        );
+        for(const d of dealers){
+
+            await downloadSinglePDF(
+                d.name
+            );
+        }
+
+    }catch(err){
+
+        console.error(err);
+
+        alert(err.message || err);
     }
 }
 
@@ -520,25 +600,34 @@ SEND BULK WHATSAPP
 ========================= */
 async function sendBulkWhatsAppFlyers(){
 
-    const dealers =
-        await BrochureGenerator.getDealersWithOffers();
+    try{
 
-    for(const d of dealers){
+        const dealers =
+            await BrochureGenerator.getDealersWithOffers();
 
-        if(d.phone){
+        for(const d of dealers){
 
-            BrochureGenerator.sendFlyerToWhatsApp(
-                d.name
-            );
+            if(d.phone){
 
-            await new Promise(r =>
-                setTimeout(r,1500)
-            );
+                BrochureGenerator.sendFlyerToWhatsApp(
+                    d.name
+                );
+
+                await new Promise(r =>
+                    setTimeout(r,1500)
+                );
+            }
         }
+
+    }catch(err){
+
+        console.error(err);
+
+        alert(err.message || err);
     }
 }
 
 </script>
 
 </body>
-    </html>
+</html>
