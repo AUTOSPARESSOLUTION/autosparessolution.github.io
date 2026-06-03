@@ -1,6 +1,6 @@
 // brochure-generator.js
-// FINAL FULL FIXED VERSION
-// Auto Spares Solution
+// COMPLETE FINAL FIXED VERSION
+// AUTO SPARES SOLUTION
 
 (function () {
 
@@ -57,7 +57,7 @@ async function loadExcelFile(url, sheetName = null) {
 }
 
 // =========================================
-// NORMALIZE TEXT (FULL FIX)
+// NORMALIZE TEXT
 // =========================================
 function normalizeText(text){
 
@@ -247,7 +247,7 @@ function getAllDealerOffers(dealerName) {
 }
 
 // =========================================
-// FIND DEALER INFO (FULL FIX)
+// FIND DEALER INFO
 // =========================================
 function findDealerInfo(dealerName){
 
@@ -255,11 +255,6 @@ function findDealerInfo(dealerName){
 
     const normalizedSearch =
         normalizeText(dealerName);
-
-    console.log(
-        'Searching Dealer:',
-        normalizedSearch
-    );
 
     // EXACT MATCH
     let found =
@@ -446,39 +441,54 @@ function showBrochurePreview(dealerName){
 }
 
 // =========================================
-// WHATSAPP MESSAGE
+// PERSONAL WHATSAPP MESSAGE
 // =========================================
 function generateWhatsAppFlyerMessage(
     dealerName
-) {
+){
 
     const offers =
-        getAllDealerOffers(dealerName);
+        getAllDealerOffers(
+            dealerName
+        );
+
+    const dealer =
+        findDealerInfo(
+            dealerName
+        ) || {};
+
+    if(!offers.length){
+
+        return 'No offers available';
+    }
+
+    const o = offers[0];
 
     let msg = '';
 
-    msg += '⚡ AUTO SPARES SOLUTION ⚡\n\n';
-
     msg +=
-        'Dealer: ' +
-        dealerName +
-        '\n\n';
+`Dear ${dealerName},
 
-    offers.forEach((o, i) => {
+🎁 Special Offer for ${o.part || ''}
 
-        msg +=
-            (i + 1) +
-            '. ' +
-            (o.part || '') +
-            '\n';
+Extra Discount:
+${o.discount || 0}% OFF
 
-        msg +=
-            'Rs. ' +
-            Number(
-                o.offerPrice || 0
-            ).toFixed(2) +
-            '\n\n';
-    });
+Offer Price:
+₹${Number(
+    o.offerPrice || 0
+).toFixed(2)}
+
+Available Stock:
+${o.totalStock || 0}
+
+District:
+${dealer.district || 'N/A'}
+
+Reply YES to confirm order.
+
+Auto Spares Solution
+https://autosparessolution.com`;
 
     return msg;
 }
@@ -491,7 +501,9 @@ function sendFlyerToWhatsApp(
 ) {
 
     const dealer =
-        findDealerInfo(dealerName);
+        findDealerInfo(
+            dealerName
+        );
 
     if (!dealer) {
 
@@ -518,10 +530,19 @@ function sendFlyerToWhatsApp(
             dealerName
         );
 
-    const url =
-        `https://wa.me/${dealer.phone}?text=${encodeURIComponent(msg)}`;
+    const phone =
+        String(dealer.phone)
+        .replace(/\D/g,'');
 
-    window.open(url, '_blank');
+    const url =
+`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
+
+    console.log(
+        'WhatsApp URL:',
+        url
+    );
+
+    window.location.href = url;
 }
 
 // =========================================
