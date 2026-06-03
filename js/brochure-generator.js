@@ -441,7 +441,7 @@ function showBrochurePreview(dealerName){
 }
 
 // =========================================
-// PERSONAL WHATSAPP MESSAGE
+// PERSONAL MULTI-ITEM WHATSAPP MESSAGE
 // =========================================
 function generateWhatsAppFlyerMessage(
     dealerName
@@ -462,14 +462,19 @@ function generateWhatsAppFlyerMessage(
         return 'No offers available';
     }
 
-    const o = offers[0];
-
     let msg = '';
 
     msg +=
 `Dear ${dealerName},
 
-🎁 Special Offer for ${o.part || ''}
+🎁 Special Offer List
+
+`;
+
+    offers.forEach((o, i) => {
+
+        msg +=
+`${i + 1}) ${o.part || ''}
 
 Extra Discount:
 ${o.discount || 0}% OFF
@@ -482,7 +487,12 @@ Offer Price:
 Available Stock:
 ${o.totalStock || 0}
 
-District:
+`;
+
+    });
+
+    msg +=
+`District:
 ${dealer.district || 'N/A'}
 
 Reply YES to confirm order.
