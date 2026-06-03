@@ -12,10 +12,10 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<!-- PDF LIBRARY (ONLY ONCE FIXED) -->
+<!-- PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-<!-- HTML TO IMAGE -->
+<!-- HTML TO CANVAS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script src="js/dealer-intelligence.js"></script>
@@ -59,11 +59,21 @@ h1,h2,h3{
     margin:5px;
 }
 
-.btn:hover{opacity:0.9;}
+.btn:hover{
+    opacity:0.9;
+}
 
-.btn-whatsapp{background:#25D366;}
-.btn-purple{background:#9333ea;}
-.btn-success{background:#16a34a;}
+.btn-whatsapp{
+    background:#25D366;
+}
+
+.btn-purple{
+    background:#9333ea;
+}
+
+.btn-success{
+    background:#16a34a;
+}
 
 .stats-grid{
     display:grid;
@@ -116,6 +126,27 @@ th{
     font-size:12px;
 }
 
+.flyer-card{
+    background:#0f172a;
+    border-radius:12px;
+    padding:15px;
+    min-width:280px;
+    border:1px solid #334155;
+}
+
+.flyer-title{
+    color:#facc15;
+    font-size:18px;
+    margin-bottom:8px;
+}
+
+.flyer-buttons{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:10px;
+}
+
 </style>
 
 </head>
@@ -124,7 +155,9 @@ th{
 
 <div class="container">
 
-<h1>Dealer Intelligence Dashboard</h1>
+<h1>
+Dealer Intelligence Dashboard
+</h1>
 
 <div class="stats-grid">
 
@@ -152,15 +185,44 @@ th{
 
 <div class="flex">
 
-<button class="btn btn-success" onclick="runAnalysis()">Run Analysis</button>
-<button class="btn btn-whatsapp" onclick="sendBulkWhatsApp()">Send Top Offers</button>
+<button class="btn btn-success"
+onclick="runAnalysis()">
+
+Run Analysis
+
+</button>
+
+<button class="btn btn-whatsapp"
+onclick="sendBulkWhatsAppFlyers()">
+
+Send Flyers
+
+</button>
+
+<button class="btn btn-purple"
+onclick="downloadAllFlyersPDF()">
+
+Download PDF
+
+</button>
+
+<button class="btn"
+onclick="generateAllFlyers()">
+
+Generate Flyers
+
+</button>
 
 </div>
 
-<h2>Active Offers</h2>
+<h2 style="margin-top:20px;">
+Active Offers
+</h2>
 
 <table>
+
 <thead>
+
 <tr>
 <th>Dealer</th>
 <th>Part</th>
@@ -170,176 +232,313 @@ th{
 <th>Offer Price</th>
 <th>Action</th>
 </tr>
+
 </thead>
 
 <tbody id="offersTbody"></tbody>
+
 </table>
 
-<h2 style="margin-top:20px;">Marketing</h2>
+<h2 style="margin-top:20px;">
+Dealer Flyers
+</h2>
 
-<div class="flex">
-
-<button class="btn btn-purple" onclick="generateAllFlyers()">Generate Flyers</button>
-
-<button class="btn btn-whatsapp" onclick="sendBulkWhatsAppFlyers()">Send Flyers</button>
-
-<button class="btn btn-purple" onclick="downloadAllFlyersPDF()">Download PDF</button>
-
-</div>
-
-<div id="flyerList" class="flex"></div>
+<div id="flyerList"
+class="flex"
+style="margin-top:15px;"></div>
 
 </div>
 
 <script>
 
 /* =========================
-INIT FIX (VERY IMPORTANT)
+INIT
 ========================= */
-window.addEventListener("load", async () => {
-    if (window.BrochureGenerator?.init) {
+window.addEventListener('load', async () => {
+
+    if(window.BrochureGenerator?.init){
+
         await BrochureGenerator.init();
-        console.log("✅ Brochure Init Done");
+
+        console.log("✅ BrochureGenerator Initialized");
     }
 });
 
 /* =========================
-SAFE PDF ACCESS FIX
+RUN ANALYSIS
 ========================= */
-function getJsPDF(){
-    return window.jspdf?.jsPDF || null;
-}
-
-/* =========================
-PDF FIX WRAPPER
-========================= */
-async function downloadSinglePDF(dealerName){
-
-    const html =
-        BrochureGenerator.generateFullBrochureHTML?.(dealerName)
-        || "<div>No Template Found</div>";
-
-    const div = document.createElement('div');
-
-    div.innerHTML = html;
-
-    div.style.position = "absolute";
-    div.style.left = "0";
-    div.style.top = "0";
-    div.style.background = "white";
-
-    document.body.appendChild(div);
-
-    await new Promise(r => setTimeout(r, 500));
-
-    const canvas = await html2canvas(div);
-    const img = canvas.toDataURL('image/png');
-
-    const jsPDF = getJsPDF();
-
-    if(!jsPDF){
-        alert("PDF library not loaded");
-        document.body.removeChild(div);
-        return;
-    }
-
-    const pdf = new jsPDF('p','mm','a4');
-
-    pdf.addImage(img,'PNG',5,5,200,280);
-
-    pdf.save(dealerName + '.pdf');
-
-    document.body.removeChild(div);
-}
-
-/* =========================
-REST OF YOUR FUNCTIONS (UNCHANGED CALLS)
-========================= */
-
 async function runAnalysis(){
-    const result = await DealerIntelligence.runFullAnalysis();
-    document.getElementById('totalOffers').innerText = result.offersGenerated || 0;
-    document.getElementById('highDiscount').innerText = result.highDiscountOffers || 0;
-    document.getElementById('lowStockCount').innerText = result.lowStockAlerts || 0;
-    document.getElementById('areasCount').innerText = result.areasAnalysed || 0;
-    displayOffers(result.offers || []);
+
+    try{
+
+        const result =
+            await DealerIntelligence.runFullAnalysis();
+
+        document.getElementById('totalOffers').innerText =
+            result.offersGenerated || 0;
+
+        document.getElementById('highDiscount').innerText =
+            result.highDiscountOffers || 0;
+
+        document.getElementById('lowStockCount').innerText =
+            result.lowStockAlerts || 0;
+
+        document.getElementById('areasCount').innerText =
+            result.areasAnalysed || 0;
+
+        displayOffers(result.offers || []);
+
+    }catch(err){
+
+        console.error(err);
+
+        alert(err.message);
+    }
 }
 
+/* =========================
+DISPLAY OFFERS
+========================= */
 function displayOffers(offers){
 
-    const tbody = document.getElementById('offersTbody');
+    const tbody =
+        document.getElementById('offersTbody');
+
     tbody.innerHTML = '';
 
     offers.slice(0,50).forEach(o => {
 
-        const row = tbody.insertRow();
+        const row =
+            tbody.insertRow();
 
-        row.insertCell(0).innerText = o.dealer;
-        row.insertCell(1).innerText = o.part;
-        row.insertCell(2).innerText = o.pincode || '-';
-        row.insertCell(3).innerText = o.totalStock;
+        row.insertCell(0).innerText =
+            o.dealer;
 
-        row.insertCell(4).innerHTML =
-            `<span class="badge">${o.discount}%</span>`;
+        row.insertCell(1).innerText =
+            o.part;
+
+        row.insertCell(2).innerText =
+            o.pincode || '-';
+
+        row.insertCell(3).innerText =
+            o.totalStock;
+
+        row.insertCell(4).innerText =
+            o.discount + '%';
 
         row.insertCell(5).innerText =
-            '₹' + Number(o.offerPrice).toFixed(2);
+            '₹' + Number(o.offerPrice || 0).toFixed(2);
 
-        row.insertCell(6).innerHTML =
-            `<button class="btn btn-whatsapp" onclick="sendSingleWhatsApp('${o.dealer}')">WA</button>`;
+        row.insertCell(6).innerHTML = `
+
+        <button class="btn btn-whatsapp"
+        onclick="sendSingleWhatsApp('${o.dealer}')">
+
+        <i class="fab fa-whatsapp"></i>
+
+        </button>
+
+        `;
     });
 }
 
+/* =========================
+WHATSAPP
+========================= */
 async function sendSingleWhatsApp(dealerName){
+
     await BrochureGenerator.loadDealerMaster();
+
     BrochureGenerator.loadOffers();
-    BrochureGenerator.sendFlyerToWhatsApp(dealerName);
+
+    BrochureGenerator.sendFlyerToWhatsApp(
+        dealerName
+    );
 }
 
+/* =========================
+GENERATE ALL FLYERS
+========================= */
 async function generateAllFlyers(){
+
     await BrochureGenerator.loadDealerMaster();
+
     BrochureGenerator.loadOffers();
 
-    const dealers = await BrochureGenerator.getDealersWithOffers();
+    const dealers =
+        await BrochureGenerator.getDealersWithOffers();
 
-    const div = document.getElementById('flyerList');
+    const div =
+        document.getElementById('flyerList');
+
     div.innerHTML = '';
 
     dealers.forEach(d => {
 
         div.innerHTML += `
-        <button class="btn" onclick="sendSingleWhatsApp('${d.name}')">
-        ${d.name} (${d.offerCount})
-        </button>`;
+
+        <div class="flyer-card">
+
+            <div class="flyer-title">
+                ${d.name}
+            </div>
+
+            <div>
+                Total Offers:
+                ${d.offerCount}
+            </div>
+
+            <div class="flyer-buttons">
+
+                <button class="btn"
+                onclick="previewFlyer('${d.name}')">
+
+                👁 Preview
+
+                </button>
+
+                <button class="btn btn-purple"
+                onclick="downloadSinglePDF('${d.name}')">
+
+                📄 PDF
+
+                </button>
+
+                <button class="btn btn-whatsapp"
+                onclick="sendSingleWhatsApp('${d.name}')">
+
+                <i class="fab fa-whatsapp"></i>
+
+                </button>
+
+            </div>
+
+        </div>
+        `;
     });
 }
 
-async function sendBulkWhatsAppFlyers(){
+/* =========================
+PREVIEW
+========================= */
+async function previewFlyer(dealerName){
 
     await BrochureGenerator.loadDealerMaster();
+
     BrochureGenerator.loadOffers();
 
-    const dealers = await BrochureGenerator.getDealersWithOffers();
+    BrochureGenerator.showBrochurePreview(
+        dealerName
+    );
+}
+
+/* =========================
+PDF DOWNLOAD
+========================= */
+async function downloadSinglePDF(dealerName){
+
+    const html =
+        BrochureGenerator.generateFullBrochureHTML(
+            dealerName
+        );
+
+    const div =
+        document.createElement('div');
+
+    div.innerHTML = html;
+
+    div.style.position = 'fixed';
+    div.style.left = '-9999px';
+    div.style.background = 'white';
+
+    document.body.appendChild(div);
+
+    await new Promise(r =>
+        setTimeout(r, 500)
+    );
+
+    const canvas =
+        await html2canvas(div,{
+            scale:2,
+            useCORS:true
+        });
+
+    const img =
+        canvas.toDataURL('image/png');
+
+    const jsPDF =
+        window.jspdf?.jsPDF;
+
+    if(!jsPDF){
+
+        alert('PDF library missing');
+
+        return;
+    }
+
+    const pdf =
+        new jsPDF(
+            'p',
+            'mm',
+            'a4'
+        );
+
+    pdf.addImage(
+        img,
+        'PNG',
+        5,
+        5,
+        200,
+        280
+    );
+
+    pdf.save(
+        dealerName + '.pdf'
+    );
+
+    document.body.removeChild(div);
+}
+
+/* =========================
+DOWNLOAD ALL PDF
+========================= */
+async function downloadAllFlyersPDF(){
+
+    const dealers =
+        await BrochureGenerator.getDealersWithOffers();
+
+    for(const d of dealers){
+
+        await downloadSinglePDF(
+            d.name
+        );
+    }
+}
+
+/* =========================
+SEND BULK WHATSAPP
+========================= */
+async function sendBulkWhatsAppFlyers(){
+
+    const dealers =
+        await BrochureGenerator.getDealersWithOffers();
 
     for(const d of dealers){
 
         if(d.phone){
-            BrochureGenerator.sendFlyerToWhatsApp(d.name);
-            await new Promise(r=>setTimeout(r,1500));
+
+            BrochureGenerator.sendFlyerToWhatsApp(
+                d.name
+            );
+
+            await new Promise(r =>
+                setTimeout(r,1500)
+            );
         }
-    }
-}
-
-async function downloadAllFlyersPDF(){
-
-    const dealers = await BrochureGenerator.getDealersWithOffers();
-
-    for(const d of dealers){
-        await downloadSinglePDF(d.name);
     }
 }
 
 </script>
 
 </body>
-</html>
+    </html>
