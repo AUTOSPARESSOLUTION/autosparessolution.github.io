@@ -1,5 +1,5 @@
 // brochure-generator.js
-// COMPLETE FINAL FIXED VERSION
+// COMPLETE FINAL VERSION
 // AUTO SPARES SOLUTION
 
 (function () {
@@ -203,11 +203,6 @@ function loadOffers() {
                 );
             });
 
-        console.log(
-            '✅ Offers Loaded:',
-            currentOffers.length
-        );
-
         return currentOffers;
 
     } catch (err) {
@@ -247,7 +242,7 @@ function getAllDealerOffers(dealerName) {
 }
 
 // =========================================
-// FIND DEALER INFO
+// FIND DEALER
 // =========================================
 function findDealerInfo(dealerName){
 
@@ -256,7 +251,6 @@ function findDealerInfo(dealerName){
     const normalizedSearch =
         normalizeText(dealerName);
 
-    // EXACT MATCH
     let found =
         dealerMaster.find(d => {
 
@@ -270,7 +264,6 @@ function findDealerInfo(dealerName){
         return found;
     }
 
-    // PARTIAL MATCH
     found =
         dealerMaster.find(d => {
 
@@ -281,34 +274,6 @@ function findDealerInfo(dealerName){
                 db.includes(normalizedSearch) ||
                 normalizedSearch.includes(db)
             );
-        });
-
-    if(found){
-        return found;
-    }
-
-    // WORD MATCH
-    const words =
-        normalizedSearch
-        .split(' ')
-        .filter(w => w.length > 2);
-
-    found =
-        dealerMaster.find(d => {
-
-            const db =
-                normalizeText(d.name);
-
-            let matched = 0;
-
-            words.forEach(w => {
-
-                if(db.includes(w)){
-                    matched++;
-                }
-            });
-
-            return matched >= 2;
         });
 
     return found || null;
@@ -341,11 +306,7 @@ function generateFullBrochureHTML(dealerName){
     AUTO SPARES SOLUTION
     </h1>
 
-    <h2 style="
-        margin-bottom:10px;
-    ">
-    ${dealerName}
-    </h2>
+    <h2>${dealerName}</h2>
 
     <p>
     Mobile:
@@ -441,7 +402,7 @@ function showBrochurePreview(dealerName){
 }
 
 // =========================================
-// PERSONAL MULTI-ITEM WHATSAPP MESSAGE
+// WHATSAPP MESSAGE
 // =========================================
 function generateWhatsAppFlyerMessage(
     dealerName
@@ -488,7 +449,6 @@ Available Stock:
 ${o.totalStock || 0}
 
 `;
-
     });
 
     msg +=
@@ -547,12 +507,113 @@ function sendFlyerToWhatsApp(
     const url =
 `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
 
-    console.log(
-        'WhatsApp URL:',
-        url
-    );
-
     window.location.href = url;
+}
+
+// =========================================
+// SHARE PDF TO WHATSAPP
+// =========================================
+async function sharePDFToWhatsApp(
+    dealerName
+){
+
+    try{
+
+        const html =
+            generateFullBrochureHTML(
+                dealerName
+            );
+
+        const div =
+            document.createElement('div');
+
+        div.innerHTML = html;
+
+        div.style.position = 'fixed';
+        div.style.left = '-9999px';
+        div.style.background = 'white';
+
+        document.body.appendChild(div);
+
+        await new Promise(r =>
+            setTimeout(r,500)
+        );
+
+        const canvas =
+            await html2canvas(div,{
+                scale:2,
+                useCORS:true
+            });
+
+        const img =
+            canvas.toDataURL('image/png');
+
+        const jsPDF =
+            window.jspdf?.jsPDF;
+
+        const pdf =
+            new jsPDF(
+                'p',
+                'mm',
+                'a4'
+            );
+
+        pdf.addImage(
+            img,
+            'PNG',
+            5,
+            5,
+            200,
+            280
+        );
+
+        const blob =
+            pdf.output('blob');
+
+        const file =
+            new File(
+                [blob],
+                dealerName + '.pdf',
+                {
+                    type:'application/pdf'
+                }
+            );
+
+        if(
+            navigator.canShare &&
+            navigator.canShare({
+                files:[file]
+            })
+        ){
+
+            await navigator.share({
+
+                title:
+                    dealerName,
+
+                text:
+                    'Special Offer Flyer',
+
+                files:[file]
+            });
+
+        }else{
+
+            alert(
+                'Sharing not supported on this device'
+            );
+        }
+
+        document.body.removeChild(div);
+
+    }catch(err){
+
+        console.error(err);
+
+        alert(
+            'PDF share failed'
+        );
+    }
 }
 
 // =========================================
@@ -678,6 +739,8 @@ window.BrochureGenerator = {
     generateWhatsAppFlyerMessage,
 
     sendFlyerToWhatsApp,
+
+    sharePDFToWhatsApp,
 
     getDealersWithOffers,
 
