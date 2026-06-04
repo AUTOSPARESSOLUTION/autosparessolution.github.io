@@ -323,7 +323,7 @@
                     parseInt(cols[7]) || 0;
 
                 const price =
-                    parseFloat(cols[6]) || 0;
+                    parseFloat(cols[3]) || 0;
 
                 currentStock.set(part, {
                     stock,
