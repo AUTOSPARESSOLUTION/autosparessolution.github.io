@@ -100,6 +100,47 @@ function cleanPhone(phone) {
 }
 
 // =========================================
+// CALCULATIONS
+// =========================================
+function getMRP(o){
+
+    return Number(
+        o.mrp ||
+        o.MRP ||
+        o.price ||
+        o.Price ||
+        o.offerPrice ||
+        0
+    );
+}
+
+function getBasicPrice(mrp){
+
+    return mrp - (mrp * 31.77 / 100);
+}
+
+function getSplDiscount(o){
+
+    return Number(
+        o.discount ||
+        o.Discount ||
+        0
+    );
+}
+
+function getNetPrice(basicPrice, splDiscount){
+
+    const afterDiscount =
+        basicPrice -
+        (basicPrice * splDiscount / 100);
+
+    const gst =
+        afterDiscount * 18 / 100;
+
+    return afterDiscount + gst;
+}
+
+// =========================================
 // LOAD DEALER MASTER
 // =========================================
 async function loadDealerMaster() {
@@ -292,11 +333,16 @@ function generateFullBrochureHTML(dealerName){
 
     let html = `
     <div style="
-        width:800px;
+        width:1100px;
         background:white;
         color:black;
         padding:20px;
         font-family:Arial;
+    ">
+
+    <div style="
+        text-align:center;
+        margin-bottom:20px;
     ">
 
     <h1 style="
@@ -306,34 +352,73 @@ function generateFullBrochureHTML(dealerName){
     AUTO SPARES SOLUTION
     </h1>
 
-    <h2>${dealerName}</h2>
+    <h2 style="
+        margin:0;
+    ">
+    SPECIAL OFFER FLYER
+    </h2>
 
-    <p>
-    Mobile:
+    </div>
+
+    <div style="
+        margin-bottom:15px;
+        font-size:16px;
+    ">
+
+    <b>Dealer:</b>
+    ${dealerName}
+
+    <br><br>
+
+    <b>Mobile:</b>
     ${dealer?.phone || 'N/A'}
-    </p>
+
+    <br><br>
+
+    <b>District:</b>
+    ${dealer?.district || 'N/A'}
+
+    </div>
 
     <table style="
         width:100%;
         border-collapse:collapse;
-        margin-top:20px;
+        margin-top:10px;
+        font-size:13px;
     ">
 
-    <tr style="background:#facc15;">
+    <tr style="
+        background:#facc15;
+        color:black;
+    ">
 
-    <th style="border:1px solid #ccc;padding:8px;">
+    <th style="border:1px solid #999;padding:8px;">
     Part
     </th>
 
-    <th style="border:1px solid #ccc;padding:8px;">
-    Price
+    <th style="border:1px solid #999;padding:8px;">
+    MRP
     </th>
 
-    <th style="border:1px solid #ccc;padding:8px;">
-    Discount
+    <th style="border:1px solid #999;padding:8px;">
+    Basic Price
+    <br>
+    (Less 31.77%)
     </th>
 
-    <th style="border:1px solid #ccc;padding:8px;">
+    <th style="border:1px solid #999;padding:8px;">
+    Spl Dis
+    <br>
+    (Max 6%)
+    </th>
+
+    <th style="border:1px solid #999;padding:8px;">
+    Net Price
+    <br>
+    Incl GST 18%
+    </th>
+
+    <th style="border:1px solid #999;padding:8px;">
     Stock
     </th>
 
@@ -342,22 +427,70 @@ function generateFullBrochureHTML(dealerName){
 
     offers.forEach(o => {
 
+        const mrp =
+            getMRP(o);
+
+        const basicPrice =
+            getBasicPrice(mrp);
+
+        const splDiscount =
+            getSplDiscount(o);
+
+        const netPrice =
+            getNetPrice(
+                basicPrice,
+                splDiscount
+            );
+
         html += `
         <tr>
 
-        <td style="border:1px solid #ccc;padding:8px;">
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+        ">
         ${o.part || ''}
         </td>
 
-        <td style="border:1px solid #ccc;padding:8px;">
-        ₹${Number(o.offerPrice || 0).toFixed(2)}
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+            text-align:right;
+        ">
+        ₹${mrp.toFixed(2)}
         </td>
 
-        <td style="border:1px solid #ccc;padding:8px;">
-        ${o.discount || 0}%
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+            text-align:right;
+        ">
+        ₹${basicPrice.toFixed(2)}
         </td>
 
-        <td style="border:1px solid #ccc;padding:8px;">
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+            text-align:center;
+        ">
+        ${splDiscount}%
+        </td>
+
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+            text-align:right;
+            font-weight:bold;
+            color:#16a34a;
+        ">
+        ₹${netPrice.toFixed(2)}
+        </td>
+
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+            text-align:center;
+        ">
         ${o.totalStock || 0}
         </td>
 
@@ -367,6 +500,25 @@ function generateFullBrochureHTML(dealerName){
 
     html += `
     </table>
+
+    <div style="
+        margin-top:25px;
+        text-align:center;
+        font-size:14px;
+        color:#444;
+    ">
+
+    Reply YES to confirm order
+
+    <br><br>
+
+    Auto Spares Solution
+
+    <br>
+
+    https://autosparessolution.com
+
+    </div>
 
     </div>
     `;
@@ -392,8 +544,14 @@ function showBrochurePreview(dealerName){
     <head>
     <title>${dealerName}</title>
     </head>
-    <body style="background:#eee;padding:20px;">
+
+    <body style="
+        background:#ddd;
+        padding:20px;
+    ">
+
     ${html}
+
     </body>
     </html>
     `);
@@ -428,25 +586,46 @@ function generateWhatsAppFlyerMessage(
     msg +=
 `Dear ${dealerName},
 
-🎁 Special Offer List
+🎁 SPECIAL OFFER LIST
 
 `;
 
     offers.forEach((o, i) => {
 
+        const mrp =
+            getMRP(o);
+
+        const basicPrice =
+            getBasicPrice(mrp);
+
+        const splDiscount =
+            getSplDiscount(o);
+
+        const netPrice =
+            getNetPrice(
+                basicPrice,
+                splDiscount
+            );
+
         msg +=
 `${i + 1}) ${o.part || ''}
 
-Extra Discount:
-${o.discount || 0}% OFF
+MRP:
+₹${mrp.toFixed(2)}
 
-Offer Price:
-₹${Number(
-    o.offerPrice || 0
-).toFixed(2)}
+Basic Price:
+₹${basicPrice.toFixed(2)}
+
+Special Discount:
+${splDiscount}% OFF
+
+Net Price Incl GST:
+₹${netPrice.toFixed(2)}
 
 Available Stock:
 ${o.totalStock || 0}
+
+-------------------------
 
 `;
     });
@@ -505,12 +684,13 @@ function sendFlyerToWhatsApp(
         .replace(/\D/g,'');
 
     const url =
-`whatsapp://send?phone=${dealer.phone}&text=${encodeURIComponent(msg)}`;
+`whatsapp://send?phone=${phone}&text=${encodeURIComponent(msg)}`;
 
-window.location.href = url;}
+    window.location.href = url;
+}
 
 // =========================================
-// SHARE PDF TO WHATSAPP
+// SHARE PDF
 // =========================================
 async function sharePDFToWhatsApp(
     dealerName
@@ -530,12 +710,13 @@ async function sharePDFToWhatsApp(
 
         div.style.position = 'fixed';
         div.style.left = '-9999px';
+        div.style.top = '0';
         div.style.background = 'white';
 
         document.body.appendChild(div);
 
         await new Promise(r =>
-            setTimeout(r,500)
+            setTimeout(r,700)
         );
 
         const canvas =
@@ -549,6 +730,13 @@ async function sharePDFToWhatsApp(
 
         const jsPDF =
             window.jspdf?.jsPDF;
+
+        if(!jsPDF){
+
+            alert('PDF Library Missing');
+
+            return;
+        }
 
         const pdf =
             new jsPDF(
@@ -566,42 +754,9 @@ async function sharePDFToWhatsApp(
             280
         );
 
-        const blob =
-            pdf.output('blob');
-
-        const file =
-            new File(
-                [blob],
-                dealerName + '.pdf',
-                {
-                    type:'application/pdf'
-                }
-            );
-
-        if(
-            navigator.canShare &&
-            navigator.canShare({
-                files:[file]
-            })
-        ){
-
-            await navigator.share({
-
-                title:
-                    dealerName,
-
-                text:
-                    'Special Offer Flyer',
-
-                files:[file]
-            });
-
-        }else{
-
-            alert(
-                'Sharing not supported on this device'
-            );
-        }
+        pdf.save(
+            dealerName + '.pdf'
+        );
 
         document.body.removeChild(div);
 
@@ -610,7 +765,7 @@ async function sharePDFToWhatsApp(
         console.error(err);
 
         alert(
-            'PDF share failed'
+            'PDF creation failed'
         );
     }
 }
