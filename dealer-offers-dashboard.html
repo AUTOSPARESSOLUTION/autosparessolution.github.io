@@ -436,7 +436,7 @@ async function generateAllFlyers(){
 
                     <div class="flyer-buttons">
 
-    <!-- DIRECT MESSAGE -->
+    <!-- DIRECT WHATSAPP -->
     <button class="btn btn-whatsapp"
     onclick="sendSingleWhatsApp('${d.name}')">
 
@@ -445,9 +445,9 @@ async function generateAllFlyers(){
 
     </button>
 
-    <!-- PDF SHARE -->
+    <!-- PDF DOWNLOAD -->
     <button class="btn btn-purple"
-    onclick="BrochureGenerator.sharePDFToWhatsApp('${d.name}')">
+    onclick="downloadSinglePDF('${d.name}')">
 
     <i class="fas fa-file-pdf"></i>
     PDF
