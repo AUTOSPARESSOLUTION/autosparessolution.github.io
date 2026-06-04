@@ -1,41 +1,37 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (ZERO BREAK VERSION)");
+console.log("🚀 Brochure System Loaded (FINAL STABLE VERSION)");
 
-// ================================
-// DATA STORAGE
-// ================================
+// =========================
+// DATA
+// =========================
 let dealerMaster = [];
 let currentOffers = [];
 let dealerOfferMap = {};
 
-// ================================
-// SAFE XLSX CHECK
-// ================================
-function checkXLSX() {
-    if (typeof XLSX === "undefined") {
-        console.error("❌ XLSX library missing");
-        return false;
-    }
-    return true;
+// =========================
+// XLSX CHECK
+// =========================
+function hasXLSX() {
+    return typeof XLSX !== "undefined";
 }
 
-// ================================
+// =========================
 // LOAD EXCEL
-// ================================
+// =========================
 async function loadExcelFile(url, sheetName = null) {
 
     try {
 
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("File not found: " + url);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("File not found: " + url);
 
-        const buffer = await response.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
+        const buf = await res.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
 
-        const sheet = sheetName && workbook.SheetNames.includes(sheetName)
-            ? workbook.Sheets[sheetName]
-            : workbook.Sheets[workbook.SheetNames[0]];
+        const sheet = sheetName && wb.SheetNames.includes(sheetName)
+            ? wb.Sheets[sheetName]
+            : wb.Sheets[wb.SheetNames[0]];
 
         return XLSX.utils.sheet_to_json(sheet);
 
@@ -46,100 +42,99 @@ async function loadExcelFile(url, sheetName = null) {
     }
 }
 
-// ================================
-// NORMALIZE (STABLE)
-// ================================
-function normalizeText(text) {
+// =========================
+// NORMALIZE (SAFE)
+// =========================
+function normalizeText(t) {
 
-    return String(text || '')
-        .replace(/[\u200B-\u200D\uFEFF]/g, '')
-        .replace(/\n|\r|\t/g, ' ')
-        .replace(/[^a-zA-Z0-9]/g, ' ')
-        .replace(/\s+/g, ' ')
+    return String(t || "")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replace(/\n|\r|\t/g, " ")
+        .replace(/[^a-zA-Z0-9]/g, " ")
+        .replace(/\s+/g, " ")
         .trim()
         .toUpperCase();
 }
 
-// ================================
-// PHONE CLEAN
-// ================================
-function cleanPhone(phone) {
+// =========================
+// PHONE
+// =========================
+function cleanPhone(p) {
 
-    let p = String(phone || '').replace(/\D/g, '');
-    if (!p) return '';
+    let x = String(p || "").replace(/\D/g, "");
 
-    if (p.length === 10) p = '91' + p;
-    return p;
+    if (!x) return "";
+    if (x.length === 10) x = "91" + x;
+
+    return x;
 }
 
-// ================================
+// =========================
 // PRICE ENGINE
-// ================================
+// =========================
 function getMRP(o) {
     return Number(o.originalPrice || o.mrp || o.MRP || 0);
 }
 
-function getBasicPrice(mrp) {
+function getBasic(mrp) {
     return mrp - (mrp * 31.77 / 100);
 }
 
-function getSplDiscount(o) {
+function getDiscount(o) {
     return Number(o.discount || 0);
 }
 
-function getNetPrice(basic, dis) {
+function getNet(basic, dis) {
     return (basic - (basic * dis / 100)) * 1.18;
 }
 
-// ================================
+// =========================
 // LOAD DEALERS
-// ================================
+// =========================
 async function loadDealerMaster() {
 
-    const rows = await loadExcelFile('./data/RETAILER data Deatils.xlsx');
+    const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
 
-    console.log("📊 Sample Excel Row:", rows[0]);
-
-    dealerMaster = rows.map(row => {
+    dealerMaster = rows.map(r => {
 
         const name =
-            row['Retailer Name'] ||
-            row['Customer Name'] ||
-            row['Dealer Name'] ||
-            row['Name'] || '';
+            r["Retailer Name"] ||
+            r["Customer Name"] ||
+            r["Dealer Name"] ||
+            r["Name"] ||
+            "";
 
         const phone =
-            row['Mobile No'] ||
-            row['Mobile Number'] ||
-            row['MobileNo'] ||
-            row['Phone'] ||
-            '';
+            r["Mobile No"] ||
+            r["Mobile Number"] ||
+            r["Phone"] ||
+            "";
 
         const district =
-            row['District'] ||
-            row['District Name'] ||
-            row['PLACE'] ||
-            row['Location'] ||
-            '';
+            r["District"] ||
+            r["District Name"] ||
+            r["PLACE"] ||
+            r["Location"] ||
+            "";
 
         return {
-            name: String(name || '').trim(),
+            name: String(name).trim(),
             phone: cleanPhone(phone),
-            district: String(district || '').trim(),
-            normalized: normalizeText(name)
+            district: String(district).trim(),
+            norm: normalizeText(name)
         };
 
-    }).filter(d => d.name);
+    }).filter(x => x.name);
 
-    console.log("✅ Dealers Loaded:", dealerMaster.length);
+    console.log("✅ Dealers:", dealerMaster.length);
 }
 
-// ================================
-// LOAD OFFERS + INDEX
-// ================================
+// =========================
+// LOAD OFFERS
+// =========================
 function loadOffers() {
 
-    const data = JSON.parse(localStorage.getItem('dealerOffers') || '{}');
+    const data = JSON.parse(localStorage.getItem("dealerOffers") || "{}");
 
     currentOffers = Array.isArray(data.offers) ? data.offers : [];
 
@@ -154,61 +149,66 @@ function loadOffers() {
         dealerOfferMap[key].push(o);
     });
 
-    console.log("✅ Offers Loaded:", currentOffers.length);
+    console.log("✅ Offers:", currentOffers.length);
 }
 
-// ================================
+// =========================
 // GET OFFERS
-// ================================
+// =========================
 function getAllDealerOffers(name) {
     return dealerOfferMap[normalizeText(name)] || [];
 }
 
-// ================================
+// =========================
 // FIND DEALER
-// ================================
-function findDealerInfo(name) {
+// =========================
+function findDealer(name) {
 
     return dealerMaster.find(d =>
         normalizeText(d.name) === normalizeText(name)
     ) || null;
 }
 
-// ================================
-// HTML GENERATOR
-// ================================
+// =========================
+// HTML
+// =========================
 function generateFullBrochureHTML(name) {
 
     const offers = getAllDealerOffers(name);
-    const dealer = findDealerInfo(name);
+    const dealer = findDealer(name);
 
     let html = `
     <div style="width:1000px;background:#fff;padding:20px;font-family:Arial;color:#000;">
     <h1>AUTO SPARES SOLUTION</h1>
     <h2>${name}</h2>
 
-    <p><b>Mobile:</b> ${dealer?.phone || 'N/A'}</p>
-    <p><b>District:</b> ${dealer?.district || 'N/A'}</p>
+    <p><b>Mobile:</b> ${dealer?.phone || "N/A"}</p>
+    <p><b>District:</b> ${dealer?.district || "N/A"}</p>
 
     <table style="width:100%;border-collapse:collapse;">
     <tr style="background:#facc15;">
-        <th>Part</th><th>MRP</th><th>Basic</th><th>Dis%</th><th>Net</th><th>Stock</th>
+        <th>Part</th>
+        <th>MRP</th>
+        <th>Basic</th>
+        <th>Disc%</th>
+        <th>Net</th>
+        <th>Stock</th>
     </tr>`;
 
     offers.forEach(o => {
 
         const mrp = getMRP(o);
-        const basic = getBasicPrice(mrp);
-        const dis = getSplDiscount(o);
-        const net = getNetPrice(basic, dis);
+        const basic = getBasic(mrp);
+        const dis = getDiscount(o);
+        const net = getNet(basic, dis);
 
         html += `
         <tr>
-            <td>${o.part || ''}</td>
+            <td>${o.part || ""}</td>
             <td>₹${mrp.toFixed(2)}</td>
             <td>₹${basic.toFixed(2)}</td>
             <td>${dis}%</td>
-            <td>${net.toFixed(2)}</td>
+            <td>₹${net.toFixed(2)}</td>
             <td>${o.totalStock || 0}</td>
         </tr>`;
     });
@@ -218,30 +218,80 @@ function generateFullBrochureHTML(name) {
     return html;
 }
 
-// ================================
+// =========================
 // PREVIEW
-// ================================
-function preview(name) {
-    const win = window.open('', '_blank');
-    win.document.write(generateFullBrochureHTML(name));
-    win.document.close();
+// =========================
+function showBrochurePreview(name) {
+
+    const w = window.open("", "_blank");
+
+    w.document.write(generateFullBrochureHTML(name));
+
+    w.document.close();
 }
 
-// ================================
-// EXCEL EXPORT (FIXED)
-// ================================
-function exportExcel(name) {
+// =========================
+// WHATSAPP (SAFE FIXED)
+// =========================
+function sendFlyerToWhatsApp(name) {
 
-    if (!checkXLSX()) return;
+    const dealer = findDealer(name);
+    const offers = getAllDealerOffers(name);
+
+    if (!offers.length) {
+        alert("No offers");
+        return;
+    }
+
+    let msg = `Dear ${name}\n\n🎁 Offers\n\n`;
+
+    let i = 0;
+
+    for (let o of offers) {
+
+        if (msg.length > 3500) break;
+
+        const mrp = getMRP(o);
+        const basic = getBasic(mrp);
+        const dis = getDiscount(o);
+        const net = getNet(basic, dis);
+
+        msg += `${++i}) ${o.part}\n₹${net.toFixed(2)}\n\n`;
+    }
+
+    msg += `District: ${dealer?.district || "N/A"}`;
+
+    const phone = dealer?.phone || "";
+
+    if (!phone) {
+        alert("Phone missing");
+        return;
+    }
+
+    const url =
+        `whatsapp://send?phone=${phone}&text=${encodeURIComponent(msg)}`;
+
+    window.location.href = url;
+}
+
+// =========================
+// EXCEL EXPORT
+// =========================
+function exportDealerOffersToExcel(name) {
+
+    if (!hasXLSX()) {
+        alert("XLSX missing");
+        return;
+    }
 
     const offers = getAllDealerOffers(name);
 
     const data = offers.map(o => {
 
         const mrp = getMRP(o);
-        const basic = getBasicPrice(mrp);
-        const dis = getSplDiscount(o);
-        const net = getNetPrice(basic, dis);
+        const basic = getBasic(mrp);
+        const dis = getDiscount(o);
+        const net = getNet(basic, dis);
 
         return {
             Part: o.part,
@@ -256,45 +306,54 @@ function exportExcel(name) {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
 
-    XLSX.utils.book_append_sheet(wb, ws, "Data");
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
 
     XLSX.writeFile(wb, `${name}_brochure.xlsx`);
 }
 
-// ================================
-// API LAYER (NO BREAK SYSTEM)
-// ================================
-const API = {
+// =========================
+// NEW SAFE API (IMPORTANT)
+// =========================
+async function getDealersWithOffers() {
 
-    init: async function () {
-        await loadDealerMaster();
-        loadOffers();
-        console.log("🚀 SYSTEM READY (ZERO BREAK)");
-    },
+    return dealerMaster
+        .map(d => ({
+            name: d.name,
+            phone: d.phone,
+            district: d.district,
+            offerCount: getAllDealerOffers(d.name).length
+        }))
+        .filter(d => d.offerCount > 0);
+}
 
+// =========================
+// INIT
+// =========================
+async function init() {
+    await loadDealerMaster();
+    loadOffers();
+    console.log("🚀 SYSTEM READY");
+}
+
+// =========================
+// GLOBAL EXPORT (NO BREAK SYSTEM)
+// =========================
+window.BrochureGenerator = {
+
+    init,
     loadDealerMaster,
     loadOffers,
+
     getAllDealerOffers,
-    findDealerInfo,
+    getDealersWithOffers,
+
+    findDealer,
     generateFullBrochureHTML,
-    preview,
-    exportExcel
-};
 
-// ================================
-// LEGACY SUPPORT (OLD CODE SAFE)
-// ================================
-window.BrochureGenerator = {
-    dealersWithOffer: getAllDealerOffers,
-    getDealersWithOffers: getAllDealerOffers,
-    exportDealerOffersToExcel: exportExcel,
-    showBrochurePreview: preview,
-    generateFullBrochureHTML
-};
+    showBrochurePreview,
+    sendFlyerToWhatsApp,
 
-// ================================
-// NEW STABLE SYSTEM
-// ================================
-window.BrochureAPI = API;
+    exportDealerOffersToExcel
+};
 
 })();
