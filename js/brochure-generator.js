@@ -1,83 +1,63 @@
 // brochure-generator.js
-// COMPLETE FINAL VERSION
+// COMPLETE FINAL FIXED + UPGRADED VERSION
 // AUTO SPARES SOLUTION
 
 (function () {
 
-console.log("✅ Brochure Generator Loaded");
+console.log("✅ Brochure Generator Loaded (Fixed + Excel Export Enabled)");
 
 let dealerMaster = [];
 let currentOffers = [];
+
+// NEW: Fast lookup map (performance upgrade)
+let dealerOfferMap = {};
 
 // =========================================
 // LOAD EXCEL FILE
 // =========================================
 async function loadExcelFile(url, sheetName = null) {
 
-try {
+    try {
 
-    const response = await fetch(url);
+        const response = await fetch(url);
 
-    if (!response.ok) {
-        throw new Error(`Cannot load ${url}`);
+        if (!response.ok) {
+            throw new Error(`Cannot load ${url}`);
+        }
+
+        const buffer = await response.arrayBuffer();
+
+        const workbook = XLSX.read(buffer, { type: 'array' });
+
+        let sheet;
+
+        if (sheetName && workbook.SheetNames.includes(sheetName)) {
+            sheet = workbook.Sheets[sheetName];
+        } else {
+            sheet = workbook.Sheets[workbook.SheetNames[0]];
+        }
+
+        return XLSX.utils.sheet_to_json(sheet);
+
+    } catch (err) {
+
+        console.error("Excel Load Error:", err);
+        return [];
     }
-
-    const buffer = await response.arrayBuffer();
-
-    const workbook = XLSX.read(buffer, {
-        type: 'array'
-    });
-
-    let sheet;
-
-    if (
-        sheetName &&
-        workbook.SheetNames.includes(sheetName)
-    ) {
-
-        sheet =
-            workbook.Sheets[sheetName];
-
-    } else {
-
-        sheet =
-            workbook.Sheets[
-                workbook.SheetNames[0]
-            ];
-    }
-
-    return XLSX.utils.sheet_to_json(sheet);
-
-} catch (err) {
-
-    console.error(err);
-
-    return [];
-}
-
 }
 
 // =========================================
-// NORMALIZE TEXT
+// FIXED NORMALIZE (IMPORTANT FIX)
 // =========================================
-function normalizeText(text){
+function normalizeText(text) {
 
-return String(text || '')
-
-    .replace(/[\u200B-\u200D\uFEFF]/g,'')
-
-    .replace(/\n/g,' ')
-    .replace(/\r/g,' ')
-    .replace(/\t/g,' ')
-
-    .replace(/[^a-zA-Z0-9 ]/g,'')
-
-    .replace(/\s+/g,' ')
-
-    .trim()
-
-    .toUpperCase();
-
+    return String(text || '')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\n|\r|\t/g, ' ')
+        .replace(/[^a-zA-Z0-9]/g, ' ')   // FIXED (was deleting structure)
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase();
 }
 
 // =========================================
@@ -85,60 +65,35 @@ return String(text || '')
 // =========================================
 function cleanPhone(phone) {
 
-let p = String(phone || '')
-    .replace(/\D/g, '');
+    let p = String(phone || '').replace(/\D/g, '');
 
-if (!p) return '';
+    if (!p) return '';
 
-if (p.startsWith('0')) {
-    p = p.substring(1);
-}
+    if (p.startsWith('0')) p = p.substring(1);
 
-if (p.length === 10) {
-    p = '91' + p;
-}
+    if (p.length === 10) p = '91' + p;
 
-return p;
-
+    return p;
 }
 
 // =========================================
-// CALCULATIONS
+// PRICE CALCULATION
 // =========================================
-function getMRP(o){
-
-return Number(
-    o.originalPrice ||
-    o.mrp ||
-    o.MRP ||
-    0
-);
-
+function getMRP(o) {
+    return Number(o.originalPrice || o.mrp || o.MRP || 0);
 }
 
-function getBasicPrice(mrp){
-
-return mrp - (mrp * 31.77 / 100);
-
+function getBasicPrice(mrp) {
+    return mrp - (mrp * 31.77 / 100);
 }
 
-function getSplDiscount(o){
-
-return Number(
-    o.discount ||
-    0
-);
-
+function getSplDiscount(o) {
+    return Number(o.discount || 0);
 }
 
-function getNetPrice(basicPrice, splDiscount){
-
-const afterDiscount =
-    basicPrice -
-    (basicPrice * splDiscount / 100);
-
-return afterDiscount * 1.18;
-
+function getNetPrice(basicPrice, splDiscount) {
+    const after = basicPrice - (basicPrice * splDiscount / 100);
+    return after * 1.18;
 }
 
 // =========================================
@@ -146,75 +101,38 @@ return afterDiscount * 1.18;
 // =========================================
 async function loadDealerMaster() {
 
-try {
+    try {
 
-    const rows =
-        await loadExcelFile(
-            'data/RETAILER data details.xlsx'
-        );
+        const rows = await loadExcelFile('data/RETAILER data Deatils.xlsx');
 
-    dealerMaster = rows.map(row => {
+        dealerMaster = rows.map(row => {
 
-        const dealerName =
-            row['Retailer Name'] ||
-            row['Customer Name'] ||
-            row['Dealer Name'] ||
-            row['Name'] ||
-            '';
+            const name =
+                row['Retailer Name'] ||
+                row['Customer Name'] ||
+                row['Dealer Name'] ||
+                row['Name'] ||
+                '';
 
-        return {
+            return {
+                name: String(name || '').trim(),
+                normalizedName: normalizeText(name),
+                phone: cleanPhone(row['Mobile No'] || row['Phone'] || ''),
+                district: row['District'] || '',
+                ownerName: row['Owner Name'] || ''
+            };
+        }).filter(d => d.name);
 
-            name:
-                String(dealerName || '')
-                .replace(/\s+/g,' ')
-                .trim(),
+        console.log("✅ Dealer Master Loaded:", dealerMaster.length);
 
-            normalizedName:
-                normalizeText(dealerName),
+        return dealerMaster;
 
-            phone:
-                cleanPhone(
-                    row['Mobile No'] ||
-                    row['Phone'] ||
-                    row['Mobile'] ||
-                    ''
-                ),
+    } catch (err) {
 
-            district:
-                row['District'] || '',
-
-            ownerName:
-                row['Owner Name'] || '',
-
-            customerType:
-                row['Customer Type'] || '',
-
-            rlpCode:
-                row['RLP Code'] || ''
-        };
-    });
-
-    dealerMaster =
-        dealerMaster.filter(
-            d => d.name
-        );
-
-    console.log(
-        '✅ Dealer Master Loaded:',
-        dealerMaster.length
-    );
-
-    return dealerMaster;
-
-} catch (err) {
-
-    console.error(err);
-
-    dealerMaster = [];
-
-    return [];
-}
-
+        console.error("Dealer Load Error:", err);
+        dealerMaster = [];
+        return [];
+    }
 }
 
 // =========================================
@@ -222,729 +140,276 @@ try {
 // =========================================
 function loadOffers() {
 
-try {
+    try {
 
-    const data =
-        JSON.parse(
-            localStorage.getItem(
-                'dealerOffers'
-            ) || '{}'
-        );
+        const data = JSON.parse(localStorage.getItem('dealerOffers') || '{}');
 
-    currentOffers =
-        data.offers || [];
+        currentOffers = Array.isArray(data.offers) ? data.offers : [];
 
-    return currentOffers;
+        buildOfferIndex(); // NEW
 
-} catch (err) {
+        console.log("✅ Offers Loaded:", currentOffers.length);
 
-    console.error(err);
+        return currentOffers;
 
-    currentOffers = [];
+    } catch (err) {
 
-    return [];
-}
-
+        console.error("Offer Load Error:", err);
+        currentOffers = [];
+        dealerOfferMap = {};
+        return [];
+    }
 }
 
 // =========================================
-// GET DEALER OFFERS
+// BUILD FAST INDEX (IMPORTANT UPGRADE)
+// =========================================
+function buildOfferIndex() {
+
+    dealerOfferMap = {};
+
+    currentOffers.forEach(o => {
+
+        const key = normalizeText(o.dealer);
+
+        if (!dealerOfferMap[key]) {
+            dealerOfferMap[key] = [];
+        }
+
+        dealerOfferMap[key].push(o);
+    });
+}
+
+// =========================================
+// GET DEALER OFFERS (FAST)
 // =========================================
 function getAllDealerOffers(dealerName) {
 
-const normalized =
-    normalizeText(dealerName);
+    const key = normalizeText(dealerName);
 
-return currentOffers.filter(o => {
-
-    const offerDealer =
-        normalizeText(
-            o.dealer || ''
-        );
-
-    return (
-        offerDealer === normalized ||
-        offerDealer.includes(normalized) ||
-        normalized.includes(offerDealer)
-    );
-});
-
+    return dealerOfferMap[key] || [];
 }
 
 // =========================================
 // FIND DEALER
 // =========================================
-function findDealerInfo(dealerName){
+function findDealerInfo(dealerName) {
 
-if(!dealerName) return null;
+    const key = normalizeText(dealerName);
 
-const normalizedSearch =
-    normalizeText(dealerName);
-
-let found =
-    dealerMaster.find(d => {
-
-        const db =
-            normalizeText(d.name);
-
-        return db === normalizedSearch;
-    });
-
-if(found){
-    return found;
-}
-
-found =
-    dealerMaster.find(d => {
-
-        const db =
-            normalizeText(d.name);
-
-        return (
-            db.includes(normalizedSearch) ||
-            normalizedSearch.includes(db)
-        );
-    });
-
-return found || null;
-
+    return dealerMaster.find(d =>
+        normalizeText(d.name) === key
+    ) || null;
 }
 
 // =========================================
-// GENERATE HTML
+// HTML GENERATOR
 // =========================================
-function generateFullBrochureHTML(dealerName){
+function generateFullBrochureHTML(dealerName) {
 
-const offers =
-    getAllDealerOffers(dealerName);
+    const offers = getAllDealerOffers(dealerName);
+    const dealer = findDealerInfo(dealerName);
 
-const dealer =
-    findDealerInfo(dealerName);
+    let html = `
+    <div style="width:1000px;background:white;color:black;padding:20px;font-family:Arial;">
 
-let html = `
-<div style="
-    width:760px;
-    background:white;
-    color:black;
-    padding:20px;
-    font-family:Arial;
-">
+    <h1 style="color:#2563eb;">AUTO SPARES SOLUTION</h1>
+    <h2>${dealerName}</h2>
 
-<div style="
-    text-align:center;
-    margin-bottom:20px;
-">
+    <p><b>Mobile:</b> ${dealer?.phone || 'N/A'}</p>
+    <p><b>District:</b> ${dealer?.district || 'N/A'}</p>
 
-<h1 style="
-    color:#2563eb;
-    margin-bottom:5px;
-    font-size:28px;
-">
-AUTO SPARES SOLUTION
-</h1>
-
-<h2 style="
-    margin:0;
-">
-SPECIAL OFFER FLYER
-</h2>
-
-</div>
-
-<div style="
-    margin-bottom:15px;
-    font-size:15px;
-    line-height:1.7;
-">
-
-<b>Dealer:</b>
-${dealerName}
-
-<br>
-
-<b>Mobile:</b>
-${dealer?.phone || 'N/A'}
-
-<br>
-
-<b>District:</b>
-${dealer?.district || 'N/A'}
-
-</div>
-
-<table style="
-    width:100%;
-    border-collapse:collapse;
-    margin-top:15px;
-    font-size:11px;
-">
-
-<tr style="
-    background:#facc15;
-    color:black;
-">
-
-<th style="border:1px solid #999;padding:6px;">
-Part
-</th>
-
-<th style="border:1px solid #999;padding:6px;">
-MRP
-</th>
-
-<th style="border:1px solid #999;padding:6px;">
-Basic Price
-<br>
-Less 31.77%
-</th>
-
-<th style="border:1px solid #999;padding:6px;">
-Spl Dis
-</th>
-
-<th style="border:1px solid #999;padding:6px;">
-Net Price
-<br>
-Incl GST
-</th>
-
-<th style="border:1px solid #999;padding:6px;">
-Stock
-</th>
-
-</tr>
-`;
-
-offers.forEach(o => {
-
-    const mrp =
-        getMRP(o);
-
-    const basicPrice =
-        getBasicPrice(mrp);
-
-    const splDiscount =
-        getSplDiscount(o);
-
-    const netPrice =
-        getNetPrice(
-            basicPrice,
-            splDiscount
-        );
-
-    html += `
-    <tr>
-
-    <td style="
-        border:1px solid #ccc;
-        padding:6px;
-    ">
-    ${o.part || ''}
-    </td>
-
-    <td style="
-        border:1px solid #ccc;
-        padding:6px;
-    ">
-    ₹${mrp.toFixed(2)}
-    </td>
-
-    <td style="
-        border:1px solid #ccc;
-        padding:6px;
-    ">
-    ₹${basicPrice.toFixed(2)}
-    </td>
-
-    <td style="
-        border:1px solid #ccc;
-        padding:6px;
-    ">
-    ${splDiscount}%
-    </td>
-
-    <td style="
-        border:1px solid #ccc;
-        padding:6px;
-        color:green;
-        font-weight:bold;
-    ">
-    ₹${netPrice.toFixed(2)}
-    </td>
-
-    <td style="
-        border:1px solid #ccc;
-        padding:6px;
-    ">
-    ${o.totalStock || 0}
-    </td>
-
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <tr style="background:#facc15;">
+        <th>Part</th><th>MRP</th><th>Basic</th><th>Dis%</th><th>Net</th><th>Stock</th>
     </tr>
     `;
-});
 
-html += `
-</table>
+    offers.forEach(o => {
 
-<div style="
-    margin-top:20px;
-    padding:12px;
-    background:#f3f4f6;
-    border-radius:8px;
-    font-size:13px;
-    line-height:1.7;
-">
+        const mrp = getMRP(o);
+        const basic = getBasicPrice(mrp);
+        const dis = getSplDiscount(o);
+        const net = getNetPrice(basic, dis);
 
-<b>Special Notes:</b>
+        html += `
+        <tr>
+            <td>${o.part || ''}</td>
+            <td>₹${mrp.toFixed(2)}</td>
+            <td>₹${basic.toFixed(2)}</td>
+            <td>${dis}%</td>
+            <td style="color:green;font-weight:bold;">₹${net.toFixed(2)}</td>
+            <td>${o.totalStock || 0}</td>
+        </tr>`;
+    });
 
-<br>
+    html += `
+    </table>
 
-• Prices including GST
+    <div style="margin-top:20px;">
+    Auto Spares Solution - autosparessolution.com
+    </div>
 
-<br>
+    </div>`;
 
-• Limited stock available
-
-<br>
-
-• Offer valid till stock lasts
-
-<br><br>
-
-Reply YES to confirm order.
-
-<br><br>
-
-<b>Auto Spares Solution</b>
-
-<br>
-
-https://autosparessolution.com
-
-</div>
-
-</div>
-`;
-
-return html;
-
+    return html;
 }
 
 // =========================================
 // PREVIEW
 // =========================================
-function showBrochurePreview(dealerName){
+function showBrochurePreview(dealerName) {
 
-const html =
-    generateFullBrochureHTML(
-        dealerName
-    );
+    const win = window.open('', '_blank');
 
-const win =
-    window.open('', '_blank');
+    win.document.write(`
+    <html><body style="background:#eee;padding:20px;">
+    ${generateFullBrochureHTML(dealerName)}
+    </body></html>`);
 
-win.document.write(`
-<html>
-<head>
-<title>${dealerName}</title>
-</head>
-
-<body style="
-    background:#ddd;
-    padding:20px;
-">
-
-${html}
-
-</body>
-</html>
-`);
-
-win.document.close();
-
+    win.document.close();
 }
 
 // =========================================
-// WHATSAPP MESSAGE
+// WHATSAPP MESSAGE (SAFE LENGTH)
 // =========================================
-function generateWhatsAppFlyerMessage(
-dealerName
-){
+function generateWhatsAppFlyerMessage(dealerName) {
 
-const offers =
-    getAllDealerOffers(
-        dealerName
-    );
+    const offers = getAllDealerOffers(dealerName);
+    const dealer = findDealerInfo(dealerName) || {};
 
-const dealer =
-    findDealerInfo(
-        dealerName
-    ) || {};
+    let msg = `Dear ${dealerName}\n\n🎁 SPECIAL OFFER LIST\n\n`;
 
-if(!offers.length){
+    let count = 0;
 
-    return 'No offers available';
-}
+    for (let o of offers) {
 
-let msg = '';
+        if (msg.length > 3500) break; // SAFE LIMIT
 
-msg +=
+        const mrp = getMRP(o);
+        const basic = getBasicPrice(mrp);
+        const dis = getSplDiscount(o);
+        const net = getNetPrice(basic, dis);
 
-`Dear ${dealerName},
+        msg += `${++count}) ${o.part}\n₹${net.toFixed(2)} Net\n\n`;
+    }
 
-🎁 SPECIAL OFFER LIST
+    msg += `District: ${dealer.district || 'N/A'}\nAuto Spares Solution`;
 
-`;
-
-offers.forEach((o, i) => {
-
-    const mrp =
-        getMRP(o);
-
-    const basicPrice =
-        getBasicPrice(mrp);
-
-    const splDiscount =
-        getSplDiscount(o);
-
-    const netPrice =
-        getNetPrice(
-            basicPrice,
-            splDiscount
-        );
-
-    msg +=
-
-`${i + 1}) ${o.part || ''}
-
-MRP:
-₹${mrp.toFixed(2)}
-
-Basic Price:
-₹${basicPrice.toFixed(2)}
-
-Special Discount:
-${splDiscount}% OFF
-
-Net Price Incl GST:
-₹${netPrice.toFixed(2)}
-
-Available Stock:
-${o.totalStock || 0}
-
----
-
-`;
-});
-
-msg +=
-
-`District:
-${dealer.district || 'N/A'}
-
-Reply YES to confirm order.
-
-Auto Spares Solution
-https://autosparessolution.com`;
-
-return msg;
-
+    return msg;
 }
 
 // =========================================
-// SEND WHATSAPP
+// PDF (FIXED + AUTO SCALE)
 // =========================================
-function sendFlyerToWhatsApp(
-dealerName
-) {
+async function sharePDFToWhatsApp(dealerName) {
 
-const dealer =
-    findDealerInfo(
-        dealerName
-    );
+    try {
 
-if (!dealer) {
+        const html = generateFullBrochureHTML(dealerName);
 
-    alert(
-        'Dealer not found:\n' +
-        dealerName
-    );
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        div.style.position = 'fixed';
+        div.style.left = '-9999px';
 
-    return;
+        document.body.appendChild(div);
+
+        await new Promise(r => setTimeout(r, 500));
+
+        const canvas = await html2canvas(div, { scale: 2 });
+
+        const img = canvas.toDataURL('image/png');
+
+        const jsPDF = window.jspdf.jsPDF;
+
+        const pdf = new jsPDF('p', 'mm', 'a4');
+
+        const pageWidth = 210;
+        const pageHeight = 297;
+
+        const imgProps = pdf.getImageProperties(img);
+        const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
+
+        let position = 0;
+
+        pdf.addImage(img, 'PNG', 0, position, pageWidth, imgHeight);
+
+        while (imgHeight > pageHeight) {
+            position -= pageHeight;
+            pdf.addPage();
+            pdf.addImage(img, 'PNG', 0, position, pageWidth, imgHeight);
+        }
+
+        pdf.save(`${dealerName}.pdf`);
+
+        document.body.removeChild(div);
+
+    } catch (err) {
+
+        console.error(err);
+        alert('PDF creation failed');
+    }
 }
 
-if (!dealer.phone) {
-
-    alert(
-        'Phone not found:\n' +
-        dealerName
-    );
-
-    return;
-}
-
-const msg =
-    generateWhatsAppFlyerMessage(
-        dealerName
-    );
-
-const phone =
-    String(dealer.phone)
-    .replace(/\D/g,'');
-
-const url =
-
-"whatsapp://send?phone=${phone}&text=${encodeURIComponent(msg)}";
-
-window.location.href = url;
-
-}
-
 // =========================================
-// SHARE PDF
+// NEW: EXPORT EXCEL (BROCHURE DATA)
 // =========================================
-async function sharePDFToWhatsApp(
-dealerName
-){
+function exportDealerOffersToExcel(dealerName) {
 
-try{
+    const offers = getAllDealerOffers(dealerName);
 
-    const html =
-        generateFullBrochureHTML(
-            dealerName
-        );
-
-    const div =
-        document.createElement('div');
-
-    div.innerHTML = html;
-
-    div.style.position = 'fixed';
-    div.style.left = '-9999px';
-    div.style.top = '0';
-    div.style.background = 'white';
-    div.style.width = '760px';
-    div.style.padding = '10px';
-
-    document.body.appendChild(div);
-
-    await new Promise(r =>
-        setTimeout(r,700)
-    );
-
-    const canvas =
-        await html2canvas(div,{
-            scale:1.5,
-            useCORS:true,
-            scrollX:0,
-            scrollY:0,
-            windowWidth: div.scrollWidth,
-            windowHeight: div.scrollHeight
-        });
-
-    const img =
-        canvas.toDataURL('image/png');
-
-    const jsPDF =
-        window.jspdf?.jsPDF;
-
-    if(!jsPDF){
-
-        alert('PDF Library Missing');
-
+    if (!offers.length) {
+        alert("No data found");
         return;
     }
 
-    const pdf =
-        new jsPDF(
-            'p',
-            'mm',
-            'a4'
-        );
+    const exportData = offers.map(o => {
 
-    const pdfWidth =
-        pdf.internal.pageSize.getWidth();
+        const mrp = getMRP(o);
+        const basic = getBasicPrice(mrp);
+        const dis = getSplDiscount(o);
+        const net = getNetPrice(basic, dis);
 
-    const margin = 5;
-
-    const imgWidth =
-        pdfWidth - (margin * 2);
-
-    const imgHeight =
-        (canvas.height * imgWidth) /
-        canvas.width;
-
-    pdf.addImage(
-        img,
-        'PNG',
-        margin,
-        5,
-        imgWidth,
-        imgHeight
-    );
-
-    pdf.save(
-        dealerName + '.pdf'
-    );
-
-    document.body.removeChild(div);
-
-}catch(err){
-
-    console.error(err);
-
-    alert(
-        'PDF creation failed'
-    );
-}
-
-}
-
-// =========================================
-// DEALERS WITH OFFERS
-// =========================================
-async function getDealersWithOffers() {
-
-await loadDealerMaster();
-
-loadOffers();
-
-const uniqueDealers =
-    [...new Set(
-        currentOffers.map(o =>
-            String(o.dealer || '').trim()
-        )
-    )];
-
-const result = [];
-
-uniqueDealers.forEach(name => {
-
-    if(!name) return;
-
-    const offers =
-        getAllDealerOffers(name);
-
-    if(offers.length === 0)
-        return;
-
-    const dealer =
-        findDealerInfo(name) || {};
-
-    result.push({
-
-        name: name,
-
-        phone:
-            dealer.phone || '',
-
-        district:
-            dealer.district || '',
-
-        owner:
-            dealer.ownerName || '',
-
-        offerCount:
-            offers.length
-    });
-});
-
-return result;
-
-}
-
-// =========================================
-// EXPORT HTML
-// =========================================
-async function exportAllBrochures() {
-
-const dealers =
-    await getDealersWithOffers();
-
-let html = '';
-
-dealers.forEach(d => {
-
-    html +=
-        generateFullBrochureHTML(
-            d.name
-        );
-
-    html += '<hr>';
-});
-
-const blob =
-    new Blob([html], {
-        type: 'text/html'
+        return {
+            Part: o.part,
+            MRP: mrp,
+            BasicPrice: basic,
+            Discount: dis,
+            NetPrice: net,
+            Stock: o.totalStock || 0
+        };
     });
 
-const url =
-    URL.createObjectURL(blob);
+    const ws = XLSX.utils.json_to_sheet(exportData);
 
-const a =
-    document.createElement('a');
+    const wb = XLSX.utils.book_new();
 
-a.href = url;
+    XLSX.utils.book_append_sheet(wb, ws, "Brochure");
 
-a.download =
-    'all_brochures.html';
-
-a.click();
-
-URL.revokeObjectURL(url);
-
+    XLSX.writeFile(wb, `${dealerName}_brochure.xlsx`);
 }
 
 // =========================================
-// INIT
-// =========================================
-async function init(){
-
-await loadDealerMaster();
-
-loadOffers();
-
-console.log(
-    '✅ Brochure Generator Ready'
-);
-
-}
-
-// =========================================
-// GLOBAL
+// GLOBAL EXPORT
 // =========================================
 window.BrochureGenerator = {
 
-init,
+    init: async function () {
+        await loadDealerMaster();
+        loadOffers();
+        console.log("✅ Ready");
+    },
 
-loadDealerMaster,
-
-loadOffers,
-
-getAllDealerOffers,
-
-generateWhatsAppFlyerMessage,
-
-sendFlyerToWhatsApp,
-
-sharePDFToWhatsApp,
-
-getDealersWithOffers,
-
-exportAllBrochures,
-
-showBrochurePreview,
-
-findDealerInfo,
-
-generateFullBrochureHTML,
-
-getDealerMaster: () =>
-    dealerMaster,
-
-getCurrentOffers: () =>
-    currentOffers
-
+    loadDealerMaster,
+    loadOffers,
+    getAllDealerOffers,
+    findDealerInfo,
+    generateFullBrochureHTML,
+    showBrochurePreview,
+    generateWhatsAppFlyerMessage,
+    sharePDFToWhatsApp,
+    exportDealerOffersToExcel
 };
 
 })();
