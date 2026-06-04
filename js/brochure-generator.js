@@ -507,7 +507,7 @@ function sendFlyerToWhatsApp(
     const url =
 `whatsapp://send?phone=${dealer.phone}&text=${encodeURIComponent(msg)}`;
 
-window.location.href = url;
+window.location.href = url;}
 
 // =========================================
 // SHARE PDF TO WHATSAPP
