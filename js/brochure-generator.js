@@ -426,70 +426,183 @@ function generateFullBrochureHTML(dealerName){
     `;
 
     offers.forEach(o => {
+// =========================================
+// GENERATE HTML
+// =========================================
+function generateFullBrochureHTML(dealerName){
+
+    const offers =
+        getAllDealerOffers(dealerName);
+
+    const dealer =
+        findDealerInfo(dealerName);
+
+    let html = `
+    <div style="
+        width:1000px;
+        background:white;
+        color:black;
+        padding:20px;
+        font-family:Arial;
+    ">
+
+    <h1 style="
+        color:#2563eb;
+        margin-bottom:5px;
+        font-size:28px;
+    ">
+    AUTO SPARES SOLUTION
+    </h1>
+
+    <h2 style="
+        margin-bottom:5px;
+    ">
+    ${dealerName}
+    </h2>
+
+    <p style="margin:3px 0;">
+    <b>Mobile:</b>
+    ${dealer?.phone || 'N/A'}
+    </p>
+
+    <p style="margin:3px 0;">
+    <b>District:</b>
+    ${dealer?.district || 'N/A'}
+    </p>
+
+    <table style="
+        width:100%;
+        border-collapse:collapse;
+        margin-top:20px;
+        font-size:13px;
+    ">
+
+    <tr style="
+        background:#facc15;
+        color:black;
+    ">
+
+    <th style="
+        border:1px solid #ccc;
+        padding:8px;
+    ">
+    Part
+    </th>
+
+    <th style="
+        border:1px solid #ccc;
+        padding:8px;
+    ">
+    MRP
+    </th>
+
+    <th style="
+        border:1px solid #ccc;
+        padding:8px;
+    ">
+    Basic Price
+    <br>
+    (Less 31.77%)
+    </th>
+
+    <th style="
+        border:1px solid #ccc;
+        padding:8px;
+    ">
+    Spl Dis
+    <br>
+    (Max 6%)
+    </th>
+
+    <th style="
+        border:1px solid #ccc;
+        padding:8px;
+    ">
+    Net Price
+    <br>
+    Incl GST 18%
+    </th>
+
+    <th style="
+        border:1px solid #ccc;
+        padding:8px;
+    ">
+    Stock
+    </th>
+
+    </tr>
+    `;
+
+    offers.forEach(o => {
 
         const mrp =
-            getMRP(o);
+            Number(
+                o.mrp ||
+                o.MRP ||
+                o.price ||
+                o.listPrice ||
+                o.salePrice ||
+                o.originalPrice ||
+                o.offerPrice ||
+                0
+            );
 
         const basicPrice =
-            getBasicPrice(mrp);
+            mrp - (mrp * 31.77 / 100);
 
         const splDiscount =
-            getSplDiscount(o);
+            Number(o.discount || 0);
 
-        const netPrice =
-            getNetPrice(
-                basicPrice,
-                splDiscount
-            );
+        const afterSpl =
+            basicPrice -
+            (basicPrice * splDiscount / 100);
+
+        const gstPrice =
+            afterSpl * 1.18;
 
         html += `
         <tr>
 
         <td style="
-            border:1px solid #999;
+            border:1px solid #ccc;
             padding:8px;
         ">
         ${o.part || ''}
         </td>
 
         <td style="
-            border:1px solid #999;
+            border:1px solid #ccc;
             padding:8px;
-            text-align:right;
         ">
         ₹${mrp.toFixed(2)}
         </td>
 
         <td style="
-            border:1px solid #999;
+            border:1px solid #ccc;
             padding:8px;
-            text-align:right;
         ">
         ₹${basicPrice.toFixed(2)}
         </td>
 
         <td style="
-            border:1px solid #999;
+            border:1px solid #ccc;
             padding:8px;
-            text-align:center;
         ">
         ${splDiscount}%
         </td>
 
         <td style="
-            border:1px solid #999;
+            border:1px solid #ccc;
             padding:8px;
-            text-align:right;
+            color:green;
             font-weight:bold;
-            color:#16a34a;
         ">
-        ₹${netPrice.toFixed(2)}
+        ₹${gstPrice.toFixed(2)}
         </td>
 
         <td style="
-            border:1px solid #999;
+            border:1px solid #ccc;
             padding:8px;
-            text-align:center;
         ">
         ${o.totalStock || 0}
         </td>
@@ -499,20 +612,41 @@ function generateFullBrochureHTML(dealerName){
     });
 
     html += `
+
     </table>
 
     <div style="
-        margin-top:25px;
-        text-align:center;
-        font-size:14px;
-        color:#444;
+        margin-top:20px;
+        padding:12px;
+        background:#f3f4f6;
+        border-radius:8px;
+        font-size:13px;
+        line-height:1.7;
     ">
 
-    Reply YES to confirm order
+    <b>Special Notes:</b>
+
+    <br>
+
+    • Prices are including GST
+
+    <br>
+
+    • Limited stock available
+
+    <br>
+
+    • Offer valid till stock lasts
 
     <br><br>
 
+    Reply YES to confirm order.
+
+    <br><br>
+
+    <b>
     Auto Spares Solution
+    </b>
 
     <br>
 
