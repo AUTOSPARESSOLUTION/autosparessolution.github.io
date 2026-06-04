@@ -620,8 +620,201 @@ function generateFullBrochureHTML(dealerName){
         padding:12px;
         background:#f3f4f6;
         border-radius:8px;
+// =========================================
+// GENERATE HTML
+// =========================================
+function generateFullBrochureHTML(dealerName){
+
+    const offers =
+        getAllDealerOffers(dealerName);
+
+    const dealer =
+        findDealerInfo(dealerName);
+
+    let html = `
+    <div style="
+        width:1000px;
+        background:white;
+        color:black;
+        padding:20px;
+        font-family:Arial;
+    ">
+
+    <div style="
+        text-align:center;
+        margin-bottom:20px;
+    ">
+
+    <h1 style="
+        color:#2563eb;
+        margin-bottom:5px;
+        font-size:30px;
+    ">
+    AUTO SPARES SOLUTION
+    </h1>
+
+    <h2 style="
+        margin:0;
+        color:#111827;
+    ">
+    SPECIAL OFFER FLYER
+    </h2>
+
+    </div>
+
+    <div style="
+        margin-bottom:20px;
+        line-height:1.8;
+        font-size:15px;
+    ">
+
+    <b>Dealer:</b>
+    ${dealerName}
+
+    <br>
+
+    <b>Mobile:</b>
+    ${dealer?.phone || 'N/A'}
+
+    <br>
+
+    <b>District:</b>
+    ${dealer?.district || 'N/A'}
+
+    </div>
+
+    <table style="
+        width:100%;
+        border-collapse:collapse;
         font-size:13px;
-        line-height:1.7;
+    ">
+
+    <tr style="
+        background:#facc15;
+        color:black;
+    ">
+
+    <th style="border:1px solid #999;padding:8px;">
+    Part
+    </th>
+
+    <th style="border:1px solid #999;padding:8px;">
+    MRP
+    </th>
+
+    <th style="border:1px solid #999;padding:8px;">
+    Basic Price
+    <br>
+    (Less 31.77%)
+    </th>
+
+    <th style="border:1px solid #999;padding:8px;">
+    Spl Dis
+    <br>
+    (Max 6%)
+    </th>
+
+    <th style="border:1px solid #999;padding:8px;">
+    Net Price
+    <br>
+    Incl GST 18%
+    </th>
+
+    <th style="border:1px solid #999;padding:8px;">
+    Stock
+    </th>
+
+    </tr>
+    `;
+
+    offers.forEach(o => {
+
+        const mrp =
+            Number(
+                o.mrp ||
+                o.MRP ||
+                o.price ||
+                o.Price ||
+                o.listPrice ||
+                o.originalPrice ||
+                0
+            );
+
+        const basicPrice =
+            mrp - (mrp * 31.77 / 100);
+
+        const splDiscount =
+            Number(o.discount || 0);
+
+        const afterDiscount =
+            basicPrice -
+            (basicPrice * splDiscount / 100);
+
+        const netPrice =
+            afterDiscount * 1.18;
+
+        html += `
+        <tr>
+
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+        ">
+        ${o.part || ''}
+        </td>
+
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+        ">
+        ₹${mrp.toFixed(2)}
+        </td>
+
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+        ">
+        ₹${basicPrice.toFixed(2)}
+        </td>
+
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+        ">
+        ${splDiscount}%
+        </td>
+
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+            color:green;
+            font-weight:bold;
+        ">
+        ₹${netPrice.toFixed(2)}
+        </td>
+
+        <td style="
+            border:1px solid #999;
+            padding:8px;
+        ">
+        ${o.totalStock || 0}
+        </td>
+
+        </tr>
+        `;
+    });
+
+    html += `
+
+    </table>
+
+    <div style="
+        margin-top:20px;
+        background:#f3f4f6;
+        padding:15px;
+        border-radius:10px;
+        font-size:13px;
+        line-height:1.8;
     ">
 
     <b>Special Notes:</b>
@@ -644,9 +837,7 @@ function generateFullBrochureHTML(dealerName){
 
     <br><br>
 
-    <b>
-    Auto Spares Solution
-    </b>
+    <b>Auto Spares Solution</b>
 
     <br>
 
