@@ -617,15 +617,23 @@ async function sharePDFToWhatsApp(
                 'a4'
             );
 
-        pdf.addImage(
-            img,
-            'PNG',
-            5,
-            5,
-            200,
-            280
-        );
+        const pageWidth =
+    pdf.internal.pageSize.getWidth();
 
+const imgWidth =
+    pageWidth - 10;
+
+const imgHeight =
+    canvas.height * imgWidth / canvas.width;
+
+pdf.addImage(
+    img,
+    'PNG',
+    5,
+    5,
+    imgWidth,
+    imgHeight
+);
         pdf.save(
             dealerName + '.pdf'
         );
