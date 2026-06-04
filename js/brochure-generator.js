@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FINAL STABLE VERSION)");
+console.log("🚀 Brochure System Loaded (FINAL STABLE + PDF AUTO FIT)");
 
 // =========================
 // DATA
@@ -43,7 +43,7 @@ async function loadExcelFile(url, sheetName = null) {
 }
 
 // =========================
-// NORMALIZE (SAFE)
+// NORMALIZE
 // =========================
 function normalizeText(t) {
 
@@ -62,10 +62,8 @@ function normalizeText(t) {
 function cleanPhone(p) {
 
     let x = String(p || "").replace(/\D/g, "");
-
     if (!x) return "";
     if (x.length === 10) x = "91" + x;
-
     return x;
 }
 
@@ -126,7 +124,7 @@ async function loadDealerMaster() {
 
     }).filter(x => x.name);
 
-    console.log("✅ Dealers:", dealerMaster.length);
+    console.log("✅ Dealers Loaded:", dealerMaster.length);
 }
 
 // =========================
@@ -149,7 +147,7 @@ function loadOffers() {
         dealerOfferMap[key].push(o);
     });
 
-    console.log("✅ Offers:", currentOffers.length);
+    console.log("✅ Offers Loaded:", currentOffers.length);
 }
 
 // =========================
@@ -170,7 +168,7 @@ function findDealer(name) {
 }
 
 // =========================
-// HTML
+// HTML BROCHURE (FIXED HEADERS)
 // =========================
 function generateFullBrochureHTML(name) {
 
@@ -179,6 +177,7 @@ function generateFullBrochureHTML(name) {
 
     let html = `
     <div style="width:1000px;background:#fff;padding:20px;font-family:Arial;color:#000;">
+
     <h1>AUTO SPARES SOLUTION</h1>
     <h2>${name}</h2>
 
@@ -186,12 +185,13 @@ function generateFullBrochureHTML(name) {
     <p><b>District:</b> ${dealer?.district || "N/A"}</p>
 
     <table style="width:100%;border-collapse:collapse;">
+    
     <tr style="background:#facc15;">
         <th>Part</th>
         <th>MRP</th>
-        <th>Basic</th>
-        <th>Disc%</th>
-        <th>Net</th>
+        <th>Basic Price (Less 31.77%)</th>
+        <th>Spl Dis</th>
+        <th>Net Price Including GST</th>
         <th>Stock</th>
     </tr>`;
 
@@ -208,7 +208,7 @@ function generateFullBrochureHTML(name) {
             <td>₹${mrp.toFixed(2)}</td>
             <td>₹${basic.toFixed(2)}</td>
             <td>${dis}%</td>
-            <td>₹${net.toFixed(2)}</td>
+            <td style="color:green;font-weight:bold;">₹${net.toFixed(2)}</td>
             <td>${o.totalStock || 0}</td>
         </tr>`;
     });
@@ -224,24 +224,17 @@ function generateFullBrochureHTML(name) {
 function showBrochurePreview(name) {
 
     const w = window.open("", "_blank");
-
     w.document.write(generateFullBrochureHTML(name));
-
     w.document.close();
 }
 
 // =========================
-// WHATSAPP (SAFE FIXED)
+// WHATSAPP
 // =========================
 function sendFlyerToWhatsApp(name) {
 
     const dealer = findDealer(name);
     const offers = getAllDealerOffers(name);
-
-    if (!offers.length) {
-        alert("No offers");
-        return;
-    }
 
     let msg = `Dear ${name}\n\n🎁 Offers\n\n`;
 
@@ -264,7 +257,7 @@ function sendFlyerToWhatsApp(name) {
     const phone = dealer?.phone || "";
 
     if (!phone) {
-        alert("Phone missing");
+        alert("Phone not found");
         return;
     }
 
@@ -296,9 +289,9 @@ function exportDealerOffersToExcel(name) {
         return {
             Part: o.part,
             MRP: mrp,
-            Basic: basic,
-            Discount: dis,
-            Net: net,
+            "Basic Price (Less 31.77%)": basic,
+            "Spl Dis": dis,
+            "Net Price Including GST": net,
             Stock: o.totalStock || 0
         };
     });
@@ -312,7 +305,67 @@ function exportDealerOffersToExcel(name) {
 }
 
 // =========================
-// NEW SAFE API (IMPORTANT)
+// PDF AUTO FIT (FULL PAGE FIX)
+// =========================
+async function sharePDFToWhatsApp(name) {
+
+    try {
+
+        const div = document.createElement("div");
+        div.innerHTML = generateFullBrochureHTML(name);
+
+        div.style.position = "fixed";
+        div.style.left = "-9999px";
+        div.style.width = "1000px";
+        div.style.background = "#fff";
+        div.style.padding = "20px";
+
+        document.body.appendChild(div);
+
+        await new Promise(r => setTimeout(r, 500));
+
+        const canvas = await html2canvas(div, {
+            scale: 2,
+            useCORS: true
+        });
+
+        const img = canvas.toDataURL("image/png");
+
+        const pdf = new window.jspdf.jsPDF("p", "mm", "a4");
+
+        const pageWidth = 210;
+        const pageHeight = 297;
+
+        const ratio = canvas.height / canvas.width;
+
+        let imgWidth = pageWidth;
+        let imgHeight = pageWidth * ratio;
+
+        // AUTO FIT FULL PAGE (NO CUT)
+        if (imgHeight > pageHeight) {
+            const scale = pageHeight / imgHeight;
+            imgHeight *= scale;
+            imgWidth *= scale;
+        }
+
+        const x = (pageWidth - imgWidth) / 2;
+        const y = (pageHeight - imgHeight) / 2;
+
+        pdf.addImage(img, "PNG", x, y, imgWidth, imgHeight);
+
+        pdf.save(`${name}.pdf`);
+
+        document.body.removeChild(div);
+
+    } catch (err) {
+
+        console.error(err);
+        alert("PDF generation failed");
+    }
+}
+
+// =========================
+// SAFE DEALER LIST
 // =========================
 async function getDealersWithOffers() {
 
@@ -336,7 +389,7 @@ async function init() {
 }
 
 // =========================
-// GLOBAL EXPORT (NO BREAK SYSTEM)
+// GLOBAL API
 // =========================
 window.BrochureGenerator = {
 
@@ -346,14 +399,15 @@ window.BrochureGenerator = {
 
     getAllDealerOffers,
     getDealersWithOffers,
-
     findDealer,
+
     generateFullBrochureHTML,
-
     showBrochurePreview,
-    sendFlyerToWhatsApp,
 
-    exportDealerOffersToExcel
+    sendFlyerToWhatsApp,
+    exportDealerOffersToExcel,
+
+    sharePDFToWhatsApp
 };
 
 })();
