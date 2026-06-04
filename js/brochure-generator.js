@@ -35,7 +35,8 @@ async function loadExcelFile(url, sheetName = null) {
             workbook.SheetNames.includes(sheetName)
         ) {
 
-            sheet = workbook.Sheets[sheetName];
+            sheet =
+                workbook.Sheets[sheetName];
 
         } else {
 
@@ -99,7 +100,7 @@ function cleanPhone(phone) {
 }
 
 // =========================================
-// PRICE CALCULATIONS
+// CALCULATIONS
 // =========================================
 function getMRP(o){
 
@@ -119,8 +120,7 @@ function getBasicPrice(mrp){
 function getSplDiscount(o){
 
     return Number(
-        o.discount ||
-        0
+        o.discount || 0
     );
 }
 
@@ -142,7 +142,7 @@ async function loadDealerMaster() {
 
         const rows =
             await loadExcelFile(
-                'data/RETAILER data details.xlsx'
+                'data/RETAILER data Deatils.xlsx'
             );
 
         dealerMaster = rows.map(row => {
@@ -185,11 +185,6 @@ async function loadDealerMaster() {
                 d => d.name
             );
 
-        console.log(
-            '✅ Dealer Master Loaded:',
-            dealerMaster.length
-        );
-
         return dealerMaster;
 
     } catch (err) {
@@ -219,23 +214,6 @@ function loadOffers() {
         currentOffers =
             data.offers || [];
 
-        currentOffers =
-            currentOffers.filter(o => {
-
-                const dealer =
-                    String(o.dealer || '');
-
-                return (
-                    dealer &&
-                    !dealer.includes('@')
-                );
-            });
-
-        console.log(
-            "✅ Offers Loaded:",
-            currentOffers.length
-        );
-
         return currentOffers;
 
     } catch (err) {
@@ -260,14 +238,11 @@ function getAllDealerOffers(dealerName) {
 
         const offerDealer =
             normalizeText(
-                o.dealer ||
-                ''
+                o.dealer || ''
             );
 
         return (
-            offerDealer === normalized ||
-            offerDealer.includes(normalized) ||
-            normalized.includes(offerDealer)
+            offerDealer === normalized
         );
     });
 }
@@ -291,22 +266,6 @@ function findDealerInfo(dealerName){
             return db === normalizedSearch;
         });
 
-    if(found){
-        return found;
-    }
-
-    found =
-        dealerMaster.find(d => {
-
-            const db =
-                normalizeText(d.name);
-
-            return (
-                db.includes(normalizedSearch) ||
-                normalizedSearch.includes(db)
-            );
-        });
-
     return found || null;
 }
 
@@ -319,98 +278,72 @@ function generateFullBrochureHTML(dealerName){
         getAllDealerOffers(dealerName);
 
     const dealer =
-        findDealerInfo(dealerName) || {};
+        findDealerInfo(dealerName);
 
     let html = `
     <div style="
-        width:1100px;
+        width:1000px;
         background:white;
         color:black;
         padding:20px;
         font-family:Arial;
     ">
 
-    <div style="
-        text-align:center;
-        margin-bottom:20px;
-    ">
-
     <h1 style="
         color:#2563eb;
         margin-bottom:5px;
-        font-size:32px;
     ">
     AUTO SPARES SOLUTION
     </h1>
 
-    <h2 style="
-        margin:0;
-        color:#111827;
-    ">
-    SPECIAL OFFER FLYER
-    </h2>
+    <h2>${dealerName}</h2>
 
-    </div>
-
-    <div style="
-        margin-bottom:20px;
-        line-height:1.8;
-        font-size:15px;
-    ">
-
-    <b>Dealer:</b>
-    ${dealerName}
-
-    <br>
-
+    <p>
     <b>Mobile:</b>
-    ${dealer.phone || 'N/A'}
+    ${dealer?.phone || 'N/A'}
+    </p>
 
-    <br>
-
+    <p>
     <b>District:</b>
-    ${dealer.district || 'N/A'}
-
-    </div>
+    ${dealer?.district || 'N/A'}
+    </p>
 
     <table style="
         width:100%;
         border-collapse:collapse;
+        margin-top:20px;
         font-size:13px;
     ">
 
-    <tr style="
-        background:#facc15;
-        color:black;
-    ">
+    <tr style="background:#facc15;">
 
-    <th style="border:1px solid #999;padding:8px;">
+    <th style="border:1px solid #ccc;padding:8px;">
     Part
     </th>
 
-    <th style="border:1px solid #999;padding:8px;">
+    <th style="border:1px solid #ccc;padding:8px;">
     MRP
     </th>
 
-    <th style="border:1px solid #999;padding:8px;">
+    <th style="border:1px solid #ccc;padding:8px;">
     Basic Price
     <br>
     (Less 31.77%)
     </th>
 
-    <th style="border:1px solid #999;padding:8px;">
+    <th style="border:1px solid #ccc;padding:8px;">
     Spl Dis
     <br>
     (Max 6%)
     </th>
 
-    <th style="border:1px solid #999;padding:8px;">
+    <th style="border:1px solid #ccc;padding:8px;">
     Net Price
     <br>
     Incl GST 18%
     </th>
 
-    <th style="border:1px solid #999;padding:8px;">
+    <th style="border:1px solid #ccc;padding:8px;">
     Stock
     </th>
 
@@ -437,31 +370,19 @@ function generateFullBrochureHTML(dealerName){
         html += `
         <tr>
 
-        <td style="
-            border:1px solid #ccc;
-            padding:8px;
-        ">
+        <td style="border:1px solid #ccc;padding:8px;">
         ${o.part || ''}
         </td>
 
-        <td style="
-            border:1px solid #ccc;
-            padding:8px;
-        ">
+        <td style="border:1px solid #ccc;padding:8px;">
         ₹${mrp.toFixed(2)}
         </td>
 
-        <td style="
-            border:1px solid #ccc;
-            padding:8px;
-        ">
+        <td style="border:1px solid #ccc;padding:8px;">
         ₹${basicPrice.toFixed(2)}
         </td>
 
-        <td style="
-            border:1px solid #ccc;
-            padding:8px;
-        ">
+        <td style="border:1px solid #ccc;padding:8px;">
         ${splDiscount}%
         </td>
 
@@ -474,10 +395,7 @@ function generateFullBrochureHTML(dealerName){
         ₹${netPrice.toFixed(2)}
         </td>
 
-        <td style="
-            border:1px solid #ccc;
-            padding:8px;
-        ">
+        <td style="border:1px solid #ccc;padding:8px;">
         ${o.totalStock || 0}
         </td>
 
@@ -486,33 +404,13 @@ function generateFullBrochureHTML(dealerName){
     });
 
     html += `
-
     </table>
 
     <div style="
         margin-top:20px;
-        padding:15px;
+        padding:10px;
         background:#f3f4f6;
-        border-radius:8px;
-        line-height:1.8;
-        font-size:13px;
     ">
-
-    <b>Special Notes:</b>
-
-    <br>
-
-    • Prices are including GST
-
-    <br>
-
-    • Limited stock available
-
-    <br>
-
-    • Offer valid till stock lasts
-
-    <br><br>
 
     Reply YES to confirm order.
 
@@ -547,17 +445,8 @@ function showBrochurePreview(dealerName){
 
     win.document.write(`
     <html>
-    <head>
-    <title>${dealerName}</title>
-    </head>
-
-    <body style="
-        background:#ddd;
-        padding:20px;
-    ">
-
+    <body style="background:#eee;padding:20px;">
     ${html}
-
     </body>
     </html>
     `);
@@ -660,22 +549,9 @@ function sendFlyerToWhatsApp(
             dealerName
         );
 
-    if (!dealer) {
+    if (!dealer || !dealer.phone) {
 
-        alert(
-            'Dealer not found:\n' +
-            dealerName
-        );
-
-        return;
-    }
-
-    if (!dealer.phone) {
-
-        alert(
-            'Phone not found:\n' +
-            dealerName
-        );
+        alert('Dealer phone not found');
 
         return;
     }
@@ -696,7 +572,7 @@ function sendFlyerToWhatsApp(
 }
 
 // =========================================
-// SHARE PDF
+// PDF DOWNLOAD
 // =========================================
 async function sharePDFToWhatsApp(
     dealerName
@@ -716,37 +592,27 @@ async function sharePDFToWhatsApp(
 
         div.style.position = 'fixed';
         div.style.left = '-9999px';
-        div.style.top = '0';
-        div.style.background = 'white';
 
         document.body.appendChild(div);
 
         await new Promise(r =>
-            setTimeout(r,700)
+            setTimeout(r,500)
         );
 
         const canvas =
             await html2canvas(div,{
-                scale:2,
-                useCORS:true
+                scale:2
             });
 
         const img =
             canvas.toDataURL('image/png');
 
         const jsPDF =
-            window.jspdf?.jsPDF;
-
-        if(!jsPDF){
-
-            alert('PDF Library Missing');
-
-            return;
-        }
+            window.jspdf.jsPDF;
 
         const pdf =
             new jsPDF(
-                'l',
+                'p',
                 'mm',
                 'a4'
             );
@@ -756,8 +622,8 @@ async function sharePDFToWhatsApp(
             'PNG',
             5,
             5,
-            285,
-            200
+            200,
+            280
         );
 
         pdf.save(
@@ -766,14 +632,105 @@ async function sharePDFToWhatsApp(
 
         document.body.removeChild(div);
 
-    }catch(err){
+    } catch(err){
 
         console.error(err);
 
-        alert(
-            'PDF creation failed'
-        );
+        alert('PDF creation failed');
     }
+}
+
+// =========================================
+// GET DEALERS WITH OFFERS
+// =========================================
+async function getDealersWithOffers() {
+
+    await loadDealerMaster();
+
+    loadOffers();
+
+    const uniqueDealers =
+        [...new Set(
+            currentOffers.map(o =>
+                String(o.dealer || '').trim()
+            )
+        )];
+
+    const result = [];
+
+    uniqueDealers.forEach(name => {
+
+        if (!name) return;
+
+        const offers =
+            getAllDealerOffers(name);
+
+        if (offers.length === 0)
+            return;
+
+        const dealer =
+            findDealerInfo(name) || {};
+
+        result.push({
+
+            name: name,
+
+            phone:
+                dealer.phone || '',
+
+            district:
+                dealer.district || '',
+
+            owner:
+                dealer.ownerName || '',
+
+            offerCount:
+                offers.length
+        });
+    });
+
+    return result;
+}
+
+// =========================================
+// EXPORT HTML
+// =========================================
+async function exportAllBrochures() {
+
+    const dealers =
+        await getDealersWithOffers();
+
+    let html = '';
+
+    dealers.forEach(d => {
+
+        html +=
+            generateFullBrochureHTML(
+                d.name
+            );
+
+        html += '<hr>';
+    });
+
+    const blob =
+        new Blob([html], {
+            type: 'text/html'
+        });
+
+    const url =
+        URL.createObjectURL(blob);
+
+    const a =
+        document.createElement('a');
+
+    a.href = url;
+
+    a.download =
+        'all_brochures.html';
+
+    a.click();
+
+    URL.revokeObjectURL(url);
 }
 
 // =========================================
@@ -801,6 +758,8 @@ window.BrochureGenerator = {
 
     loadOffers,
 
+    getDealersWithOffers,
+
     getAllDealerOffers,
 
     generateWhatsAppFlyerMessage,
@@ -811,14 +770,11 @@ window.BrochureGenerator = {
 
     showBrochurePreview,
 
+    exportAllBrochures,
+
     findDealerInfo,
 
     generateFullBrochureHTML
 };
-
-// =========================================
-// AUTO INIT
-// =========================================
-init();
 
 })();
