@@ -9,8 +9,6 @@
 
     const CONFIG = {
 
-        // MAX EXTRA OFFER = 6%
-
         volumeTiers: [
 
             { min: 50, discount: 6, label: "Strategic Dealer" },
@@ -486,8 +484,6 @@
         const stock =
             currentStock.get(part)?.stock || 0;
 
-        // ONLY OFFER AVAILABLE STOCK
-
         if (stock <= 0) {
             return null;
         }
@@ -528,6 +524,10 @@
             originalPrice *
             (1 - discount / 100);
 
+        const basicPrice =
+            originalPrice -
+            (originalPrice * 31.77 / 100);
+
         return {
 
             dealer,
@@ -553,7 +553,11 @@
 
             minQty: 1,
 
+            mrp: originalPrice,
+
             originalPrice,
+
+            basicPrice,
 
             offerPrice,
 
@@ -585,10 +589,6 @@
 
         const processed = new Set();
 
-        // ==========================================
-        // INVOICE RETAILERS
-        // ==========================================
-
         for (const [key, data] of dealerPartAverages) {
 
             const master =
@@ -619,10 +619,6 @@
                 );
             }
         }
-
-        // ==========================================
-        // EXCEL RETAILERS
-        // ==========================================
 
         for (const retailer of dealerData) {
 
@@ -704,7 +700,7 @@
         }
 
         let csv =
-            "Dealer,Part No,Avg Monthly Qty,District,Stock,Discount %,Offer Type,Offer Price,Source\n";
+            "Dealer,Part No,MRP,Basic Price,Discount %,Offer Price,Stock\n";
 
         for (const o of activeOffers) {
 
@@ -714,19 +710,15 @@
 
                 `${o.part},` +
 
-                `${o.avgQty.toFixed(1)},` +
+                `${o.mrp.toFixed(2)},` +
 
-                `"${o.district}",` +
-
-                `${o.totalStock},` +
+                `${o.basicPrice.toFixed(2)},` +
 
                 `${o.discount},` +
 
-                `"${o.offerType}",` +
-
                 `${o.offerPrice.toFixed(2)},` +
 
-                `"${o.source}"\n`;
+                `${o.totalStock}\n`;
         }
 
         return csv;
@@ -742,6 +734,12 @@
 Dear ${offer.dealer},
 
 🎉 Special Offer for ${offer.part}
+
+MRP:
+₹${offer.mrp.toFixed(2)}
+
+Basic Price:
+₹${offer.basicPrice.toFixed(2)}
 
 Extra Discount:
 ${offer.discount}% OFF
