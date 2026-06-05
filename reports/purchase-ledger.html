@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Purchase Register – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="js/data-manager.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
@@ -15,18 +16,18 @@
         .summary-card h3 { margin: 0; font-size: 14px; color: #6c757d; }
         .summary-card .amount { font-size: 24px; font-weight: bold; color: #0a7c71; margin-top: 5px; }
         .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
-        .filter-group { flex: 1; min-width: 180px; }
+        .filter-group { flex: 1; min-width: 160px; }
         label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #495057; }
         select, input { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 6px; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin: 0 5px 5px 0; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 5px; }
         button:hover { background: #09645a; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; position: sticky; top: 0; }
         .export-btn { background: #6c757d; }
         .export-btn:hover { background: #5a6268; }
-        .empty-message { text-align: center; padding: 40px; color: #6c757d; }
         .debug { background: #fff3cd; padding: 10px; margin-bottom: 15px; display: none; font-family: monospace; font-size: 12px; }
+        .empty-message { text-align: center; padding: 40px; color: #6c757d; }
     </style>
 </head>
 <body>
@@ -80,42 +81,54 @@
     
     <!-- Purchase Table -->
     <div id="purchaseTableContainer">
-        <table id="purchaseTable">
-            <thead>
-                <tr><th>PO/Invoice No</th><th>Date</th><th>Supplier</th><th>Part No</th><th>Qty</th><th>Rate (₹)</th><th>GST (18%)</th><th>Total (₹)</th></tr>
-            </thead>
-            <tbody id="purchaseTbody"></tbody>
-        </table>
+        <div id="purchaseTable">Loading...</div>
     </div>
 </div>
 
 <script>
     let allPurchases = [];
-    let suppliers = [];
     
-    // Load purchases from localStorage
-    function loadPurchases() {
-        // Read from purchaseInvoices (main storage used by purchase-invoice-stock.html)
-        const purchaseInvoices = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+    // Load purchases from multiple possible localStorage keys
+    function loadPurchaseData() {
+        // Try multiple possible keys
+        const possibleKeys = [
+            'purchaseInvoices',      // Main key from purchase-invoice-stock.html
+            'allPurchases',          // Fallback from generateDocument()
+            'purchaseInvoicesData',  // Alternative
+            'purchaseInvoicesList'   // Another alternative
+        ];
         
-        // Also read from allPurchases (fallback)
-        const allPurchasesStorage = JSON.parse(localStorage.getItem('allPurchases') || '[]');
-        
-        // Read suppliers for supplier names
-        suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        
-        // Combine both sources
-        allPurchases = [...purchaseInvoices, ...allPurchasesStorage];
-        
-        // Remove duplicates by invoice number
-        const unique = new Map();
-        for (const p of allPurchases) {
-            const invNo = p.invoiceNo || p.poNo;
-            if (invNo && !unique.has(invNo)) {
-                unique.set(invNo, p);
+        let purchases = [];
+        for (const key of possibleKeys) {
+            const data = localStorage.getItem(key);
+            if (data) {
+                const parsed = JSON.parse(data);
+                if (parsed && parsed.length > 0) {
+                    purchases = parsed;
+                    console.log(`✅ Loaded ${purchases.length} purchases from key: ${key}`);
+                    break;
+                }
             }
         }
-        allPurchases = Array.from(unique.values());
+        
+        // If still empty, try to read from data-manager
+        if (purchases.length === 0 && typeof DataManager !== 'undefined') {
+            purchases = DataManager.purchaseInvoices;
+            console.log(`✅ Loaded ${purchases.length} purchases from DataManager`);
+        }
+        
+        return purchases;
+    }
+    
+    function getSupplierName(purchase) {
+        if (purchase.supplierName) return purchase.supplierName;
+        if (purchase.supplier) return purchase.supplier.name || purchase.supplier;
+        if (purchase.supplierEmail) return purchase.supplierEmail;
+        return 'Unknown';
+    }
+    
+    function loadPurchases() {
+        allPurchases = loadPurchaseData();
         
         // Apply filters
         const supplierFilter = document.getElementById('supplierFilter').value.toLowerCase();
@@ -126,10 +139,7 @@
         let filtered = allPurchases;
         
         if (supplierFilter) {
-            filtered = filtered.filter(p => {
-                const supplier = getSupplierName(p);
-                return supplier.toLowerCase().includes(supplierFilter);
-            });
+            filtered = filtered.filter(p => getSupplierName(p).toLowerCase().includes(supplierFilter));
         }
         
         if (partFilter) {
@@ -151,35 +161,34 @@
         
         displayPurchases(filtered);
         populateSupplierFilter();
-        
-        // Debug info
-        console.log(`Total purchases loaded: ${allPurchases.length}`);
-        console.log('First purchase:', allPurchases[0]);
-    }
-    
-    function getSupplierName(purchase) {
-        // Try to get supplier name from various possible fields
-        if (purchase.supplierName) return purchase.supplierName;
-        if (purchase.supplierEmail) {
-            const supplier = suppliers.find(s => s.email === purchase.supplierEmail);
-            if (supplier) return supplier.name;
-            return purchase.supplierEmail;
-        }
-        if (purchase.supplier?.name) return purchase.supplier.name;
-        return 'Unknown';
     }
     
     function displayPurchases(purchases) {
-        const tbody = document.getElementById('purchaseTbody');
-        tbody.innerHTML = '';
+        const container = document.getElementById('purchaseTable');
         
         if (purchases.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="empty-message">No purchase invoices found.<br><br>Generate a purchase invoice from the main website to see data here.</td></tr>';
+            container.innerHTML = '<div class="empty-message"><i class="fas fa-info-circle"></i> No purchase invoices found.<br><br>Generate a purchase invoice from the main website to see data here.</div>';
             document.getElementById('totalPurchase').innerHTML = '₹0';
             document.getElementById('totalGST').innerHTML = '₹0';
             document.getElementById('grandTotal').innerHTML = '₹0';
             return;
         }
+        
+        let html = `<div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>PO/Invoice No</th>
+                        <th>Date</th>
+                        <th>Supplier</th>
+                        <th>Part No</th>
+                        <th>Qty</th>
+                        <th>Rate (₹)</th>
+                        <th>GST (18%)</th>
+                        <th>Total (₹)</th>
+                    </tr>
+                </thead>
+                <tbody>`;
         
         let totalPurchase = 0, totalGST = 0, grandTotal = 0;
         
@@ -200,18 +209,24 @@
                 totalGST += gst;
                 grandTotal += lineTotal;
                 
-                const row = tbody.insertRow();
-                row.insertCell(0).innerText = po.invoiceNo || po.poNo || 'N/A';
-                row.insertCell(1).innerText = date;
-                row.insertCell(2).innerText = supplierName;
-                row.insertCell(3).innerText = part;
-                row.insertCell(4).innerText = qty;
-                row.insertCell(5).innerText = `₹${rate.toFixed(2)}`;
-                row.insertCell(6).innerText = `₹${gst.toFixed(2)}`;
-                row.insertCell(7).innerText = `₹${lineTotal.toFixed(2)}`;
+                html += `<tr>
+                    <td>${po.invoiceNo || po.poNo || 'N/A'}</td>
+                    <td>${date}</td>
+                    <td>${escapeHtml(supplierName)}</strong></td>
+                    <td>${escapeHtml(part)}</strong></td>
+                    <td>${qty}</strong></td>
+                    <td>₹${rate.toFixed(2)}</strong></td>
+                    <td>₹${gst.toFixed(2)}</strong></td>
+                    <td>₹${lineTotal.toFixed(2)}</strong></td>
+                </tr>`;
             }
         }
         
+        html += `</tbody>
+            </table>
+        </div>`;
+        
+        container.innerHTML = html;
         document.getElementById('totalPurchase').innerHTML = `₹${totalPurchase.toFixed(2)}`;
         document.getElementById('totalGST').innerHTML = `₹${totalGST.toFixed(2)}`;
         document.getElementById('grandTotal').innerHTML = `₹${grandTotal.toFixed(2)}`;
@@ -233,14 +248,15 @@
     }
     
     function exportToCSV() {
-        const tbody = document.getElementById('purchaseTbody');
-        if (tbody.children.length === 0 || tbody.innerHTML.includes('No purchase invoices')) {
+        const tableDiv = document.getElementById('purchaseTable');
+        const table = tableDiv.querySelector('table');
+        if (!table) {
             alert('No data to export');
             return;
         }
         
         let csv = "PO/Invoice No,Date,Supplier,Part No,Qty,Rate (₹),GST (18%),Total (₹)\n";
-        const rows = tbody.querySelectorAll('tr');
+        const rows = table.querySelectorAll('tbody tr');
         
         for (const row of rows) {
             const cols = row.querySelectorAll('td');
@@ -261,8 +277,17 @@
     function toggleDebug() {
         const panel = document.getElementById('debugPanel');
         if (panel.style.display === 'none' || !panel.style.display) {
-            panel.innerHTML = `<strong>Raw purchaseInvoices (first 3):</strong><br><pre>${JSON.stringify(allPurchases.slice(0, 3), null, 2)}</pre>
-            <strong>Suppliers:</strong><br><pre>${JSON.stringify(suppliers.slice(0, 3), null, 2)}</pre>`;
+            const purchases = loadPurchaseData();
+            panel.innerHTML = `<strong>Debug Info:</strong><br>
+            Total purchase invoices: ${purchases.length}<br>
+            Sample invoice (first): <pre>${JSON.stringify(purchases[0], null, 2)}</pre>
+            <strong>localStorage keys:</strong><br>`;
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.toLowerCase().includes('purchase')) {
+                    panel.innerHTML += `- ${key}<br>`;
+                }
+            }
             panel.style.display = 'block';
         } else {
             panel.style.display = 'none';
@@ -279,8 +304,14 @@
         });
     }
     
+    // Set default dates (current month)
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('fromDate').value = firstDay.toISOString().split('T')[0];
+    document.getElementById('toDate').value = today.toISOString().split('T')[0];
+    
     // Load on page load
-    loadPurchases();
+    setTimeout(loadPurchases, 1000);
 </script>
 </body>
-    </html>
+</html>
