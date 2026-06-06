@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="access-control.js"></script>
-    <!-- Google AdSense (already present) -->
+    <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8126256456942389" crossorigin="anonymous"></script>
     <style>
         /* ========== GLOBAL STYLES ========== */
@@ -24,17 +24,21 @@
             --success: #27ae60;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        
         body {
             font-family: 'Roboto', sans-serif;
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            background-attachment: fixed;  /* ✅ full coverage */
             color: var(--light);
             line-height: 1.6;
-            overflow-x: hidden;
+            overflow-x: hidden;            /* ✅ prevent horizontal scroll */
             margin-left: 280px;
             transition: margin-left 0.3s ease;
+            min-height: 100vh;
         }
         body.sidebar-hidden { margin-left: 0; }
         body.sidebar-hidden .professional-sidebar { transform: translateX(-100%); }
+        
         header {
             text-align: center;
             padding: 1.5rem 1rem;
@@ -48,8 +52,23 @@
         .logo { height: 60px; border-radius: 5px; }
         header h1 { margin: 0; font-size: 2.2rem; color: var(--accent); font-family: 'Montserrat', sans-serif; }
         .tagline { color: #a0d9d4; font-size: 1rem; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
-        .section { padding: 3rem 1rem; background: rgba(255,255,255,0.05); border-radius: 10px; margin: 1.5rem 0; }
+        
+        /* ✅ Fixed container – prevents overflow */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+            overflow-x: hidden;      /* Prevent horizontal scroll */
+            position: relative;
+            min-height: 100vh;       /* Instead of fixed height */
+            height: auto;
+        }
+        .section {
+            padding: 3rem 1rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            margin: 1.5rem 0;
+        }
         .section-title { text-align: center; margin-bottom: 2rem; color: var(--accent); font-family: 'Montserrat', sans-serif; position: relative; }
         .section-title::after { content: ''; display: block; width: 80px; height: 3px; background: var(--primary); margin: 0.5rem auto 0; }
         .brand-filter { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 1rem 1.5rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
@@ -65,8 +84,33 @@
         #search-input:focus, #brand-select:focus { outline: 2px solid var(--accent); background: #ffffff; }
         #search-button { padding: 0.7rem 1.5rem; background: linear-gradient(135deg, #ff8c00, #e67e22); color: white; border: none; border-radius: 40px; cursor: pointer; font-weight: 700; transition: 0.2s; }
         #search-button:hover { background: linear-gradient(135deg, #ffaa33, #ff7700); transform: scale(1.02); }
-        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
-        .card { background: rgba(255,255,255,0.08); border-radius: 10px; padding: 1.2rem; text-align: center; transition: transform 0.3s; position: relative; display: flex; flex-direction: column; height: 100%; }
+        
+        /* ✅ Fixed gallery – scrollable, proper stacking */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            overflow-y: auto;        /* Enable vertical scrolling if needed */
+            padding: 1rem 0;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* ✅ Fixed cards – no spill, consistent height */
+        .card {
+            background: rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 1.2rem;
+            text-align: center;
+            transition: transform 0.3s;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            height: auto;            /* Remove fixed height */
+            min-height: 380px;       /* Consistent card size */
+            overflow: hidden;        /* Prevent content spill */
+            z-index: 1;
+        }
         .card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.12); }
         .brand-logo-container { position: absolute; top: 10px; left: 10px; width: 50px; height: 50px; background: white; border-radius: 50%; padding: 5px; z-index: 3; overflow: hidden; }
         .brand-logo-container img { width: 100%; height: 100%; object-fit: contain; display: block; }
@@ -138,7 +182,33 @@
         .user-panel { position: fixed; top: 150px; left: -300px; width: 300px; height: calc(100% - 80px); background: #1a1a1a; z-index: 999; padding: 20px; transition: left 0.3s; overflow-y: auto; }
         .user-panel.active { left: 0; }
         .user-toggle { position: fixed; top: 150px; left: 10px; z-index: 1000; background: var(--primary); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; }
-        @media (max-width: 768px) { body { margin-left: 0; } .brand-logo-item { width: 60px; height: 45px; } .card-actions { flex-direction: column; } .card-actions .btn { width: 100%; } }
+        
+        /* ✅ Mobile responsive fixes */
+        @media (max-width: 768px) {
+            body {
+                margin-left: 0;
+            }
+            .brand-logo-item {
+                width: 60px;
+                height: 45px;
+            }
+            .card-actions {
+                flex-direction: column;
+            }
+            .card-actions .btn {
+                width: 100%;
+            }
+            .container {
+                padding: 0 0.5rem;
+            }
+            .gallery {
+                gap: 1rem;
+            }
+            .professional-sidebar {
+                width: 260px;
+            }
+        }
+        
         .card-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
         .card-actions .btn { flex: 1; min-width: 100px; text-align: center; }
         #preloader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0f2027, #203a43); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.8s ease; }
@@ -153,7 +223,22 @@
         .info-btn { background: #3498db; color: white; }
         .info-btn:hover { background: #2980b9; }
         #galleryCloseBtn { z-index: 10002; cursor: pointer; position: absolute; right: 20px; top: 10px; font-size: 35px; }
-        .professional-sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 280px; background: linear-gradient(180deg, #0a2e3a 0%, #0a4b5e 100%); color: #fff; overflow-y: auto; z-index: 10000; box-shadow: 2px 0 12px rgba(0,0,0,0.15); transition: transform 0.3s ease; }
+        
+        /* ✅ Fixed professional sidebar – transform based, no overlap */
+        .professional-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px;
+            background: linear-gradient(180deg, #0a2e3a 0%, #0a4b5e 100%);
+            color: #fff;
+            overflow-y: auto;
+            z-index: 10000;
+            transition: transform 0.3s ease;
+            transform: translateX(0);
+            box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+        }
         .professional-sidebar::-webkit-scrollbar { width: 5px; }
         .professional-sidebar::-webkit-scrollbar-track { background: #1e5a6b; }
         .professional-sidebar::-webkit-scrollbar-thumb { background: #ffc107; border-radius: 4px; }
@@ -177,9 +262,16 @@
         @media (max-width: 768px) { .sidebar-toggle-btn { top: 80px; left: 10px; } }
         .card::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('images/ASS.jpg'); background-repeat: no-repeat; background-position: center; background-size: 40%; opacity: 0.08; pointer-events: none; z-index: 0; }
         .card img { position: relative; z-index: 1; background: transparent; }
+        
+        /* Extra overflow protection for main content */
+        .main-content {
+            position: relative;
+            z-index: 1;
+        }
     </style>
 </head>
 <body>
+    <!-- The rest of your HTML body remains unchanged -->
     <div id="preloader">
         <img src="images/ASS.jpg" alt="Auto Spares Solution" class="preloader-logo">
         <div class="loader"></div>
@@ -246,42 +338,37 @@
             <a href="https://razorpay.me/@autosparessolution" target="_blank" class="nav-link"><i class="fas fa-money-bill-wave"></i><span>Pay Online</span></a>
             <a href="#" id="cart-link-sidebar" class="nav-link"><i class="fas fa-shopping-cart"></i><span>Cart</span><span class="badge" id="cart-count-sidebar">0</span></a>
         </div>
-        <!-- ========== NEW REPORTS & GST SECTION ========== -->
-<div class="nav-group">
-    <div class="group-title"><i class="fas fa-chart-line"></i> Reports & GST</div>
-    <a href="reports/sales-ledger.html" class="nav-link"><i class="fas fa-book"></i> Sales Register</a>
-    <a href="reports/purchase-ledger.html" class="nav-link"><i class="fas fa-truck"></i> Purchase Register</a>
-    <a href="reports/stock-ledger.html" class="nav-link"><i class="fas fa-boxes"></i> Stock Ledger</a>
-    <a href="reports/gst-register.html" class="nav-link"><i class="fas fa-percent"></i> GST Register</a>
-    <a href="reports/payment-register.html" class="nav-link"><i class="fas fa-credit-card"></i> Payment Register</a>
-    <a href="reports/expense-entry.html" class="nav-link"><i class="fas fa-money-bill-wave"></i> Expense Entry</a>
-    <a href="reports/expense-report.html" class="nav-link"><i class="fas fa-chart-line"></i> Expense Report</a>
-    <a href="reports/trial-balance.html" class="nav-link"><i class="fas fa-scale-balanced"></i> Trial Balance</a>
-    <a href="reports/profit-loss.html" class="nav-link"><i class="fas fa-chart-line"></i> Profit & Loss</a>
-    <a href="reports/balance-sheet.html" class="nav-link"><i class="fas fa-balance-scale"></i> Balance Sheet</a>
-    <a href="reports/customer-outstanding.html" class="nav-link"><i class="fas fa-users"></i> Customer Outstanding</a>
-</div>
-
-<!-- ========== ADMIN PANEL (Hidden for normal users) ========== -->
-<div class="nav-group" id="adminNavGroup" style="display: none;">
-    <div class="group-title"><i class="fas fa-crown"></i> Admin Panel</div>
-    <a href="admin/platform-fees.html" class="nav-link"><i class="fas fa-percent"></i> Platform Fees</a>
-    <a href="admin/platform-settings.html" class="nav-link"><i class="fas fa-sliders-h"></i> Platform Settings</a>
-    <a href="admin/subscriptions.html" class="nav-link"><i class="fas fa-users"></i> Subscriptions</a>
-</div>
-<!-- ========== DEALER INTELLIGENCE ========== -->
-<div class="nav-group">
-    <div class="group-title"><i class="fas fa-robot"></i> AI Intelligence</div>
-    <a href="dealer-offers-dashboard.html" class="nav-link">
-        <i class="fas fa-chart-line"></i>
-        <span>Dealer Offers & Intelligence</span>
-    </a>
-</div>
-<!-- ========== DEALER PORTAL ========== -->
-<div class="nav-group">
-    <div class="group-title"><i class="fas fa-store"></i> Dealer Portal</div>
-    <a href="dealer/index.html" class="nav-link"><i class="fas fa-sign-in-alt"></i> Dealer Login</a>
-</div>
+        <div class="nav-group">
+            <div class="group-title"><i class="fas fa-chart-line"></i> Reports & GST</div>
+            <a href="reports/sales-ledger.html" class="nav-link"><i class="fas fa-book"></i> Sales Register</a>
+            <a href="reports/purchase-ledger.html" class="nav-link"><i class="fas fa-truck"></i> Purchase Register</a>
+            <a href="reports/stock-ledger.html" class="nav-link"><i class="fas fa-boxes"></i> Stock Ledger</a>
+            <a href="reports/gst-register.html" class="nav-link"><i class="fas fa-percent"></i> GST Register</a>
+            <a href="reports/payment-register.html" class="nav-link"><i class="fas fa-credit-card"></i> Payment Register</a>
+            <a href="reports/expense-entry.html" class="nav-link"><i class="fas fa-money-bill-wave"></i> Expense Entry</a>
+            <a href="reports/expense-report.html" class="nav-link"><i class="fas fa-chart-line"></i> Expense Report</a>
+            <a href="reports/trial-balance.html" class="nav-link"><i class="fas fa-scale-balanced"></i> Trial Balance</a>
+            <a href="reports/profit-loss.html" class="nav-link"><i class="fas fa-chart-line"></i> Profit & Loss</a>
+            <a href="reports/balance-sheet.html" class="nav-link"><i class="fas fa-balance-scale"></i> Balance Sheet</a>
+            <a href="reports/customer-outstanding.html" class="nav-link"><i class="fas fa-users"></i> Customer Outstanding</a>
+        </div>
+        <div class="nav-group" id="adminNavGroup" style="display: none;">
+            <div class="group-title"><i class="fas fa-crown"></i> Admin Panel</div>
+            <a href="admin/platform-fees.html" class="nav-link"><i class="fas fa-percent"></i> Platform Fees</a>
+            <a href="admin/platform-settings.html" class="nav-link"><i class="fas fa-sliders-h"></i> Platform Settings</a>
+            <a href="admin/subscriptions.html" class="nav-link"><i class="fas fa-users"></i> Subscriptions</a>
+        </div>
+        <div class="nav-group">
+            <div class="group-title"><i class="fas fa-robot"></i> AI Intelligence</div>
+            <a href="dealer-offers-dashboard.html" class="nav-link">
+                <i class="fas fa-chart-line"></i>
+                <span>Dealer Offers & Intelligence</span>
+            </a>
+        </div>
+        <div class="nav-group">
+            <div class="group-title"><i class="fas fa-store"></i> Dealer Portal</div>
+            <a href="dealer/index.html" class="nav-link"><i class="fas fa-sign-in-alt"></i> Dealer Login</a>
+        </div>
         <div class="sidebar-footer"><i class="fas fa-copyright"></i> Auto Spares ERP v2.0</div>
     </div>
     <button class="user-toggle" id="user-toggle"><i class="fas fa-user"></i></button>
@@ -309,10 +396,9 @@
                 <option value="proforma">📑 Proforma Invoice</option>
                 <option value="quotation">✉️ Quotation</option>
             </select>
-            <!-- NEW AI SCAN BUTTON (added without modifying existing lines) -->
             <label for="ai-scan-input" id="ai-scan-btn" class="btn" style="background:#6c5ce7; cursor:pointer;">
-    <i class="fas fa-camera"></i> Scan Order
-</label>
+                <i class="fas fa-camera"></i> Scan Order
+            </label>
             <input type="file" id="ai-scan-input" accept="image/*,.pdf,.xlsx,.xls,.csv" capture style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;">
         </div>
         <div class="stock-info-date">Stock last updated: <span id="last-updated-date">Loading...</span></div>
@@ -328,7 +414,6 @@
             <div class="stat-card" style="background:rgba(255,255,255,0.08); padding:2rem; text-align:center;">98% Satisfaction</div>
             <div class="stat-card" style="background:rgba(255,255,255,0.08); padding:2rem; text-align:center;">24H Processing</div>
         </div>
-        <!-- Google AdSense unit inserted before About Us section -->
         <ins class="adsbygoogle"
              style="display:block; text-align:center; margin: 1rem 0;"
              data-ad-layout="in-article"
@@ -376,7 +461,6 @@
     </div>
     <div id="galleryModal" class="modal"><div class="modal-content"><span class="close-modal" id="galleryCloseBtn" onclick="closeGallery()">&times;</span><div id="gallery-media"></div><div id="gallery-thumbnails"></div></div></div>
     <div id="infoModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="closeInfoModal()">&times;</span><h3>Product Information</h3><div id="infoModalBody"></div></div></div>
-    <!-- NEW AI REVIEW MODAL (added without modifying existing lines) -->
     <div id="aiReviewModal" class="modal" style="display:none;">
         <div class="modal-content" style="max-width:900px; background:#0f172a; color:#e2e8f0;">
             <span class="close-modal" id="closeReviewModal" style="color:white;">&times;</span>
@@ -778,12 +862,10 @@
         function closeFloatingCart() { document.getElementById('floating-cart').style.display = 'none'; }
         function openGalleryFromCard(btn) { const card = btn.closest('.card'); const media = card.getAttribute('data-media'); if(!media) return; try{ const arr = JSON.parse(media.replace(/&apos;/g,"'")); openGallery(arr,0); } catch(e){ console.error(e); } }
         
-        // ========== DYNAMIC SHOW PRODUCT INFO (RESTORED FROM ORIGINAL CODE) ==========
         function showProductInfo(part) {
             const product = allProducts.find(p => p.part === part);
             if (!product) return;
             
-            // Check if there is any application-specific info beyond basic fields
             const hasLocalInfo = (product.make && product.make !== '') ||
                                  (product.model && product.model !== '') ||
                                  (product.year_start && product.year_start !== '') ||
@@ -795,7 +877,6 @@
             html += `<p><strong>Stock:</strong> ${product.stock}</p>`;
             html += `<p><strong>Price:</strong> ₹${product.price.toFixed(2)}</p>`;
             
-            // Dynamically display all extra properties (except a skip list)
             const skipProps = ['part', 'desc', 'brand', 'stock', 'price', 'score', 'media', 'rawData', 'video', 'boxQty', 'masterCarton', 'mostSelling', 'sales_volume', 'sales_value', 'zone', 'region'];
             for (let [key, value] of Object.entries(product)) {
                 if (skipProps.includes(key)) continue;
@@ -873,7 +954,7 @@
         logout = function() { originalLogout(); if(typeof updateNavigationByRole === 'function') updateNavigationByRole(); };
     </script>
     <script>
-    // Global exposure for AI module (no existing code changed)
+    // Global exposure for AI module
     window.allProducts = allProducts;
     window.carts = carts;
     window.currentUser = currentUser;
@@ -884,57 +965,26 @@
     window.aiAddToCart = aiAddToCart;
     console.log("AI module exposed: allProducts count =", allProducts?.length);
     </script>
-    <!-- NEW AI MODULE SCRIPTS (must be created in /js/ai/ folder) -->
-   <!-- Libraries required for AI scan -->
-
-<!-- Libraries required for AI scan -->
-
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
-
-<!-- SHEETJS FOR EXCEL EXPORT -->
-
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-<!-- AI CONFIG -->
-
-<script src="js/ai/ai-config.js"></script>
-
-<script src="js/ai/ai-utils.js"></script>
-
-<!-- CACHE BUSTER -->
-
-<script>
-
-window.AI_VERSION = Date.now();
-
-document.write('<script src="js/ai/ai-ocr.js?v=' + window.AI_VERSION + '"><\/script>');
-
-document.write('<script src="js/ai/ai-parser.js?v=' + window.AI_VERSION + '"><\/script>');
-
-document.write('<script src="js/ai/ai-matcher.js?v=' + window.AI_VERSION + '"><\/script>');
-
-document.write('<script src="js/ai/ai-export.js?v=' + window.AI_VERSION + '"><\/script>');
-
-document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/script>');
-
-</script>
-
-<!-- UI FILES -->
-
-<script src="js/ai/ai-review-modal.js"></script>
-
-<script src="js/ai/ai-cart.js"></script>
-    <!-- Dealer Reorder Memory scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="js/ai/ai-config.js"></script>
+    <script src="js/ai/ai-utils.js"></script>
+    <script>
+    window.AI_VERSION = Date.now();
+    document.write('<script src="js/ai/ai-ocr.js?v=' + window.AI_VERSION + '"><\/script>');
+    document.write('<script src="js/ai/ai-parser.js?v=' + window.AI_VERSION + '"><\/script>');
+    document.write('<script src="js/ai/ai-matcher.js?v=' + window.AI_VERSION + '"><\/script>');
+    document.write('<script src="js/ai/ai-export.js?v=' + window.AI_VERSION + '"><\/script>');
+    document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/script>');
+    </script>
+    <script src="js/ai/ai-review-modal.js"></script>
+    <script src="js/ai/ai-cart.js"></script>
     <script src="js/reorder-history.js"></script>
     <script src="js/reorder-ui.js"></script>
     <script>
-    // Show admin panel only when admin is logged in
     function showAdminPanel() {
         const user = JSON.parse(localStorage.getItem('currentUser'));
         const adminNav = document.getElementById('adminNavGroup');
@@ -946,28 +996,20 @@ document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/sc
             }
         }
     }
-    
-    // Run on page load and after login
     document.addEventListener('DOMContentLoaded', showAdminPanel);
     setTimeout(showAdminPanel, 2000);
-    
-    // Override login function to refresh admin panel
-    const originalLogin = window.login;
-    if (typeof originalLogin === 'function') {
+    const originalLogin2 = window.login;
+    if (typeof originalLogin2 === 'function') {
         window.login = function() {
-            originalLogin();
+            originalLogin2();
             setTimeout(showAdminPanel, 500);
         };
     }
     </script>
     <script>
-    // ========== DEALER RECOGNITION & UI CONTROL ==========
-    
-    // Function to get current user type
     function getCurrentUserType() {
         const user = JSON.parse(localStorage.getItem('currentUser'));
         const dealer = JSON.parse(localStorage.getItem('currentDealer'));
-        
         if (user && user.email === 'dipankar@autosparessolution.com') {
             return 'admin';
         } else if (dealer) {
@@ -978,30 +1020,19 @@ document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/sc
             return 'guest';
         }
     }
-    
-    // Function to update UI based on user type
     function updateUIByUserType() {
         const userType = getCurrentUserType();
-        
-        // Find the "Generate Invoice" button (manual invoice generation)
         const generateBtn = document.querySelector('.btn-block[onclick="generateDocument()"]');
         const generateBtnAlt = document.querySelector('#generateDocumentBtn');
-        
         if (userType === 'admin') {
-            // Admin can see manual generate button
             if (generateBtn) generateBtn.style.display = 'inline-flex';
             if (generateBtnAlt) generateBtnAlt.style.display = 'block';
         } else {
-            // Customers and dealers CANNOT generate manual invoices
             if (generateBtn) generateBtn.style.display = 'none';
             if (generateBtnAlt) generateBtnAlt.style.display = 'none';
         }
-        
-        // Show/Hide Dealer Portal Button
         let dealerPortalBtn = document.getElementById('dealerPortalBtn');
-        
         if (userType === 'dealer') {
-            // Show floating dealer portal button if not exists
             if (!dealerPortalBtn) {
                 dealerPortalBtn = document.createElement('a');
                 dealerPortalBtn.id = 'dealerPortalBtn';
@@ -1030,13 +1061,10 @@ document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/sc
                 document.body.appendChild(dealerPortalBtn);
             }
         } else {
-            // Remove dealer portal button if exists
             if (dealerPortalBtn) {
                 dealerPortalBtn.remove();
             }
         }
-        
-        // Optional: Show toast message for dealers
         if (userType === 'dealer' && !sessionStorage.getItem('dealerWelcomeShown')) {
             setTimeout(() => {
                 if (typeof showToast === 'function') {
@@ -1046,13 +1074,9 @@ document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/sc
             }, 2000);
         }
     }
-    
-    // Function to sync dealer login from main site (optional)
     function syncDealerLogin() {
         const user = JSON.parse(localStorage.getItem('currentUser'));
         const dealer = JSON.parse(localStorage.getItem('currentDealer'));
-        
-        // If a dealer logged into main site with same email, sync session
         if (user && !dealer) {
             const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
             const matchedDealer = dealers.find(d => d.email === user.email);
@@ -1067,39 +1091,31 @@ document.write('<script src="js/ai/ai-init.js?v=' + window.AI_VERSION + '"><\/sc
             }
         }
     }
-    
-    // Override login function to check for dealer status after login
-    const originalLogin = window.login;
-    if (typeof originalLogin === 'function') {
+    const originalLogin3 = window.login;
+    if (typeof originalLogin3 === 'function') {
         window.login = function() {
-            originalLogin();
+            originalLogin3();
             setTimeout(() => {
                 syncDealerLogin();
                 updateUIByUserType();
             }, 500);
         };
     }
-    
-    // Override logout function to clear dealer session
-    const originalLogout = window.logout;
-    if (typeof originalLogout === 'function') {
+    const originalLogout2 = window.logout;
+    if (typeof originalLogout2 === 'function') {
         window.logout = function() {
-            originalLogout();
+            originalLogout2();
             localStorage.removeItem('currentDealer');
             updateUIByUserType();
         };
     }
-    
-    // Initialize UI on page load
     document.addEventListener('DOMContentLoaded', function() {
         syncDealerLogin();
         updateUIByUserType();
     });
-    
-    // Also run after products load (to ensure cart UI is ready)
     setTimeout(() => {
         updateUIByUserType();
     }, 2000);
-</script>
+    </script>
 </body>
-    </html>
+                </html>
