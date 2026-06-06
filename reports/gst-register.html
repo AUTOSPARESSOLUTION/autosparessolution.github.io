@@ -66,9 +66,8 @@
     let outputDetails = [], inputDetails = [];
     let outputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
     let inputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
-    let debugInfo = [];
     
-    // Helper: safely get field value with fallbacks
+    // ----- Helper functions to safely extract fields -----
     function getItemPart(item) {
         return item.part || item.productId || item.sku || item.productName || 'N/A';
     }
@@ -85,23 +84,35 @@
         return inv.invoiceNo || inv.poNo || 'N/A';
     }
     
-    function getCustomerDisplay(email) {
-        if (!email) return 'Guest';
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
-        let found = [...users, ...dealers].find(u => u.email === email);
-        if (found) return found.business || found.name || email.split('@')[0];
-        return email.split('@')[0];
+    // PRIORITY: use customerName (already fixed), then email, then Guest
+    function getCustomerDisplay(inv) {
+        if (inv.customerName && inv.customerName !== 'Guest' && inv.customerName !== '') 
+            return inv.customerName;
+        if (inv.customerEmail) {
+            const email = inv.customerEmail;
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
+            let found = [...users, ...dealers].find(u => u.email === email);
+            if (found) return found.business || found.name || email.split('@')[0];
+            return email.split('@')[0];
+        }
+        return 'Guest';
     }
     
-    function getSupplierDisplay(email) {
-        if (!email) return 'Unknown';
-        const suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        let found = suppliers.find(s => s.email === email);
-        if (found) return found.business || found.name || email.split('@')[0];
-        return email.split('@')[0];
+    function getSupplierDisplay(inv) {
+        if (inv.supplierName && inv.supplierName !== '') 
+            return inv.supplierName;
+        if (inv.supplierEmail) {
+            const email = inv.supplierEmail;
+            const suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+            let found = suppliers.find(s => s.email === email);
+            if (found) return found.business || found.name || email.split('@')[0];
+            return email.split('@')[0];
+        }
+        return 'Unknown';
     }
     
+    // ----- Main calculation -----
     function calculateGST() {
         const from = document.getElementById('fromDate').value;
         const to = document.getElementById('toDate').value;
@@ -114,7 +125,7 @@
         const fromDate = new Date(from);
         const toDate = new Date(to);
         
-        // Process Sales
+        // --- Sales (Output GST) ---
         outputDetails = [];
         outputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
         for (let inv of allInvoices) {
@@ -133,7 +144,7 @@
                     outputDetails.push({
                         invoiceNo: getInvoiceNo(inv),
                         date: inv.date,
-                        customer: getCustomerDisplay(inv.customerEmail),
+                        customer: getCustomerDisplay(inv),
                         part: getItemPart(item),
                         qty,
                         taxable, gstRate: 18, cgst, sgst, totalGST: gst
@@ -142,25 +153,18 @@
             }
         }
         
-        // Process Purchases (with robust field handling)
+        // --- Purchases (Input GST) ---
         inputDetails = [];
         inputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
-        debugInfo = [];
         for (let inv of allPurchases) {
             const invDate = new Date(inv.date);
             if (invDate >= fromDate && invDate <= toDate) {
                 for (let item of (inv.items || [])) {
                     const qty = getItemQty(item);
                     const price = getItemPrice(item);
-                    const part = getItemPart(item);
                     const taxable = qty * price;
                     const gst = taxable * 0.18;
                     const cgst = gst/2, sgst = gst/2;
-                    
-                    if (isNaN(taxable) || taxable === 0) {
-                        debugInfo.push({ invoice: getInvoiceNo(inv), part, qty, price, taxable, rawItem: item });
-                    }
-                    
                     inputTotal.taxable += taxable;
                     inputTotal.cgst += cgst;
                     inputTotal.sgst += sgst;
@@ -168,8 +172,8 @@
                     inputDetails.push({
                         invoiceNo: getInvoiceNo(inv),
                         date: inv.date,
-                        supplier: getSupplierDisplay(inv.supplierEmail),
-                        part: part,
+                        supplier: getSupplierDisplay(inv),
+                        part: getItemPart(item),
                         qty,
                         taxable, gstRate: 18, cgst, sgst, totalGST: gst
                     });
@@ -180,7 +184,6 @@
         displaySummary();
         displayOutputTable();
         displayInputTable();
-        if (debugInfo.length > 0) console.warn('Items with zero/NaN taxable value:', debugInfo);
     }
     
     function displaySummary() {
@@ -197,8 +200,8 @@
             <table>
                 <thead><tr><th>Component</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
                 <tbody>
-                    <tr><td>Output</td><td>₹${outputTotal.cgst.toFixed(2)}</td><td>₹${outputTotal.sgst.toFixed(2)}</td><td>₹${outputTotal.total.toFixed(2)}</td></tr>
-                    <tr><td>Input (ITC)</td><td>₹${inputTotal.cgst.toFixed(2)}</td><td>₹${inputTotal.sgst.toFixed(2)}</td><td>₹${inputTotal.total.toFixed(2)}</td></tr>
+                    <tr><td>Output</strong></td><td>₹${outputTotal.cgst.toFixed(2)}</td><td>₹${outputTotal.sgst.toFixed(2)}</td><td>₹${outputTotal.total.toFixed(2)}</td></tr>
+                    <tr><td>Input (ITC)</strong></td><td>₹${inputTotal.cgst.toFixed(2)}</td><td>₹${inputTotal.sgst.toFixed(2)}</td><td>₹${inputTotal.total.toFixed(2)}</td></tr>
                     <tr style="background:#f8f9fa;"><td><strong>Payable</strong></td><td><strong>₹${payableCgst.toFixed(2)}</strong></td><td><strong>₹${payableSgst.toFixed(2)}</strong></td><td><strong>₹${payableTotal.toFixed(2)}</strong></td></tr>
                 </tbody>
             </table>
@@ -250,22 +253,22 @@
     }
     
     function toggleDebug() {
-        console.log('=== Input GST Debug ===');
-        console.log('Total purchase invoices:', allPurchases.length);
+        console.log('=== GST REGISTER DEBUG INFO ===');
+        console.log('Purchase invoices count:', allPurchases.length);
         console.log('Input details count:', inputDetails.length);
-        console.log('Zero/NaN items:', debugInfo);
         if (allPurchases.length > 0 && allPurchases[0].items && allPurchases[0].items[0]) {
-            console.log('Sample purchase item fields:', Object.keys(allPurchases[0].items[0]));
-            console.log('Sample purchase item:', allPurchases[0].items[0]);
+            const sample = allPurchases[0].items[0];
+            console.log('Sample purchase item fields:', Object.keys(sample));
+            console.log('Sample purchase item:', sample);
         }
-        alert('Debug info logged to console (F12). Look for "Input GST Debug".');
+        alert('Debug info logged to console (F12). Look for "GST REGISTER DEBUG INFO".');
     }
     
     function exportGSTR1() {
         const from = document.getElementById('fromDate').value;
         const to = document.getElementById('toDate').value;
         if (!from || !to) { alert('Select date range'); return; }
-        const gstin = '19ANOPD3300R1ZO';
+        const gstin = document.getElementById('gstin')?.value || '19ANOPD3300R1ZO';
         const gstr1 = { version: '1.0.0', gstin, fp: `${from.slice(5,7)}${from.slice(0,4)}`, b2b: outputDetails.map(inv => ({
             ctin: '', inv: [{ inum: inv.invoiceNo, idt: inv.date, val: inv.taxable, itms: [{ num: 1, itm_det: { txval: inv.taxable, rt: inv.gstRate, camt: inv.cgst, samt: inv.sgst, iamt: 0, csamt: 0 } }] }]
         })) };
@@ -274,7 +277,7 @@
     
     function exportGSTR3B() {
         const from = document.getElementById('fromDate').value;
-        const gstin = '19ANOPD3300R1ZO';
+        const gstin = document.getElementById('gstin')?.value || '19ANOPD3300R1ZO';
         const payableCgst = outputTotal.cgst - inputTotal.cgst;
         const payableSgst = outputTotal.sgst - inputTotal.sgst;
         const gstr3b = {
@@ -303,6 +306,7 @@
         evt.currentTarget.classList.add('active');
     }
     
+    // Set default dates (current month)
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     document.getElementById('fromDate').value = firstDay.toISOString().slice(0,10);
