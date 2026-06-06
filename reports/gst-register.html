@@ -38,6 +38,7 @@
         <button onclick="calculateGST()"><i class="fas fa-calculator"></i> Calculate</button>
         <button onclick="exportGSTR1()" class="export-btn"><i class="fas fa-download"></i> GSTR-1</button>
         <button onclick="exportGSTR3B()" class="export-btn"><i class="fas fa-download"></i> GSTR-3B</button>
+        <button onclick="toggleDebug()" class="export-btn"><i class="fas fa-bug"></i> Debug</button>
     </div>
     
     <div class="tab">
@@ -65,8 +66,25 @@
     let outputDetails = [], inputDetails = [];
     let outputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
     let inputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
+    let debugInfo = [];
     
-    // Helper: get best customer name from users/dealers
+    // Helper: safely get field value with fallbacks
+    function getItemPart(item) {
+        return item.part || item.productId || item.sku || item.productName || 'N/A';
+    }
+    
+    function getItemQty(item) {
+        return item.qty || item.quantity || 0;
+    }
+    
+    function getItemPrice(item) {
+        return item.price || item.cost || 0;
+    }
+    
+    function getInvoiceNo(inv) {
+        return inv.invoiceNo || inv.poNo || 'N/A';
+    }
+    
     function getCustomerDisplay(email) {
         if (!email) return 'Guest';
         const users = JSON.parse(localStorage.getItem('users') || '[]');
@@ -103,7 +121,9 @@
             const invDate = new Date(inv.date);
             if (invDate >= fromDate && invDate <= toDate) {
                 for (let item of (inv.items || [])) {
-                    const taxable = item.price * item.qty;
+                    const qty = getItemQty(item);
+                    const price = getItemPrice(item);
+                    const taxable = qty * price;
                     const gst = taxable * 0.18;
                     const cgst = gst/2, sgst = gst/2;
                     outputTotal.taxable += taxable;
@@ -111,38 +131,45 @@
                     outputTotal.sgst += sgst;
                     outputTotal.total += gst;
                     outputDetails.push({
-                        invoiceNo: inv.invoiceNo,
+                        invoiceNo: getInvoiceNo(inv),
                         date: inv.date,
                         customer: getCustomerDisplay(inv.customerEmail),
-                        part: item.part,
-                        qty: item.qty,
+                        part: getItemPart(item),
+                        qty,
                         taxable, gstRate: 18, cgst, sgst, totalGST: gst
                     });
                 }
             }
         }
         
-        // Process Purchases
+        // Process Purchases (with robust field handling)
         inputDetails = [];
         inputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
+        debugInfo = [];
         for (let inv of allPurchases) {
             const invDate = new Date(inv.date);
             if (invDate >= fromDate && invDate <= toDate) {
                 for (let item of (inv.items || [])) {
-                    const cost = item.cost || item.price || 0;
-                    const qty = item.quantity || item.qty || 0;
-                    const taxable = cost * qty;
+                    const qty = getItemQty(item);
+                    const price = getItemPrice(item);
+                    const part = getItemPart(item);
+                    const taxable = qty * price;
                     const gst = taxable * 0.18;
                     const cgst = gst/2, sgst = gst/2;
+                    
+                    if (isNaN(taxable) || taxable === 0) {
+                        debugInfo.push({ invoice: getInvoiceNo(inv), part, qty, price, taxable, rawItem: item });
+                    }
+                    
                     inputTotal.taxable += taxable;
                     inputTotal.cgst += cgst;
                     inputTotal.sgst += sgst;
                     inputTotal.total += gst;
                     inputDetails.push({
-                        invoiceNo: inv.invoiceNo || inv.poNo,
+                        invoiceNo: getInvoiceNo(inv),
                         date: inv.date,
                         supplier: getSupplierDisplay(inv.supplierEmail),
-                        part: item.part,
+                        part: part,
                         qty,
                         taxable, gstRate: 18, cgst, sgst, totalGST: gst
                     });
@@ -153,6 +180,7 @@
         displaySummary();
         displayOutputTable();
         displayInputTable();
+        if (debugInfo.length > 0) console.warn('Items with zero/NaN taxable value:', debugInfo);
     }
     
     function displaySummary() {
@@ -166,10 +194,14 @@
         `;
         document.getElementById('payableTable').innerHTML = `
             <h3>Breakdown</h3>
-            <table><tr><th>Component</th><th>CGST</th><th>SGST</th><th>Total</th></tr>
-            <tr><td>Output</td><td>₹${outputTotal.cgst.toFixed(2)}</td><td>₹${outputTotal.sgst.toFixed(2)}</td><td>₹${outputTotal.total.toFixed(2)}</td></tr>
-            <tr><td>Input (ITC)</td><td>₹${inputTotal.cgst.toFixed(2)}</td><td>₹${inputTotal.sgst.toFixed(2)}</td><td>₹${inputTotal.total.toFixed(2)}</td></tr>
-            <tr style="background:#f8f9fa;"><td><strong>Payable</strong></td><td><strong>₹${payableCgst.toFixed(2)}</strong></td><td><strong>₹${payableSgst.toFixed(2)}</strong></td><td><strong>₹${payableTotal.toFixed(2)}</strong></td></tr></table>
+            <table>
+                <thead><tr><th>Component</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
+                <tbody>
+                    <tr><td>Output</td><td>₹${outputTotal.cgst.toFixed(2)}</td><td>₹${outputTotal.sgst.toFixed(2)}</td><td>₹${outputTotal.total.toFixed(2)}</td></tr>
+                    <tr><td>Input (ITC)</td><td>₹${inputTotal.cgst.toFixed(2)}</td><td>₹${inputTotal.sgst.toFixed(2)}</td><td>₹${inputTotal.total.toFixed(2)}</td></tr>
+                    <tr style="background:#f8f9fa;"><td><strong>Payable</strong></td><td><strong>₹${payableCgst.toFixed(2)}</strong></td><td><strong>₹${payableSgst.toFixed(2)}</strong></td><td><strong>₹${payableTotal.toFixed(2)}</strong></td></tr>
+                </tbody>
+            </table>
         `;
     }
     
@@ -215,6 +247,18 @@
                 row.insertCell(9).innerText = `₹${d.totalGST.toFixed(2)}`;
             });
         }
+    }
+    
+    function toggleDebug() {
+        console.log('=== Input GST Debug ===');
+        console.log('Total purchase invoices:', allPurchases.length);
+        console.log('Input details count:', inputDetails.length);
+        console.log('Zero/NaN items:', debugInfo);
+        if (allPurchases.length > 0 && allPurchases[0].items && allPurchases[0].items[0]) {
+            console.log('Sample purchase item fields:', Object.keys(allPurchases[0].items[0]));
+            console.log('Sample purchase item:', allPurchases[0].items[0]);
+        }
+        alert('Debug info logged to console (F12). Look for "Input GST Debug".');
     }
     
     function exportGSTR1() {
