@@ -26,6 +26,8 @@
         .tabcontent { display: none; }
         .tabcontent.active { display: block; }
         .empty-message { text-align: center; padding: 40px; color: #6c757d; }
+        .fix-btn { background: #e67e22; margin-left: 10px; }
+        .fix-btn:hover { background: #d35400; }
     </style>
 </head>
 <body>
@@ -38,6 +40,7 @@
         <button onclick="calculateGST()"><i class="fas fa-calculator"></i> Calculate</button>
         <button onclick="exportGSTR1()" class="export-btn"><i class="fas fa-download"></i> GSTR-1</button>
         <button onclick="exportGSTR3B()" class="export-btn"><i class="fas fa-download"></i> GSTR-3B</button>
+        <button onclick="runNameFix()" class="fix-btn" id="fixBtn"><i class="fas fa-user-check"></i> Fix Customer Names</button>
         <button onclick="toggleDebug()" class="export-btn"><i class="fas fa-bug"></i> Debug</button>
     </div>
     
@@ -62,6 +65,7 @@
 </div>
 
 <script>
+    // Global variables
     let allInvoices = [], allPurchases = [];
     let outputDetails = [], inputDetails = [];
     let outputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
@@ -81,25 +85,28 @@
         return inv.invoiceNo || inv.poNo || 'N/A';
     }
     
-    // ----- Get best customer name using master data -----
+    // ----- Best customer name (business > name > email-derived) -----
     function getBestCustomerName(inv) {
-        // 1. Use customerName if it exists and is not 'Guest'
-        if (inv.customerName && inv.customerName !== 'Guest' && inv.customerName !== '') {
+        // If invoice already has a proper name, use it (but only if not generic)
+        if (inv.customerName && inv.customerName !== 'Guest' && inv.customerName !== 'Walk-in Customer' && inv.customerName !== '') {
             return inv.customerName;
         }
-        // 2. If email exists, look up in users/dealers
+        // Try to find by email
         if (inv.customerEmail) {
             const users = JSON.parse(localStorage.getItem('users') || '[]');
             const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
             const allCustomers = [...users, ...dealers];
             const found = allCustomers.find(c => c.email === inv.customerEmail);
             if (found) {
-                return found.business || found.name || inv.customerEmail.split('@')[0];
+                if (found.business && found.business.trim()) return found.business.trim();
+                if (found.name && found.name.trim()) return found.name.trim();
             }
-            return inv.customerEmail.split('@')[0];
+            // Fallback to email local part
+            const local = inv.customerEmail.split('@')[0];
+            return local.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }
-        // 3. Fallback
-        return 'Walk-in Customer';
+        // Last resort: if invoice has a name but it's generic, we keep it as is (already handled above)
+        return inv.customerName || 'Unknown Customer';
     }
     
     function getBestSupplierName(inv) {
@@ -107,8 +114,12 @@
         if (inv.supplierEmail) {
             const suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
             const found = suppliers.find(s => s.email === inv.supplierEmail);
-            if (found) return found.business || found.name || inv.supplierEmail.split('@')[0];
-            return inv.supplierEmail.split('@')[0];
+            if (found) {
+                if (found.business && found.business.trim()) return found.business.trim();
+                if (found.name && found.name.trim()) return found.name.trim();
+            }
+            const local = inv.supplierEmail.split('@')[0];
+            return local.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }
         return 'Unknown Supplier';
     }
@@ -126,7 +137,7 @@
         const fromDate = new Date(from);
         const toDate = new Date(to);
         
-        // --- Output GST (Sales) ---
+        // Output GST
         outputDetails = [];
         outputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
         for (let inv of allInvoices) {
@@ -154,7 +165,7 @@
             }
         }
         
-        // --- Input GST (Purchases) ---
+        // Input GST
         inputDetails = [];
         inputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
         for (let inv of allPurchases) {
@@ -201,8 +212,8 @@
             <table>
                 <thead><tr><th>Component</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
                 <tbody>
-                    <tr><td>Output</td><td>₹${outputTotal.cgst.toFixed(2)}</td><td>₹${outputTotal.sgst.toFixed(2)}</td><td>₹${outputTotal.total.toFixed(2)}</td></tr>
-                    <tr><td>Input (ITC)</td><td>₹${inputTotal.cgst.toFixed(2)}</td><td>₹${inputTotal.sgst.toFixed(2)}</td><td>₹${inputTotal.total.toFixed(2)}</td></tr>
+                    <tr><td>Output</strong></td><td>₹${outputTotal.cgst.toFixed(2)}</td><td>₹${outputTotal.sgst.toFixed(2)}</td><td>₹${outputTotal.total.toFixed(2)}</td></tr>
+                    <tr><td>Input (ITC)</strong></td><td>₹${inputTotal.cgst.toFixed(2)}</td><td>₹${inputTotal.sgst.toFixed(2)}</td><td>₹${inputTotal.total.toFixed(2)}</td></tr>
                     <tr style="background:#f8f9fa;"><td><strong>Payable</strong></td><td><strong>₹${payableCgst.toFixed(2)}</strong></td><td><strong>₹${payableSgst.toFixed(2)}</strong></td><td><strong>₹${payableTotal.toFixed(2)}</strong></td></tr>
                 </tbody>
             </table>
@@ -251,6 +262,91 @@
                 row.insertCell(9).innerText = `₹${d.totalGST.toFixed(2)}`;
             });
         }
+    }
+    
+    // ----- NAME FIX FUNCTION (Safe, no data loss) -----
+    function runNameFix() {
+        const fixBtn = document.getElementById('fixBtn');
+        fixBtn.disabled = true;
+        fixBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fixing...';
+        
+        setTimeout(() => {
+            try {
+                let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+                let users = JSON.parse(localStorage.getItem('users') || '[]');
+                let dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
+                let allCustomers = [...users, ...dealers];
+                
+                if (allCustomers.length === 0) {
+                    alert("No customer master data found. Please add customers first.");
+                    fixBtn.disabled = false;
+                    fixBtn.innerHTML = '<i class="fas fa-user-check"></i> Fix Customer Names';
+                    return;
+                }
+                
+                function getDisplayName(cust) {
+                    if (cust.business && cust.business.trim()) return cust.business.trim();
+                    if (cust.name && cust.name.trim()) return cust.name.trim();
+                    return null;
+                }
+                
+                function normalize(str) {
+                    return str ? str.trim().toLowerCase() : '';
+                }
+                
+                // Build maps
+                const emailMap = new Map();
+                const businessMap = new Map();
+                const nameMap = new Map();
+                for (const cust of allCustomers) {
+                    if (cust.email) emailMap.set(normalize(cust.email), cust);
+                    if (cust.business) businessMap.set(normalize(cust.business), cust);
+                    if (cust.name) nameMap.set(normalize(cust.name), cust);
+                }
+                
+                let fixed = 0;
+                for (let inv of invoices) {
+                    let oldName = inv.customerName;
+                    if (oldName && oldName !== 'Guest' && oldName !== 'Walk-in Customer' && oldName !== '' && !oldName.includes('@')) {
+                        continue; // already good
+                    }
+                    let newName = null;
+                    // by email
+                    if (inv.customerEmail) {
+                        let cust = emailMap.get(normalize(inv.customerEmail));
+                        if (cust) newName = getDisplayName(cust);
+                    }
+                    // by business name from existing name
+                    if (!newName && oldName && oldName !== 'Guest' && oldName !== 'Walk-in Customer') {
+                        let cust = businessMap.get(normalize(oldName));
+                        if (cust) newName = getDisplayName(cust);
+                    }
+                    // by customer name
+                    if (!newName && oldName && oldName !== 'Guest' && oldName !== 'Walk-in Customer') {
+                        let cust = nameMap.get(normalize(oldName));
+                        if (cust) newName = getDisplayName(cust);
+                    }
+                    if (newName) {
+                        inv.customerName = newName;
+                        fixed++;
+                    }
+                }
+                if (fixed > 0) {
+                    localStorage.setItem('allInvoices', JSON.stringify(invoices));
+                    alert(`✅ Fixed ${fixed} invoice names. Refresh the page and recalculate.`);
+                    // Refresh the current view
+                    calculateGST();
+                } else {
+                    alert("No invoice names needed fixing.");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error: " + err.message);
+            } finally {
+                fixBtn.disabled = false;
+                fixBtn.innerHTML = '<i class="fas fa-user-check"></i> Fix Customer Names';
+            }
+        }, 100);
     }
     
     function toggleDebug() {
