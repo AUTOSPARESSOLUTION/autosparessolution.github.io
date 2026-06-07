@@ -28,6 +28,8 @@
         .empty-message { text-align: center; padding: 40px; color: #6c757d; }
         .fix-btn { background: #e67e22; margin-left: 10px; }
         .fix-btn:hover { background: #d35400; }
+        .diagnose-btn { background: #17a2b8; margin-left: 10px; }
+        .diagnose-btn:hover { background: #138496; }
     </style>
 </head>
 <body>
@@ -40,8 +42,8 @@
         <button onclick="calculateGST()"><i class="fas fa-calculator"></i> Calculate</button>
         <button onclick="exportGSTR1()" class="export-btn"><i class="fas fa-download"></i> GSTR-1</button>
         <button onclick="exportGSTR3B()" class="export-btn"><i class="fas fa-download"></i> GSTR-3B</button>
-        <button onclick="runNameFix()" class="fix-btn" id="fixBtn"><i class="fas fa-user-check"></i> Fix Customer Names</button>
-        <button onclick="toggleDebug()" class="export-btn"><i class="fas fa-bug"></i> Debug</button>
+        <button onclick="runNameFix()" class="fix-btn"><i class="fas fa-user-check"></i> Fix Customer Names</button>
+        <button onclick="diagnoseUnknowns()" class="diagnose-btn"><i class="fas fa-stethoscope"></i> Diagnose Unknowns</button>
     </div>
     
     <div class="tab">
@@ -60,7 +62,7 @@
     </div>
     
     <div id="InputGST" class="tabcontent">
-        <div style="overflow-x: auto;"><table id="inputTable"><thead><tr><th>Invoice No</th><th>Date</th><th>Supplier</th><th>Part</th><th>Qty</th><th>Taxable</th><th>GST Rate</th><th>CGST</th><th>SGST</th><th>Total GST</th></tr></thead><tbody id="inputBody"></tbody></table></div>
+        <div style="overflow-x: auto;"><table id="inputTable"><thead><tr><th>Invoice No</th><th>Date</th><th>Supplier</th><th>Part</th><th>Qty</th><th>Taxable</th><th>GST Rate</th><th>CGST</th><th>SGST</th><th>Total GST</th></tr></thead><tbody id="inputBody"></tbody><tr></div>
     </div>
 </div>
 
@@ -85,10 +87,10 @@
         return inv.invoiceNo || inv.poNo || 'N/A';
     }
     
-    // ----- Best customer name (business > name > email-derived) -----
+    // ----- Best customer name (prioritises master data, then falls back to existing name) -----
     function getBestCustomerName(inv) {
-        // If invoice already has a proper name, use it (but only if not generic)
-        if (inv.customerName && inv.customerName !== 'Guest' && inv.customerName !== 'Walk-in Customer' && inv.customerName !== '') {
+        // If invoice already has a proper name (not generic), use it
+        if (inv.customerName && inv.customerName !== 'Guest' && inv.customerName !== 'Walk-in Customer' && inv.customerName !== 'Unknown Customer' && inv.customerName !== '') {
             return inv.customerName;
         }
         // Try to find by email
@@ -105,7 +107,7 @@
             const local = inv.customerEmail.split('@')[0];
             return local.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }
-        // Last resort: if invoice has a name but it's generic, we keep it as is (already handled above)
+        // If we still have a name (even generic), keep it; otherwise return a placeholder
         return inv.customerName || 'Unknown Customer';
     }
     
@@ -212,8 +214,8 @@
             <table>
                 <thead><tr><th>Component</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
                 <tbody>
-                    <tr><td>Output</strong></td><td>₹${outputTotal.cgst.toFixed(2)}</td><td>₹${outputTotal.sgst.toFixed(2)}</td><td>₹${outputTotal.total.toFixed(2)}</td></tr>
-                    <tr><td>Input (ITC)</strong></td><td>₹${inputTotal.cgst.toFixed(2)}</td><td>₹${inputTotal.sgst.toFixed(2)}</td><td>₹${inputTotal.total.toFixed(2)}</td></tr>
+                    <tr><td>Output</strong></td><td>₹${outputTotal.cgst.toFixed(2)}</strong></td><td>₹${outputTotal.sgst.toFixed(2)}</strong></td><td>₹${outputTotal.total.toFixed(2)}</strong></td></tr>
+                    <tr><td>Input (ITC)</strong></td><td>₹${inputTotal.cgst.toFixed(2)}</strong></td><td>₹${inputTotal.sgst.toFixed(2)}</strong></td><td>₹${inputTotal.total.toFixed(2)}</strong></td></tr>
                     <tr style="background:#f8f9fa;"><td><strong>Payable</strong></td><td><strong>₹${payableCgst.toFixed(2)}</strong></td><td><strong>₹${payableSgst.toFixed(2)}</strong></td><td><strong>₹${payableTotal.toFixed(2)}</strong></td></tr>
                 </tbody>
             </table>
@@ -266,7 +268,7 @@
     
     // ----- NAME FIX FUNCTION (Safe, no data loss) -----
     function runNameFix() {
-        const fixBtn = document.getElementById('fixBtn');
+        const fixBtn = document.querySelector('.fix-btn');
         fixBtn.disabled = true;
         fixBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fixing...';
         
@@ -307,24 +309,30 @@
                 let fixed = 0;
                 for (let inv of invoices) {
                     let oldName = inv.customerName;
-                    if (oldName && oldName !== 'Guest' && oldName !== 'Walk-in Customer' && oldName !== '' && !oldName.includes('@')) {
-                        continue; // already good
+                    // Skip if already has a proper name (not generic)
+                    if (oldName && oldName !== 'Guest' && oldName !== 'Walk-in Customer' && oldName !== 'Unknown Customer' && oldName !== '' && !oldName.includes('@')) {
+                        continue;
                     }
                     let newName = null;
-                    // by email
+                    // 1. by email
                     if (inv.customerEmail) {
                         let cust = emailMap.get(normalize(inv.customerEmail));
                         if (cust) newName = getDisplayName(cust);
                     }
-                    // by business name from existing name
-                    if (!newName && oldName && oldName !== 'Guest' && oldName !== 'Walk-in Customer') {
+                    // 2. by business name (if invoice has a name that might match)
+                    if (!newName && oldName && oldName !== 'Guest' && oldName !== 'Walk-in Customer' && oldName !== 'Unknown Customer') {
                         let cust = businessMap.get(normalize(oldName));
                         if (cust) newName = getDisplayName(cust);
                     }
-                    // by customer name
-                    if (!newName && oldName && oldName !== 'Guest' && oldName !== 'Walk-in Customer') {
+                    // 3. by customer name
+                    if (!newName && oldName && oldName !== 'Guest' && oldName !== 'Walk-in Customer' && oldName !== 'Unknown Customer') {
                         let cust = nameMap.get(normalize(oldName));
                         if (cust) newName = getDisplayName(cust);
+                    }
+                    // 4. If still no match and invoice has an email, use email local part as fallback (so it never shows Unknown)
+                    if (!newName && inv.customerEmail) {
+                        const local = inv.customerEmail.split('@')[0];
+                        newName = local.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     }
                     if (newName) {
                         inv.customerName = newName;
@@ -334,7 +342,6 @@
                 if (fixed > 0) {
                     localStorage.setItem('allInvoices', JSON.stringify(invoices));
                     alert(`✅ Fixed ${fixed} invoice names. Refresh the page and recalculate.`);
-                    // Refresh the current view
                     calculateGST();
                 } else {
                     alert("No invoice names needed fixing.");
@@ -347,6 +354,24 @@
                 fixBtn.innerHTML = '<i class="fas fa-user-check"></i> Fix Customer Names';
             }
         }, 100);
+    }
+    
+    // ----- DIAGNOSE UNKNOWNS (list invoices with "Unknown Customer" after fix) -----
+    function diagnoseUnknowns() {
+        const invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        const unknownInvoices = invoices.filter(inv => inv.customerName === 'Unknown Customer' || inv.customerName === 'Walk-in Customer' || inv.customerName === 'Guest');
+        if (unknownInvoices.length === 0) {
+            alert("✅ No invoices with generic/unknown names found.");
+            return;
+        }
+        let msg = `Found ${unknownInvoices.length} invoice(s) with generic names:\n\n`;
+        unknownInvoices.slice(0, 20).forEach(inv => {
+            msg += `${inv.invoiceNo} | ${inv.date} | Email: ${inv.customerEmail || 'none'}\n`;
+        });
+        if (unknownInvoices.length > 20) msg += `\n... and ${unknownInvoices.length - 20} more.`;
+        msg += `\n\nTo fix, ensure the invoice has a customerEmail that exists in your master data, or manually edit customerName.`;
+        alert(msg);
+        console.table(unknownInvoices);
     }
     
     function toggleDebug() {
@@ -438,4 +463,4 @@
     calculateGST();
 </script>
 </body>
-</html>
+    </html>
