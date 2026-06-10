@@ -27,15 +27,13 @@
         .tabcontent.active { display: block; }
         .empty-message { text-align: center; padding: 40px; color: #6c757d; }
         .fix-btn { background: #e67e22; margin-left: 10px; }
-        .fix-btn:hover { background: #d35400; }
-        .diagnose-btn { background: #17a2b8; margin-left: 10px; }
-        .diagnose-btn:hover { background: #138496; }
+        .force-april-btn { background: #dc3545; margin-left: 10px; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1><i class="fas fa-file-invoice-dollar"></i> GST Register</h1>
-    
+
     <div class="period-selector">
         <input type="date" id="fromDate">
         <input type="date" id="toDate">
@@ -43,99 +41,95 @@
         <button onclick="exportGSTR1()" class="export-btn"><i class="fas fa-download"></i> GSTR-1</button>
         <button onclick="exportGSTR3B()" class="export-btn"><i class="fas fa-download"></i> GSTR-3B</button>
         <button onclick="runNameFix()" class="fix-btn"><i class="fas fa-user-check"></i> Fix Customer Names</button>
-        <button onclick="diagnoseUnknowns()" class="diagnose-btn"><i class="fas fa-stethoscope"></i> Diagnose Unknowns</button>
+        <button onclick="forceFixApril()" class="force-april-btn"><i class="fas fa-calendar-alt"></i> Force Fix April Invoices</button>
     </div>
-    
+
     <div class="tab">
         <button class="tablinks active" onclick="openTab(event, 'Summary')">Summary</button>
         <button class="tablinks" onclick="openTab(event, 'OutputGST')">Output GST (Sales)</button>
         <button class="tablinks" onclick="openTab(event, 'InputGST')">Input GST (Purchases)</button>
     </div>
-    
+
     <div id="Summary" class="tabcontent active">
         <div class="gst-summary" id="summaryCards"></div>
         <div id="payableTable"></div>
     </div>
-    
+
     <div id="OutputGST" class="tabcontent">
-        <div style="overflow-x: auto;"><table id="outputTable"><thead><tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Part</th><th>Qty</th><th>Taxable</th><th>GST Rate</th><th>CGST</th><th>SGST</th><th>Total GST</th></tr></thead><tbody id="outputBody"></tbody></table></div>
+        <div style="overflow-x: auto;">
+            <table id="outputTable">
+                <thead><tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Part</th><th>Qty</th><th>Taxable</th><th>GST Rate</th><th>CGST</th><th>SGST</th><th>Total GST</th></tr></thead>
+                <tbody id="outputBody"></tbody>
+            </table>
+        </div>
     </div>
-    
+
     <div id="InputGST" class="tabcontent">
-        <div style="overflow-x: auto;"><table id="inputTable"><thead><tr><th>Invoice No</th><th>Date</th><th>Supplier</th><th>Part</th><th>Qty</th><th>Taxable</th><th>GST Rate</th><th>CGST</th><th>SGST</th><th>Total GST</th></tr></thead><tbody id="inputBody"></tbody></table></div>
+        <div style="overflow-x: auto;">
+            <table id="inputTable">
+                <thead><tr><th>Invoice No</th><th>Date</th><th>Supplier</th><th>Part</th><th>Qty</th><th>Taxable</th><th>GST Rate</th><th>CGST</th><th>SGST</th><th>Total GST</th></tr></thead>
+                <tbody id="inputBody"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <script>
-    // Global variables
-    let allInvoices = [], allPurchases = [];
-    let outputDetails = [], inputDetails = [];
-    let outputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
-    let inputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
-    
     // ----- Helper functions -----
-    function getItemPart(item) {
-        return item.part || item.productId || item.sku || item.productName || 'N/A';
-    }
-    function getItemQty(item) {
-        return item.qty || item.quantity || 0;
-    }
-    function getItemPrice(item) {
-        return item.price || item.cost || 0;
-    }
-    function getInvoiceNo(inv) {
-        return inv.invoiceNo || inv.poNo || 'N/A';
-    }
-    
+    function getItemPart(item) { return item.part || item.productId || item.sku || item.productName || 'N/A'; }
+    function getItemQty(item) { return item.qty || item.quantity || 0; }
+    function getItemPrice(item) { return item.price || item.cost || 0; }
+    function getInvoiceNo(inv) { return inv.invoiceNo || inv.poNo || 'N/A'; }
+
+    // ----- Best customer name: buyer.name > customerName > email lookup > email local part -----
     function getBestCustomerName(inv) {
-        // If already has a proper name, use it
+        if (inv.buyer?.name && inv.buyer.name !== 'Guest') return inv.buyer.name;
         if (inv.customerName && inv.customerName !== 'Guest' && inv.customerName !== 'Walk-in Customer' && inv.customerName !== 'Unknown Customer' && inv.customerName !== '') {
             return inv.customerName;
         }
-        // Try by email
         if (inv.customerEmail) {
             const users = JSON.parse(localStorage.getItem('users') || '[]');
             const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
-            const allCustomers = [...users, ...dealers];
-            const found = allCustomers.find(c => c.email === inv.customerEmail);
-            if (found) {
-                if (found.business && found.business.trim()) return found.business.trim();
-                if (found.name && found.name.trim()) return found.name.trim();
-            }
+            const all = [...users, ...dealers];
+            const found = all.find(c => c.email === inv.customerEmail);
+            if (found) return found.business?.trim() || found.name?.trim();
             const local = inv.customerEmail.split('@')[0];
             return local.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }
-        return inv.customerName || 'Unknown Customer';
+        return 'Unknown Customer';
     }
-    
+
     function getBestSupplierName(inv) {
         if (inv.supplierName && inv.supplierName !== '') return inv.supplierName;
         if (inv.supplierEmail) {
             const suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
             const found = suppliers.find(s => s.email === inv.supplierEmail);
-            if (found) {
-                if (found.business && found.business.trim()) return found.business.trim();
-                if (found.name && found.name.trim()) return found.name.trim();
-            }
+            if (found) return found.business?.trim() || found.name?.trim();
             const local = inv.supplierEmail.split('@')[0];
             return local.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }
         return 'Unknown Supplier';
     }
-    
+
+    // ----- Main calculation -----
+    let allInvoices = [], allPurchases = [];
+    let outputDetails = [], inputDetails = [];
+    let outputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
+    let inputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
+
     function calculateGST() {
         const from = document.getElementById('fromDate').value;
         const to = document.getElementById('toDate').value;
         if (!from || !to) { alert('Select date range'); return; }
-        
+
         allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         allPurchases = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
         if (allPurchases.length === 0) allPurchases = JSON.parse(localStorage.getItem('allPurchases') || '[]');
-        
+
         const fromDate = new Date(from);
         const toDate = new Date(to);
-        
-        // Output GST
+
+        // Output GST (Sales)
         outputDetails = [];
         outputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
         for (let inv of allInvoices) {
@@ -162,8 +156,8 @@
                 }
             }
         }
-        
-        // Input GST
+
+        // Input GST (Purchases)
         inputDetails = [];
         inputTotal = { taxable:0, cgst:0, sgst:0, total:0 };
         for (let inv of allPurchases) {
@@ -190,12 +184,12 @@
                 }
             }
         }
-        
+
         displaySummary();
         displayOutputTable();
         displayInputTable();
     }
-    
+
     function displaySummary() {
         const payableCgst = outputTotal.cgst - inputTotal.cgst;
         const payableSgst = outputTotal.sgst - inputTotal.sgst;
@@ -207,22 +201,19 @@
         `;
         document.getElementById('payableTable').innerHTML = `
             <h3>Breakdown</h3>
-            <table>
-                <thead><tr><th>Component</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
-                <tbody>
-                    <tr><td>Output</strong></td><td>₹${outputTotal.cgst.toFixed(2)}</strong></td><td>₹${outputTotal.sgst.toFixed(2)}</strong></td><td>₹${outputTotal.total.toFixed(2)}</strong></td></tr>
-                    <tr><td>Input (ITC)</strong></td><td>₹${inputTotal.cgst.toFixed(2)}</strong></td><td>₹${inputTotal.sgst.toFixed(2)}</strong></td><td>₹${inputTotal.total.toFixed(2)}</strong></td></tr>
-                    <tr style="background:#f8f9fa;"><td><strong>Payable</strong></td><td><strong>₹${payableCgst.toFixed(2)}</strong></td><td><strong>₹${payableSgst.toFixed(2)}</strong></td><td><strong>₹${payableTotal.toFixed(2)}</strong></td></tr>
-                </tbody>
-            </table>
+            <table><thead><tr><th>Component</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead><tbody>
+            <tr><td>Output</strong></td><td>₹${outputTotal.cgst.toFixed(2)}</strong></td><td>₹${outputTotal.sgst.toFixed(2)}</strong></td><td>₹${outputTotal.total.toFixed(2)}</strong></td></tr>
+            <tr><td>Input (ITC)</strong></td><td>₹${inputTotal.cgst.toFixed(2)}</strong></td><td>₹${inputTotal.sgst.toFixed(2)}</strong></td><td>₹${inputTotal.total.toFixed(2)}</strong></td></tr>
+            <tr style="background:#f8f9fa;"><td><strong>Payable</strong></td><td><strong>₹${payableCgst.toFixed(2)}</strong></td><td><strong>₹${payableSgst.toFixed(2)}</strong></td><td><strong>₹${payableTotal.toFixed(2)}</strong></td></tr>
+            </tbody></table>
         `;
     }
-    
+
     function displayOutputTable() {
         const tbody = document.getElementById('outputBody');
         tbody.innerHTML = '';
         if (outputDetails.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" class="empty-message">No sales in this period</td></tr>';
+            tbody.innerHTML = '<td><td colspan="10" class="empty-message">No sales in this period</td></tr>';
         } else {
             outputDetails.forEach(d => {
                 const row = tbody.insertRow();
@@ -239,7 +230,7 @@
             });
         }
     }
-    
+
     function displayInputTable() {
         const tbody = document.getElementById('inputBody');
         tbody.innerHTML = '';
@@ -261,123 +252,149 @@
             });
         }
     }
-    
+
+    // ----- Fix Customer Names (generic names -> master data) -----
     function runNameFix() {
-        const fixBtn = document.querySelector('.fix-btn');
-        fixBtn.disabled = true;
-        fixBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fixing...';
+        const btn = document.querySelector('.fix-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fixing...';
         setTimeout(() => {
             try {
                 let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
                 let users = JSON.parse(localStorage.getItem('users') || '[]');
                 let dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
                 let allCustomers = [...users, ...dealers];
-                if (allCustomers.length === 0) {
-                    alert("No customer master data found.");
-                    return;
-                }
-                function getDisplayName(cust) {
-                    if (cust.business && cust.business.trim()) return cust.business.trim();
-                    if (cust.name && cust.name.trim()) return cust.name.trim();
-                    return null;
-                }
-                function normalize(s) { return s ? s.trim().toLowerCase() : ''; }
+                if (allCustomers.length === 0) { alert("No customer master data."); return; }
+                function getDisplayName(cust) { return cust.business?.trim() || cust.name?.trim() || null; }
+                function norm(s) { return s ? s.trim().toLowerCase() : ''; }
                 const emailMap = new Map(), businessMap = new Map(), nameMap = new Map();
                 for (const cust of allCustomers) {
-                    if (cust.email) emailMap.set(normalize(cust.email), cust);
-                    if (cust.business) businessMap.set(normalize(cust.business), cust);
-                    if (cust.name) nameMap.set(normalize(cust.name), cust);
+                    if (cust.email) emailMap.set(norm(cust.email), cust);
+                    if (cust.business) businessMap.set(norm(cust.business), cust);
+                    if (cust.name) nameMap.set(norm(cust.name), cust);
                 }
                 let fixed = 0;
                 for (let inv of invoices) {
                     let old = inv.customerName;
                     if (old && old !== 'Guest' && old !== 'Walk-in Customer' && old !== 'Unknown Customer' && old !== '' && !old.includes('@')) continue;
                     let newName = null;
-                    if (inv.customerEmail) {
-                        let cust = emailMap.get(normalize(inv.customerEmail));
-                        if (cust) newName = getDisplayName(cust);
-                    }
-                    if (!newName && old && old !== 'Guest' && old !== 'Walk-in Customer' && old !== 'Unknown Customer') {
-                        let cust = businessMap.get(normalize(old));
-                        if (cust) newName = getDisplayName(cust);
-                    }
-                    if (!newName && old && old !== 'Guest' && old !== 'Walk-in Customer' && old !== 'Unknown Customer') {
-                        let cust = nameMap.get(normalize(old));
-                        if (cust) newName = getDisplayName(cust);
-                    }
-                    if (!newName && inv.customerEmail) {
-                        const local = inv.customerEmail.split('@')[0];
-                        newName = local.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    }
-                    if (newName) {
-                        inv.customerName = newName;
-                        fixed++;
-                    }
+                    if (inv.customerEmail) { let c = emailMap.get(norm(inv.customerEmail)); if (c) newName = getDisplayName(c); }
+                    if (!newName && old && old !== 'Guest' && old !== 'Walk-in Customer' && old !== 'Unknown Customer') { let c = businessMap.get(norm(old)); if (c) newName = getDisplayName(c); }
+                    if (!newName && old && old !== 'Guest' && old !== 'Walk-in Customer' && old !== 'Unknown Customer') { let c = nameMap.get(norm(old)); if (c) newName = getDisplayName(c); }
+                    if (!newName && inv.customerEmail) { const local = inv.customerEmail.split('@')[0]; newName = local.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); }
+                    if (newName) { inv.customerName = newName; fixed++; }
                 }
-                if (fixed > 0) {
-                    localStorage.setItem('allInvoices', JSON.stringify(invoices));
-                    alert(`✅ Fixed ${fixed} invoice names.`);
-                    calculateGST();
-                } else {
-                    alert("No invoice names needed fixing.");
-                }
-            } catch(e) { alert("Error: " + e.message); }
-            finally {
-                fixBtn.disabled = false;
-                fixBtn.innerHTML = '<i class="fas fa-user-check"></i> Fix Customer Names';
-            }
+                if (fixed) { localStorage.setItem('allInvoices', JSON.stringify(invoices)); alert(`✅ Fixed ${fixed} invoice names.`); calculateGST(); }
+                else alert("No invoice names needed fixing.");
+            } catch(e) { alert("Error: "+e.message); }
+            finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-check"></i> Fix Customer Names'; }
         }, 100);
     }
-    
-    function diagnoseUnknowns() {
-        const invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        const unknown = invoices.filter(inv => inv.customerName === 'Unknown Customer' || inv.customerName === 'Walk-in Customer' || inv.customerName === 'Guest');
-        if (unknown.length === 0) {
-            alert("✅ No invoices with generic/unknown names found.");
-            return;
-        }
-        let msg = `Found ${unknown.length} invoice(s) with generic names:\n\n`;
-        unknown.slice(0, 20).forEach(inv => {
-            msg += `${inv.invoiceNo} | ${inv.date} | Email: ${inv.customerEmail || 'none'}\n`;
-        });
-        if (unknown.length > 20) msg += `\n... and ${unknown.length - 20} more.`;
-        alert(msg);
-        console.table(unknown);
+
+    // ----- Force fix April invoices: copy buyer.name to customerName -----
+    function forceFixApril() {
+        const btn = document.querySelector('.force-april-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fixing April...';
+        setTimeout(() => {
+            try {
+                let invoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+                let fixed = 0;
+                for (let inv of invoices) {
+                    const d = new Date(inv.date);
+                    if (d.getFullYear() === 2026 && d.getMonth() === 3) {
+                        let current = inv.customerName;
+                        // If customerName is placeholder or generic, replace with buyer.name
+                        if (current && (current.startsWith('Customer_') || current === 'Unknown Customer' || current === 'Guest' || current === 'Walk-in Customer') && inv.buyer?.name) {
+                            inv.customerName = inv.buyer.name;
+                            fixed++;
+                            console.log(`Fixed ${inv.invoiceNo}: "${inv.buyer.name}" (was "${current}")`);
+                        } else if (!current && inv.buyer?.name) {
+                            inv.customerName = inv.buyer.name;
+                            fixed++;
+                            console.log(`Fixed ${inv.invoiceNo}: "${inv.buyer.name}" (was empty)`);
+                        }
+                    }
+                }
+                if (fixed) {
+                    localStorage.setItem('allInvoices', JSON.stringify(invoices));
+                    alert(`✅ Fixed ${fixed} April invoices. Refresh and recalculate.`);
+                    calculateGST();
+                } else {
+                    alert("No April invoices needed fixing.");
+                }
+            } catch(e) { alert("Error: "+e.message); }
+            finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-calendar-alt"></i> Force Fix April Invoices'; }
+        }, 100);
     }
-    
+
+    // ----- Export functions -----
     function exportGSTR1() {
         const from = document.getElementById('fromDate').value, to = document.getElementById('toDate').value;
         if (!from || !to) { alert('Select date range'); return; }
         const gstin = prompt('Enter GSTIN:', '19ANOPD3300R1ZO') || '19ANOPD3300R1ZO';
-        const data = { version: '1.0.0', gstin, fp: `${from.slice(5,7)}${from.slice(0,4)}`, b2b: outputDetails.map(inv => ({ ctin: '', inv: [{ inum: inv.invoiceNo, idt: inv.date, val: inv.taxable, itms: [{ num:1, itm_det: { txval: inv.taxable, rt: inv.gstRate, camt: inv.cgst, samt: inv.sgst, iamt:0, csamt:0 } }] }] })) };
+        const data = {
+            version: '1.0.0',
+            gstin: gstin,
+            fp: `${from.slice(5,7)}${from.slice(0,4)}`,
+            b2b: outputDetails.map(inv => ({
+                ctin: '',
+                inv: [{
+                    inum: inv.invoiceNo,
+                    idt: inv.date,
+                    val: inv.taxable,
+                    itms: [{
+                        num: 1,
+                        itm_det: {
+                            txval: inv.taxable,
+                            rt: inv.gstRate,
+                            camt: inv.cgst,
+                            samt: inv.sgst,
+                            iamt: 0,
+                            csamt: 0
+                        }
+                    }]
+                }]
+            }))
+        };
         downloadJSON(data, `GSTR1_${from}_to_${to}`);
     }
-    
+
     function exportGSTR3B() {
         const from = document.getElementById('fromDate').value;
         if (!from) { alert('Select from date'); return; }
         const gstin = prompt('Enter GSTIN:', '19ANOPD3300R1ZO') || '19ANOPD3300R1ZO';
-        const payableCgst = outputTotal.cgst - inputTotal.cgst, payableSgst = outputTotal.sgst - inputTotal.sgst;
-        const data = { version: '1.0.0', gstin, fp: `${from.slice(5,7)}${from.slice(0,4)}`, supply_attr: { os_sup_zero: { txval:0 } }, intr_attr: { intr_sup: { txval: outputTotal.taxable, iamt:0, camt: outputTotal.cgst, samt: outputTotal.sgst, csamt:0 } }, itc_avl: { itc_avl: { iamt:0, camt: inputTotal.cgst, samt: inputTotal.sgst, csamt:0 } }, net_taxpay_attr: { os_taxpay: { iamt:0, camt: Math.max(0,payableCgst), samt: Math.max(0,payableSgst), csamt:0 } } };
+        const payableCgst = outputTotal.cgst - inputTotal.cgst;
+        const payableSgst = outputTotal.sgst - inputTotal.sgst;
+        const data = {
+            version: '1.0.0',
+            gstin: gstin,
+            fp: `${from.slice(5,7)}${from.slice(0,4)}`,
+            supply_attr: { os_sup_zero: { txval:0 } },
+            intr_attr: { intr_sup: { txval: outputTotal.taxable, iamt:0, camt: outputTotal.cgst, samt: outputTotal.sgst, csamt:0 } },
+            itc_avl: { itc_avl: { iamt:0, camt: inputTotal.cgst, samt: inputTotal.sgst, csamt:0 } },
+            net_taxpay_attr: { os_taxpay: { iamt:0, camt: Math.max(0, payableCgst), samt: Math.max(0, payableSgst), csamt:0 } }
+        };
         downloadJSON(data, `GSTR3B_${from.slice(0,7)}`);
     }
-    
+
     function downloadJSON(data, name) {
-        const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = `${name}.json`;
         a.click();
         URL.revokeObjectURL(blob);
     }
-    
+
     function openTab(evt, tabName) {
         document.querySelectorAll('.tabcontent').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tablinks').forEach(btn => btn.classList.remove('active'));
         document.getElementById(tabName).classList.add('active');
         evt.currentTarget.classList.add('active');
     }
-    
+
+    // Set default dates (current month)
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     document.getElementById('fromDate').value = firstDay.toISOString().slice(0,10);
