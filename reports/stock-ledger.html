@@ -3,225 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Report – Auto Spares</title>
+    <title>Stock Movement Report – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
         .container { max-width: 1400px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; }
-        .summary { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
-        .summary-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; min-width: 150px; }
-        .summary-card .number { font-size: 24px; font-weight: bold; color: #0a7c71; }
         .filter-box { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
         .filter-group { flex: 1; min-width: 160px; }
         label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #495057; }
-        select, input { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 6px; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 6px; }
         button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 5px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #0a7c71; color: white; }
-        .low-stock { background-color: #fff3cd; }
-        .out-of-stock { background-color: #f8d7da; }
         .export-btn { background: #6c757d; }
         .empty-message { text-align: center; padding: 40px; color: #6c757d; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1><i class="fas fa-boxes"></i> Stock Report</h1>
-
-    <div class="summary" id="summaryCards"></div>
+    <h1><i class="fas fa-boxes"></i> Stock Movement Report (Local Data)</h1>
+    <p>Shows only products with transactions in selected period.</p>
 
     <div class="filter-box">
         <div class="filter-group">
-            <label>Brand</label>
-            <select id="brandFilter"><option value="">All Brands</option></select>
+            <label>From Date</label>
+            <input type="date" id="fromDate">
         </div>
         <div class="filter-group">
-            <label>Stock Status</label>
-            <select id="stockFilter">
-                <option value="">All</option>
-                <option value="low">Low Stock (≤10)</option>
-                <option value="out">Out of Stock (0)</option>
-                <option value="normal">Normal (>10)</option>
-            </select>
+            <label>To Date</label>
+            <input type="date" id="toDate">
         </div>
         <div class="filter-group">
-            <label>Search Part No</label>
-            <input type="text" id="partSearch" placeholder="Enter part number">
+            <label>Filter by Product (Part No)</label>
+            <input type="text" id="productFilter" placeholder="Part number">
         </div>
         <div class="filter-group">
-            <button onclick="loadStock()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button onclick="loadReport()"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button onclick="exportToCSV()" class="export-btn"><i class="fas fa-file-csv"></i> Export CSV</button>
         </div>
     </div>
 
-    <div id="stockTableContainer">
-        <div id="stockTable">Loading...</div>
+    <div id="reportContainer">
+        <div id="reportTable">Loading...</div>
     </div>
 </div>
 
 <script>
-    let allProducts = [];
+    let allInvoices = [];
+    let allPurchases = [];
+    let stockData = [];
 
-    // Load products from localStorage (cached by main site) or fetch if needed
-    async function loadProducts() {
-        // 1. Try to get from localStorage (set by index.html or previous fetch)
-        const cached = localStorage.getItem('productsCache');
-        if (cached) {
-            try {
-                allProducts = JSON.parse(cached);
-                console.log(`✅ Loaded ${allProducts.length} products from localStorage cache`);
-                populateBrandFilter();
-                return true;
-            } catch(e) { console.warn('Cache parse error', e); }
-        }
+    // Helper: extract product ID (part number) from item
+    function getPart(item) {
+        return item.part || item.productId || item.sku || 'N/A';
+    }
 
-        // 2. Fallback: fetch from root prices.csv (slow but reliable)
-        try {
-            const response = await fetch('/prices.csv');
-            if (!response.ok) throw new Error('prices.csv not found');
-            const csv = await response.text();
-            const rows = csv.split('\n').slice(1);
-            allProducts = [];
-            for (const row of rows) {
-                const cols = row.split(',');
-                if (cols[0] && cols[0].trim()) {
-                    allProducts.push({
-                        part: cols[0].trim(),
-                        desc: cols[1]?.trim() || '',
-                        brand: cols[10]?.trim() || '',
-                        make: cols[11]?.trim() || '',
-                        price: parseFloat(cols[6]) || 0,
-                        stock: parseInt(cols[7]) || 0,
-                        hsn: cols[23]?.trim() || ''
-                    });
-                }
+    function getQty(item) {
+        return item.qty || item.quantity || 0;
+    }
+
+    function getPrice(item) {
+        return item.price || item.cost || 0;
+    }
+
+    function loadData() {
+        allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        allPurchases = JSON.parse(localStorage.getItem('purchaseInvoices') || '[]');
+        if (allPurchases.length === 0) allPurchases = JSON.parse(localStorage.getItem('allPurchases') || '[]');
+    }
+
+    function calculateStock(fromDate, toDate, productFilter = '') {
+        const from = new Date(fromDate);
+        const to = new Date(toDate);
+        const productMap = new Map(); // key: partNo -> { opening, inward, outward, closing }
+
+        // Helper: add transaction
+        function addTransaction(part, type, qty, date) {
+            if (!productMap.has(part)) {
+                productMap.set(part, { opening: 0, inward: 0, outward: 0 });
             }
-            // Cache for next time
-            localStorage.setItem('productsCache', JSON.stringify(allProducts));
-            console.log(`✅ Loaded ${allProducts.length} products from prices.csv and cached`);
-            populateBrandFilter();
-            return true;
-        } catch (err) {
-            console.error(err);
-            document.getElementById('stockTable').innerHTML = '<div class="empty-message">Error loading product data. Please visit the main page first to load products.</div>';
-            return false;
+            const entry = productMap.get(part);
+            const transDate = new Date(date);
+            if (type === 'purchase') {
+                if (transDate < from) entry.opening += qty;
+                else if (transDate >= from && transDate <= to) entry.inward += qty;
+            } else if (type === 'sale') {
+                if (transDate < from) entry.opening -= qty;
+                else if (transDate >= from && transDate <= to) entry.outward += qty;
+            }
         }
-    }
 
-    function populateBrandFilter() {
-        const brands = [...new Set(allProducts.map(p => p.brand).filter(b => b))].sort();
-        const select = document.getElementById('brandFilter');
-        select.innerHTML = '<option value="">All Brands</option>';
-        brands.forEach(b => {
-            select.innerHTML += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
-        });
-    }
+        // Process purchases
+        for (const inv of allPurchases) {
+            const invDate = inv.date;
+            for (const item of (inv.items || [])) {
+                const part = getPart(item);
+                const qty = getQty(item);
+                if (qty === 0) continue;
+                addTransaction(part, 'purchase', qty, invDate);
+            }
+        }
 
-    function getFilteredProducts() {
-        const brand = document.getElementById('brandFilter').value;
-        const stockStatus = document.getElementById('stockFilter').value;
-        const search = document.getElementById('partSearch').value.toLowerCase();
+        // Process sales
+        for (const inv of allInvoices) {
+            const invDate = inv.date;
+            for (const item of (inv.items || [])) {
+                const part = getPart(item);
+                const qty = getQty(item);
+                if (qty === 0) continue;
+                addTransaction(part, 'sale', qty, invDate);
+            }
+        }
 
-        let filtered = [...allProducts];
-        if (brand) filtered = filtered.filter(p => p.brand === brand);
-        if (search) filtered = filtered.filter(p => p.part.toLowerCase().includes(search));
-        if (stockStatus === 'low') filtered = filtered.filter(p => p.stock > 0 && p.stock <= 10);
-        else if (stockStatus === 'out') filtered = filtered.filter(p => p.stock === 0);
-        else if (stockStatus === 'normal') filtered = filtered.filter(p => p.stock > 10);
+        // Convert map to array and compute closing stock
+        const result = [];
+        for (let [part, data] of productMap.entries()) {
+            const opening = data.opening;
+            const inward = data.inward;
+            const outward = data.outward;
+            const closing = opening + inward - outward;
+            // Only include if there is any movement in the period (inward>0 or outward>0) OR if product filter matches
+            if (inward === 0 && outward === 0 && productFilter === '') continue;
+            result.push({
+                part: part,
+                opening: opening,
+                inward: inward,
+                outward: outward,
+                closing: closing
+            });
+        }
 
+        // Filter by product part number if provided
+        let filtered = result;
+        if (productFilter) {
+            const filterLower = productFilter.toLowerCase();
+            filtered = result.filter(r => r.part.toLowerCase().includes(filterLower));
+        }
+
+        // Sort by part number
         filtered.sort((a,b) => a.part.localeCompare(b.part));
         return filtered;
     }
 
-    function displayStock(products) {
-        const container = document.getElementById('stockTable');
-        if (products.length === 0) {
-            container.innerHTML = '<div class="empty-message">No products match the filter.</div>';
+    function displayReport(data) {
+        const container = document.getElementById('reportTable');
+        if (data.length === 0) {
+            container.innerHTML = '<div class="empty-message">No stock transactions found in selected period.</div>';
             return;
         }
 
-        let totalValue = 0;
-        let lowCount = 0;
-        let outCount = 0;
-
         let html = `<div style="overflow-x: auto;">
-            <tr>
+            <table>
                 <thead>
-                    <tr><th>Part No</th><th>Description</th><th>Brand</th><th>Make</th><th>Stock</th><th>Price (₹)</th><th>Value (₹)</th><th>Status</th></tr>
+                    <tr>
+                        <th>Part No</th>
+                        <th>Opening Stock</th>
+                        <th>Inward (Purchases)</th>
+                        <th>Outward (Sales)</th>
+                        <th>Closing Stock</th>
+                    </tr>
                 </thead>
                 <tbody>`;
 
-        for (const p of products) {
-            const value = p.stock * p.price;
-            totalValue += value;
-            if (p.stock === 0) outCount++;
-            else if (p.stock <= 10) lowCount++;
-
-            let statusClass = '';
-            let statusText = '';
-            if (p.stock === 0) {
-                statusClass = 'out-of-stock';
-                statusText = '<i class="fas fa-times-circle"></i> Out of Stock';
-            } else if (p.stock <= 10) {
-                statusClass = 'low-stock';
-                statusText = '<i class="fas fa-exclamation-triangle"></i> Low Stock';
-            } else {
-                statusText = '<i class="fas fa-check-circle"></i> In Stock';
-            }
-
-            html += `<tr class="${statusClass}">
-                <td><strong>${escapeHtml(p.part)}</strong></td>
-                <td>${escapeHtml(p.desc.substring(0, 60))}</strong></td>
-                <td>${escapeHtml(p.brand || '-')}</td>
-                <td>${escapeHtml(p.make || '-')}</td>
-                <td><strong>${p.stock}</strong></td>
-                <td>₹${p.price.toFixed(2)}</strong></td>
-                <td>₹${value.toFixed(2)}</strong></td>
-                <td>${statusText}</strong></td>
+        for (const row of data) {
+            html += `<tr>
+                <td><strong>${escapeHtml(row.part)}</strong></td>
+                <td>${row.opening}</td>
+                <td>${row.inward}</td>
+                <td>${row.outward}</td>
+                <td><strong>${row.closing}</strong></td>
             </tr>`;
         }
 
         html += `</tbody>
             </table>
         </div>`;
-
         container.innerHTML = html;
-
-        // Update summary cards
-        document.getElementById('summaryCards').innerHTML = `
-            <div class="summary-card"><div class="number">${products.length}</div><div>Products</div></div>
-            <div class="summary-card"><div class="number">₹${totalValue.toFixed(2)}</div><div>Total Stock Value</div></div>
-            <div class="summary-card"><div class="number">${lowCount}</div><div>Low Stock (≤10)</div></div>
-            <div class="summary-card"><div class="number">${outCount}</div><div>Out of Stock</div></div>
-        `;
     }
 
-    async function loadStock() {
-        document.getElementById('stockTable').innerHTML = '<div class="empty-message">Loading...</div>';
-        await loadProducts();
-        const filtered = getFilteredProducts();
-        displayStock(filtered);
+    function loadReport() {
+        const from = document.getElementById('fromDate').value;
+        const to = document.getElementById('toDate').value;
+        if (!from || !to) {
+            alert('Please select both From and To dates');
+            return;
+        }
+        loadData();
+        const productFilter = document.getElementById('productFilter').value;
+        const data = calculateStock(from, to, productFilter);
+        displayReport(data);
     }
 
     function exportToCSV() {
-        const products = getFilteredProducts();
-        if (products.length === 0) { alert('No data to export'); return; }
-        let csv = "Part No,Description,Brand,Make,Stock,Price (₹),Value (₹),Status\n";
-        for (const p of products) {
-            let status = '';
-            if (p.stock === 0) status = 'Out of Stock';
-            else if (p.stock <= 10) status = 'Low Stock';
-            else status = 'In Stock';
-            csv += `"${escapeCsv(p.part)}","${escapeCsv(p.desc)}","${escapeCsv(p.brand || '')}","${escapeCsv(p.make || '')}",${p.stock},${p.price},${(p.stock * p.price).toFixed(2)},"${status}"\n`;
+        const from = document.getElementById('fromDate').value;
+        const to = document.getElementById('toDate').value;
+        if (!from || !to) { alert('Select date range first'); return; }
+        const productFilter = document.getElementById('productFilter').value;
+        const data = calculateStock(from, to, productFilter);
+        if (data.length === 0) { alert('No data to export'); return; }
+        let csv = "Part No,Opening Stock,Inward (Purchases),Outward (Sales),Closing Stock\n";
+        for (const row of data) {
+            csv += `"${escapeCsv(row.part)}",${row.opening},${row.inward},${row.outward},${row.closing}\n`;
         }
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `stock_report_${new Date().toISOString().slice(0,10)}.csv`;
+        a.download = `stock_movement_${from}_to_${to}.csv`;
         a.click();
         URL.revokeObjectURL(url);
     }
@@ -229,8 +220,12 @@
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     function escapeCsv(str) { return String(str).replace(/"/g, '""'); }
 
-    // Initial load
-    loadStock();
+    // Set default dates (current month)
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('fromDate').value = firstDay.toISOString().slice(0,10);
+    document.getElementById('toDate').value = today.toISOString().slice(0,10);
+    loadReport();
 </script>
 </body>
 </html>
