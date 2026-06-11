@@ -65,11 +65,23 @@
 <script>
     let allProducts = [];
 
-    // Load products from prices.csv (absolute path from root)
+    // Load products from localStorage (cached by main site) or fetch if needed
     async function loadProducts() {
+        // 1. Try to get from localStorage (set by index.html or previous fetch)
+        const cached = localStorage.getItem('productsCache');
+        if (cached) {
+            try {
+                allProducts = JSON.parse(cached);
+                console.log(`✅ Loaded ${allProducts.length} products from localStorage cache`);
+                populateBrandFilter();
+                return true;
+            } catch(e) { console.warn('Cache parse error', e); }
+        }
+
+        // 2. Fallback: fetch from root prices.csv (slow but reliable)
         try {
-            const response = await fetch('/prices.csv');   // ✅ Fixed: root path
-            if (!response.ok) throw new Error('prices.csv not found at root');
+            const response = await fetch('/prices.csv');
+            if (!response.ok) throw new Error('prices.csv not found');
             const csv = await response.text();
             const rows = csv.split('\n').slice(1);
             allProducts = [];
@@ -87,12 +99,14 @@
                     });
                 }
             }
-            console.log(`Loaded ${allProducts.length} products`);
+            // Cache for next time
+            localStorage.setItem('productsCache', JSON.stringify(allProducts));
+            console.log(`✅ Loaded ${allProducts.length} products from prices.csv and cached`);
             populateBrandFilter();
             return true;
         } catch (err) {
             console.error(err);
-            document.getElementById('stockTable').innerHTML = '<div class="empty-message">Error loading prices.csv. Make sure the file exists in the website root.</div>';
+            document.getElementById('stockTable').innerHTML = '<div class="empty-message">Error loading product data. Please visit the main page first to load products.</div>';
             return false;
         }
     }
@@ -134,7 +148,7 @@
         let outCount = 0;
 
         let html = `<div style="overflow-x: auto;">
-            <table>
+            <tr>
                 <thead>
                     <tr><th>Part No</th><th>Description</th><th>Brand</th><th>Make</th><th>Stock</th><th>Price (₹)</th><th>Value (₹)</th><th>Status</th></tr>
                 </thead>
@@ -160,13 +174,13 @@
 
             html += `<tr class="${statusClass}">
                 <td><strong>${escapeHtml(p.part)}</strong></td>
-                <td>${escapeHtml(p.desc.substring(0, 60))}</td>
+                <td>${escapeHtml(p.desc.substring(0, 60))}</strong></td>
                 <td>${escapeHtml(p.brand || '-')}</td>
                 <td>${escapeHtml(p.make || '-')}</td>
                 <td><strong>${p.stock}</strong></td>
                 <td>₹${p.price.toFixed(2)}</strong></td>
                 <td>₹${value.toFixed(2)}</strong></td>
-                <td>${statusText}</td>
+                <td>${statusText}</strong></td>
             </tr>`;
         }
 
