@@ -65,11 +65,11 @@
 <script>
     let allProducts = [];
 
-    // Load products from prices.csv
+    // Load products from prices.csv (absolute path from root)
     async function loadProducts() {
         try {
-            const response = await fetch('prices.csv');
-            if (!response.ok) throw new Error('prices.csv not found');
+            const response = await fetch('/prices.csv');   // ✅ Fixed: root path
+            if (!response.ok) throw new Error('prices.csv not found at root');
             const csv = await response.text();
             const rows = csv.split('\n').slice(1);
             allProducts = [];
@@ -92,7 +92,7 @@
             return true;
         } catch (err) {
             console.error(err);
-            document.getElementById('stockTable').innerHTML = '<div class="empty-message">Error loading prices.csv. Make sure the file exists.</div>';
+            document.getElementById('stockTable').innerHTML = '<div class="empty-message">Error loading prices.csv. Make sure the file exists in the website root.</div>';
             return false;
         }
     }
@@ -164,8 +164,8 @@
                 <td>${escapeHtml(p.brand || '-')}</td>
                 <td>${escapeHtml(p.make || '-')}</td>
                 <td><strong>${p.stock}</strong></td>
-                <td>₹${p.price.toFixed(2)}</td>
-                <td>₹${value.toFixed(2)}</td>
+                <td>₹${p.price.toFixed(2)}</strong></td>
+                <td>₹${value.toFixed(2)}</strong></td>
                 <td>${statusText}</td>
             </tr>`;
         }
