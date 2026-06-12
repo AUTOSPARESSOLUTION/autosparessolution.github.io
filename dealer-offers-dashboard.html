@@ -46,7 +46,7 @@
         .btn-danger { background: #dc2626; }
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 15px;
             margin: 20px 0;
         }
@@ -86,6 +86,14 @@
             font-size: 14px;
             color: #4ade80;
         }
+        .distributor-badge {
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        .badge-active { background: #16a34a; color: white; }
+        .badge-inactive { background: #475569; color: #94a3b8; }
         .flyer-card {
             background: #0f172a;
             border-radius: 12px;
@@ -105,10 +113,18 @@
         }
         .file-input-label:hover { background: #1d4ed8; }
         #distributorFiles { display: none; }
+        .stock-dist-badge {
+            background: #16a34a;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 5px;
+            white-space: nowrap;
+        }
         @media (max-width: 768px) {
             .btn { padding: 6px 10px; font-size: 12px; }
             th, td { font-size: 11px; padding: 5px; }
-            .stat-number { font-size: 24px; }
+            .stat-number { font-size: 20px; }
         }
     </style>
 </head>
@@ -116,9 +132,9 @@
 <div class="container">
     <h1><i class="fas fa-chart-line"></i> Dealer Intelligence Dashboard</h1>
 
-    <!-- Distributor Stock Upload Section -->
+    <!-- Distributor Stock Upload Section with Visual Badge -->
     <div class="upload-section">
-        <h3><i class="fas fa-warehouse"></i> Distributor Stock (Upload to REPLACE existing data)</h3>
+        <h3><i class="fas fa-warehouse"></i> Distributor Stock</h3>
         <p>Upload stock lists from your distributors. <strong>New uploads will REPLACE all existing data.</strong></p>
         <label class="file-input-label" for="distributorFiles">
             <i class="fas fa-upload"></i> Select Excel Files
@@ -130,15 +146,19 @@
         <button class="btn btn-danger" onclick="clearDistributorStock()">
             <i class="fas fa-trash"></i> Clear All Data
         </button>
+        <div id="distributorStockBadge" class="distributor-badge badge-inactive">
+            <i class="fas fa-spinner fa-spin"></i> Loading...
+        </div>
         <div id="distributorStatus" class="distributor-status"></div>
     </div>
 
-    <!-- Stats Cards -->
+    <!-- Stats Grid -->
     <div class="stats-grid">
         <div class="stat-card"><div class="stat-number" id="totalOffers">0</div><div>Total Offers</div></div>
         <div class="stat-card"><div class="stat-number" id="highDiscount">0</div><div>High Discount</div></div>
-        <div class="stat-card"><div class="stat-number" id="lowStockCount">0</div><div>Low Stock</div></div>
+        <div class="stat-card"><div class="stat-number" id="lowStockCount">0</div><div>Low Stock Alerts</div></div>
         <div class="stat-card"><div class="stat-number" id="areasCount">0</div><div>Areas</div></div>
+        <div class="stat-card"><div class="stat-number" id="distributorPartsCount">0</div><div>Distributor Parts</div><small id="distributorUnitsCount" style="font-size:12px;">0 units</small></div>
     </div>
 
     <!-- Action Buttons -->
@@ -154,7 +174,7 @@
     <div style="overflow-x: auto;">
         <table id="offersTable">
             <thead>
-                <tr><th>Dealer</th><th>Part</th><th>District</th><th>Stock</th><th>Discount</th><th>Offer Price</th><th>Action</th></tr>
+                <tr><th>Dealer</th><th>Part</th><th>District</th><th>Stock (Your + Dist)</th><th>Discount</th><th>Offer Price</th><th>Action</th></tr>
             </thead>
             <tbody id="offersTbody"></tbody>
         </table>
@@ -194,17 +214,42 @@ function readExcelFile(file) {
 }
 
 // ============================================================
+// UPDATE DISTRIBUTOR STOCK BADGE & STATS
+// ============================================================
+function updateDistributorIndicators() {
+    const stock = JSON.parse(localStorage.getItem('distributorStock') || '[]');
+    const badge = document.getElementById('distributorStockBadge');
+    const partsCount = document.getElementById('distributorPartsCount');
+    const unitsCount = document.getElementById('distributorUnitsCount');
+    
+    if (stock.length > 0) {
+        const uniqueParts = new Set(stock.map(d => d.part)).size;
+        const totalUnits = stock.reduce((sum, d) => sum + d.stock, 0);
+        partsCount.innerText = uniqueParts;
+        unitsCount.innerHTML = `${totalUnits} units`;
+        badge.innerHTML = `<i class="fas fa-check-circle"></i> Distributor Stock Active: ${uniqueParts} parts, ${totalUnits} units`;
+        badge.className = "distributor-badge badge-active";
+    } else {
+        partsCount.innerText = "0";
+        unitsCount.innerHTML = "0 units";
+        badge.innerHTML = `<i class="fas fa-info-circle"></i> No distributor stock loaded`;
+        badge.className = "distributor-badge badge-inactive";
+    }
+}
+
+// ============================================================
 // CLEAR ALL DISTRIBUTOR STOCK
 // ============================================================
 function clearDistributorStock() {
     if (confirm('⚠️ This will DELETE ALL distributor stock data. This action cannot be undone. Are you sure?')) {
         localStorage.removeItem('distributorStock');
+        updateDistributorIndicators();
         document.getElementById('distributorStatus').innerHTML = '🗑️ All distributor stock cleared.';
-        alert('Distributor stock cleared. You can now upload fresh files.');
-        // Refresh analysis if available
+        alert('Distributor stock cleared.');
         if (typeof DealerIntelligence !== 'undefined' && DealerIntelligence.refreshStock) {
             DealerIntelligence.refreshStock();
         }
+        setTimeout(() => runAnalysis(), 500);
     }
 }
 
@@ -224,30 +269,19 @@ async function uploadMultipleDistributorFiles() {
     
     const statusSpan = document.getElementById('distributorStatus');
     statusSpan.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-    statusSpan.style.color = '#facc15';
     
     let allStock = [];
-    let errorCount = 0;
-    
     for (let file of files) {
         try {
             const stockData = await readExcelFile(file);
             allStock = allStock.concat(stockData);
-            console.log(`✅ Loaded ${stockData.length} items from ${file.name}`);
         } catch(err) {
             console.error(`Error reading ${file.name}:`, err);
-            errorCount++;
         }
-    }
-    
-    if (errorCount > 0) {
-        statusSpan.innerHTML = `⚠️ ${errorCount} file(s) had errors. Partial data loaded.`;
-        statusSpan.style.color = '#facc15';
     }
     
     if (allStock.length === 0) {
         statusSpan.innerHTML = '❌ No valid stock data found in selected files.';
-        statusSpan.style.color = '#f87171';
         return;
     }
     
@@ -266,24 +300,14 @@ async function uploadMultipleDistributorFiles() {
     }
     
     const combinedStock = Array.from(mergedMap.values());
-    
-    // REPLACE old data (not merge)
     localStorage.setItem('distributorStock', JSON.stringify(combinedStock));
+    updateDistributorIndicators();
+    statusSpan.innerHTML = `✅ REPLACED with ${files.length} file(s), total ${combinedStock.length} entries.`;
     
-    statusSpan.innerHTML = `✅ REPLACED with ${files.length} file(s), total ${combinedStock.length} distributor stock entries.`;
-    statusSpan.style.color = '#4ade80';
-    
-    // Refresh analysis if available
     if (typeof DealerIntelligence !== 'undefined' && DealerIntelligence.refreshStock) {
         DealerIntelligence.refreshStock();
     }
-    
-    // Show summary in console
-    const summary = {};
-    for (const item of combinedStock) {
-        summary[item.distributor] = (summary[item.distributor] || 0) + 1;
-    }
-    console.log('Distributor summary:', summary);
+    setTimeout(() => runAnalysis(), 500);
 }
 
 // ============================================================
@@ -292,7 +316,7 @@ async function uploadMultipleDistributorFiles() {
 async function runAnalysis() {
     try {
         if (typeof DealerIntelligence === 'undefined') {
-            alert('DealerIntelligence not loaded. Check that js/dealer-intelligence.js exists.');
+            alert('DealerIntelligence not loaded.');
             return;
         }
         const result = await DealerIntelligence.runFullAnalysis();
@@ -319,7 +343,14 @@ function displayOffers(offers) {
         row.insertCell(0).innerText = o.dealer || '';
         row.insertCell(1).innerText = o.part || '';
         row.insertCell(2).innerText = o.pincode || '-';
-        row.insertCell(3).innerText = o.totalStock || 0;
+        
+        // Stock cell with distributor badge
+        let stockHtml = `${o.totalStock || 0}`;
+        if (o.distributorStock > 0) {
+            stockHtml += ` <span class="stock-dist-badge">+${o.distributorStock} from Dist</span>`;
+        }
+        row.insertCell(3).innerHTML = stockHtml;
+        
         row.insertCell(4).innerText = (o.discount || 0) + '%';
         row.insertCell(5).innerText = '₹' + Number(o.offerPrice || 0).toFixed(2);
         row.insertCell(6).innerHTML = `<button class="btn btn-whatsapp" style="padding:5px 10px;" onclick="sendSingleWhatsApp('${escapeHtml(o.dealer).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i></button>`;
@@ -327,29 +358,20 @@ function displayOffers(offers) {
 }
 
 // ============================================================
-// FLYER FUNCTIONS
+// FLYER FUNCTIONS (unchanged, kept for reference)
 // ============================================================
 async function sendSingleWhatsApp(dealerName) {
     try {
-        if (typeof BrochureGenerator === 'undefined') {
-            alert('BrochureGenerator not loaded');
-            return;
-        }
+        if (typeof BrochureGenerator === 'undefined') { alert('BrochureGenerator not loaded'); return; }
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         BrochureGenerator.sendFlyerToWhatsApp(dealerName);
-    } catch(err) {
-        console.error(err);
-        alert(err.message);
-    }
+    } catch(err) { console.error(err); alert(err.message); }
 }
 
 async function generateAllFlyers() {
     try {
-        if (typeof BrochureGenerator === 'undefined') {
-            alert('BrochureGenerator not loaded');
-            return;
-        }
+        if (typeof BrochureGenerator === 'undefined') { alert('BrochureGenerator not loaded'); return; }
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         const dealers = await BrochureGenerator.getDealersWithOffers();
@@ -372,10 +394,7 @@ async function generateAllFlyers() {
                 </div>
             `;
         });
-    } catch(err) {
-        console.error(err);
-        alert(err.message);
-    }
+    } catch(err) { console.error(err); alert(err.message); }
 }
 
 async function previewFlyer(dealerName) {
@@ -383,28 +402,17 @@ async function previewFlyer(dealerName) {
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         BrochureGenerator.showBrochurePreview(dealerName);
-    } catch(err) {
-        console.error(err);
-        alert(err.message);
-    }
+    } catch(err) { console.error(err); alert(err.message); }
 }
 
 async function downloadSinglePDF(dealerName) {
     try {
-        if (typeof BrochureGenerator === 'undefined') {
-            alert('BrochureGenerator not loaded');
-            return;
-        }
         const html = BrochureGenerator.generateFullBrochureHTML(dealerName);
         if (!html) { alert('No flyer found'); return; }
         const div = document.createElement('div');
         div.innerHTML = html;
-        div.style.position = 'fixed';
-        div.style.left = '-9999px';
-        div.style.top = '0';
-        div.style.width = '800px';
-        div.style.background = 'white';
-        div.style.padding = '20px';
+        div.style.position = 'fixed'; div.style.left = '-9999px'; div.style.top = '0';
+        div.style.width = '800px'; div.style.background = 'white'; div.style.padding = '20px';
         document.body.appendChild(div);
         await new Promise(r => setTimeout(r, 700));
         const canvas = await html2canvas(div, { scale: 2, useCORS: true });
@@ -417,25 +425,15 @@ async function downloadSinglePDF(dealerName) {
         pdf.addImage(img, 'PNG', 10, 10, pdfWidth, pdfHeight);
         pdf.save(dealerName.replace(/[^a-z0-9]/gi, '_') + '.pdf');
         document.body.removeChild(div);
-    } catch(err) {
-        console.error(err);
-        alert(err.message);
-    }
+    } catch(err) { console.error(err); alert(err.message); }
 }
 
 async function downloadAllFlyersPDF() {
     try {
         const dealers = await BrochureGenerator.getDealersWithOffers();
-        if (dealers.length === 0) { alert('No flyers to download'); return; }
-        for (const d of dealers) {
-            await downloadSinglePDF(d.name);
-            await new Promise(r => setTimeout(r, 500));
-        }
+        for (const d of dealers) { await downloadSinglePDF(d.name); await new Promise(r => setTimeout(r, 500)); }
         alert(`Downloaded ${dealers.length} PDF files`);
-    } catch(err) {
-        console.error(err);
-        alert(err.message);
-    }
+    } catch(err) { console.error(err); alert(err.message); }
 }
 
 async function sendBulkWhatsAppFlyers() {
@@ -443,17 +441,10 @@ async function sendBulkWhatsAppFlyers() {
         const dealers = await BrochureGenerator.getDealersWithOffers();
         let count = 0;
         for (const d of dealers) {
-            if (d.phone) {
-                BrochureGenerator.sendFlyerToWhatsApp(d.name);
-                count++;
-                await new Promise(r => setTimeout(r, 1500));
-            }
+            if (d.phone) { BrochureGenerator.sendFlyerToWhatsApp(d.name); count++; await new Promise(r => setTimeout(r, 1500)); }
         }
         alert(`Opened WhatsApp for ${count} dealers`);
-    } catch(err) {
-        console.error(err);
-        alert(err.message);
-    }
+    } catch(err) { console.error(err); alert(err.message); }
 }
 
 function escapeHtml(str) {
@@ -462,28 +453,14 @@ function escapeHtml(str) {
 }
 
 // ============================================================
-// PAGE LOAD INITIALIZATION
+// PAGE LOAD
 // ============================================================
 window.addEventListener('load', () => {
-    // Show existing distributor stock count
-    const existingStock = localStorage.getItem('distributorStock');
-    if (existingStock) {
-        try {
-            const stock = JSON.parse(existingStock);
-            const statusSpan = document.getElementById('distributorStatus');
-            if (statusSpan && stock.length > 0) {
-                statusSpan.innerHTML = `📦 ${stock.length} distributor stock entries loaded. Upload new files to REPLACE.`;
-                statusSpan.style.color = '#4ade80';
-            }
-        } catch(e) {}
-    }
-    
-    // Auto-run analysis after a short delay
+    updateDistributorIndicators();
     setTimeout(() => {
         if (typeof DealerIntelligence !== 'undefined') {
             runAnalysis();
         } else {
-            console.warn('DealerIntelligence not available. Check js/dealer-intelligence.js');
             document.getElementById('offersTbody').innerHTML = '<tr><td colspan="7" style="text-align:center; color:#f87171;">⚠️ DealerIntelligence not loaded. Please ensure js/dealer-intelligence.js exists.</td></tr>';
         }
     }, 1500);
