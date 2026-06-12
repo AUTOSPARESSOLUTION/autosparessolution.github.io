@@ -75,6 +75,10 @@ h1,h2,h3{
     background:#16a34a;
 }
 
+.btn-secondary{
+    background:#475569;
+}
+
 .stats-grid{
     display:grid;
     grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
@@ -138,6 +142,41 @@ th{
     margin-top:10px;
 }
 
+.upload-section{
+    background:#0f172a;
+    border-radius:12px;
+    padding:15px;
+    margin:20px 0;
+    border:1px solid #334155;
+}
+
+.upload-section h3{
+    margin-top:0;
+}
+
+.file-input-label{
+    display:inline-block;
+    background:#2563eb;
+    padding:8px 15px;
+    border-radius:8px;
+    cursor:pointer;
+    margin:10px 0;
+}
+
+.file-input-label:hover{
+    background:#1d4ed8;
+}
+
+#distributorFiles{
+    display:none;
+}
+
+.distributor-status{
+    margin-top:10px;
+    font-size:14px;
+    color:#4ade80;
+}
+
 </style>
 
 </head>
@@ -149,6 +188,23 @@ th{
 <h1>
 Dealer Intelligence Dashboard
 </h1>
+
+<!-- ========== DISTRIBUTOR STOCK UPLOAD SECTION (MULTI-FILE) ========== -->
+<div class="upload-section">
+    <h3><i class="fas fa-warehouse"></i> Distributor Stock (Multiple Excel Files)</h3>
+    <p>Upload stock lists from multiple distributors. Files will be combined automatically.</p>
+    
+    <label class="file-input-label" for="distributorFiles">
+        <i class="fas fa-upload"></i> Select Excel Files
+    </label>
+    <input type="file" id="distributorFiles" accept=".xlsx,.xls,.csv" multiple>
+    
+    <button class="btn btn-secondary" onclick="uploadMultipleDistributorFiles()">
+        <i class="fas fa-cloud-upload-alt"></i> Upload & Combine
+    </button>
+    
+    <div id="distributorStatus" class="distributor-status"></div>
+</div>
 
 <div class="stats-grid">
 
@@ -243,21 +299,130 @@ style="margin-top:15px;"></div>
 <script>
 
 /* =========================
+READ EXCEL FILE (HELPER)
+========================= */
+function readExcelFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet);
+                const stock = rows.map(row => ({
+                    part: row['Part No'] || row['part_no'] || row['Part Number'] || row['Part'],
+                    distributor: row['Distributor Name'] || row['distributor'] || row['Supplier'] || '',
+                    stock: parseFloat(row['Available Stock'] || row['stock'] || 0),
+                    price: parseFloat(row['Price'] || row['price'] || 0),
+                    leadTime: parseFloat(row['Lead Time (Days)'] || row['leadTime'] || 3)
+                })).filter(item => item.part);
+                resolve(stock);
+            } catch(err) {
+                reject(err);
+            }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+/* =========================
+UPLOAD MULTIPLE DISTRIBUTOR FILES
+========================= */
+async function uploadMultipleDistributorFiles() {
+    const files = document.getElementById('distributorFiles').files;
+    if (files.length === 0) {
+        alert("Please select one or more Excel files");
+        return;
+    }
+    
+    const statusSpan = document.getElementById('distributorStatus');
+    statusSpan.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing ' + files.length + ' file(s)...';
+    statusSpan.style.color = '#facc15';
+    
+    let allStock = [];
+    let errorCount = 0;
+    
+    for (let file of files) {
+        try {
+            const stockData = await readExcelFile(file);
+            allStock = allStock.concat(stockData);
+            console.log(`✅ Loaded ${stockData.length} items from ${file.name}`);
+        } catch(err) {
+            console.error(`Error reading ${file.name}:`, err);
+            errorCount++;
+        }
+    }
+    
+    if (errorCount > 0) {
+        statusSpan.innerHTML = `⚠️ ${errorCount} file(s) had errors. Partial data loaded.`;
+        statusSpan.style.color = '#facc15';
+    }
+    
+    if (allStock.length === 0) {
+        statusSpan.innerHTML = '❌ No valid stock data found in selected files.';
+        statusSpan.style.color = '#f87171';
+        return;
+    }
+    
+    // Merge duplicates: same part + same distributor
+    const mergedMap = new Map();
+    for (const item of allStock) {
+        const key = `${item.part}|${item.distributor}`;
+        if (mergedMap.has(key)) {
+            const existing = mergedMap.get(key);
+            existing.stock += item.stock;
+            // Keep lowest price and lead time
+            if (item.price && item.price < existing.price) existing.price = item.price;
+            if (item.leadTime && item.leadTime < existing.leadTime) existing.leadTime = item.leadTime;
+        } else {
+            mergedMap.set(key, { ...item });
+        }
+    }
+    
+    const combinedStock = Array.from(mergedMap.values());
+    localStorage.setItem('distributorStock', JSON.stringify(combinedStock));
+    
+    statusSpan.innerHTML = `✅ Loaded ${files.length} file(s), total ${combinedStock.length} distributor stock entries.`;
+    statusSpan.style.color = '#4ade80';
+    
+    // Optional: trigger refresh of DealerIntelligence if available
+    if (window.DealerIntelligence && typeof window.DealerIntelligence.refreshStock === 'function') {
+        window.DealerIntelligence.refreshStock();
+    }
+    
+    // Show summary
+    const summary = {};
+    for (const item of combinedStock) {
+        summary[item.distributor] = (summary[item.distributor] || 0) + 1;
+    }
+    console.log('Distributor summary:', summary);
+}
+
+/* =========================
 INIT
 ========================= */
 window.addEventListener('load', async () => {
 
     try{
-
         if(window.BrochureGenerator?.init){
-
             await BrochureGenerator.init();
-
             console.log("✅ BrochureGenerator Initialized");
         }
-
+        
+        // Load existing distributor stock into memory if needed
+        const existingStock = localStorage.getItem('distributorStock');
+        if (existingStock) {
+            const stock = JSON.parse(existingStock);
+            console.log(`📦 Loaded ${stock.length} distributor stock entries from cache`);
+            const statusSpan = document.getElementById('distributorStatus');
+            if (statusSpan && stock.length > 0) {
+                statusSpan.innerHTML = `📦 ${stock.length} distributor stock entries loaded. Add more files to update.`;
+                statusSpan.style.color = '#4ade80';
+            }
+        }
     }catch(err){
-
         console.error(err);
     }
 });
@@ -434,35 +599,13 @@ async function generateAllFlyers(){
 
                     </button>
 
-                    <div class="flyer-buttons">
+                    <button class="btn btn-whatsapp"
+                    onclick='sendSingleWhatsApp(${dealerSafe})'>
 
-    <!-- DIRECT WHATSAPP -->
-    <button class="btn btn-whatsapp"
-    onclick="sendSingleWhatsApp('${d.name}')">
+                    <i class="fab fa-whatsapp"></i>
+                    WhatsApp
 
-    <i class="fab fa-whatsapp"></i>
-    Msg
-
-    </button>
-
-    <!-- PDF DOWNLOAD -->
-    <button class="btn btn-purple"
-    onclick="downloadSinglePDF('${d.name}')">
-
-    <i class="fas fa-file-pdf"></i>
-    PDF
-
-    </button>
-
-    <!-- PREVIEW -->
-    <button class="btn"
-    onclick="previewFlyer('${d.name}')">
-
-    👁 Preview
-
-    </button>
-
-</div>
+                    </button>
 
                 </div>
 
@@ -580,7 +723,7 @@ async function downloadSinglePDF(dealerName){
         );
 
         pdf.save(
-            dealerName + '.pdf'
+            dealerName.replace(/[^a-z0-9]/gi, '_') + '.pdf'
         );
 
         document.body.removeChild(div);
@@ -608,7 +751,12 @@ async function downloadAllFlyersPDF(){
             await downloadSinglePDF(
                 d.name
             );
+            
+            // Small delay between PDF generations
+            await new Promise(r => setTimeout(r, 500));
         }
+        
+        alert(`Downloaded ${dealers.length} PDF files`);
 
     }catch(err){
 
@@ -627,6 +775,8 @@ async function sendBulkWhatsAppFlyers(){
 
         const dealers =
             await BrochureGenerator.getDealersWithOffers();
+            
+        let sentCount = 0;
 
         for(const d of dealers){
 
@@ -636,11 +786,15 @@ async function sendBulkWhatsAppFlyers(){
                     d.name
                 );
 
+                sentCount++;
+                
                 await new Promise(r =>
                     setTimeout(r,1500)
                 );
             }
         }
+        
+        alert(`Opened WhatsApp for ${sentCount} dealers`);
 
     }catch(err){
 
@@ -653,4 +807,4 @@ async function sendBulkWhatsAppFlyers(){
 </script>
 
 </body>
-</html>
+    </html>
