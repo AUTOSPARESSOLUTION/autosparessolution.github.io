@@ -1,4 +1,6 @@
-// dealer-intelligence.js
+// dealer-intelligence.js - COMPLETE FIXED VERSION
+// Fixes: Reads distributor stock from localStorage, merges into offers
+
 (function () {
 
     console.log("Dealer Intelligence System loaded");
@@ -44,7 +46,7 @@
     let retailerMaster = new Map();
 
     // ===================================================
-    // LOAD EXCEL FILE
+    // LOAD EXCEL FILE (from server, fallback only)
     // ===================================================
 
     async function loadExcelFile(url, sheetName = null) {
@@ -84,6 +86,70 @@
             console.warn(`Could not load ${url}`, err);
 
             return [];
+        }
+    }
+
+    // ===================================================
+    // LOAD DISTRIBUTOR STOCK - FIXED: Reads from localStorage FIRST
+    // ===================================================
+
+    async function loadDistributorStockAuto() {
+
+        // FIRST: Check if distributor stock exists in localStorage (from HTML upload)
+        const localStock = localStorage.getItem('distributorStock');
+        
+        if (localStock) {
+            try {
+                const parsedStock = JSON.parse(localStock);
+                if (parsedStock && parsedStock.length > 0) {
+                    // Normalize to standard format
+                    distributorStock = parsedStock.map(item => ({
+                        part: String(item.part || item['Part No'] || '').trim(),
+                        distributor: String(item.distributor || item['Distributor Name'] || ''),
+                        stock: Number(item.stock || item['Available Stock'] || 0),
+                        price: Number(item.price || 0),
+                        leadTime: Number(item.leadTime || item['Lead Time (Days)'] || 3)
+                    })).filter(item => item.part && item.stock > 0);
+                    
+                    console.log(`✅ Distributor stock loaded from localStorage: ${distributorStock.length} items`);
+                    return;
+                }
+            } catch(e) {
+                console.warn("Error parsing localStorage stock", e);
+            }
+        }
+        
+        // SECOND: Fallback - try to read from Excel file on server
+        try {
+            const rows = await loadExcelFile('data/distributor-stock.xlsx');
+            distributorStock = [];
+
+            for (const row of rows) {
+
+                const part = row['Part No'] || row['part_no'] || row['Part Number'];
+
+                if (!part) continue;
+
+                distributorStock.push({
+
+                    part: String(part).trim(),
+
+                    distributor: row['Distributor Name'] || '',
+
+                    stock: parseFloat(row['Available Stock'] || 0),
+
+                    price: parseFloat(row['Price'] || 0),
+
+                    leadTime: parseFloat(row['Lead Time (Days)'] || 3)
+                });
+            }
+
+            console.log(`✅ Distributor stock loaded from Excel file: ${distributorStock.length}`);
+
+        } catch(err) {
+
+            console.warn("Could not load distributor-stock.xlsx", err);
+            distributorStock = [];
         }
     }
 
@@ -131,54 +197,6 @@
         }
 
         console.log(`✅ Retailer master loaded: ${retailerMaster.size}`);
-    }
-
-    // ===================================================
-    // LOAD DISTRIBUTOR STOCK
-    // ===================================================
-
-    async function loadDistributorStockAuto() {
-
-        const rows = await loadExcelFile(
-            'data/distributor-stock.xlsx'
-        );
-
-        distributorStock = [];
-
-        for (const row of rows) {
-
-            const part =
-                row['Part No'] ||
-                row['part_no'] ||
-                row['Part Number'];
-
-            if (!part) continue;
-
-            distributorStock.push({
-
-                part: String(part).trim(),
-
-                distributor:
-                    row['Distributor Name'] || '',
-
-                stock:
-                    parseFloat(
-                        row['Available Stock'] || 0
-                    ),
-
-                price:
-                    parseFloat(
-                        row['Price'] || 0
-                    ),
-
-                leadTime:
-                    parseFloat(
-                        row['Lead Time (Days)'] || 3
-                    )
-            });
-        }
-
-        console.log(`✅ Distributor stock loaded`);
     }
 
     // ===================================================
@@ -470,7 +488,7 @@
     }
 
     // ===================================================
-    // CALCULATE OFFER
+    // CALCULATE OFFER - FIXED: Includes distributor stock
     // ===================================================
 
     function calculateOffer(
@@ -480,16 +498,26 @@
         district,
         source
     ) {
+        const myStock = currentStock.get(part)?.stock || 0;
+        
+        // ===== FIX: Get distributor stock for this part =====
+        const distItem = distributorStock.find(d => d.part === part);
+        const distributorStockQty = distItem?.stock || 0;
+        const totalStock = myStock + distributorStockQty;
+        // ====================================================
 
-        const stock =
-            currentStock.get(part)?.stock || 0;
-
-        if (stock <= 0) {
+        // Only create offer if there's ANY stock (my stock OR distributor stock)
+        if (myStock <= 0 && distributorStockQty <= 0) {
             return null;
         }
 
-        const originalPrice =
-            currentStock.get(part)?.price || 0;
+        const originalPrice = currentStock.get(part)?.price || 0;
+
+        // If no my stock, use a default price (will be updated from distributor data)
+        let finalPrice = originalPrice;
+        if (myStock === 0 && distributorStockQty > 0 && distItem?.price > 0) {
+            finalPrice = distItem.price;
+        }
 
         let volumeTier = CONFIG.volumeTiers[5];
 
@@ -521,12 +549,12 @@
             Math.round(discount);
 
         const offerPrice =
-            originalPrice *
+            finalPrice *
             (1 - discount / 100);
 
         const basicPrice =
-            originalPrice -
-            (originalPrice * 31.77 / 100);
+            finalPrice -
+            (finalPrice * 31.77 / 100);
 
         return {
 
@@ -540,11 +568,11 @@
 
             district: district,
 
-            myStock: stock,
+            myStock: myStock,
 
-            distributorStock: 0,
+            distributorStock: distributorStockQty,  // FIX: Now has value
 
-            totalStock: stock,
+            totalStock: totalStock,                  // FIX: Combined stock
 
             discount: discount,
 
@@ -553,9 +581,9 @@
 
             minQty: 1,
 
-            mrp: originalPrice,
+            mrp: finalPrice,
 
-            originalPrice,
+            originalPrice: finalPrice,
 
             basicPrice,
 
@@ -577,7 +605,7 @@
 
         await loadMyStock();
 
-        await loadDistributorStockAuto();
+        await loadDistributorStockAuto();  // FIX: Now reads from localStorage
 
         await loadRetailerOfftakeAuto();
 
@@ -661,6 +689,7 @@
         saveOffersToStorage();
 
         console.log(`✅ Offers generated: ${offers.length}`);
+        console.log(`✅ Offers with distributor stock: ${offers.filter(o => o.distributorStock > 0).length}`);
 
         return offers;
     }
@@ -700,7 +729,7 @@
         }
 
         let csv =
-            "Dealer,Part No,MRP,Basic Price,Discount %,Offer Price,Stock\n";
+            "Dealer,Part No,MRP,Basic Price,Discount %,Offer Price,My Stock,Dist Stock,Total Stock\n";
 
         for (const o of activeOffers) {
 
@@ -717,6 +746,10 @@
                 `${o.discount},` +
 
                 `${o.offerPrice.toFixed(2)},` +
+
+                `${o.myStock},` +
+
+                `${o.distributorStock},` +
 
                 `${o.totalStock}\n`;
         }
@@ -748,7 +781,7 @@ Offer Price:
 ₹${offer.offerPrice.toFixed(2)}
 
 Available Stock:
-${offer.totalStock}
+${offer.totalStock} (Your: ${offer.myStock} | Dist: ${offer.distributorStock})
 
 District:
 ${offer.district || 'N/A'}
@@ -796,6 +829,24 @@ https://autosparessolution.com
     }
 
     // ===================================================
+    // REFRESH STOCK (for external calls)
+    // ===================================================
+
+    async function refreshStock() {
+        await loadDistributorStockAuto();
+        console.log(`Stock refreshed: ${distributorStock.length} distributor items`);
+        return distributorStock.length;
+    }
+
+    // ===================================================
+    // GET DISTRIBUTOR STOCK (for external calls)
+    // ===================================================
+
+    function getDistributorStock() {
+        return distributorStock;
+    }
+
+    // ===================================================
     // RUN
     // ===================================================
 
@@ -830,12 +881,12 @@ https://autosparessolution.com
                 areaDemand.size,
 
             offers:
-                offers.slice(0, 20)
+                offers.slice(0, 50)  // Send more offers for display
         };
     }
 
     // ===================================================
-    // AUTO RUN
+    // AUTO RUN (DELAYED)
     // ===================================================
 
     setTimeout(async () => {
@@ -845,7 +896,7 @@ https://autosparessolution.com
     }, 3000);
 
     // ===================================================
-    // GLOBAL
+    // GLOBAL EXPORTS
     // ===================================================
 
     window.DealerIntelligence = {
@@ -859,6 +910,10 @@ https://autosparessolution.com
         exportOffersCSV,
 
         generateWhatsAppMessage,
+
+        refreshStock,           // NEW: Force reload distributor stock
+
+        getDistributorStock,    // NEW: Get current distributor stock
 
         CONFIG
     };
