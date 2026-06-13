@@ -198,15 +198,58 @@ function readExcelFile(file) {
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(sheet);
-                const stock = rows.map(row => ({
-                    part: row['Part No'] || row['part_no'] || row['Part Number'] || row['Part'],
-                    distributor: row['Distributor Name'] || row['distributor'] || row['Supplier'] || '',
-                    stock: parseFloat(row['Available Stock'] || row['stock'] || 0),
-                    price: parseFloat(row['Price'] || row['price'] || 0),
-                    leadTime: parseFloat(row['Lead Time (Days)'] || row['leadTime'] || 3)
-                })).filter(item => item.part);
+                
+                console.log("First raw row from Excel:", rows[0]);
+                
+                const stock = rows.map(row => {
+                    // Get stock value - try multiple column names
+                    let stockValue = 0;
+                    if (row['Available Stock'] !== undefined) stockValue = parseFloat(row['Available Stock']) || 0;
+                    else if (row['stock'] !== undefined) stockValue = parseFloat(row['stock']) || 0;
+                    else if (row['Stock'] !== undefined) stockValue = parseFloat(row['Stock']) || 0;
+                    else if (row['Quantity'] !== undefined) stockValue = parseFloat(row['Quantity']) || 0;
+                    
+                    // Get part number
+                    let partValue = '';
+                    if (row['Part No']) partValue = String(row['Part No']).trim();
+                    else if (row['part_no']) partValue = String(row['part_no']).trim();
+                    else if (row['PartNumber']) partValue = String(row['PartNumber']).trim();
+                    else if (row['Part']) partValue = String(row['Part']).trim();
+                    
+                    // Get distributor name
+                    let distributorValue = '';
+                    if (row['Distributor Name']) distributorValue = String(row['Distributor Name']).trim();
+                    else if (row['distributor']) distributorValue = String(row['distributor']).trim();
+                    else if (row['Supplier']) distributorValue = String(row['Supplier']).trim();
+                    
+                    // Get price if available
+                    let priceValue = 0;
+                    if (row['Price']) priceValue = parseFloat(row['Price']) || 0;
+                    else if (row['price']) priceValue = parseFloat(row['price']) || 0;
+                    
+                    // Get lead time
+                    let leadTimeValue = 3;
+                    if (row['Lead Time (Days)']) leadTimeValue = parseFloat(row['Lead Time (Days)']) || 3;
+                    else if (row['leadTime']) leadTimeValue = parseFloat(row['leadTime']) || 3;
+                    
+                    return {
+                        part: partValue,
+                        distributor: distributorValue,
+                        stock: stockValue,
+                        price: priceValue,
+                        leadTime: leadTimeValue
+                    };
+                }).filter(item => item.part && item.stock > 0);
+                
+                console.log(`Found ${stock.length} items with stock > 0`);
+                if (stock.length > 0) {
+                    console.log("First processed item:", stock[0]);
+                }
                 resolve(stock);
-            } catch(err) { reject(err); }
+            } catch(err) { 
+                console.error("Error parsing Excel:", err);
+                reject(err); 
+            }
         };
         reader.onerror = reject;
         reader.readAsArrayBuffer(file);
@@ -274,14 +317,18 @@ async function uploadMultipleDistributorFiles() {
     for (let file of files) {
         try {
             const stockData = await readExcelFile(file);
+            console.log(`File ${file.name}: ${stockData.length} items with stock > 0`);
             allStock = allStock.concat(stockData);
         } catch(err) {
             console.error(`Error reading ${file.name}:`, err);
         }
     }
     
+    console.log(`Total items before merge: ${allStock.length}`);
+    
     if (allStock.length === 0) {
-        statusSpan.innerHTML = '❌ No valid stock data found in selected files.';
+        statusSpan.innerHTML = '❌ No valid stock data found in selected files. Check column names: "Part No", "Available Stock"';
+        alert('No valid stock data. Make sure your Excel has columns: "Part No" and "Available Stock"');
         return;
     }
     
@@ -300,12 +347,19 @@ async function uploadMultipleDistributorFiles() {
     }
     
     const combinedStock = Array.from(mergedMap.values());
+    console.log(`Total items after merge: ${combinedStock.length}`);
+    console.log("Sample merged item:", combinedStock[0]);
+    
+    // Calculate total units
+    const totalUnits = combinedStock.reduce((sum, item) => sum + item.stock, 0);
+    console.log(`Total units across all parts: ${totalUnits}`);
+    
     localStorage.setItem('distributorStock', JSON.stringify(combinedStock));
     updateDistributorIndicators();
-    statusSpan.innerHTML = `✅ REPLACED with ${files.length} file(s), total ${combinedStock.length} entries.`;
+    statusSpan.innerHTML = `✅ REPLACED with ${files.length} file(s), total ${combinedStock.length} entries, ${totalUnits} units.`;
     
     if (typeof DealerIntelligence !== 'undefined' && DealerIntelligence.refreshStock) {
-        DealerIntelligence.refreshStock();
+        await DealerIntelligence.refreshStock();
     }
     setTimeout(() => runAnalysis(), 500);
 }
