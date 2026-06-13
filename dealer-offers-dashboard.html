@@ -199,31 +199,32 @@ function readExcelFile(file) {
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(sheet);
                 
-                console.log("Excel column names:", Object.keys(rows[0]));
-                console.log("First row sample:", rows[0]);
+                console.log("Column names found:", Object.keys(rows[0]));
                 
                 const stock = [];
                 for (let i = 0; i < rows.length; i++) {
                     const row = rows[i];
                     
-                    // Try multiple possible column names for Part Number
-                    let part = row['Part No'] || row['PartNumber'] || row['part_no'] || row['Part'] || row['PART_NO'];
+                    // Get part number
+                    let part = row['Part No'];
+                    if (!part) part = row['PartNumber'];
+                    if (!part) part = row['part_no'];
+                    if (!part) part = row['Part'];
                     
-                    // Try multiple possible column names for Stock
+                    if (!part) continue;
+                    
+                    // Find stock value - check ALL columns
                     let stockQty = 0;
-                    if (row['Available Stock'] !== undefined) stockQty = Number(row['Available Stock']);
-                    else if (row['Stock'] !== undefined) stockQty = Number(row['Stock']);
-                    else if (row['stock'] !== undefined) stockQty = Number(row['stock']);
-                    else if (row['Quantity'] !== undefined) stockQty = Number(row['Quantity']);
-                    else if (row['Qty'] !== undefined) stockQty = Number(row['Qty']);
-                    
-                    // Also check if the value might be in a different format
-                    if (stockQty === 0) {
-                        // Try to find any numeric column that might be stock
-                        for (let key in row) {
-                            if (key.toLowerCase().includes('stock') || key.toLowerCase().includes('qty') || key.toLowerCase().includes('quantity')) {
-                                stockQty = Number(row[key]);
-                                console.log("Found stock in column:", key, "value:", stockQty);
+                    for (let key in row) {
+                        const value = Number(row[key]);
+                        if (!isNaN(value) && value > 0) {
+                            // If this looks like a stock quantity (not price, not lead time)
+                            if (key.toLowerCase().includes('stock') || 
+                                key.toLowerCase().includes('qty') || 
+                                key.toLowerCase().includes('available') ||
+                                (value > 0 && value < 10000 && key.length < 20)) {
+                                stockQty = value;
+                                console.log("Found stock for part " + part + " in column '" + key + "': " + stockQty);
                                 break;
                             }
                         }
@@ -232,17 +233,20 @@ function readExcelFile(file) {
                     if (part && stockQty > 0) {
                         stock.push({
                             part: String(part).trim(),
-                            distributor: row['Distributor Name'] || row['Distributor'] || row['distributor'] || 'Auto Links',
+                            distributor: row['Distributor Name'] || row['Distributor'] || 'Auto Links',
                             stock: stockQty,
-                            price: row['Price'] ? Number(row['Price']) : (row['price'] ? Number(row['price']) : 0),
-                            leadTime: row['Lead Time (Days)'] ? Number(row['Lead Time (Days)']) : (row['leadTime'] ? Number(row['leadTime']) : 3)
+                            price: Number(row['Price']) || Number(row['price']) || 0,
+                            leadTime: Number(row['Lead Time (Days)']) || Number(row['leadTime']) || 3
                         });
                     }
                 }
                 
-                console.log("Total valid items:", stock.length);
+                console.log("Total items with stock > 0:", stock.length);
                 if (stock.length > 0) {
-                    console.log("First valid item:", stock[0]);
+                    console.log("Sample item:", stock[0]);
+                } else {
+                    console.log("WARNING: No items with stock > 0 found!");
+                    console.log("First row had these values:", rows[0]);
                 }
                 resolve(stock);
             } catch(err) { 
@@ -254,7 +258,6 @@ function readExcelFile(file) {
         reader.readAsArrayBuffer(file);
     });
 }
-
 // ============================================================
 // UPDATE DISTRIBUTOR STOCK BADGE & STATS
 // ============================================================
