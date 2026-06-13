@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributor Stock List – Auto Spares</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        h1 { color: #0a7c71; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th { background: #0a7c71; color: white; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        .empty { text-align: center; padding: 40px; color: #6c757d; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-truck"></i> Distributor Stock List</h1>
+    <p>Current stock from uploaded distributor Excel file.</p>
+    <div id="stockDisplay">Loading...</div>
+    <button onclick="location.reload()">Refresh</button>
+    <button onclick="window.location.href='index.html'">Back to Dashboard</button>
+</div>
+
+<script>
+    function loadDistributorStock() {
+        const stockData = localStorage.getItem('distributorStock');
+        if (!stockData) {
+            document.getElementById('stockDisplay').innerHTML = '<div class="empty">No distributor stock data found. Please upload distributor-stock.xlsx in the Dealer Intelligence dashboard first.</div>';
+            return;
+        }
+        try {
+            const stock = JSON.parse(stockData);
+            if (stock.length === 0) {
+                document.getElementById('stockDisplay').innerHTML = '<div class="empty">Distributor stock list is empty.</div>';
+                return;
+            }
+            let html = `<div style="overflow-x: auto;">
+                <table>
+                    <thead><tr><th>Part No</th><th>Distributor</th><th>Available Stock</th><th>Price (₹)</th><th>Lead Time (Days)</th></tr></thead>
+                    <tbody>`;
+            for (const item of stock) {
+                html += `<tr>
+                    <td><strong>${escapeHtml(item.part)}</strong></td>
+                    <td>${escapeHtml(item.distributor)}</td>
+                    <td>${item.stock}</td>
+                    <td>₹${(item.price || 0).toFixed(2)}</td>
+                    <td>${item.leadTime || 3}</td>
+                </tr>`;
+            }
+            html += `</tbody></table></div>`;
+            document.getElementById('stockDisplay').innerHTML = html;
+        } catch(e) {
+            document.getElementById('stockDisplay').innerHTML = '<div class="empty">Error loading stock data.</div>';
+        }
+    }
+    function escapeHtml(s) { return s ? String(s).replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;') : ''; }
+    loadDistributorStock();
+</script>
+</body>
+</html>
