@@ -199,55 +199,54 @@ function readExcelFile(file) {
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(sheet);
                 
-                console.log("First raw row from Excel:", rows[0]);
+                console.log("Excel column names:", Object.keys(rows[0]));
+                console.log("First row sample:", rows[0]);
                 
-                const stock = rows.map(row => {
-                    // Get stock value - try multiple column names
-                    let stockValue = 0;
-                    if (row['Available Stock'] !== undefined) stockValue = parseFloat(row['Available Stock']) || 0;
-                    else if (row['stock'] !== undefined) stockValue = parseFloat(row['stock']) || 0;
-                    else if (row['Stock'] !== undefined) stockValue = parseFloat(row['Stock']) || 0;
-                    else if (row['Quantity'] !== undefined) stockValue = parseFloat(row['Quantity']) || 0;
+                const stock = [];
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
                     
-                    // Get part number
-                    let partValue = '';
-                    if (row['Part No']) partValue = String(row['Part No']).trim();
-                    else if (row['part_no']) partValue = String(row['part_no']).trim();
-                    else if (row['PartNumber']) partValue = String(row['PartNumber']).trim();
-                    else if (row['Part']) partValue = String(row['Part']).trim();
+                    // Try multiple possible column names for Part Number
+                    let part = row['Part No'] || row['PartNumber'] || row['part_no'] || row['Part'] || row['PART_NO'];
                     
-                    // Get distributor name
-                    let distributorValue = '';
-                    if (row['Distributor Name']) distributorValue = String(row['Distributor Name']).trim();
-                    else if (row['distributor']) distributorValue = String(row['distributor']).trim();
-                    else if (row['Supplier']) distributorValue = String(row['Supplier']).trim();
+                    // Try multiple possible column names for Stock
+                    let stockQty = 0;
+                    if (row['Available Stock'] !== undefined) stockQty = Number(row['Available Stock']);
+                    else if (row['Stock'] !== undefined) stockQty = Number(row['Stock']);
+                    else if (row['stock'] !== undefined) stockQty = Number(row['stock']);
+                    else if (row['Quantity'] !== undefined) stockQty = Number(row['Quantity']);
+                    else if (row['Qty'] !== undefined) stockQty = Number(row['Qty']);
                     
-                    // Get price if available
-                    let priceValue = 0;
-                    if (row['Price']) priceValue = parseFloat(row['Price']) || 0;
-                    else if (row['price']) priceValue = parseFloat(row['price']) || 0;
+                    // Also check if the value might be in a different format
+                    if (stockQty === 0) {
+                        // Try to find any numeric column that might be stock
+                        for (let key in row) {
+                            if (key.toLowerCase().includes('stock') || key.toLowerCase().includes('qty') || key.toLowerCase().includes('quantity')) {
+                                stockQty = Number(row[key]);
+                                console.log("Found stock in column:", key, "value:", stockQty);
+                                break;
+                            }
+                        }
+                    }
                     
-                    // Get lead time
-                    let leadTimeValue = 3;
-                    if (row['Lead Time (Days)']) leadTimeValue = parseFloat(row['Lead Time (Days)']) || 3;
-                    else if (row['leadTime']) leadTimeValue = parseFloat(row['leadTime']) || 3;
-                    
-                    return {
-                        part: partValue,
-                        distributor: distributorValue,
-                        stock: stockValue,
-                        price: priceValue,
-                        leadTime: leadTimeValue
-                    };
-                }).filter(item => item.part && item.stock > 0);
+                    if (part && stockQty > 0) {
+                        stock.push({
+                            part: String(part).trim(),
+                            distributor: row['Distributor Name'] || row['Distributor'] || row['distributor'] || 'Auto Links',
+                            stock: stockQty,
+                            price: row['Price'] ? Number(row['Price']) : (row['price'] ? Number(row['price']) : 0),
+                            leadTime: row['Lead Time (Days)'] ? Number(row['Lead Time (Days)']) : (row['leadTime'] ? Number(row['leadTime']) : 3)
+                        });
+                    }
+                }
                 
-                console.log(`Found ${stock.length} items with stock > 0`);
+                console.log("Total valid items:", stock.length);
                 if (stock.length > 0) {
-                    console.log("First processed item:", stock[0]);
+                    console.log("First valid item:", stock[0]);
                 }
                 resolve(stock);
             } catch(err) { 
-                console.error("Error parsing Excel:", err);
+                console.error("Error:", err);
                 reject(err); 
             }
         };
