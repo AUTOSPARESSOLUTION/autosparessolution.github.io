@@ -1,5 +1,5 @@
 // dealer-intelligence.js - COMPLETE FIXED VERSION
-// Fixes: Reads distributor stock from localStorage, merges into offers
+// Fixes: Flexible column detection for distributor stock (matches upload behavior)
 
 (function () {
 
@@ -46,7 +46,7 @@
     let retailerMaster = new Map();
 
     // ===================================================
-    // LOAD EXCEL FILE (from server, fallback only)
+    // LOAD EXCEL FILE (from server)
     // ===================================================
 
     async function loadExcelFile(url, sheetName = null) {
@@ -90,7 +90,7 @@
     }
 
     // ===================================================
-    // LOAD DISTRIBUTOR STOCK - FIXED: Reads from localStorage FIRST
+    // LOAD DISTRIBUTOR STOCK - FLEXIBLE COLUMN DETECTION
     // ===================================================
 
     async function loadDistributorStockAuto() {
@@ -102,7 +102,6 @@
             try {
                 const parsedStock = JSON.parse(localStock);
                 if (parsedStock && parsedStock.length > 0) {
-                    // Normalize to standard format
                     distributorStock = parsedStock.map(item => ({
                         part: String(item.part || item['Part No'] || '').trim(),
                         distributor: String(item.distributor || item['Distributor Name'] || ''),
@@ -119,32 +118,63 @@
             }
         }
         
-        // SECOND: Fallback - try to read from Excel file on server
+        // SECOND: Fallback - try to read from Excel file on server with flexible column detection
         try {
             const rows = await loadExcelFile('data/distributor-stock.xlsx');
             distributorStock = [];
 
-            for (const row of rows) {
-
-                const part = row['Part No'] || row['part_no'] || row['Part Number'];
-
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                
+                // Get part number - try multiple column names
+                let part = row['Part No'] || row['part_no'] || row['PartNumber'] || row['Part'];
+                
                 if (!part) continue;
-
-                distributorStock.push({
-
-                    part: String(part).trim(),
-
-                    distributor: row['Distributor Name'] || '',
-
-                    stock: parseFloat(row['Available Stock'] || 0),
-
-                    price: parseFloat(row['Price'] || 0),
-
-                    leadTime: parseFloat(row['Lead Time (Days)'] || 3)
-                });
+                
+                // Get distributor name - try multiple column names
+                let distributor = row['Distributor Name'] || row['Distributor'] || row['distributor'] || 'Auto Links';
+                
+                // FLEXIBLE STOCK DETECTION - same as upload function
+                let stockQty = 0;
+                for (let key in row) {
+                    const value = Number(row[key]);
+                    if (!isNaN(value) && value > 0) {
+                        if (key.toLowerCase().includes('stock') || 
+                            key.toLowerCase().includes('qty') || 
+                            key.toLowerCase().includes('available')) {
+                            stockQty = value;
+                            console.log(`Found stock for part ${part} in column '${key}': ${stockQty}`);
+                            break;
+                        }
+                    }
+                }
+                
+                // Also try direct match if flexible detection failed
+                if (stockQty === 0) {
+                    stockQty = Number(row['Available Stock'] || row['stock'] || row['Stock'] || 0);
+                }
+                
+                // Get price - try multiple column names
+                let price = Number(row['Price'] || row['price'] || 0);
+                
+                // Get lead time - try multiple column names
+                let leadTime = Number(row['Lead Time (Days)'] || row['leadTime'] || 3);
+                
+                if (part && stockQty > 0) {
+                    distributorStock.push({
+                        part: String(part).trim(),
+                        distributor: String(distributor).trim(),
+                        stock: stockQty,
+                        price: price,
+                        leadTime: leadTime
+                    });
+                }
             }
 
-            console.log(`✅ Distributor stock loaded from Excel file: ${distributorStock.length}`);
+            console.log(`✅ Distributor stock loaded from Excel file: ${distributorStock.length} items`);
+            if (distributorStock.length > 0) {
+                console.log("Sample item:", distributorStock[0]);
+            }
 
         } catch(err) {
 
@@ -488,7 +518,7 @@
     }
 
     // ===================================================
-    // CALCULATE OFFER - FIXED: Includes distributor stock
+    // CALCULATE OFFER - Includes distributor stock
     // ===================================================
 
     function calculateOffer(
@@ -500,11 +530,10 @@
     ) {
         const myStock = currentStock.get(part)?.stock || 0;
         
-        // ===== FIX: Get distributor stock for this part =====
+        // Get distributor stock for this part
         const distItem = distributorStock.find(d => d.part === part);
         const distributorStockQty = distItem?.stock || 0;
         const totalStock = myStock + distributorStockQty;
-        // ====================================================
 
         // Only create offer if there's ANY stock (my stock OR distributor stock)
         if (myStock <= 0 && distributorStockQty <= 0) {
@@ -570,9 +599,9 @@
 
             myStock: myStock,
 
-            distributorStock: distributorStockQty,  // FIX: Now has value
+            distributorStock: distributorStockQty,
 
-            totalStock: totalStock,                  // FIX: Combined stock
+            totalStock: totalStock,
 
             discount: discount,
 
@@ -605,7 +634,7 @@
 
         await loadMyStock();
 
-        await loadDistributorStockAuto();  // FIX: Now reads from localStorage
+        await loadDistributorStockAuto();
 
         await loadRetailerOfftakeAuto();
 
@@ -699,23 +728,26 @@
     // ===================================================
 
     function saveOffersToStorage() {
+        try {
+            localStorage.setItem(
 
-        localStorage.setItem(
+                'dealerOffers',
 
-            'dealerOffers',
+                JSON.stringify({
 
-            JSON.stringify({
+                    generatedAt:
+                        new Date().toISOString(),
 
-                generatedAt:
-                    new Date().toISOString(),
+                    offerCount:
+                        activeOffers.length,
 
-                offerCount:
-                    activeOffers.length,
-
-                offers:
-                    activeOffers
-            })
-        );
+                    offers:
+                        activeOffers
+                })
+            );
+        } catch(err) {
+            console.warn("Could not save offers to localStorage (quota exceeded)", err.message);
+        }
     }
 
     // ===================================================
@@ -881,7 +913,7 @@ https://autosparessolution.com
                 areaDemand.size,
 
             offers:
-                offers.slice(0, 50)  // Send more offers for display
+                offers.slice(0, 50)
         };
     }
 
@@ -911,9 +943,9 @@ https://autosparessolution.com
 
         generateWhatsAppMessage,
 
-        refreshStock,           // NEW: Force reload distributor stock
+        refreshStock,
 
-        getDistributorStock,    // NEW: Get current distributor stock
+        getDistributorStock,
 
         CONFIG
     };
