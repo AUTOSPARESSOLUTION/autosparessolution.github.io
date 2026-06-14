@@ -3,62 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Distributor Stock List – Auto Spares</title>
+    <title>Distributor Stock Viewer – Both Sources</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { font-family: 'Roboto', sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: white; border-radius: 12px; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         h1 { color: #0a7c71; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        h2 { color: #2563eb; margin-top: 0; }
+        h3 { color: #0a7c71; margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; }
         th { background: #0a7c71; color: white; }
-        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-top: 10px; }
-        .empty { text-align: center; padding: 40px; color: #6c757d; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-left: 10px; }
+        .badge-local { background: #2563eb; color: white; }
+        .badge-github { background: #16a34a; color: white; }
+        .badge-empty { background: #dc2626; color: white; }
+        .stats { background: #e9ecef; padding: 10px; border-radius: 8px; margin: 15px 0; font-size: 14px; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 10px; margin-top: 10px; }
+        .flex { display: flex; gap: 20px; flex-wrap: wrap; }
+        .col { flex: 1; min-width: 300px; }
+        hr { margin: 20px 0; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1><i class="fas fa-truck"></i> Distributor Stock List</h1>
-    <p>Current stock from uploaded distributor Excel file.</p>
-    <div id="stockDisplay">Loading...</div>
-    <button onclick="location.reload()">Refresh</button>
-    <button onclick="window.location.href='index.html'">Back to Dashboard</button>
+    <div class="card">
+        <h1><i class="fas fa-truck"></i> Distributor Stock Viewer</h1>
+        <p>Viewing stock from TWO sources:</p>
+        <ul>
+            <li><span class="badge badge-local">LocalStorage</span> - From manual upload using the dashboard button</li>
+            <li><span class="badge badge-github">GitHub Data Folder</span> - From <code>data/distributor-stock.xlsx</code> in repository</li>
+        </ul>
+        <button onclick="loadBothSources()"><i class="fas fa-sync"></i> Refresh Both</button>
+        <button onclick="window.location.href='index.html'"><i class="fas fa-home"></i> Back to Dashboard</button>
+    </div>
+
+    <div class="flex">
+        <!-- Column 1: LocalStorage Source -->
+        <div class="col">
+            <div class="card">
+                <h2><i class="fas fa-database"></i> LocalStorage <span id="localBadge" class="badge badge-empty">Loading...</span></h2>
+                <div id="localStorageDisplay">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Column 2: GitHub Data Folder Source -->
+        <div class="col">
+            <div class="card">
+                <h2><i class="fab fa-github"></i> GitHub Data Folder <span id="githubBadge" class="badge badge-empty">Loading...</span></h2>
+                <div id="githubDisplay">Loading...</div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
-    function loadDistributorStock() {
-        const stockData = localStorage.getItem('distributorStock');
-        if (!stockData) {
-            document.getElementById('stockDisplay').innerHTML = '<div class="empty">No distributor stock data found. Please upload distributor-stock.xlsx in the Dealer Intelligence dashboard first.</div>';
-            return;
-        }
+    const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/AUTOSPARESSOLUTION/autosparessolution.github.io/main/data/distributor-stock.xlsx';
+
+    // ============================================================
+    // LOAD FROM LOCALSTORAGE
+    // ============================================================
+    function loadFromLocalStorage() {
+        const displayDiv = document.getElementById('localStorageDisplay');
+        const badge = document.getElementById('localBadge');
+        
         try {
-            const stock = JSON.parse(stockData);
-            if (stock.length === 0) {
-                document.getElementById('stockDisplay').innerHTML = '<div class="empty">Distributor stock list is empty.</div>';
+            const stockData = localStorage.getItem('distributorStock');
+            
+            if (!stockData) {
+                displayDiv.innerHTML = '<div class="empty" style="text-align:center; padding:40px;"><i class="fas fa-info-circle"></i> No distributor stock in localStorage.<br><br>Use the Upload button in Dashboard first.</div>';
+                badge.innerHTML = 'Empty';
+                badge.className = 'badge badge-empty';
                 return;
             }
-            let html = `<div style="overflow-x: auto;">
-                <table>
-                    <thead><tr><th>Part No</th><th>Distributor</th><th>Available Stock</th><th>Price (₹)</th><th>Lead Time (Days)</th></tr></thead>
-                    <tbody>`;
-            for (const item of stock) {
+            
+            const stock = JSON.parse(stockData);
+            
+            if (stock.length === 0) {
+                displayDiv.innerHTML = '<div class="empty" style="text-align:center; padding:40px;">Stock list is empty.</div>';
+                badge.innerHTML = 'Empty';
+                badge.className = 'badge badge-empty';
+                return;
+            }
+            
+            const totalUnits = stock.reduce((sum, item) => sum + (item.stock || 0), 0);
+            badge.innerHTML = stock.length + ' parts, ' + totalUnits + ' units';
+            badge.className = 'badge badge-local';
+            
+            let html = `<div class="stats"><strong>📊 Source:</strong> Manual Upload | <strong>📦 Parts:</strong> ${stock.length} | <strong>📦 Units:</strong> ${totalUnits}</div>`;
+            html += `<div style="overflow-x: auto;"><table><thead><tr><th>Part No</th><th>Distributor</th><th>Stock</th><th>Price</th><th>Lead Time</th></tr></thead><tbody>`;
+            
+            for (const item of stock.slice(0, 100)) {
                 html += `<tr>
                     <td><strong>${escapeHtml(item.part)}</strong></td>
                     <td>${escapeHtml(item.distributor)}</td>
-                    <td>${item.stock}</td>
+                    <td style="color: ${item.stock < 5 ? 'red' : item.stock < 20 ? 'orange' : 'green'}">${item.stock}</td>
                     <td>₹${(item.price || 0).toFixed(2)}</td>
                     <td>${item.leadTime || 3}</td>
                 </tr>`;
             }
+            
+            if (stock.length > 100) {
+                html += `<tr><td colspan="5" style="text-align:center;">... and ${stock.length - 100} more parts</td></tr>`;
+            }
+            
             html += `</tbody></table></div>`;
-            document.getElementById('stockDisplay').innerHTML = html;
+            displayDiv.innerHTML = html;
+            
         } catch(e) {
-            document.getElementById('stockDisplay').innerHTML = '<div class="empty">Error loading stock data.</div>';
+            console.error(e);
+            displayDiv.innerHTML = '<div class="empty" style="text-align:center; padding:40px;">Error parsing localStorage data.</div>';
+            badge.innerHTML = 'Error';
+            badge.className = 'badge badge-empty';
         }
     }
-    function escapeHtml(s) { return s ? String(s).replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;') : ''; }
-    loadDistributorStock();
+
+    // ============================================================
+    // LOAD FROM GITHUB DATA FOLDER
+    // ============================================================
+    async function loadFromGitHub() {
+        const displayDiv = document.getElementById('githubDisplay');
+        const badge = document.getElementById('githubBadge');
+        
+        displayDiv.innerHTML = '<div style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin"></i> Fetching from GitHub...</div>';
+        
+        try {
+            const response = await fetch(GITHUB_RAW_URL);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: File not found.`);
+            }
+            
+            const arrayBuffer = await response.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet);
+            
+            if (rows.length === 0) {
+                displayDiv.innerHTML = '<div class="empty" style="text-align:center; padding:40px;">Excel file is empty.</div>';
+                badge.innerHTML = 'Empty';
+                badge.className = 'badge badge-empty';
+                return;
+            }
+            
+            // Parse stock data
+            const stock = [];
+            let totalUnits = 0;
+            
+            for (const row of rows) {
+                const part = row['Part No'] || row['part_no'] || row['PartNumber'] || row['Part'];
+                const stockQty = Number(row['Available Stock'] || row['stock'] || row['Stock'] || 0);
+                const distributor = row['Distributor Name'] || row['Distributor'] || 'Auto Links';
+                
+                if (part && stockQty > 0) {
+                    stock.push({
+                        part: String(part).trim(),
+                        distributor: String(distributor).trim(),
+                        stock: stockQty,
+                        price: Number(row['Price'] || row['price'] || 0),
+                        leadTime: Number(row['Lead Time (Days)'] || 3)
+                    });
+                    totalUnits += stockQty;
+                }
+            }
+            
+            badge.innerHTML = stock.length + ' parts, ' + totalUnits + ' units';
+            badge.className = 'badge badge-github';
+            
+            let html = `<div class="stats"><strong>📊 Source:</strong> data/distributor-stock.xlsx | <strong>📦 Parts:</strong> ${stock.length} | <strong>📦 Units:</strong> ${totalUnits}</div>`;
+            html += `<div style="overflow-x: auto;"><table><thead><tr><th>Part No</th><th>Distributor</th><th>Stock</th><th>Price</th><th>Lead Time</th></tr></thead><tbody>`;
+            
+            for (const item of stock.slice(0, 100)) {
+                html += `<tr>
+                    <td><strong>${escapeHtml(item.part)}</strong></td>
+                    <td>${escapeHtml(item.distributor)}</td>
+                    <td style="color: ${item.stock < 5 ? 'red' : item.stock < 20 ? 'orange' : 'green'}">${item.stock}</td>
+                    <td>₹${(item.price || 0).toFixed(2)}</td>
+                    <td>${item.leadTime}</td>
+                </tr>`;
+            }
+            
+            if (stock.length > 100) {
+                html += `<tr><td colspan="5" style="text-align:center;">... and ${stock.length - 100} more parts</td></tr>`;
+            }
+            
+            html += `</tbody></table></div>`;
+            displayDiv.innerHTML = html;
+            
+        } catch (error) {
+            console.error("Error loading from GitHub:", error);
+            displayDiv.innerHTML = `<div class="empty" style="text-align:center; padding:40px;">
+                <i class="fas fa-exclamation-triangle"></i> Error loading file<br><br>
+                <strong>${error.message}</strong><br><br>
+                Make sure:<br>
+                1. File exists at: <code>data/distributor-stock.xlsx</code><br>
+                2. File is committed and pushed to GitHub
+            </div>`;
+            badge.innerHTML = 'Not Found';
+            badge.className = 'badge badge-empty';
+        }
+    }
+
+    // ============================================================
+    // LOAD BOTH SOURCES
+    // ============================================================
+    function loadBothSources() {
+        loadFromLocalStorage();
+        loadFromGitHub();
+    }
+
+    function escapeHtml(s) { 
+        if (!s) return '';
+        return String(s).replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // Load both on page load
+    loadBothSources();
 </script>
 </body>
-</html>
+    </html>
