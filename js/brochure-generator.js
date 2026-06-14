@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FINAL STABLE + PDF AUTO FIT)");
+console.log("🚀 Brochure System Loaded (FINAL STABLE + PDF AUTO FIT + DISTRIBUTOR STOCK)");
 
 // =========================
 // DATA
@@ -8,6 +8,7 @@ console.log("🚀 Brochure System Loaded (FINAL STABLE + PDF AUTO FIT)");
 let dealerMaster = [];
 let currentOffers = [];
 let dealerOfferMap = {};
+let distributorStock = [];  // NEW: Store distributor stock
 
 // =========================
 // XLSX CHECK
@@ -43,6 +44,62 @@ async function loadExcelFile(url, sheetName = null) {
 }
 
 // =========================
+// LOAD DISTRIBUTOR STOCK (NEW)
+// =========================
+async function loadDistributorStock() {
+    try {
+        // First check localStorage (from manual upload)
+        const localStock = localStorage.getItem('distributorStock');
+        if (localStock) {
+            const parsed = JSON.parse(localStock);
+            if (parsed && parsed.length > 0) {
+                distributorStock = parsed;
+                console.log(`✅ Distributor stock loaded from localStorage: ${distributorStock.length} items`);
+                return distributorStock;
+            }
+        }
+        
+        // Fallback to data folder
+        const rows = await loadExcelFile("./data/distributor-stock.xlsx");
+        
+        distributorStock = rows.map(row => {
+            let stockQty = 0;
+            // Flexible stock detection
+            for (let key in row) {
+                const value = Number(row[key]);
+                if (!isNaN(value) && value > 0) {
+                    if (key.toLowerCase().includes('stock') || 
+                        key.toLowerCase().includes('qty') || 
+                        key.toLowerCase().includes('available')) {
+                        stockQty = value;
+                        break;
+                    }
+                }
+            }
+            // If flexible detection failed, try direct match
+            if (stockQty === 0) {
+                stockQty = Number(row['Available Stock'] || row['stock'] || 0);
+            }
+            
+            return {
+                part: String(row['Part No'] || row['part_no'] || row['PartNumber'] || '').trim(),
+                distributor: row['Distributor Name'] || 'Auto Links',
+                stock: stockQty,
+                price: Number(row['Price'] || row['price'] || 0),
+                leadTime: Number(row['Lead Time (Days)'] || 3)
+            };
+        }).filter(item => item.part && item.stock > 0);
+        
+        console.log(`✅ Distributor stock loaded from data folder: ${distributorStock.length} items`);
+        
+    } catch (err) {
+        console.warn("Could not load distributor stock:", err);
+        distributorStock = [];
+    }
+    return distributorStock;
+}
+
+// =========================
 // NORMALIZE
 // =========================
 function normalizeText(t) {
@@ -68,9 +125,21 @@ function cleanPhone(p) {
 }
 
 // =========================
-// PRICE ENGINE
+// GET DISTRIBUTOR INFO FOR PART (NEW)
+// =========================
+function getDistributorInfo(part) {
+    return distributorStock.find(d => d.part === part) || null;
+}
+
+// =========================
+// PRICE ENGINE (UPDATED to prioritize distributor price)
 // =========================
 function getMRP(o) {
+    // If distributor has stock and price, use distributor price as base
+    const distInfo = getDistributorInfo(o.part);
+    if (distInfo && distInfo.stock > 0 && distInfo.price > 0) {
+        return distInfo.price;
+    }
     return Number(o.originalPrice || o.mrp || o.MRP || 0);
 }
 
@@ -84,6 +153,23 @@ function getDiscount(o) {
 
 function getNet(basic, dis) {
     return (basic - (basic * dis / 100)) * 1.18;
+}
+
+// =========================
+// GET DISPLAY STOCK (NEW)
+// =========================
+function getDisplayStock(offer) {
+    const myStock = offer.myStock || offer.totalStock || 0;
+    const distInfo = getDistributorInfo(offer.part);
+    const distributorStockQty = distInfo?.stock || offer.distributorStock || 0;
+    
+    return {
+        myStock: myStock,
+        distributorStock: distributorStockQty,
+        totalStock: myStock + distributorStockQty,
+        hasDistributor: distributorStockQty > 0,
+        distPrice: distInfo?.price || 0
+    };
 }
 
 // =========================
@@ -168,7 +254,7 @@ function findDealer(name) {
 }
 
 // =========================
-// HTML BROCHURE (FIXED HEADERS)
+// HTML BROCHURE (UPDATED with distributor stock)
 // =========================
 function generateFullBrochureHTML(name) {
 
@@ -192,7 +278,9 @@ function generateFullBrochureHTML(name) {
         <th>Basic Price (Less 31.77%)</th>
         <th>Spl Dis</th>
         <th>Net Price Including GST</th>
-        <th>Stock</th>
+        <th>Our Stock</th>
+        <th>Dist. Stock</th>
+        <th>Total Stock</th>
     </tr>`;
 
     offers.forEach(o => {
@@ -201,19 +289,28 @@ function generateFullBrochureHTML(name) {
         const basic = getBasic(mrp);
         const dis = getDiscount(o);
         const net = getNet(basic, dis);
+        const stockInfo = getDisplayStock(o);
 
         html += `
         <tr>
             <td>${o.part || ""}</td>
-            <td>₹${mrp.toFixed(2)}</td>
+            <td>₹${mrp.toFixed(2)}${stockInfo.distPrice > 0 ? '<br><small>(Dist.Price)</small>' : ''}</td>
             <td>₹${basic.toFixed(2)}</td>
             <td>${dis}%</td>
             <td style="color:green;font-weight:bold;">₹${net.toFixed(2)}</td>
-            <td>${o.totalStock || 0}</td>
+            <td>${stockInfo.myStock}</td>
+            <td style="color:#16a34a;font-weight:bold;">${stockInfo.distributorStock || '-'}</td>
+            <td style="font-weight:bold;">${stockInfo.totalStock}</td>
         </tr>`;
     });
 
-    html += `</table></div>`;
+    html += `</table>`;
+
+    if (offers.some(o => getDisplayStock(o).hasDistributor)) {
+        html += `<p style="margin-top:15px;font-size:12px;color:#16a34a;">* Distributor stock available at special pricing</p>`;
+    }
+
+    html += `</div>`;
 
     return html;
 }
@@ -229,14 +326,22 @@ function showBrochurePreview(name) {
 }
 
 // =========================
-// WHATSAPP
+// WHATSAPP (UPDATED with distributor stock details)
 // =========================
 function sendFlyerToWhatsApp(name) {
 
     const dealer = findDealer(name);
     const offers = getAllDealerOffers(name);
 
-    let msg = `Dear ${name}\n\n🎁 Offers\n\n`;
+    if (offers.length === 0) {
+        alert("No offers found for " + name);
+        return;
+    }
+
+    let msg = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
+    msg += `*Dear ${name},*\n\n`;
+    msg += `*📋 SPECIAL OFFER LIST*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     let i = 0;
 
@@ -248,27 +353,47 @@ function sendFlyerToWhatsApp(name) {
         const basic = getBasic(mrp);
         const dis = getDiscount(o);
         const net = getNet(basic, dis);
+        const stockInfo = getDisplayStock(o);
 
-        msg += `${++i}) ${o.part}\n₹${net.toFixed(2)}\n\n`;
+        msg += `🔹 *${o.part}*\n`;
+        msg += `   💰 Offer Price: ₹${net.toFixed(2)}\n`;
+        
+        if (stockInfo.distPrice > 0) {
+            msg += `   🏭 Distributor Price: ₹${stockInfo.distPrice.toFixed(2)}\n`;
+        }
+        
+        if (dis > 0) {
+            msg += `   ✨ ${dis}% OFF\n`;
+        }
+        
+        msg += `   📦 Our Stock: ${stockInfo.myStock} units\n`;
+        
+        if (stockInfo.hasDistributor) {
+            msg += `   🏭 Dist. Stock: ${stockInfo.distributorStock} units\n`;
+        }
+        
+        msg += `   📊 Total Stock: ${stockInfo.totalStock} units\n\n`;
     }
 
-    msg += `District: ${dealer?.district || "N/A"}`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📍 District: ${dealer?.district || "N/A"}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `_Reply with part numbers and quantity_\n`;
+    msg += `*Thank you for your business!*`;
 
     const phone = dealer?.phone || "";
 
     if (!phone) {
-        alert("Phone not found");
+        alert("Phone number not found for " + name);
         return;
     }
 
-    const url =
-        `whatsapp://send?phone=${phone}&text=${encodeURIComponent(msg)}`;
-
-    window.location.href = url;
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
 }
 
 // =========================
-// EXCEL EXPORT
+// EXCEL EXPORT (UPDATED)
 // =========================
 function exportDealerOffersToExcel(name) {
 
@@ -285,6 +410,7 @@ function exportDealerOffersToExcel(name) {
         const basic = getBasic(mrp);
         const dis = getDiscount(o);
         const net = getNet(basic, dis);
+        const stockInfo = getDisplayStock(o);
 
         return {
             Part: o.part,
@@ -292,7 +418,10 @@ function exportDealerOffersToExcel(name) {
             "Basic Price (Less 31.77%)": basic,
             "Spl Dis": dis,
             "Net Price Including GST": net,
-            Stock: o.totalStock || 0
+            "Our Stock": stockInfo.myStock,
+            "Dist. Stock": stockInfo.distributorStock,
+            "Total Stock": stockInfo.totalStock,
+            "Dist. Price": stockInfo.distPrice
         };
     });
 
@@ -380,12 +509,20 @@ async function getDealersWithOffers() {
 }
 
 // =========================
-// INIT
+// GET DISTRIBUTOR STOCK (NEW)
+// =========================
+function getDistributorStock() {
+    return distributorStock;
+}
+
+// =========================
+// INIT (UPDATED to load distributor stock)
 // =========================
 async function init() {
     await loadDealerMaster();
+    await loadDistributorStock();  // NEW: Load distributor stock
     loadOffers();
-    console.log("🚀 SYSTEM READY");
+    console.log("🚀 SYSTEM READY - Distributor stock:", distributorStock.length);
 }
 
 // =========================
@@ -396,6 +533,7 @@ window.BrochureGenerator = {
     init,
     loadDealerMaster,
     loadOffers,
+    loadDistributorStock,        // NEW
 
     getAllDealerOffers,
     getDealersWithOffers,
@@ -407,7 +545,13 @@ window.BrochureGenerator = {
     sendFlyerToWhatsApp,
     exportDealerOffersToExcel,
 
-    sharePDFToWhatsApp
+    sharePDFToWhatsApp,
+    
+    getDistributorStock,         // NEW
+    getDistributorInfo           // NEW
 };
+
+// Auto-init
+init();
 
 })();
