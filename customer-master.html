@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Master – Auto Spares</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -69,6 +70,10 @@
         .btn-danger:hover { background: #c82333; }
         .btn-warning { background: #ffc107; color: #333; }
         .btn-warning:hover { background: #e0a800; }
+        .btn-info { background: #17a2b8; }
+        .btn-info:hover { background: #138496; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
         .search-box {
             margin-bottom: 20px;
             display: flex;
@@ -76,10 +81,27 @@
             flex-wrap: wrap;
             align-items: center;
         }
+        .bulk-section {
+            background: #e8f4f8;
+            border: 2px dashed #0a7c71;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .bulk-section h3 { margin-top: 0; color: #0a7c71; }
+        .template-link {
+            display: inline-block;
+            margin: 10px 0;
+            color: #0a7c71;
+            cursor: pointer;
+            text-decoration: underline;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            overflow-x: auto;
+            display: block;
         }
         th, td {
             border: 1px solid #dee2e6;
@@ -97,6 +119,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         .nav-bar a {
             background: #6c757d;
@@ -105,6 +129,17 @@
             border-radius: 6px;
             text-decoration: none;
         }
+        .file-input-label {
+            background: #0a7c71;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .file-input-label:hover { background: #09645a; }
+        #bulkExcelFile { display: none; }
         @media (max-width: 768px) {
             .form-row { flex-direction: column; }
             table { font-size: 12px; }
@@ -115,7 +150,23 @@
 <div class="container">
     <div class="nav-bar">
         <h1><i class="fas fa-users"></i> Customer Master</h1>
-        <a href="index.html"><i class="fas fa-home"></i> Home</a>
+        <div>
+            <a href="index.html"><i class="fas fa-home"></i> Home</a>
+            <a href="distributor-stock-viewer.html" style="margin-left: 10px;"><i class="fas fa-warehouse"></i> Stock</a>
+        </div>
+    </div>
+
+    <!-- Bulk Upload Section -->
+    <div class="bulk-section">
+        <h3><i class="fas fa-upload"></i> Bulk Customer Upload</h3>
+        <p>Upload Excel file with columns: <strong>Name, Email, Mobile No, District, Address, PIN Code, GSTIN, State, Business Name, Credit Limit</strong></p>
+        <label class="file-input-label" for="bulkExcelFile">
+            <i class="fas fa-file-excel"></i> Select Excel File
+        </label>
+        <input type="file" id="bulkExcelFile" accept=".xlsx,.xls,.csv">
+        <button class="btn-success" onclick="uploadBulkCustomers()"><i class="fas fa-cloud-upload-alt"></i> Upload & Add Customers</button>
+        <button class="btn-info" onclick="downloadTemplate()"><i class="fas fa-download"></i> Download Template</button>
+        <div id="bulkStatus" style="margin-top: 10px; font-size: 14px; color: #666;"></div>
     </div>
 
     <!-- Add/Edit Customer Form -->
@@ -131,11 +182,15 @@
                 <input type="email" id="custEmail" placeholder="customer@example.com">
             </div>
             <div class="form-group">
-                <label>Phone *</label>
-                <input type="text" id="custPhone" placeholder="Phone number">
+                <label>Mobile No *</label>
+                <input type="text" id="custMobile" placeholder="Mobile number (10 digits)">
             </div>
         </div>
         <div class="form-row">
+            <div class="form-group">
+                <label>District</label>
+                <input type="text" id="custDistrict" placeholder="District">
+            </div>
             <div class="form-group">
                 <label>Address</label>
                 <textarea id="custAddress" rows="2" placeholder="Full address"></textarea>
@@ -144,26 +199,26 @@
                 <label>PIN Code</label>
                 <input type="text" id="custPincode" placeholder="PIN code">
             </div>
+        </div>
+        <div class="form-row">
             <div class="form-group">
                 <label>GSTIN</label>
                 <input type="text" id="custGstin" placeholder="GSTIN (optional)">
             </div>
-        </div>
-        <div class="form-row">
             <div class="form-group">
                 <label>State</label>
                 <input type="text" id="custState" placeholder="State">
             </div>
             <div class="form-group">
-                <label>Credit Limit (₹)</label>
-                <input type="number" id="custCreditLimit" step="1000" value="50000">
-            </div>
-            <div class="form-group">
                 <label>Business Name</label>
-                <input type="text" id="custBusiness" placeholder="Business name (optional)">
+                <input type="text" id="custBusiness" placeholder="Business name">
             </div>
         </div>
         <div class="form-row">
+            <div class="form-group">
+                <label>Credit Limit (₹)</label>
+                <input type="number" id="custCreditLimit" step="1000" value="50000">
+            </div>
             <div class="form-group">
                 <label>Status</label>
                 <select id="custStatus">
@@ -172,7 +227,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>Customer Code (Auto-generated)</label>
+                <label>Customer Code (Auto)</label>
                 <input type="text" id="custCode" readonly style="background:#e9ecef;">
             </div>
         </div>
@@ -185,7 +240,7 @@
 
     <!-- Search Box -->
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by Name, Email, Phone, GSTIN, Code...">
+        <input type="text" id="searchInput" placeholder="Search by Name, Email, Mobile, Code, District...">
         <button onclick="searchCustomers()"><i class="fas fa-search"></i> Search</button>
         <button onclick="loadCustomers()"><i class="fas fa-sync-alt"></i> Refresh</button>
         <button onclick="exportToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
@@ -198,12 +253,20 @@
     let customers = [];
     let editId = null;
 
+    // ============================================================
+    // LOAD CUSTOMERS
+    // ============================================================
     function loadCustomers() {
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
         customers.forEach(c => {
             if (!c.customerCode) c.customerCode = generateCustomerCode();
             if (c.outstanding === undefined) c.outstanding = 0;
             if (c.totalPurchased === undefined) c.totalPurchased = 0;
+            // Convert old phone field to mobileNo
+            if (c.phone && !c.mobileNo) {
+                c.mobileNo = c.phone;
+                delete c.phone;
+            }
         });
         localStorage.setItem('customers', JSON.stringify(customers));
         displayCustomers();
@@ -218,6 +281,9 @@
         return 'CUST' + (maxNum + 1).toString().padStart(4, '0');
     }
 
+    // ============================================================
+    // DISPLAY CUSTOMERS
+    // ============================================================
     function displayCustomers() {
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         let filtered = customers;
@@ -225,16 +291,21 @@
             filtered = customers.filter(c => 
                 (c.name && c.name.toLowerCase().includes(searchTerm)) ||
                 (c.email && c.email.toLowerCase().includes(searchTerm)) ||
-                (c.phone && c.phone.includes(searchTerm)) ||
+                (c.mobileNo && c.mobileNo.includes(searchTerm)) ||
                 (c.gstin && c.gstin.toLowerCase().includes(searchTerm)) ||
-                (c.customerCode && c.customerCode.toLowerCase().includes(searchTerm))
+                (c.customerCode && c.customerCode.toLowerCase().includes(searchTerm)) ||
+                (c.district && c.district.toLowerCase().includes(searchTerm))
             );
         }
         if (filtered.length === 0) {
             document.getElementById('customersTable').innerHTML = '<p>No customers found.</p>';
             return;
         }
-        let html = '<table><thead><tr><th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>GSTIN</th><th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<div style="overflow-x: auto;"><table><thead><tr>' +
+            '<th>Code</th><th>Name</th><th>Email</th><th>Mobile No</th><th>District</th>' +
+            '<th>GSTIN</th><th>Credit Limit</th><th>Outstanding</th><th>Status</th><th>Actions</th>' +
+            '</tr></thead><tbody>';
+        
         filtered.forEach(c => {
             const outstanding = c.outstanding || 0;
             const creditLimit = c.creditLimit || 50000;
@@ -243,39 +314,52 @@
                 <td>${escapeHtml(c.customerCode)}</td>
                 <td><strong>${escapeHtml(c.name)}</strong></td>
                 <td>${escapeHtml(c.email)}</td>
-                <td>${escapeHtml(c.phone)}</td>
+                <td>${escapeHtml(c.mobileNo || c.phone || '-')}</td>
+                <td>${escapeHtml(c.district || '-')}</td>
                 <td>${escapeHtml(c.gstin || '-')}</td>
                 <td>₹${creditLimit.toLocaleString()}</td>
                 <td style="color:${outstanding>0?'#dc3545':'#28a745'}">₹${outstanding.toLocaleString()}</td>
                 <td class="${c.status === 'active' ? 'status-active' : 'status-inactive'}">${c.status || 'active'}</td>
                 <td class="action-buttons">
-                    <button onclick="window.open('edit-customer-master.html?code=' + encodeURIComponent('${c.customerCode}'), '_blank')" style="background:#17a2b8;"><i class="fas fa-edit"></i> Edit</button>
+                    <button onclick="editCustomer(${c.id})" style="background:#17a2b8;"><i class="fas fa-edit"></i> Edit</button>
                     <button onclick="viewLedger('${c.email}')" style="background:#e67e22;"><i class="fas fa-book"></i> Ledger</button>
-                    <button onclick="deleteCustomer('${c.id}')" class="btn-danger"><i class="fas fa-trash"></i> Delete</button>
+                    <button onclick="deleteCustomer(${c.id})" class="btn-danger"><i class="fas fa-trash"></i> Delete</button>
                 </td>
             </tr>`;
         });
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         document.getElementById('customersTable').innerHTML = html;
     }
 
+    // ============================================================
+    // SAVE SINGLE CUSTOMER
+    // ============================================================
     function saveCustomer() {
         const name = document.getElementById('custName').value.trim();
         const email = document.getElementById('custEmail').value.trim();
-        const phone = document.getElementById('custPhone').value.trim();
-        if (!name || !email || !phone) {
-            alert('Please fill Name, Email, and Phone');
+        const mobileNo = document.getElementById('custMobile').value.trim();
+        
+        if (!name || !email || !mobileNo) {
+            alert('Please fill Name, Email, and Mobile No');
             return;
         }
+        
+        if (mobileNo.length < 10) {
+            alert('Please enter a valid 10-digit mobile number');
+            return;
+        }
+        
         if (editId === null && customers.some(c => c.email === email)) {
             alert('Customer with this email already exists!');
             return;
         }
+        
         const customerData = {
             id: editId || Date.now(),
             name: name,
             email: email,
-            phone: phone,
+            mobileNo: mobileNo,
+            district: document.getElementById('custDistrict').value,
             address: document.getElementById('custAddress').value,
             pincode: document.getElementById('custPincode').value,
             gstin: document.getElementById('custGstin').value,
@@ -286,6 +370,7 @@
             customerCode: document.getElementById('custCode').value || generateCustomerCode(),
             updatedAt: new Date().toISOString()
         };
+        
         if (editId === null) {
             customerData.createdAt = new Date().toISOString();
             customerData.outstanding = 0;
@@ -301,6 +386,7 @@
             const index = customers.findIndex(c => c.id == editId);
             customers[index] = customerData;
         }
+        
         localStorage.setItem('customers', JSON.stringify(customers));
         syncToUsers(customerData);
         alert('Customer saved successfully!');
@@ -308,6 +394,125 @@
         loadCustomers();
     }
 
+    // ============================================================
+    // BULK UPLOAD CUSTOMERS
+    // ============================================================
+    async function uploadBulkCustomers() {
+        const fileInput = document.getElementById('bulkExcelFile');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            alert('Please select an Excel file first');
+            return;
+        }
+        
+        const statusDiv = document.getElementById('bulkStatus');
+        statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet);
+            
+            let added = 0;
+            let skipped = 0;
+            let errors = [];
+            
+            for (const row of rows) {
+                const name = row['Name'] || row['name'] || row['Customer Name'];
+                const email = row['Email'] || row['email'];
+                const mobileNo = row['Mobile No'] || row['mobileNo'] || row['Mobile'] || row['phone'];
+                const district = row['District'] || row['district'] || '';
+                const address = row['Address'] || row['address'] || '';
+                const pincode = row['PIN Code'] || row['pincode'] || '';
+                const gstin = row['GSTIN'] || row['gstin'] || '';
+                const state = row['State'] || row['state'] || '';
+                const business = row['Business Name'] || row['business'] || '';
+                const creditLimit = parseFloat(row['Credit Limit'] || row['creditLimit'] || 50000);
+                const status = row['Status'] === 'inactive' ? 'inactive' : 'active';
+                
+                if (!name || !email || !mobileNo) {
+                    skipped++;
+                    errors.push(`Missing required fields: ${JSON.stringify(row)}`);
+                    continue;
+                }
+                
+                if (mobileNo && mobileNo.toString().length < 10) {
+                    skipped++;
+                    errors.push(`Invalid mobile number for ${name}: ${mobileNo}`);
+                    continue;
+                }
+                
+                // Check if customer already exists
+                const existing = customers.find(c => c.email === email);
+                if (existing) {
+                    skipped++;
+                    continue;
+                }
+                
+                const newCustomer = {
+                    id: Date.now() + added,
+                    name: name,
+                    email: email,
+                    mobileNo: mobileNo.toString(),
+                    district: district,
+                    address: address,
+                    pincode: pincode,
+                    gstin: gstin,
+                    state: state,
+                    business: business,
+                    creditLimit: creditLimit,
+                    status: status,
+                    customerCode: generateCustomerCode(),
+                    outstanding: 0,
+                    totalPurchased: 0,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                
+                customers.push(newCustomer);
+                syncToUsers(newCustomer);
+                added++;
+            }
+            
+            localStorage.setItem('customers', JSON.stringify(customers));
+            loadCustomers();
+            
+            statusDiv.innerHTML = `<i class="fas fa-check-circle"></i> Bulk upload complete! Added: ${added}, Skipped: ${skipped}`;
+            if (errors.length > 0 && errors.length < 5) {
+                statusDiv.innerHTML += `<br>Errors: ${errors.join('; ')}`;
+            }
+            fileInput.value = '';
+            alert(`Added ${added} new customers. ${skipped} skipped (duplicates or invalid).`);
+            
+        } catch(err) {
+            console.error(err);
+            statusDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Error: ${err.message}`;
+            alert('Error processing file: ' + err.message);
+        }
+    }
+
+    // ============================================================
+    // DOWNLOAD TEMPLATE
+    // ============================================================
+    function downloadTemplate() {
+        const templateData = [
+            ['Name', 'Email', 'Mobile No', 'District', 'Address', 'PIN Code', 'GSTIN', 'State', 'Business Name', 'Credit Limit', 'Status'],
+            ['ABC Motors', 'abc@example.com', '9876543210', 'Mumbai City', '123 Main Street', '400001', '27ABCDE1234F1Z', 'Maharashtra', 'ABC Motors Pvt Ltd', '50000', 'active'],
+            ['XYZ Spares', 'xyz@example.com', '9876543211', 'Thane', '456 Park Road', '400601', '', 'Maharashtra', 'XYZ Auto Spares', '75000', 'active']
+        ];
+        
+        const ws = XLSX.utils.aoa_to_sheet(templateData);
+        ws['!cols'] = [{wch:20},{wch:25},{wch:15},{wch:15},{wch:30},{wch:12},{wch:18},{wch:15},{wch:25},{wch:12},{wch:10}];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Customer Template');
+        XLSX.writeFile(wb, 'customer_master_template.xlsx');
+    }
+
+    // ============================================================
+    // SYNC TO USERS
+    // ============================================================
     function syncToUsers(customer) {
         let users = JSON.parse(localStorage.getItem('users') || '[]');
         const idx = users.findIndex(u => u.email === customer.email);
@@ -315,19 +520,41 @@
             name: customer.name,
             email: customer.email,
             password: customer.email.split('@')[0] + '123',
-            phone: customer.phone,
+            phone: customer.mobileNo,
+            mobile: customer.mobileNo,
             business: customer.business,
             gstin: customer.gstin,
             address: customer.address,
             pincode: customer.pincode,
             state: customer.state,
+            district: customer.district,
             role: 'customer'
         };
         if (idx !== -1) users[idx] = { ...users[idx], ...userData };
         else users.push(userData);
         localStorage.setItem('users', JSON.stringify(users));
+        
+        // Also update dealers for compatibility
+        let dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
+        const dealerIdx = dealers.findIndex(d => d.email === customer.email);
+        const dealerData = {
+            name: customer.name,
+            business: customer.business,
+            email: customer.email,
+            phone: customer.mobileNo,
+            mobile: customer.mobileNo,
+            district: customer.district,
+            address: customer.address,
+            status: customer.status
+        };
+        if (dealerIdx !== -1) dealers[dealerIdx] = { ...dealers[dealerIdx], ...dealerData };
+        else dealers.push(dealerData);
+        localStorage.setItem('dealers', JSON.stringify(dealers));
     }
 
+    // ============================================================
+    // EDIT, DELETE, LEDGER FUNCTIONS
+    // ============================================================
     function editCustomer(id) {
         const c = customers.find(c => c.id == id);
         if (!c) return;
@@ -335,13 +562,14 @@
         document.getElementById('formTitle').innerHTML = '<i class="fas fa-user-edit"></i> Edit Customer';
         document.getElementById('custName').value = c.name;
         document.getElementById('custEmail').value = c.email;
-        document.getElementById('custPhone').value = c.phone;
+        document.getElementById('custMobile').value = c.mobileNo || c.phone || '';
+        document.getElementById('custDistrict').value = c.district || '';
         document.getElementById('custAddress').value = c.address || '';
         document.getElementById('custPincode').value = c.pincode || '';
         document.getElementById('custGstin').value = c.gstin || '';
         document.getElementById('custState').value = c.state || '';
-        document.getElementById('custCreditLimit').value = c.creditLimit || 50000;
         document.getElementById('custBusiness').value = c.business || '';
+        document.getElementById('custCreditLimit').value = c.creditLimit || 50000;
         document.getElementById('custStatus').value = c.status || 'active';
         document.getElementById('custCode').value = c.customerCode || '';
         document.getElementById('cancelEditBtn').style.display = 'inline-block';
@@ -355,13 +583,14 @@
         document.getElementById('formTitle').innerHTML = '<i class="fas fa-user-plus"></i> Add New Customer';
         document.getElementById('custName').value = '';
         document.getElementById('custEmail').value = '';
-        document.getElementById('custPhone').value = '';
+        document.getElementById('custMobile').value = '';
+        document.getElementById('custDistrict').value = '';
         document.getElementById('custAddress').value = '';
         document.getElementById('custPincode').value = '';
         document.getElementById('custGstin').value = '';
         document.getElementById('custState').value = '';
-        document.getElementById('custCreditLimit').value = '50000';
         document.getElementById('custBusiness').value = '';
+        document.getElementById('custCreditLimit').value = '50000';
         document.getElementById('custStatus').value = 'active';
         document.getElementById('custCode').value = '';
         document.getElementById('cancelEditBtn').style.display = 'none';
@@ -382,9 +611,9 @@
     function searchCustomers() { displayCustomers(); }
 
     function exportToCSV() {
-        let csv = "Customer Code,Name,Email,Phone,Address,PIN,GSTIN,State,Business,Credit Limit,Outstanding,Status\n";
+        let csv = "Customer Code,Name,Email,Mobile No,District,Address,PIN Code,GSTIN,State,Business Name,Credit Limit,Outstanding,Status\n";
         customers.forEach(c => {
-            csv += `"${c.customerCode}","${c.name}","${c.email}","${c.phone}","${c.address || ''}","${c.pincode || ''}","${c.gstin || ''}","${c.state || ''}","${c.business || ''}",${c.creditLimit || 0},${c.outstanding || 0},${c.status}\n`;
+            csv += `"${c.customerCode}","${c.name}","${c.email}","${c.mobileNo || ''}","${c.district || ''}","${c.address || ''}","${c.pincode || ''}","${c.gstin || ''}","${c.state || ''}","${c.business || ''}",${c.creditLimit || 0},${c.outstanding || 0},${c.status}\n`;
         });
         const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
@@ -400,7 +629,8 @@
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
     }
 
+    // Initialize
     loadCustomers();
 </script>
 </body>
-</html>
+                </html>
