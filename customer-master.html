@@ -140,6 +140,11 @@
         }
         .file-input-label:hover { background: #09645a; }
         #bulkExcelFile { display: none; }
+        .phone-hint {
+            font-size: 11px;
+            color: #6c757d;
+            margin-top: 3px;
+        }
         @media (max-width: 768px) {
             .form-row { flex-direction: column; }
             table { font-size: 12px; }
@@ -159,7 +164,7 @@
     <!-- Bulk Upload Section -->
     <div class="bulk-section">
         <h3><i class="fas fa-upload"></i> Bulk Customer Upload</h3>
-        <p>Upload Excel file with columns: <strong>Name, Email, Mobile No, District, Address, PIN Code, GSTIN, State, Business Name, Credit Limit</strong></p>
+        <p>Upload Excel file with columns: <strong>Name, Email, Phone, Mobile No, District, Address, PIN Code, GSTIN, State, Business Name, Credit Limit</strong></p>
         <label class="file-input-label" for="bulkExcelFile">
             <i class="fas fa-file-excel"></i> Select Excel File
         </label>
@@ -182,14 +187,16 @@
                 <input type="email" id="custEmail" placeholder="customer@example.com">
             </div>
             <div class="form-group">
-                <label>Mobile No *</label>
+                <label>Mobile No / Phone *</label>
                 <input type="text" id="custMobile" placeholder="Mobile number (10 digits)">
+                <div class="phone-hint">⚠️ This number will be used for WhatsApp offers</div>
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
                 <label>District</label>
                 <input type="text" id="custDistrict" placeholder="District">
+                <div class="phone-hint">📍 Used for location-based offers</div>
             </div>
             <div class="form-group">
                 <label>Address</label>
@@ -244,6 +251,7 @@
         <button onclick="searchCustomers()"><i class="fas fa-search"></i> Search</button>
         <button onclick="loadCustomers()"><i class="fas fa-sync-alt"></i> Refresh</button>
         <button onclick="exportToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <button onclick="fixMissingPhones()" style="background:#17a2b8;"><i class="fas fa-mobile-alt"></i> Fix Missing Phones</button>
     </div>
 
     <div id="customersTable"></div>
@@ -262,10 +270,13 @@
             if (!c.customerCode) c.customerCode = generateCustomerCode();
             if (c.outstanding === undefined) c.outstanding = 0;
             if (c.totalPurchased === undefined) c.totalPurchased = 0;
-            // Convert old phone field to mobileNo
+            
+            // IMPORTANT: Ensure BOTH phone and mobileNo fields exist for compatibility
+            if (c.mobileNo && !c.phone) {
+                c.phone = c.mobileNo;
+            }
             if (c.phone && !c.mobileNo) {
                 c.mobileNo = c.phone;
-                delete c.phone;
             }
         });
         localStorage.setItem('customers', JSON.stringify(customers));
@@ -282,6 +293,31 @@
     }
 
     // ============================================================
+    // FIX MISSING PHONES - Scan and update
+    // ============================================================
+    function fixMissingPhones() {
+        let fixed = 0;
+        customers.forEach(c => {
+            // Ensure both fields exist
+            if (c.mobileNo && !c.phone) {
+                c.phone = c.mobileNo;
+                fixed++;
+            }
+            if (c.phone && !c.mobileNo) {
+                c.mobileNo = c.phone;
+                fixed++;
+            }
+        });
+        if (fixed > 0) {
+            localStorage.setItem('customers', JSON.stringify(customers));
+            loadCustomers();
+            alert(`✅ Fixed ${fixed} customers with missing phone fields`);
+        } else {
+            alert('All customers already have both phone and mobileNo fields');
+        }
+    }
+
+    // ============================================================
     // DISPLAY CUSTOMERS
     // ============================================================
     function displayCustomers() {
@@ -291,7 +327,7 @@
             filtered = customers.filter(c => 
                 (c.name && c.name.toLowerCase().includes(searchTerm)) ||
                 (c.email && c.email.toLowerCase().includes(searchTerm)) ||
-                (c.mobileNo && c.mobileNo.includes(searchTerm)) ||
+                ((c.mobileNo || c.phone) && (c.mobileNo || c.phone).includes(searchTerm)) ||
                 (c.gstin && c.gstin.toLowerCase().includes(searchTerm)) ||
                 (c.customerCode && c.customerCode.toLowerCase().includes(searchTerm)) ||
                 (c.district && c.district.toLowerCase().includes(searchTerm))
@@ -310,11 +346,14 @@
             const outstanding = c.outstanding || 0;
             const creditLimit = c.creditLimit || 50000;
             const isOverLimit = outstanding > creditLimit;
-            html += `<tr class="${isOverLimit ? 'credit-warning' : ''}">
+            const displayPhone = c.mobileNo || c.phone || '-';
+            const hasPhone = !!(c.mobileNo || c.phone);
+            
+            html += `<tr class="${isOverLimit ? 'credit-warning' : ''}" style="${!hasPhone ? 'background:#fff3cd' : ''}">
                 <td>${escapeHtml(c.customerCode)}</td>
-                <td><strong>${escapeHtml(c.name)}</strong></td>
+                <td><strong>${escapeHtml(c.name)}</strong>${!hasPhone ? '<br><small style="color:#dc3545;">⚠️ No Phone</small>' : ''}</td>
                 <td>${escapeHtml(c.email)}</td>
-                <td>${escapeHtml(c.mobileNo || c.phone || '-')}</td>
+                <td style="${hasPhone ? 'color:#28a745;font-weight:bold;' : 'color:#dc3545;'}">${escapeHtml(displayPhone)}</td>
                 <td>${escapeHtml(c.district || '-')}</td>
                 <td>${escapeHtml(c.gstin || '-')}</td>
                 <td>₹${creditLimit.toLocaleString()}</td>
@@ -329,10 +368,17 @@
         });
         html += '</tbody></table></div>';
         document.getElementById('customersTable').innerHTML = html;
+        
+        // Show summary
+        const withPhone = customers.filter(c => c.mobileNo || c.phone).length;
+        const withoutPhone = customers.length - withPhone;
+        if (withoutPhone > 0) {
+            console.warn(`⚠️ ${withoutPhone} customers missing phone numbers`);
+        }
     }
 
     // ============================================================
-    // SAVE SINGLE CUSTOMER
+    // SAVE SINGLE CUSTOMER (UPDATED to save BOTH fields)
     // ============================================================
     function saveCustomer() {
         const name = document.getElementById('custName').value.trim();
@@ -359,6 +405,7 @@
             name: name,
             email: email,
             mobileNo: mobileNo,
+            phone: mobileNo,  // IMPORTANT: Save BOTH fields for compatibility
             district: document.getElementById('custDistrict').value,
             address: document.getElementById('custAddress').value,
             pincode: document.getElementById('custPincode').value,
@@ -389,13 +436,13 @@
         
         localStorage.setItem('customers', JSON.stringify(customers));
         syncToUsers(customerData);
-        alert('Customer saved successfully!');
+        alert('Customer saved successfully! Phone number saved in both phone and mobileNo fields.');
         clearForm();
         loadCustomers();
     }
 
     // ============================================================
-    // BULK UPLOAD CUSTOMERS
+    // BULK UPLOAD CUSTOMERS (UPDATED to save BOTH fields)
     // ============================================================
     async function uploadBulkCustomers() {
         const fileInput = document.getElementById('bulkExcelFile');
@@ -422,7 +469,8 @@
             for (const row of rows) {
                 const name = row['Name'] || row['name'] || row['Customer Name'];
                 const email = row['Email'] || row['email'];
-                const mobileNo = row['Mobile No'] || row['mobileNo'] || row['Mobile'] || row['phone'];
+                // Try multiple phone column names
+                const mobileNo = row['Mobile No'] || row['mobileNo'] || row['Mobile'] || row['phone'] || row['Phone'];
                 const district = row['District'] || row['district'] || '';
                 const address = row['Address'] || row['address'] || '';
                 const pincode = row['PIN Code'] || row['pincode'] || '';
@@ -451,11 +499,13 @@
                     continue;
                 }
                 
+                const cleanMobile = mobileNo.toString();
                 const newCustomer = {
                     id: Date.now() + added,
                     name: name,
                     email: email,
-                    mobileNo: mobileNo.toString(),
+                    mobileNo: cleanMobile,
+                    phone: cleanMobile,  // IMPORTANT: Save BOTH fields
                     district: district,
                     address: address,
                     pincode: pincode,
@@ -484,7 +534,7 @@
                 statusDiv.innerHTML += `<br>Errors: ${errors.join('; ')}`;
             }
             fileInput.value = '';
-            alert(`Added ${added} new customers. ${skipped} skipped (duplicates or invalid).`);
+            alert(`Added ${added} new customers. Phone numbers saved in both phone and mobileNo fields.`);
             
         } catch(err) {
             console.error(err);
@@ -494,24 +544,24 @@
     }
 
     // ============================================================
-    // DOWNLOAD TEMPLATE
+    // DOWNLOAD TEMPLATE (UPDATED)
     // ============================================================
     function downloadTemplate() {
         const templateData = [
-            ['Name', 'Email', 'Mobile No', 'District', 'Address', 'PIN Code', 'GSTIN', 'State', 'Business Name', 'Credit Limit', 'Status'],
-            ['ABC Motors', 'abc@example.com', '9876543210', 'Mumbai City', '123 Main Street', '400001', '27ABCDE1234F1Z', 'Maharashtra', 'ABC Motors Pvt Ltd', '50000', 'active'],
-            ['XYZ Spares', 'xyz@example.com', '9876543211', 'Thane', '456 Park Road', '400601', '', 'Maharashtra', 'XYZ Auto Spares', '75000', 'active']
+            ['Name', 'Email', 'Phone', 'Mobile No', 'District', 'Address', 'PIN Code', 'GSTIN', 'State', 'Business Name', 'Credit Limit', 'Status'],
+            ['ABC Motors', 'abc@example.com', '9876543210', '9876543210', 'Mumbai City', '123 Main Street', '400001', '27ABCDE1234F1Z', 'Maharashtra', 'ABC Motors Pvt Ltd', '50000', 'active'],
+            ['XYZ Spares', 'xyz@example.com', '9876543211', '9876543211', 'Thane', '456 Park Road', '400601', '', 'Maharashtra', 'XYZ Auto Spares', '75000', 'active']
         ];
         
         const ws = XLSX.utils.aoa_to_sheet(templateData);
-        ws['!cols'] = [{wch:20},{wch:25},{wch:15},{wch:15},{wch:30},{wch:12},{wch:18},{wch:15},{wch:25},{wch:12},{wch:10}];
+        ws['!cols'] = [{wch:20},{wch:25},{wch:15},{wch:15},{wch:15},{wch:30},{wch:12},{wch:18},{wch:15},{wch:25},{wch:12},{wch:10}];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Customer Template');
         XLSX.writeFile(wb, 'customer_master_template.xlsx');
     }
 
     // ============================================================
-    // SYNC TO USERS
+    // SYNC TO USERS (UPDATED)
     // ============================================================
     function syncToUsers(customer) {
         let users = JSON.parse(localStorage.getItem('users') || '[]');
@@ -520,8 +570,8 @@
             name: customer.name,
             email: customer.email,
             password: customer.email.split('@')[0] + '123',
-            phone: customer.mobileNo,
-            mobile: customer.mobileNo,
+            phone: customer.mobileNo || customer.phone,
+            mobile: customer.mobileNo || customer.phone,
             business: customer.business,
             gstin: customer.gstin,
             address: customer.address,
@@ -541,8 +591,8 @@
             name: customer.name,
             business: customer.business,
             email: customer.email,
-            phone: customer.mobileNo,
-            mobile: customer.mobileNo,
+            phone: customer.mobileNo || customer.phone,
+            mobile: customer.mobileNo || customer.phone,
             district: customer.district,
             address: customer.address,
             status: customer.status
@@ -611,9 +661,10 @@
     function searchCustomers() { displayCustomers(); }
 
     function exportToCSV() {
-        let csv = "Customer Code,Name,Email,Mobile No,District,Address,PIN Code,GSTIN,State,Business Name,Credit Limit,Outstanding,Status\n";
+        let csv = "Customer Code,Name,Email,Phone,Mobile No,District,Address,PIN Code,GSTIN,State,Business Name,Credit Limit,Outstanding,Status\n";
         customers.forEach(c => {
-            csv += `"${c.customerCode}","${c.name}","${c.email}","${c.mobileNo || ''}","${c.district || ''}","${c.address || ''}","${c.pincode || ''}","${c.gstin || ''}","${c.state || ''}","${c.business || ''}",${c.creditLimit || 0},${c.outstanding || 0},${c.status}\n`;
+            const phoneNum = c.mobileNo || c.phone || '';
+            csv += `"${c.customerCode}","${c.name}","${c.email}","${phoneNum}","${phoneNum}","${c.district || ''}","${c.address || ''}","${c.pincode || ''}","${c.gstin || ''}","${c.state || ''}","${c.business || ''}",${c.creditLimit || 0},${c.outstanding || 0},${c.status}\n`;
         });
         const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
@@ -633,4 +684,4 @@
     loadCustomers();
 </script>
 </body>
-                </html>
+    </html>
