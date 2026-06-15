@@ -25,6 +25,7 @@
         .flex { display: flex; gap: 20px; flex-wrap: wrap; }
         .col { flex: 1; min-width: 300px; }
         hr { margin: 20px 0; }
+        .debug-info { background: #f8f9fa; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 12px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -106,10 +107,10 @@
             }
             
             if (stock.length > 100) {
-                html += `<tr><td colspan="5" style="text-align:center;">... and ${stock.length - 100} more parts</td></tr>`;
+                html += `<tr><td colspan="5" style="text-align:center;">... and ${stock.length - 100} more parts</td><tr>`;
             }
             
-            html += `</tbody></table></div>`;
+            html += `</tbody><table></div>`;
             displayDiv.innerHTML = html;
             
         } catch(e) {
@@ -121,7 +122,7 @@
     }
 
     // ============================================================
-    // LOAD FROM GITHUB DATA FOLDER
+    // LOAD FROM GITHUB DATA FOLDER (FIXED VERSION)
     // ============================================================
     async function loadFromGitHub() {
         const displayDiv = document.getElementById('githubDisplay');
@@ -141,6 +142,11 @@
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(sheet);
             
+            console.log("=== GITHUB FILE DEBUG ===");
+            console.log("Total rows:", rows.length);
+            console.log("Column names:", Object.keys(rows[0]));
+            console.log("First row sample:", rows[0]);
+            
             if (rows.length === 0) {
                 displayDiv.innerHTML = '<div class="empty" style="text-align:center; padding:40px;">Excel file is empty.</div>';
                 badge.innerHTML = 'Empty';
@@ -148,32 +154,194 @@
                 return;
             }
             
-            // Parse stock data
+            // Parse stock data with improved detection
             const stock = [];
             let totalUnits = 0;
             
+            // First, detect the correct stock column name
+            const sampleRow = rows[0];
+            let stockColumnName = null;
+            let partColumnName = null;
+            let distributorColumnName = null;
+            let priceColumnName = null;
+            let leadTimeColumnName = null;
+            
+            // Detect Part column
+            for (let key in sampleRow) {
+                const lowerKey = key.toLowerCase();
+                if (lowerKey.includes('part') || lowerKey === 'part no' || lowerKey === 'partnumber') {
+                    partColumnName = key;
+                    console.log(`Found Part column: "${key}"`);
+                    break;
+                }
+            }
+            if (!partColumnName) partColumnName = 'Part No';
+            
+            // Detect Stock column
+            for (let key in sampleRow) {
+                const value = sampleRow[key];
+                const lowerKey = key.toLowerCase();
+                
+                // Check if this column has numbers that look like stock
+                if (typeof value === 'number' && value > 0 && value < 10000) {
+                    stockColumnName = key;
+                    console.log(`Found stock column by value: "${key}" with value ${value}`);
+                    break;
+                }
+                // Check by name
+                if (lowerKey.includes('stock') || lowerKey.includes('qty') || lowerKey.includes('available')) {
+                    const numValue = Number(value);
+                    if (!isNaN(numValue) && numValue > 0) {
+                        stockColumnName = key;
+                        console.log(`Found stock column by name: "${key}" with value ${numValue}`);
+                        break;
+                    }
+                }
+            }
+            
+            // If still not found, try to get any numeric column
+            if (!stockColumnName) {
+                for (let key in sampleRow) {
+                    const numValue = Number(sampleRow[key]);
+                    if (!isNaN(numValue) && numValue > 0 && numValue < 10000) {
+                        stockColumnName = key;
+                        console.log(`Using numeric column for stock: "${key}" with value ${numValue}`);
+                        break;
+                    }
+                }
+            }
+            
+            // Detect Distributor column
+            for (let key in sampleRow) {
+                const lowerKey = key.toLowerCase();
+                if (lowerKey.includes('distributor') || lowerKey.includes('supplier')) {
+                    distributorColumnName = key;
+                    console.log(`Found Distributor column: "${key}"`);
+                    break;
+                }
+            }
+            
+            // Detect Price column
+            for (let key in sampleRow) {
+                const lowerKey = key.toLowerCase();
+                if (lowerKey.includes('price') || lowerKey === 'mrp') {
+                    priceColumnName = key;
+                    console.log(`Found Price column: "${key}"`);
+                    break;
+                }
+            }
+            
+            // Detect Lead Time column
+            for (let key in sampleRow) {
+                const lowerKey = key.toLowerCase();
+                if (lowerKey.includes('lead') || lowerKey.includes('days')) {
+                    leadTimeColumnName = key;
+                    console.log(`Found Lead Time column: "${key}"`);
+                    break;
+                }
+            }
+            
             for (const row of rows) {
-                const part = row['Part No'] || row['part_no'] || row['PartNumber'] || row['Part'];
-                const stockQty = Number(row['Available Stock'] || row['stock'] || row['Stock'] || 0);
-                const distributor = row['Distributor Name'] || row['Distributor'] || 'Auto Links';
+                // Get part number
+                let part = row[partColumnName];
+                if (!part) {
+                    // Try alternative
+                    part = row['Part No'] || row['part_no'] || row['PartNumber'] || row['Part'];
+                }
+                if (!part) continue;
+                
+                // Get stock using detected column
+                let stockQty = 0;
+                if (stockColumnName) {
+                    stockQty = Number(row[stockColumnName]) || 0;
+                } else {
+                    // Fallback: try common names
+                    stockQty = Number(row['Available Stock'] || row['stock'] || row['Stock'] || row['Qty'] || 0);
+                }
+                
+                // If still 0, try to find any numeric value in the row that looks like stock
+                if (stockQty === 0) {
+                    for (let key in row) {
+                        const numValue = Number(row[key]);
+                        if (!isNaN(numValue) && numValue > 0 && numValue < 10000) {
+                            stockQty = numValue;
+                            console.log(`Found stock value ${stockQty} in column "${key}" for part ${part}`);
+                            break;
+                        }
+                    }
+                }
+                
+                // Ensure it's a positive number
+                if (isNaN(stockQty)) stockQty = 0;
+                
+                // Get distributor
+                let distributor = 'Auto Links';
+                if (distributorColumnName && row[distributorColumnName]) {
+                    distributor = String(row[distributorColumnName]).trim();
+                } else {
+                    distributor = row['Distributor Name'] || row['Distributor'] || 'Auto Links';
+                }
+                
+                // Get price
+                let price = 0;
+                if (priceColumnName && row[priceColumnName]) {
+                    price = Number(row[priceColumnName]) || 0;
+                } else {
+                    price = Number(row['Price'] || row['price'] || 0);
+                }
+                
+                // Get lead time
+                let leadTime = 3;
+                if (leadTimeColumnName && row[leadTimeColumnName]) {
+                    leadTime = Number(row[leadTimeColumnName]) || 3;
+                } else {
+                    leadTime = Number(row['Lead Time (Days)'] || 3);
+                }
                 
                 if (part && stockQty > 0) {
                     stock.push({
                         part: String(part).trim(),
-                        distributor: String(distributor).trim(),
+                        distributor: distributor,
                         stock: stockQty,
-                        price: Number(row['Price'] || row['price'] || 0),
-                        leadTime: Number(row['Lead Time (Days)'] || 3)
+                        price: price,
+                        leadTime: leadTime
                     });
                     totalUnits += stockQty;
                 }
             }
             
+            console.log(`Processed ${stock.length} items with stock > 0`);
+            
+            if (stock.length === 0) {
+                displayDiv.innerHTML = `<div class="empty" style="text-align:center; padding:40px;">
+                    <i class="fas fa-exclamation-triangle"></i> No valid stock data found.<br><br>
+                    <strong>Debug Info:</strong><br>
+                    Rows in Excel: ${rows.length}<br>
+                    Columns found: ${Object.keys(rows[0]).join(', ')}<br>
+                    Stock column detected: ${stockColumnName || 'None'}<br>
+                    Part column detected: ${partColumnName || 'None'}<br><br>
+                    <strong>First row data:</strong><br>
+                    <pre style="text-align:left;font-size:11px;background:#f8f9fa;padding:10px;border-radius:6px;">${JSON.stringify(rows[0], null, 2)}</pre>
+                </div>`;
+                badge.innerHTML = 'No Stock';
+                badge.className = 'badge badge-empty';
+                return;
+            }
+            
             badge.innerHTML = stock.length + ' parts, ' + totalUnits + ' units';
             badge.className = 'badge badge-github';
             
-            let html = `<div class="stats"><strong>📊 Source:</strong> data/distributor-stock.xlsx | <strong>📦 Parts:</strong> ${stock.length} | <strong>📦 Units:</strong> ${totalUnits}</div>`;
-            html += `<div style="overflow-x: auto;"><table><thead><tr><th>Part No</th><th>Distributor</th><th>Stock</th><th>Price</th><th>Lead Time</th></tr></thead><tbody>`;
+            let html = `<div class="stats">
+                <strong>📊 Source:</strong> data/distributor-stock.xlsx | 
+                <strong>📦 Parts:</strong> ${stock.length} | 
+                <strong>📦 Units:</strong> ${totalUnits.toLocaleString()}<br>
+                <strong>🔍 Detected Columns:</strong> Part: "${partColumnName}", Stock: "${stockColumnName || 'auto-detected'}", Distributor: "${distributorColumnName || 'default'}"
+            </div>`;
+            html += `<div style="overflow-x: auto;">能<table>
+                <thead>
+                    <tr><th>Part No</th><th>Distributor</th><th>Stock</th><th>Price</th><th>Lead Time</th></tr>
+                </thead>
+                <tbody>`;
             
             for (const item of stock.slice(0, 100)) {
                 html += `<tr>
@@ -228,4 +396,4 @@
     loadBothSources();
 </script>
 </body>
-    </html>
+</html>
