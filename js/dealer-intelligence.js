@@ -1,5 +1,5 @@
 // dealer-intelligence.js - COMPLETE FIXED VERSION
-// Fixes: Flexible column detection for distributor stock (matches upload behavior)
+// Integrates with Customer Master for phone numbers and districts
 
 (function () {
 
@@ -44,6 +44,28 @@
     let distributorStock = [];
     let dealerData = [];
     let retailerMaster = new Map();
+
+    // ===================================================
+    // HELPER FUNCTIONS
+    // ===================================================
+
+    function normalizeText(t) {
+        return String(t || "")
+            .replace(/[\u200B-\u200D\uFEFF]/g, "")
+            .replace(/\n|\r|\t/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toUpperCase();
+    }
+
+    function cleanPhone(p) {
+        let x = String(p || "").replace(/\D/g, "");
+        if (!x) return "";
+        if (x.length === 10) return "91" + x;
+        if (x.length === 11 && x.startsWith("0")) return "91" + x.substring(1);
+        if (x.length === 12 && x.startsWith("91")) return x;
+        return x;
+    }
 
     // ===================================================
     // LOAD EXCEL FILE (from server)
@@ -118,7 +140,7 @@
             }
         }
         
-        // SECOND: Fallback - try to read from Excel file on server with flexible column detection
+        // SECOND: Fallback - try to read from Excel file on server
         try {
             const rows = await loadExcelFile('data/distributor-stock.xlsx');
             distributorStock = [];
@@ -126,15 +148,11 @@
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
                 
-                // Get part number - try multiple column names
                 let part = row['Part No'] || row['part_no'] || row['PartNumber'] || row['Part'];
-                
                 if (!part) continue;
                 
-                // Get distributor name - try multiple column names
                 let distributor = row['Distributor Name'] || row['Distributor'] || row['distributor'] || 'Auto Links';
                 
-                // FLEXIBLE STOCK DETECTION - same as upload function
                 let stockQty = 0;
                 for (let key in row) {
                     const value = Number(row[key]);
@@ -143,21 +161,16 @@
                             key.toLowerCase().includes('qty') || 
                             key.toLowerCase().includes('available')) {
                             stockQty = value;
-                            console.log(`Found stock for part ${part} in column '${key}': ${stockQty}`);
                             break;
                         }
                     }
                 }
                 
-                // Also try direct match if flexible detection failed
                 if (stockQty === 0) {
                     stockQty = Number(row['Available Stock'] || row['stock'] || row['Stock'] || 0);
                 }
                 
-                // Get price - try multiple column names
                 let price = Number(row['Price'] || row['price'] || 0);
-                
-                // Get lead time - try multiple column names
                 let leadTime = Number(row['Lead Time (Days)'] || row['leadTime'] || 3);
                 
                 if (part && stockQty > 0) {
@@ -172,9 +185,6 @@
             }
 
             console.log(`✅ Distributor stock loaded from Excel file: ${distributorStock.length} items`);
-            if (distributorStock.length > 0) {
-                console.log("Sample item:", distributorStock[0]);
-            }
 
         } catch(err) {
 
@@ -184,49 +194,155 @@
     }
 
     // ===================================================
-    // LOAD RETAILER MASTER
+    // LOAD RETAILER MASTER (UPDATED - INCLUDES CUSTOMER MASTER)
     // ===================================================
 
     async function loadRetailerMaster() {
 
-        const rows = await loadExcelFile(
-            'data/RETAILER data details.xlsx',
-            'SAPUI5 Export'
-        );
-
         retailerMaster.clear();
-
-        for (const row of rows) {
-
-            const dealer =
-                String(
-                    row['Retailer Name'] || ''
-                ).trim();
-
+        
+        // ====================================
+        // SOURCE 1: Customer Master (HIGHEST PRIORITY)
+        // ====================================
+        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+        console.log(`📋 Customer Master loaded: ${customers.length} customers`);
+        
+        for (const c of customers) {
+            const dealer = c.name || '';
             if (!dealer) continue;
-
+            
             retailerMaster.set(dealer, {
-
                 dealer: dealer,
-
-                district:
-                    row['District'] || '',
-
-                mobile:
-                    row['Mobile No'] || '',
-
-                ownerName:
-                    row['Owner Name'] || '',
-
-                customerType:
-                    row['Customer Type'] || '',
-
-                rlpCode:
-                    row['RLP Code'] || ''
+                district: c.district || '',
+                mobile: c.mobileNo || c.phone || '',
+                phone: c.mobileNo || c.phone || '',
+                ownerName: c.business || '',
+                customerType: 'customer',
+                rlpCode: c.customerCode || '',
+                source: 'customer-master'
             });
         }
-
-        console.log(`✅ Retailer master loaded: ${retailerMaster.size}`);
+        
+        // ====================================
+        // SOURCE 2: Excel Master File
+        // ====================================
+        try {
+            const rows = await loadExcelFile('data/RETAILER data details.xlsx', 'SAPUI5 Export');
+            console.log(`📋 Excel Master loaded: ${rows.length} entries`);
+            
+            for (const row of rows) {
+                const dealer = String(row['Retailer Name'] || '').trim();
+                if (!dealer) continue;
+                
+                const district = row['District'] || '';
+                const mobile = row['Mobile No'] || '';
+                
+                if (!retailerMaster.has(dealer)) {
+                    retailerMaster.set(dealer, {
+                        dealer: dealer,
+                        district: district,
+                        mobile: mobile,
+                        phone: mobile,
+                        ownerName: row['Owner Name'] || '',
+                        customerType: row['Customer Type'] || '',
+                        rlpCode: row['RLP Code'] || '',
+                        source: 'excel'
+                    });
+                } else {
+                    const existing = retailerMaster.get(dealer);
+                    if (!existing.district && district) existing.district = district;
+                    if (!existing.mobile && mobile) {
+                        existing.mobile = mobile;
+                        existing.phone = mobile;
+                    }
+                }
+            }
+        } catch(e) {
+            console.warn("Excel master file not found", e);
+        }
+        
+        // ====================================
+        // SOURCE 3: Users and Dealers
+        // ====================================
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
+        const allLocal = [...users, ...dealers];
+        
+        for (const u of allLocal) {
+            const dealer = u.name || u.business || '';
+            if (!dealer) continue;
+            
+            const district = u.district || '';
+            const mobile = u.phone || u.mobile || '';
+            
+            if (!retailerMaster.has(dealer)) {
+                retailerMaster.set(dealer, {
+                    dealer: dealer,
+                    district: district,
+                    mobile: mobile,
+                    phone: mobile,
+                    source: 'user-dealer'
+                });
+            } else {
+                const existing = retailerMaster.get(dealer);
+                if (!existing.district && district) existing.district = district;
+                if (!existing.mobile && mobile) {
+                    existing.mobile = mobile;
+                    existing.phone = mobile;
+                }
+            }
+        }
+        
+        // ====================================
+        // SOURCE 4: Invoices (allInvoices)
+        // ====================================
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        for (const inv of allInvoices) {
+            let dealer = inv.customerName || inv.buyer?.name || '';
+            if (!dealer) continue;
+            
+            let mobile = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
+            let district = inv.customerDistrict || inv.buyer?.district || inv.district || '';
+            
+            if (!retailerMaster.has(dealer)) {
+                retailerMaster.set(dealer, {
+                    dealer: dealer,
+                    district: district,
+                    mobile: mobile,
+                    phone: mobile,
+                    source: 'invoice'
+                });
+            } else {
+                const existing = retailerMaster.get(dealer);
+                if (!existing.district && district) existing.district = district;
+                if (!existing.mobile && mobile) {
+                    existing.mobile = mobile;
+                    existing.phone = mobile;
+                }
+            }
+        }
+        
+        // ====================================
+        // Statistics
+        // ====================================
+        let withPhone = 0;
+        let withDistrict = 0;
+        for (const [name, data] of retailerMaster) {
+            if (data.mobile) withPhone++;
+            if (data.district) withDistrict++;
+        }
+        
+        console.log(`✅ Retailer master loaded: ${retailerMaster.size} dealers`);
+        console.log(`   📞 Has phone: ${withPhone} | 📍 Has district: ${withDistrict}`);
+        
+        // List dealers without phone for debugging
+        const missingPhone = [];
+        for (const [name, data] of retailerMaster) {
+            if (!data.mobile) missingPhone.push(name);
+        }
+        if (missingPhone.length > 0) {
+            console.warn(`⚠️ ${missingPhone.length} dealers missing phone numbers:`, missingPhone.slice(0, 10));
+        }
     }
 
     // ===================================================
@@ -530,19 +646,16 @@
     ) {
         const myStock = currentStock.get(part)?.stock || 0;
         
-        // Get distributor stock for this part
         const distItem = distributorStock.find(d => d.part === part);
         const distributorStockQty = distItem?.stock || 0;
         const totalStock = myStock + distributorStockQty;
 
-        // Only create offer if there's ANY stock (my stock OR distributor stock)
         if (myStock <= 0 && distributorStockQty <= 0) {
             return null;
         }
 
         const originalPrice = currentStock.get(part)?.price || 0;
 
-        // If no my stock, use a default price (will be updated from distributor data)
         let finalPrice = originalPrice;
         if (myStock === 0 && distributorStockQty > 0 && distItem?.price > 0) {
             finalPrice = distItem.price;
@@ -879,6 +992,14 @@ https://autosparessolution.com
     }
 
     // ===================================================
+    // GET RETAILER MASTER (for debugging)
+    // ===================================================
+
+    function getRetailerMaster() {
+        return retailerMaster;
+    }
+
+    // ===================================================
     // RUN
     // ===================================================
 
@@ -946,6 +1067,10 @@ https://autosparessolution.com
         refreshStock,
 
         getDistributorStock,
+
+        getRetailerMaster,
+
+        loadRetailerMaster,
 
         CONFIG
     };
