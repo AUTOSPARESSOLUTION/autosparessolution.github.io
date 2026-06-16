@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: GST + Personal WhatsApp + A4 Compact)");
+console.log("🚀 Brochure System Loaded (FIXED: WhatsApp Personal App + Multi-Page PDF)");
 
 // =========================
 // DATA
@@ -252,7 +252,7 @@ function loadOffers() {
 }
 
 // =========================
-// GET OFFERS (WITH BETTER MATCHING)
+// GET OFFERS
 // =========================
 function getAllDealerOffers(name) {
     const normalized = normalizeText(name);
@@ -282,7 +282,7 @@ function getAllDealerOffers(name) {
 }
 
 // =========================
-// FIND DEALER (WITH BETTER MATCHING)
+// FIND DEALER
 // =========================
 function findDealer(name) {
     const normalized = normalizeText(name);
@@ -317,7 +317,7 @@ function getDistributorInfo(part) {
 }
 
 // =========================
-// PRICE ENGINE (FIXED: Our Stock = MRP - 31.77% + 18% GST - Discount)
+// PRICE ENGINE
 // =========================
 function getMRP(o) {
     const distInfo = getDistributorInfo(o.part);
@@ -335,24 +335,13 @@ function getDiscount(o) {
     return Number(o.discount || 0);
 }
 
-// =========================
-// CALCULATE OUR STOCK PRICE (WITH 18% GST)
-// =========================
 function calculateOurPrice(mrp, discount) {
-    // MRP - 31.77% = Basic
     const basic = mrp - (mrp * 31.77 / 100);
-    // Basic - Discount
     const afterDiscount = basic - (basic * discount / 100);
-    // Add 18% GST
-    const finalPrice = afterDiscount * 1.18;
-    return finalPrice;
+    return afterDiscount * 1.18;
 }
 
-// =========================
-// CALCULATE DISTRIBUTOR PRICE (MRP - NO DISCOUNT, NO GST)
-// =========================
 function calculateDistributorPrice(mrp) {
-    // Distributor sells at MRP (NO DISCOUNT, NO GST)
     return mrp;
 }
 
@@ -370,18 +359,13 @@ function getDisplayStock(offer) {
     };
 }
 
-// =========================
-// CALCULATE PRICES SEPARATELY
-// =========================
 function calculatePrices(offer) {
     const dis = getDiscount(offer);
     const stock = getDisplayStock(offer);
     
-    // Our Stock Price: MRP - 31.77% - Discount + 18% GST
     const ourMRP = offer.originalPrice || offer.mrp || 0;
     const ourOfferPrice = calculateOurPrice(ourMRP, dis);
     
-    // Distributor Stock Price: MRP (NO DISCOUNT, NO GST)
     const distMRP = stock.distMRP || 0;
     const distOfferPrice = calculateDistributorPrice(distMRP);
     
@@ -405,15 +389,12 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
     msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     let hasDistributorStock = false;
-    let i = 0;
     
     for (let o of offers.slice(0, 8)) {
         const prices = calculatePrices(o);
         const stock = prices.stock;
         
         msg += `🔹 *${o.part}*\n`;
-        
-        // Our Stock Price (with GST + discount)
         msg += `   📦 Our Stock: ${stock.myStock} units`;
         if (prices.ourOfferPrice > 0) {
             msg += ` @ ₹${prices.ourOfferPrice.toFixed(2)}/unit (incl. GST)`;
@@ -421,7 +402,6 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
         }
         msg += `\n`;
         
-        // Distributor Stock Price (MRP - NO DISCOUNT, NO GST)
         if (stock.distributorStock > 0) {
             hasDistributorStock = true;
             msg += `   🏭 Dist. Stock: ${stock.distributorStock} units`;
@@ -452,7 +432,7 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
 }
 
 // =========================
-// SEND WHATSAPP (Personal WhatsApp App)
+// SEND WHATSAPP (FIXED: uses whatsapp:// for personal WhatsApp)
 // =========================
 function sendFlyerToWhatsApp(name) {
     console.log(`🔍 Looking for offers for: "${name}"`);
@@ -476,12 +456,7 @@ function sendFlyerToWhatsApp(name) {
     }
     
     if (offers.length === 0) {
-        alert(`❌ No offers found for "${name}"
-
-Available dealers with offers:
-${Object.keys(dealerOfferMap).slice(0, 10).join('\n')}${Object.keys(dealerOfferMap).length > 10 ? '\n...' : ''}
-
-Please run Analysis first.`);
+        alert(`❌ No offers found for "${name}"`);
         return;
     }
     
@@ -506,9 +481,7 @@ Please run Analysis first.`);
     }
     
     if (!dealer || !dealer.phone) {
-        alert(`❌ Phone number not found for "${correctDealerName}"
-
-Please add mobile number in Customer Master.`);
+        alert(`❌ Phone number not found for "${correctDealerName}"`);
         return;
     }
     
@@ -518,15 +491,15 @@ Please add mobile number in Customer Master.`);
     if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
     if (cleanPhoneNum.length === 11 && cleanPhoneNum.startsWith('0')) cleanPhoneNum = '91' + cleanPhoneNum.substring(1);
     
-    // Open personal WhatsApp app using wa.me URL (works on mobile + desktop)
-    const url = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+    // FIX: Use whatsapp:// for personal WhatsApp app
+    const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
+    window.location.href = url;
     
     console.log(`✅ WhatsApp opened for "${correctDealerName}" (${cleanPhoneNum}) | Offers: ${offers.length}`);
 }
 
 // =========================
-// GENERATE BROCHURE HTML (FIXED A4 COMPACT)
+// GENERATE BROCHURE HTML (A4 COMPACT)
 // =========================
 function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 13) {
     const offers = getAllDealerOffers(name);
@@ -619,7 +592,6 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     if (hasDistributorStock) {
         html += `<div style="margin-top:5px;padding:4px 8px;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;font-size:9px;color:#856404;">
             ⚠️ <strong>Additional courier charges will apply for distributor stock items.</strong>
-            <br><small>Please confirm availability and shipping charges before placing order.</small>
         </div>`;
     }
     
@@ -674,7 +646,7 @@ function showBrochurePreview(name) {
 }
 
 // =========================
-// DOWNLOAD PDF
+// DOWNLOAD PDF (MULTI-PAGE FIXED)
 // =========================
 async function downloadPDF(name) {
     try {
@@ -687,8 +659,20 @@ async function downloadPDF(name) {
         const rowsPerPage = 13;
         const totalPages = Math.ceil(offers.length / rowsPerPage);
         
-        const pages = [];
+        console.log(`📄 Generating PDF: ${offers.length} offers, ${totalPages} pages`);
+        
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = 210;
+        const pageHeight = 297;
+        
         for (let i = 0; i < totalPages; i++) {
+            if (i > 0) {
+                pdf.addPage();
+            }
+            
+            console.log(`   Page ${i + 1}: Generating offers ${(i * rowsPerPage) + 1} to ${Math.min((i + 1) * rowsPerPage, offers.length)}`);
+            
             const div = document.createElement("div");
             div.innerHTML = generateFullBrochureHTML(name, i, totalPages, rowsPerPage);
             div.style.position = "fixed";
@@ -699,41 +683,31 @@ async function downloadPDF(name) {
             div.style.padding = "15px";
             document.body.appendChild(div);
             
-            await new Promise(r => setTimeout(r, 300));
-            const canvas = await html2canvas(div, { scale: 2, useCORS: true, width: 1000 });
-            pages.push(canvas);
+            await new Promise(r => setTimeout(r, 400));
+            
+            const canvas = await html2canvas(div, { 
+                scale: 2, 
+                useCORS: true,
+                width: 1000,
+                height: div.scrollHeight
+            });
+            
             document.body.removeChild(div);
-        }
-        
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = 210;
-        const pageHeight = 297;
-        
-        for (let i = 0; i < pages.length; i++) {
-            if (i > 0) pdf.addPage();
             
-            const canvas = pages[i];
-            const ratio = canvas.height / canvas.width;
-            let imgWidth = pageWidth - 20;
-            let imgHeight = imgWidth * ratio;
-            
-            if (imgHeight > pageHeight - 20) {
-                const scale = (pageHeight - 20) / imgHeight;
-                imgHeight *= scale;
-                imgWidth *= scale;
-            }
-            
+            const imgData = canvas.toDataURL('image/png');
+            const imgWidth = 190;
+            const imgHeight = (canvas.height / canvas.width) * imgWidth;
             const x = (pageWidth - imgWidth) / 2;
             const y = (pageHeight - imgHeight) / 2;
-            const imgData = canvas.toDataURL('image/png');
+            
             pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
         }
         
         pdf.save(`${name.replace(/[^a-z0-9]/gi, '_')}_brochure.pdf`);
+        console.log(`✅ PDF saved: ${totalPages} pages, ${offers.length} offers`);
         
     } catch (err) {
-        console.error(err);
+        console.error("PDF Error:", err);
         alert("PDF generation failed: " + err.message);
     }
 }
@@ -768,7 +742,7 @@ function exportDealerOffersToExcel(name) {
 }
 
 // =========================
-// SHARE PDF TO WHATSAPP
+// SHARE PDF TO WHATSAPP (FIXED: uses whatsapp://)
 // =========================
 async function sharePDFToWhatsApp(name) {
     try {
@@ -798,8 +772,10 @@ async function sharePDFToWhatsApp(name) {
         const msg = `📄 *Your Special Offer Brochure*\n\nDear ${name},\n\nPlease find your personalized offer brochure attached as PDF.${extraMsg}\n\nThank you for your business!\n\nAuto Spares Solution`;
         let cleanPhoneNum = phone;
         if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
-        const waUrl = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
-        window.open(waUrl, "_blank");
+        
+        // FIX: Use whatsapp:// for personal WhatsApp app
+        const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
+        window.location.href = url;
         
     } catch (err) {
         console.error(err);
