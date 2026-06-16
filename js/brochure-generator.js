@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: Preview + PDF Multi-Page + WhatsApp Personal)");
+console.log("🚀 Brochure System Loaded (FIXED: Multi-Page PDF + Preview + WhatsApp Personal)");
 
 // =========================
 // DATA
@@ -603,7 +603,7 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
 }
 
 // =========================
-// SHOW PREVIEW (FIXED: ALL PAGES)
+// SHOW PREVIEW (ALL PAGES)
 // =========================
 function showBrochurePreview(name) {
     const offers = getAllDealerOffers(name);
@@ -663,55 +663,13 @@ function showBrochurePreview(name) {
                 background: #facc15; 
                 font-size: 7px; 
             }
-            .preview-header {
-                text-align: center;
-                padding: 10px;
-                background: #f8f9fa;
-                border-bottom: 2px solid #facc15;
-                margin-bottom: 10px;
-            }
-            .preview-header span {
-                font-size: 16px;
-                font-weight: bold;
-                color: #0a7c71;
-            }
-            .preview-header small {
-                color: #999;
-                font-size: 12px;
-            }
-            .preview-footer {
-                text-align: center;
-                padding: 15px;
-                background: #f8f9fa;
-                border-top: 2px solid #facc15;
-                margin-top: 10px;
-            }
-            .preview-footer button {
-                background: #0a7c71;
-                color: white;
-                border: none;
-                padding: 10px 25px;
-                border-radius: 6px;
-                font-size: 14px;
-                cursor: pointer;
-                margin: 5px;
-            }
-            .preview-footer button:hover {
-                background: #09645a;
-            }
-            .preview-footer .close-btn {
-                background: #dc3545;
-            }
-            .preview-footer .close-btn:hover {
-                background: #c82333;
-            }
         </style>
     </head>
     <body>
-        <div class="preview-header">
-            <span>📄 Brochure Preview: ${escapeHtml(name)}</span>
+        <div style="text-align:center;padding:10px;background:#f8f9fa;border-bottom:2px solid #facc15;margin-bottom:10px;">
+            <span style="font-size:16px;font-weight:bold;color:#0a7c71;">📄 Brochure Preview: ${escapeHtml(name)}</span>
             <br>
-            <small>${offers.length} offers | ${totalPages} pages | 13 rows per page</small>
+            <span style="font-size:13px;color:#666;">${offers.length} offers | ${totalPages} pages | 13 rows per page</span>
         </div>`;
     
     for (let i = 0; i < totalPages; i++) {
@@ -719,9 +677,13 @@ function showBrochurePreview(name) {
     }
     
     fullHtml += `
-        <div class="preview-footer">
-            <button onclick="window.print()">🖨️ Print / Save as PDF</button>
-            <button class="close-btn" onclick="window.close()">❌ Close Preview</button>
+        <div style="text-align:center;padding:15px;background:#f8f9fa;border-top:2px solid #facc15;margin-top:10px;">
+            <button onclick="window.print()" style="background:#0a7c71;color:white;border:none;padding:10px 25px;border-radius:6px;font-size:14px;cursor:pointer;margin:5px;">
+                🖨️ Print / Save as PDF
+            </button>
+            <button onclick="window.close()" style="background:#dc3545;color:white;border:none;padding:10px 25px;border-radius:6px;font-size:14px;cursor:pointer;margin:5px;">
+                ❌ Close Preview
+            </button>
         </div>
     </body></html>`;
     
@@ -731,7 +693,7 @@ function showBrochurePreview(name) {
 }
 
 // =========================
-// DOWNLOAD PDF (FIXED: ALL PAGES)
+// DOWNLOAD PDF (FIXED: MULTI-PAGE FOR ALL OFFERS)
 // =========================
 async function downloadPDF(name) {
     try {
