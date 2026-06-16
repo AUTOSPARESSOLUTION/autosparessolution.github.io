@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: GST + Personal WhatsApp)");
+console.log("🚀 Brochure System Loaded (FIXED: GST + Personal WhatsApp + A4 Compact)");
 
 // =========================
 // DATA
@@ -518,17 +518,17 @@ Please add mobile number in Customer Master.`);
     if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
     if (cleanPhoneNum.length === 11 && cleanPhoneNum.startsWith('0')) cleanPhoneNum = '91' + cleanPhoneNum.substring(1);
     
-    // Open personal WhatsApp app
-    const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
+    // Open personal WhatsApp app using wa.me URL (works on mobile + desktop)
+    const url = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
     
     console.log(`✅ WhatsApp opened for "${correctDealerName}" (${cleanPhoneNum}) | Offers: ${offers.length}`);
 }
 
 // =========================
-// GENERATE BROCHURE HTML (FIXED PRICES)
+// GENERATE BROCHURE HTML (FIXED A4 COMPACT)
 // =========================
-function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 15) {
+function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 13) {
     const offers = getAllDealerOffers(name);
     const dealer = findDealer(name);
     
@@ -551,27 +551,40 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     const hasDistributorStock = offers.some(o => getDisplayStock(o).hasDistributor);
     
     let html = `
-    <div style="width:1000px;background:#fff;padding:20px;font-family:Arial;color:#000;page-break-after:${page < totalPages - 1 ? 'always' : 'avoid'};">
-    <h1 style="color:#0a7c71;font-size:24px;margin-bottom:5px;">AUTO SPARES SOLUTION</h1>
-    <h2 style="font-size:18px;margin-top:0;">${escapeHtml(name)}</h2>
-    <table style="width:100%;margin:10px 0;font-size:14px;">
-        <tr>
-            <td style="padding:4px;"><b>📞 Mobile:</b></td>
-            <td style="padding:4px;">${phone || "Not available"}</td>
-            <td style="padding:4px;padding-left:30px;"><b>📍 District:</b></td>
-            <td style="padding:4px;">${district || "Not specified"}</td>
-        </tr>
-    </table>
-    <p style="font-size:13px;color:#666;margin:5px 0 10px 0;">Page ${page + 1} of ${totalPages} | Showing ${start + 1} - ${end} of ${offers.length} offers</p>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <div style="width:100%;max-width:1000px;background:#fff;padding:12px 15px;font-family:Arial;color:#000;margin:0 auto;page-break-after:${page < totalPages - 1 ? 'always' : 'avoid'};">
+    
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #facc15;padding-bottom:5px;margin-bottom:8px;">
+        <span style="color:#0a7c71;font-size:20px;font-weight:bold;">AUTO SPARES SOLUTION</span>
+        <span style="font-size:11px;color:#666;">Page ${page + 1}/${totalPages}</span>
+    </div>
+    
+    <h2 style="font-size:16px;margin:4px 0;">${escapeHtml(name)}</h2>
+    
+    <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;margin-bottom:6px;background:#f8f9fa;padding:5px 10px;border-radius:4px;">
+        <span><b>📞 Mobile:</b> ${phone || "Not available"}</span>
+        <span><b>📍 District:</b> ${district || "Not specified"}</span>
+        <span style="color:#666;font-size:10px;">Showing ${start + 1} - ${end} of ${offers.length} offers</span>
+    </div>
+    
+    <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;">
+    <colgroup>
+        <col style="width:20%;">
+        <col style="width:9%;">
+        <col style="width:14%;">
+        <col style="width:9%;">
+        <col style="width:14%;">
+        <col style="width:10%;">
+        <col style="width:24%;">
+    </colgroup>
     <thead>
     <tr style="background:#facc15;">
-        <th style="padding:8px;border:1px solid #ccc;text-align:left;word-wrap:break-word;max-width:120px;">Part No</th>
-        <th style="padding:8px;border:1px solid #ccc;text-align:center;word-wrap:break-word;">Our Stock</th>
-        <th style="padding:8px;border:1px solid #ccc;text-align:center;word-wrap:break-word;">Our Price<br><small>(incl. GST)</small></th>
-        <th style="padding:8px;border:1px solid #ccc;text-align:center;word-wrap:break-word;">Dist. Stock</th>
-        <th style="padding:8px;border:1px solid #ccc;text-align:center;word-wrap:break-word;">Dist. Price<br><small>(MRP)</small></th>
-        <th style="padding:8px;border:1px solid #ccc;text-align:center;word-wrap:break-word;">Total Stock</th>
+        <th style="padding:3px 2px;border:1px solid #ccc;text-align:left;font-size:8px;word-wrap:break-word;">Part No</th>
+        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Our<br>Stock</th>
+        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Our Price<br><small>incl.GST</small></th>
+        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Dist.<br>Stock</th>
+        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Dist. Price<br><small>MRP</small></th>
+        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Total</th>
+        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:7px;word-wrap:break-word;">Courier</th>
     </tr>
     </thead>
     <tbody>`;
@@ -581,33 +594,38 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
         const stock = prices.stock;
         
         html += `<tr>
-            <td style="padding:6px;border:1px solid #ccc;word-wrap:break-word;max-width:120px;"><strong>${escapeHtml(o.part || '')}</strong></td>
-            <td style="padding:6px;border:1px solid #ccc;text-align:center;">${stock.myStock}</td>
-            <td style="padding:6px;border:1px solid #ccc;text-align:center;color:#2563eb;font-weight:bold;">
+            <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:8px;"><strong>${escapeHtml(o.part || '')}</strong></td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">${stock.myStock}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;color:#2563eb;font-weight:bold;">
                 ₹${prices.ourOfferPrice.toFixed(2)}
-                ${prices.dis > 0 ? `<br><small style="color:#16a34a;">${prices.dis}% OFF</small>` : ''}
+                ${prices.dis > 0 ? `<br><span style="color:#16a34a;font-size:7px;">${prices.dis}% OFF</span>` : ''}
             </td>
-            <td style="padding:6px;border:1px solid #ccc;text-align:center;${stock.distributorStock > 0 ? 'color:#16a34a;' : 'color:#999;'}">
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;${stock.distributorStock > 0 ? 'color:#16a34a;' : 'color:#999;'}">
                 ${stock.distributorStock || '-'}
             </td>
-            <td style="padding:6px;border:1px solid #ccc;text-align:center;${stock.distributorStock > 0 ? 'color:#16a34a;font-weight:bold;' : 'color:#999;'}">
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;${stock.distributorStock > 0 ? 'color:#16a34a;font-weight:bold;' : 'color:#999;'}">
                 ${stock.distributorStock > 0 ? `₹${prices.distOfferPrice.toFixed(2)}` : '-'}
-                ${stock.distributorStock > 0 && prices.distMRP > 0 ? `<br><small style="font-size:9px;color:#666;">MRP: ₹${prices.distMRP.toFixed(2)}</small>` : ''}
+                ${stock.distributorStock > 0 && prices.distMRP > 0 ? `<br><span style="font-size:6px;color:#666;">MRP ₹${prices.distMRP.toFixed(2)}</span>` : ''}
             </td>
-            <td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:bold;">${stock.totalStock}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;font-weight:bold;">${stock.totalStock}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;${stock.hasDistributor ? 'color:#dc3545;' : 'color:#28a745;'}">
+                ${stock.hasDistributor ? '⚠️ Yes' : '✅ No'}
+            </td>
         </tr>`;
     }
 
     html += `</tbody></table>`;
     
     if (hasDistributorStock) {
-        html += `<div style="margin-top:12px;padding:10px;background:#fff3cd;border:1px solid #ffc107;border-radius:5px;font-size:13px;color:#856404;">
+        html += `<div style="margin-top:5px;padding:4px 8px;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;font-size:9px;color:#856404;">
             ⚠️ <strong>Additional courier charges will apply for distributor stock items.</strong>
             <br><small>Please confirm availability and shipping charges before placing order.</small>
         </div>`;
     }
     
-    html += `<p style="margin-top:10px;font-size:10px;color:#999;text-align:center;">Generated on ${new Date().toLocaleDateString()} | Auto Spares Solution</p>`;
+    html += `<div style="margin-top:5px;font-size:7px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:4px;">
+        ${new Date().toLocaleDateString()} | Auto Spares Solution | ${offers.length} offers total
+    </div>`;
     html += `</div>`;
     
     return html;
@@ -623,7 +641,7 @@ function showBrochurePreview(name) {
         return;
     }
     
-    const rowsPerPage = 15;
+    const rowsPerPage = 13;
     const totalPages = Math.ceil(offers.length / rowsPerPage);
     
     let fullHtml = `<!DOCTYPE html>
@@ -631,17 +649,15 @@ function showBrochurePreview(name) {
     <head>
         <title>Brochure - ${name}</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f0f0f0; }
-            .page { background: white; max-width: 1000px; margin: 20px auto; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 8px; background: #e9ecef; }
+            .page { background: white; max-width: 1000px; margin: 8px auto; padding: 12px 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 4px; }
             @media print {
                 body { background: white; padding: 0; }
-                .page { box-shadow: none; margin: 0; page-break-after: always; }
+                .page { box-shadow: none; margin: 0; border-radius: 0; page-break-after: always; max-width: 100%; padding: 10px 12px; }
             }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th, td { padding: 6px; border: 1px solid #ccc; text-align: center; }
-            th { background: #facc15; }
-            .part-col { text-align: left; word-wrap: break-word; max-width: 120px; }
-            .dist-stock { color: #16a34a; }
+            table { width: 100%; border-collapse: collapse; font-size: 8px; table-layout: fixed; }
+            th, td { padding: 2px 2px; border: 1px solid #ccc; text-align: center; word-wrap: break-word; }
+            th { background: #facc15; font-size: 7px; }
         </style>
     </head>
     <body>`;
@@ -668,7 +684,7 @@ async function downloadPDF(name) {
             return;
         }
         
-        const rowsPerPage = 15;
+        const rowsPerPage = 13;
         const totalPages = Math.ceil(offers.length / rowsPerPage);
         
         const pages = [];
@@ -680,11 +696,11 @@ async function downloadPDF(name) {
             div.style.top = "0";
             div.style.width = "1000px";
             div.style.background = "#fff";
-            div.style.padding = "20px";
+            div.style.padding = "15px";
             document.body.appendChild(div);
             
             await new Promise(r => setTimeout(r, 300));
-            const canvas = await html2canvas(div, { scale: 2, useCORS: true });
+            const canvas = await html2canvas(div, { scale: 2, useCORS: true, width: 1000 });
             pages.push(canvas);
             document.body.removeChild(div);
         }
@@ -782,7 +798,7 @@ async function sharePDFToWhatsApp(name) {
         const msg = `📄 *Your Special Offer Brochure*\n\nDear ${name},\n\nPlease find your personalized offer brochure attached as PDF.${extraMsg}\n\nThank you for your business!\n\nAuto Spares Solution`;
         let cleanPhoneNum = phone;
         if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
-        const waUrl = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
+        const waUrl = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
         window.open(waUrl, "_blank");
         
     } catch (err) {
