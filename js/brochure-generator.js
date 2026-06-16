@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (Customer Master + Distributor Stock + Personal WhatsApp)");
+console.log("🚀 Brochure System Loaded (COMPLETE FIXED VERSION)");
 
 // =========================
 // DATA
@@ -57,7 +57,7 @@ function normalizeText(t) {
 }
 
 // =========================
-// PHONE CLEANER - Adds 91 for 10-digit numbers
+// PHONE CLEANER
 // =========================
 function cleanPhone(p) {
     let x = String(p || "").replace(/\D/g, "");
@@ -122,15 +122,13 @@ async function loadDistributorStock() {
 }
 
 // =========================
-// LOAD DEALER MASTER (UPDATED - INCLUDES CUSTOMER MASTER)
+// LOAD DEALER MASTER (WITH CUSTOMER MASTER INTEGRATION)
 // =========================
 async function loadDealerMaster() {
     
     const masterMap = new Map();
     
-    // ====================================
     // SOURCE 1: Customer Master (HIGHEST PRIORITY)
-    // ====================================
     const customers = JSON.parse(localStorage.getItem('customers') || '[]');
     console.log(`📋 Customer Master: ${customers.length} customers`);
     
@@ -150,9 +148,7 @@ async function loadDealerMaster() {
         });
     }
     
-    // ====================================
     // SOURCE 2: Excel Master File
-    // ====================================
     try {
         const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
         console.log(`📋 Excel Master: ${rows.length} entries`);
@@ -182,9 +178,7 @@ async function loadDealerMaster() {
         console.warn("Excel master file not found", e);
     }
     
-    // ====================================
     // SOURCE 3: Users and Dealers
-    // ====================================
     const users = JSON.parse(localStorage.getItem('users') || '[]');
     const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
     const allLocal = [...users, ...dealers];
@@ -211,9 +205,7 @@ async function loadDealerMaster() {
         }
     }
     
-    // ====================================
     // SOURCE 4: Invoices
-    // ====================================
     const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     for (const inv of allInvoices) {
         let name = inv.customerName || inv.buyer?.name || '';
@@ -237,16 +229,13 @@ async function loadDealerMaster() {
         }
     }
     
-    // Convert to array
     dealerMaster = Array.from(masterMap.values());
     
-    // Statistics
     const withPhone = dealerMaster.filter(d => d.phone).length;
     const withDistrict = dealerMaster.filter(d => d.district).length;
     
     console.log(`✅ Dealer Master Loaded: ${dealerMaster.length} dealers`);
-    console.log(`   📞 Has Phone: ${withPhone} (${Math.round(withPhone/dealerMaster.length*100)}%)`);
-    console.log(`   📍 Has District: ${withDistrict} (${Math.round(withDistrict/dealerMaster.length*100)}%)`);
+    console.log(`   📞 Has Phone: ${withPhone} | 📍 Has District: ${withDistrict}`);
     
     return dealerMaster;
 }
@@ -267,23 +256,34 @@ function loadOffers() {
 }
 
 // =========================
-// GET OFFERS
+// GET OFFERS (WITH FALLBACK)
 // =========================
 function getAllDealerOffers(name) {
-    return dealerOfferMap[normalizeText(name)] || [];
+    const normalized = normalizeText(name);
+    
+    if (dealerOfferMap[normalized]) {
+        return dealerOfferMap[normalized];
+    }
+    
+    for (const [key, offers] of Object.entries(dealerOfferMap)) {
+        if (key.includes(normalized) || normalized.includes(key)) {
+            console.log(`✅ Found offers by partial match: "${key}" for "${name}"`);
+            return offers;
+        }
+    }
+    
+    return [];
 }
 
 // =========================
-// FIND DEALER (UPDATED with fallback)
+// FIND DEALER
 // =========================
 function findDealer(name) {
     const normalized = normalizeText(name);
     
-    // Direct match
     let dealer = dealerMaster.find(d => normalizeText(d.name) === normalized);
     if (dealer) return dealer;
     
-    // Partial match
     dealer = dealerMaster.find(d => 
         normalizeText(d.name).includes(normalized) || 
         normalized.includes(normalizeText(d.name))
@@ -374,83 +374,103 @@ function generateWhatsAppMessage(name, dealer, offers) {
 }
 
 // =========================
-// SEND WHATSAPP (UPDATED)
+// SEND WHATSAPP (FIXED WITH MULTIPLE MATCHING STRATEGIES)
 // =========================
 function sendFlyerToWhatsApp(name) {
-    console.log(`🔍 Looking for: "${name}"`);
+    console.log(`🔍 Looking for offers for: "${name}"`);
     
-    // Find offers using normalized matching
-    const normalizedName = normalizeText(name);
-    let offers = dealerOfferMap[normalizedName] || [];
+    // STRATEGY 1: Direct match
+    let offers = [];
+    let matchedKey = null;
+    const normalizedInput = normalizeText(name);
     
-    // Try partial match if direct not found
+    if (dealerOfferMap[normalizedInput]) {
+        offers = dealerOfferMap[normalizedInput];
+        matchedKey = normalizedInput;
+        console.log(`✅ Direct match found`);
+    }
+    
+    // STRATEGY 2: Partial match
     if (offers.length === 0) {
         for (const [key, offerList] of Object.entries(dealerOfferMap)) {
-            if (key.includes(normalizedName) || normalizedName.includes(key)) {
+            if (key.includes(normalizedInput) || normalizedInput.includes(key)) {
                 offers = offerList;
-                console.log(`✅ Found offers by partial match: "${key}"`);
+                matchedKey = key;
+                console.log(`✅ Partial match: "${key}"`);
                 break;
             }
         }
     }
     
+    // STRATEGY 3: Word match
     if (offers.length === 0) {
-        alert(`❌ No offers found for "${name}"\n\nPlease run Analysis first.`);
-        console.error(`No offers for: ${name}`);
+        const inputWords = normalizedInput.split(' ');
+        for (const [key, offerList] of Object.entries(dealerOfferMap)) {
+            for (const word of inputWords) {
+                if (word.length > 2 && key.includes(word)) {
+                    offers = offerList;
+                    matchedKey = key;
+                    console.log(`✅ Word match: "${word}" in "${key}"`);
+                    break;
+                }
+            }
+            if (offers.length > 0) break;
+        }
+    }
+    
+    if (offers.length === 0) {
+        console.error(`❌ No offers found for "${name}"`);
+        const availableKeys = Object.keys(dealerOfferMap).slice(0, 15);
+        alert(`❌ No offers found for "${name}"
+
+Available dealers with offers (first 15):
+${availableKeys.join('\n')}${Object.keys(dealerOfferMap).length > 15 ? '\n...' : ''}
+
+Please run Analysis again.`);
         return;
     }
     
-    // Find dealer info
+    // FIND DEALER PHONE NUMBER
     let dealer = findDealer(name);
     
-    // If not found, try to create from Customer Master directly
+    if (!dealer || !dealer.phone) {
+        for (const d of dealerMaster) {
+            if (normalizeText(d.name) === matchedKey) {
+                dealer = d;
+                console.log(`✅ Found dealer by matched key: "${d.name}"`);
+                break;
+            }
+        }
+    }
+    
     if (!dealer || !dealer.phone) {
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        const customerMatch = customers.find(c => normalizeText(c.name) === normalizedName);
+        const customerMatch = customers.find(c => 
+            normalizeText(c.name) === normalizedInput ||
+            normalizeText(c.name) === matchedKey
+        );
         
         if (customerMatch && (customerMatch.mobileNo || customerMatch.phone)) {
             dealer = {
                 name: customerMatch.name,
                 phone: cleanPhone(customerMatch.mobileNo || customerMatch.phone),
                 district: customerMatch.district || '',
-                source: 'customer-master-direct'
+                source: 'customer-master'
             };
             console.log(`✅ Found phone from Customer Master: ${dealer.phone}`);
-        }
-    }
-    
-    // Try invoices if still no phone
-    if (!dealer || !dealer.phone) {
-        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        for (const inv of allInvoices) {
-            if (normalizeText(inv.customerName) === normalizedName) {
-                const phone = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
-                if (phone) {
-                    dealer = {
-                        name: name,
-                        phone: cleanPhone(phone),
-                        district: inv.customerDistrict || inv.district || '',
-                        source: 'invoice-direct'
-                    };
-                    console.log(`✅ Found phone from Invoice: ${dealer.phone}`);
-                    break;
-                }
-            }
         }
     }
     
     if (!dealer || !dealer.phone) {
         alert(`❌ Phone number not found for "${name}"
 
-Please add mobile number in Customer Master:
-1. Go to Customer Master page
-2. Search for "${name}"
-3. Add Mobile No (10 digits)
-4. Save and retry`);
+Please add mobile number in Customer Master for this dealer.`);
         return;
     }
     
-    const msg = generateWhatsAppMessage(name, dealer, offers);
+    // SEND MESSAGE
+    const actualDealerName = offers[0]?.dealer || name;
+    const msg = generateWhatsAppMessage(actualDealerName, dealer, offers);
     let cleanPhoneNum = dealer.phone;
     
     if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
@@ -459,7 +479,7 @@ Please add mobile number in Customer Master:
     const url = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
     
-    console.log(`✅ WhatsApp opened for "${name}" (${cleanPhoneNum}) | Offers: ${offers.length}`);
+    console.log(`✅ WhatsApp opened for "${actualDealerName}" (${cleanPhoneNum}) | Offers: ${offers.length}`);
 }
 
 // =========================
@@ -500,11 +520,7 @@ function generateFullBrochureHTML(name) {
         const stock = getDisplayStock(o);
         html += `<tr>
             <td>${o.part || ''}</td>
-            <td>₹${mrp.toFixed(2)}</td yo<th>₹${basic.toFixed(2)}</td yo<th>${dis}%</td>
-            <td style="color:green;font-weight:bold;">₹${net.toFixed(2)}</td>
-            <td>${stock.myStock}</td>
-            <td style="color:#16a34a;">${stock.distributorStock || '-'}</td>
-            <td><strong>${stock.totalStock}</strong></td>
+            <td>₹${mrp.toFixed(2)}</td yo<th>₹${basic.toFixed(2)}</td yo<th>${dis}%</td yo<th style="color:green;font-weight:bold;">₹${net.toFixed(2)}</td yo<th>${stock.myStock}</td yo<th style="color:#16a34a;">${stock.distributorStock || '-'}</td yo<th><strong>${stock.totalStock}</strong></td>
         </tr>`;
     }
 
@@ -641,13 +657,32 @@ function escapeHtml(str) {
 }
 
 // =========================
+// CHECK WHATSAPP READINESS
+// =========================
+function checkWhatsAppReadiness() {
+    const withOffers = Object.keys(dealerOfferMap).length;
+    let withPhone = 0;
+    for (const key of Object.keys(dealerOfferMap)) {
+        const dealer = findDealer(key);
+        if (dealer?.phone) withPhone++;
+    }
+    return { totalDealers: withOffers, ready: withPhone, missing: withOffers - withPhone };
+}
+
+// =========================
 // INIT
 // =========================
 async function init() {
     await loadDealerMaster();
     await loadDistributorStock();
     loadOffers();
-    console.log(`🚀 SYSTEM READY - Dealers: ${dealerMaster.length}, Distributor stock: ${distributorStock.length}`);
+    const readiness = checkWhatsAppReadiness();
+    console.log(`🚀 SYSTEM READY`);
+    console.log(`   📊 Dealers with offers: ${readiness.totalDealers}`);
+    console.log(`   📞 WhatsApp ready: ${readiness.ready} / ${readiness.totalDealers}`);
+    if (readiness.missing > 0) {
+        console.warn(`   ⚠️ Missing phone for ${readiness.missing} dealers`);
+    }
 }
 
 // =========================
@@ -666,7 +701,8 @@ window.BrochureGenerator = {
     sendFlyerToWhatsApp,
     exportDealerOffersToExcel,
     sharePDFToWhatsApp,
-    getDistributorStock: () => distributorStock
+    getDistributorStock: () => distributorStock,
+    checkWhatsAppReadiness
 };
 
 // Auto-init
