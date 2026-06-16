@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: WhatsApp Personal App + Multi-Page PDF)");
+console.log("🚀 Brochure System Loaded (FIXED: Preview + PDF Multi-Page + WhatsApp Personal)");
 
 // =========================
 // DATA
@@ -432,7 +432,7 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
 }
 
 // =========================
-// SEND WHATSAPP (FIXED: uses whatsapp:// for personal WhatsApp)
+// SEND WHATSAPP
 // =========================
 function sendFlyerToWhatsApp(name) {
     console.log(`🔍 Looking for offers for: "${name}"`);
@@ -491,7 +491,6 @@ function sendFlyerToWhatsApp(name) {
     if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
     if (cleanPhoneNum.length === 11 && cleanPhoneNum.startsWith('0')) cleanPhoneNum = '91' + cleanPhoneNum.substring(1);
     
-    // FIX: Use whatsapp:// for personal WhatsApp app
     const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
     window.location.href = url;
     
@@ -499,7 +498,7 @@ function sendFlyerToWhatsApp(name) {
 }
 
 // =========================
-// GENERATE BROCHURE HTML (A4 COMPACT)
+// GENERATE BROCHURE HTML
 // =========================
 function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 13) {
     const offers = getAllDealerOffers(name);
@@ -604,7 +603,7 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
 }
 
 // =========================
-// SHOW PREVIEW
+// SHOW PREVIEW (FIXED: ALL PAGES)
 // =========================
 function showBrochurePreview(name) {
     const offers = getAllDealerOffers(name);
@@ -616,29 +615,115 @@ function showBrochurePreview(name) {
     const rowsPerPage = 13;
     const totalPages = Math.ceil(offers.length / rowsPerPage);
     
+    console.log(`📄 Preview: ${offers.length} offers, ${totalPages} pages`);
+    
     let fullHtml = `<!DOCTYPE html>
     <html>
     <head>
         <title>Brochure - ${name}</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 0; padding: 8px; background: #e9ecef; }
-            .page { background: white; max-width: 1000px; margin: 8px auto; padding: 12px 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 4px; }
+            body { 
+                font-family: Arial, sans-serif; 
+                margin: 0; 
+                padding: 8px; 
+                background: #e9ecef; 
+            }
+            .page { 
+                background: white; 
+                max-width: 1000px; 
+                margin: 8px auto; 
+                padding: 12px 15px; 
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+                border-radius: 4px; 
+            }
             @media print {
                 body { background: white; padding: 0; }
-                .page { box-shadow: none; margin: 0; border-radius: 0; page-break-after: always; max-width: 100%; padding: 10px 12px; }
+                .page { 
+                    box-shadow: none; 
+                    margin: 0; 
+                    border-radius: 0; 
+                    page-break-after: always; 
+                    max-width: 100%; 
+                    padding: 10px 12px; 
+                }
             }
-            table { width: 100%; border-collapse: collapse; font-size: 8px; table-layout: fixed; }
-            th, td { padding: 2px 2px; border: 1px solid #ccc; text-align: center; word-wrap: break-word; }
-            th { background: #facc15; font-size: 7px; }
+            table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                font-size: 8px; 
+                table-layout: fixed; 
+            }
+            th, td { 
+                padding: 2px 2px; 
+                border: 1px solid #ccc; 
+                text-align: center; 
+                word-wrap: break-word; 
+            }
+            th { 
+                background: #facc15; 
+                font-size: 7px; 
+            }
+            .preview-header {
+                text-align: center;
+                padding: 10px;
+                background: #f8f9fa;
+                border-bottom: 2px solid #facc15;
+                margin-bottom: 10px;
+            }
+            .preview-header span {
+                font-size: 16px;
+                font-weight: bold;
+                color: #0a7c71;
+            }
+            .preview-header small {
+                color: #999;
+                font-size: 12px;
+            }
+            .preview-footer {
+                text-align: center;
+                padding: 15px;
+                background: #f8f9fa;
+                border-top: 2px solid #facc15;
+                margin-top: 10px;
+            }
+            .preview-footer button {
+                background: #0a7c71;
+                color: white;
+                border: none;
+                padding: 10px 25px;
+                border-radius: 6px;
+                font-size: 14px;
+                cursor: pointer;
+                margin: 5px;
+            }
+            .preview-footer button:hover {
+                background: #09645a;
+            }
+            .preview-footer .close-btn {
+                background: #dc3545;
+            }
+            .preview-footer .close-btn:hover {
+                background: #c82333;
+            }
         </style>
     </head>
-    <body>`;
+    <body>
+        <div class="preview-header">
+            <span>📄 Brochure Preview: ${escapeHtml(name)}</span>
+            <br>
+            <small>${offers.length} offers | ${totalPages} pages | 13 rows per page</small>
+        </div>`;
     
     for (let i = 0; i < totalPages; i++) {
         fullHtml += `<div class="page">${generateFullBrochureHTML(name, i, totalPages, rowsPerPage)}</div>`;
     }
     
-    fullHtml += `</body></html>`;
+    fullHtml += `
+        <div class="preview-footer">
+            <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+            <button class="close-btn" onclick="window.close()">❌ Close Preview</button>
+        </div>
+    </body></html>`;
     
     const w = window.open("", "_blank");
     w.document.write(fullHtml);
@@ -646,7 +731,7 @@ function showBrochurePreview(name) {
 }
 
 // =========================
-// DOWNLOAD PDF (MULTI-PAGE FIXED)
+// DOWNLOAD PDF (FIXED: ALL PAGES)
 // =========================
 async function downloadPDF(name) {
     try {
@@ -671,7 +756,7 @@ async function downloadPDF(name) {
                 pdf.addPage();
             }
             
-            console.log(`   Page ${i + 1}: Generating offers ${(i * rowsPerPage) + 1} to ${Math.min((i + 1) * rowsPerPage, offers.length)}`);
+            console.log(`   Page ${i + 1}: Offers ${(i * rowsPerPage) + 1} to ${Math.min((i + 1) * rowsPerPage, offers.length)}`);
             
             const div = document.createElement("div");
             div.innerHTML = generateFullBrochureHTML(name, i, totalPages, rowsPerPage);
@@ -742,7 +827,7 @@ function exportDealerOffersToExcel(name) {
 }
 
 // =========================
-// SHARE PDF TO WHATSAPP (FIXED: uses whatsapp://)
+// SHARE PDF TO WHATSAPP
 // =========================
 async function sharePDFToWhatsApp(name) {
     try {
@@ -773,7 +858,6 @@ async function sharePDFToWhatsApp(name) {
         let cleanPhoneNum = phone;
         if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
         
-        // FIX: Use whatsapp:// for personal WhatsApp app
         const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
         window.location.href = url;
         
