@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: Part No + Description + MRP + A4 Fit)");
+console.log("🚀 Brochure System Loaded (FIXED: Description from prices.csv)");
 
 // =========================
 // DATA
@@ -9,6 +9,7 @@ let dealerMaster = [];
 let currentOffers = [];
 let dealerOfferMap = {};
 let distributorStock = [];
+let partDescriptions = new Map(); // NEW: Store descriptions from prices.csv
 
 // =========================
 // XLSX CHECK
@@ -237,6 +238,57 @@ async function loadDealerMaster() {
 }
 
 // =========================
+// LOAD MY STOCK (UPDATED: Also loads descriptions)
+// =========================
+async function loadMyStock() {
+
+    try {
+
+        const response = await fetch('prices.csv');
+
+        const csvText = await response.text();
+
+        const rows = csvText.split('\n').slice(1);
+
+        currentStock.clear();
+        partDescriptions.clear(); // NEW: Clear descriptions
+
+        for (const row of rows) {
+
+            const cols = row.split(',');
+
+            if (!cols[0]) continue;
+
+            const part = cols[0].trim();
+
+            const stock = parseInt(cols[7]) || 0;
+
+            const price = parseFloat(cols[3]) || 0;
+            
+            // NEW: Get description from column B (index 1)
+            const description = cols[1] ? cols[1].trim() : '';
+
+            currentStock.set(part, {
+                stock,
+                price,
+                description // NEW: Store description
+            });
+            
+            // NEW: Store description separately for easy lookup
+            if (description) {
+                partDescriptions.set(part, description);
+            }
+        }
+
+        console.log(`✅ My stock loaded: ${currentStock.size} parts with descriptions`);
+
+    } catch (err) {
+
+        console.error("Error loading prices.csv:", err);
+    }
+}
+
+// =========================
 // LOAD OFFERS
 // =========================
 function loadOffers() {
@@ -380,6 +432,22 @@ function calculatePrices(offer) {
 }
 
 // =========================
+// GET DESCRIPTION FOR PART (NEW)
+// =========================
+function getDescription(part) {
+    // First check from prices.csv
+    if (partDescriptions.has(part)) {
+        return partDescriptions.get(part);
+    }
+    // Check from currentStock
+    const stockData = currentStock.get(part);
+    if (stockData && stockData.description) {
+        return stockData.description;
+    }
+    return '';
+}
+
+// =========================
 // GENERATE WHATSAPP MESSAGE
 // =========================
 function generateWhatsAppMessage(dealerName, dealer, offers) {
@@ -393,8 +461,11 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
     for (let o of offers.slice(0, 8)) {
         const prices = calculatePrices(o);
         const stock = prices.stock;
+        const desc = getDescription(o.part);
         
-        msg += `🔹 *${o.part}*\n`;
+        msg += `🔹 *${o.part}*`;
+        if (desc) msg += ` - ${desc}`;
+        msg += `\n`;
         msg += `   📦 Our Stock: ${stock.myStock} units`;
         if (prices.ourOfferPrice > 0) {
             msg += ` @ ₹${prices.ourOfferPrice.toFixed(2)}/unit (incl. GST)`;
@@ -498,7 +569,7 @@ function sendFlyerToWhatsApp(name) {
 }
 
 // =========================
-// GENERATE BROCHURE HTML (NEW: Part No + Description + MRP)
+// GENERATE BROCHURE HTML (WITH DESCRIPTION)
 // =========================
 function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 14) {
     const offers = getAllDealerOffers(name);
@@ -543,10 +614,10 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
         <col style="width:15%;">
         <col style="width:25%;">
         <col style="width:10%;">
-        <col style="width:10%;">
-        <col style="width:10%;">
-        <col style="width:10%;">
-        <col style="width:10%;">
+        <col style="width:9%;">
+        <col style="width:11%;">
+        <col style="width:9%;">
+        <col style="width:11%;">
         <col style="width:10%;">
     </colgroup>
     <thead>
@@ -566,9 +637,7 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     for (const o of pageOffers) {
         const prices = calculatePrices(o);
         const stock = prices.stock;
-        
-        // Get description from offer or use part number as description
-        const description = o.description || o.partDescription || o.desc || '';
+        const description = getDescription(o.part);
         
         html += `<tr>
             <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:8px;"><strong>${escapeHtml(o.part || '')}</strong></td>
@@ -607,7 +676,7 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
 }
 
 // =========================
-// SHOW PREVIEW (ALL PAGES)
+// SHOW PREVIEW
 // =========================
 function showBrochurePreview(name) {
     const offers = getAllDealerOffers(name);
@@ -697,7 +766,7 @@ function showBrochurePreview(name) {
 }
 
 // =========================
-// DOWNLOAD PDF (MULTI-PAGE, A4 FIT)
+// DOWNLOAD PDF
 // =========================
 async function downloadPDF(name) {
     try {
@@ -749,11 +818,9 @@ async function downloadPDF(name) {
             
             const imgData = canvas.toDataURL('image/png');
             
-            // Calculate image scaling to fill A4 page (start from top)
             const imgWidth = pageWidth;
             const imgHeight = (canvas.height / canvas.width) * imgWidth;
             
-            // If image height exceeds page height, scale down to fit
             let finalWidth = imgWidth;
             let finalHeight = imgHeight;
             if (imgHeight > pageHeight) {
@@ -762,7 +829,6 @@ async function downloadPDF(name) {
                 finalHeight *= scale;
             }
             
-            // Center horizontally, start from top vertically
             const x = (pageWidth - finalWidth) / 2;
             const y = 0;
             
@@ -820,9 +886,10 @@ function exportDealerOffersToExcel(name) {
     const offers = getAllDealerOffers(name);
     const data = offers.map(o => {
         const prices = calculatePrices(o);
+        const description = getDescription(o.part);
         return {
             "Part No": o.part,
-            "Description": o.description || o.partDescription || '',
+            "Description": description || '',
             "MRP": prices.ourMRP.toFixed(2),
             "Our Stock": prices.stock.myStock,
             "Our Price (incl. GST)": prices.ourOfferPrice.toFixed(2),
@@ -919,12 +986,14 @@ function escapeHtml(str) {
 // =========================
 async function init() {
     await loadDealerMaster();
+    await loadMyStock(); // UPDATED: Loads descriptions too
     await loadDistributorStock();
     loadOffers();
     console.log(`🚀 SYSTEM READY`);
     console.log(`   📊 Offers: ${currentOffers.length}`);
     console.log(`   📞 Dealers: ${dealerMaster.length}`);
     console.log(`   🏭 Distributor Stock: ${distributorStock.length} items`);
+    console.log(`   📝 Descriptions loaded: ${partDescriptions.size}`);
 }
 
 // =========================
@@ -935,6 +1004,7 @@ window.BrochureGenerator = {
     loadDealerMaster,
     loadOffers,
     loadDistributorStock,
+    loadMyStock,
     getAllDealerOffers,
     getDealersWithOffers,
     findDealer,
@@ -947,7 +1017,9 @@ window.BrochureGenerator = {
     downloadAllFlyersPDF,
     sharePDFToWhatsApp,
     getDistributorStock: () => distributorStock,
-    getDistributorInfo: getDistributorInfo
+    getDistributorInfo: getDistributorInfo,
+    getDescription: getDescription,
+    partDescriptions: partDescriptions
 };
 
 // Auto-init
