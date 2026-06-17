@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: PDF Button + Multi-Page + WhatsApp Personal)");
+console.log("🚀 Brochure System Loaded (FIXED: Part No + Description + MRP + A4 Fit)");
 
 // =========================
 // DATA
@@ -498,9 +498,9 @@ function sendFlyerToWhatsApp(name) {
 }
 
 // =========================
-// GENERATE BROCHURE HTML
+// GENERATE BROCHURE HTML (NEW: Part No + Description + MRP)
 // =========================
-function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 13) {
+function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 14) {
     const offers = getAllDealerOffers(name);
     const dealer = findDealer(name);
     
@@ -523,40 +523,42 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     const hasDistributorStock = offers.some(o => getDisplayStock(o).hasDistributor);
     
     let html = `
-    <div style="width:100%;max-width:1000px;background:#fff;padding:12px 15px;font-family:Arial;color:#000;margin:0 auto;page-break-after:${page < totalPages - 1 ? 'always' : 'avoid'};">
+    <div style="width:100%;max-width:1000px;background:#fff;padding:8px 12px;font-family:Arial;color:#000;margin:0 auto;page-break-after:${page < totalPages - 1 ? 'always' : 'avoid'};">
     
-    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #facc15;padding-bottom:5px;margin-bottom:8px;">
-        <span style="color:#0a7c71;font-size:20px;font-weight:bold;">AUTO SPARES SOLUTION</span>
-        <span style="font-size:11px;color:#666;">Page ${page + 1}/${totalPages}</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #facc15;padding-bottom:4px;margin-bottom:5px;">
+        <span style="color:#0a7c71;font-size:18px;font-weight:bold;">AUTO SPARES SOLUTION</span>
+        <span style="font-size:10px;color:#666;">Page ${page + 1}/${totalPages}</span>
     </div>
     
-    <h2 style="font-size:16px;margin:4px 0;">${escapeHtml(name)}</h2>
+    <h2 style="font-size:14px;margin:3px 0;color:#1e293b;">${escapeHtml(name)}</h2>
     
-    <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;margin-bottom:6px;background:#f8f9fa;padding:5px 10px;border-radius:4px;">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;margin-bottom:5px;background:#f8f9fa;padding:4px 8px;border-radius:4px;">
         <span><b>📞 Mobile:</b> ${phone || "Not available"}</span>
         <span><b>📍 District:</b> ${district || "Not specified"}</span>
-        <span style="color:#666;font-size:10px;">Showing ${start + 1} - ${end} of ${offers.length} offers</span>
+        <span style="color:#666;font-size:9px;">Showing ${start + 1} - ${end} of ${offers.length} offers</span>
     </div>
     
     <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;">
     <colgroup>
-        <col style="width:20%;">
-        <col style="width:9%;">
-        <col style="width:14%;">
-        <col style="width:9%;">
-        <col style="width:14%;">
+        <col style="width:15%;">
+        <col style="width:25%;">
         <col style="width:10%;">
-        <col style="width:24%;">
+        <col style="width:10%;">
+        <col style="width:10%;">
+        <col style="width:10%;">
+        <col style="width:10%;">
+        <col style="width:10%;">
     </colgroup>
     <thead>
     <tr style="background:#facc15;">
         <th style="padding:3px 2px;border:1px solid #ccc;text-align:left;font-size:8px;word-wrap:break-word;">Part No</th>
+        <th style="padding:3px 2px;border:1px solid #ccc;text-align:left;font-size:8px;word-wrap:break-word;">Description</th>
+        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">MRP</th>
         <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Our<br>Stock</th>
         <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Our Price<br><small>incl.GST</small></th>
         <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Dist.<br>Stock</th>
         <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Dist. Price<br><small>MRP</small></th>
         <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Total</th>
-        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:7px;word-wrap:break-word;">Courier</th>
     </tr>
     </thead>
     <tbody>`;
@@ -565,12 +567,17 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
         const prices = calculatePrices(o);
         const stock = prices.stock;
         
+        // Get description from offer or use part number as description
+        const description = o.description || o.partDescription || o.desc || '';
+        
         html += `<tr>
             <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:8px;"><strong>${escapeHtml(o.part || '')}</strong></td>
+            <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:8px;color:#333;">${escapeHtml(description || '-')}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">₹${prices.ourMRP.toFixed(2)}</td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">${stock.myStock}</td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;color:#2563eb;font-weight:bold;">
                 ₹${prices.ourOfferPrice.toFixed(2)}
-                ${prices.dis > 0 ? `<br><span style="color:#16a34a;font-size:7px;">${prices.dis}% OFF</span>` : ''}
+                ${prices.dis > 0 ? `<br><span style="color:#16a34a;font-size:6px;">${prices.dis}% OFF</span>` : ''}
             </td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;${stock.distributorStock > 0 ? 'color:#16a34a;' : 'color:#999;'}">
                 ${stock.distributorStock || '-'}
@@ -580,21 +587,18 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
                 ${stock.distributorStock > 0 && prices.distMRP > 0 ? `<br><span style="font-size:6px;color:#666;">MRP ₹${prices.distMRP.toFixed(2)}</span>` : ''}
             </td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;font-weight:bold;">${stock.totalStock}</td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;${stock.hasDistributor ? 'color:#dc3545;' : 'color:#28a745;'}">
-                ${stock.hasDistributor ? '⚠️ Yes' : '✅ No'}
-            </td>
         </tr>`;
     }
 
     html += `</tbody></table>`;
     
     if (hasDistributorStock) {
-        html += `<div style="margin-top:5px;padding:4px 8px;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;font-size:9px;color:#856404;">
+        html += `<div style="margin-top:4px;padding:3px 6px;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;font-size:8px;color:#856404;">
             ⚠️ <strong>Additional courier charges will apply for distributor stock items.</strong>
         </div>`;
     }
     
-    html += `<div style="margin-top:5px;font-size:7px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:4px;">
+    html += `<div style="margin-top:4px;font-size:7px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:3px;">
         ${new Date().toLocaleDateString()} | Auto Spares Solution | ${offers.length} offers total
     </div>`;
     html += `</div>`;
@@ -612,7 +616,7 @@ function showBrochurePreview(name) {
         return;
     }
     
-    const rowsPerPage = 13;
+    const rowsPerPage = 14;
     const totalPages = Math.ceil(offers.length / rowsPerPage);
     
     console.log(`📄 Preview: ${offers.length} offers, ${totalPages} pages`);
@@ -625,26 +629,26 @@ function showBrochurePreview(name) {
             body { 
                 font-family: Arial, sans-serif; 
                 margin: 0; 
-                padding: 8px; 
+                padding: 5px; 
                 background: #e9ecef; 
             }
             .page { 
                 background: white; 
                 max-width: 1000px; 
-                margin: 8px auto; 
-                padding: 12px 15px; 
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
-                border-radius: 4px; 
+                margin: 5px auto; 
+                padding: 8px 12px; 
+                box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
+                border-radius: 3px; 
             }
             @media print {
-                body { background: white; padding: 0; }
+                body { background: white; padding: 0; margin: 0; }
                 .page { 
                     box-shadow: none; 
                     margin: 0; 
                     border-radius: 0; 
                     page-break-after: always; 
                     max-width: 100%; 
-                    padding: 10px 12px; 
+                    padding: 5px 8px; 
                 }
             }
             table { 
@@ -666,10 +670,10 @@ function showBrochurePreview(name) {
         </style>
     </head>
     <body>
-        <div style="text-align:center;padding:10px;background:#f8f9fa;border-bottom:2px solid #facc15;margin-bottom:10px;">
-            <span style="font-size:16px;font-weight:bold;color:#0a7c71;">📄 Brochure Preview: ${escapeHtml(name)}</span>
+        <div style="text-align:center;padding:6px;background:#f8f9fa;border-bottom:2px solid #facc15;margin-bottom:5px;">
+            <span style="font-size:14px;font-weight:bold;color:#0a7c71;">📄 Brochure Preview: ${escapeHtml(name)}</span>
             <br>
-            <span style="font-size:13px;color:#666;">${offers.length} offers | ${totalPages} pages | 13 rows per page</span>
+            <span style="font-size:11px;color:#666;">${offers.length} offers | ${totalPages} pages | 14 rows per page</span>
         </div>`;
     
     for (let i = 0; i < totalPages; i++) {
@@ -677,11 +681,11 @@ function showBrochurePreview(name) {
     }
     
     fullHtml += `
-        <div style="text-align:center;padding:15px;background:#f8f9fa;border-top:2px solid #facc15;margin-top:10px;">
-            <button onclick="window.print()" style="background:#0a7c71;color:white;border:none;padding:10px 25px;border-radius:6px;font-size:14px;cursor:pointer;margin:5px;">
+        <div style="text-align:center;padding:10px;background:#f8f9fa;border-top:2px solid #facc15;margin-top:5px;">
+            <button onclick="window.print()" style="background:#0a7c71;color:white;border:none;padding:8px 20px;border-radius:5px;font-size:12px;cursor:pointer;margin:3px;">
                 🖨️ Print / Save as PDF
             </button>
-            <button onclick="window.close()" style="background:#dc3545;color:white;border:none;padding:10px 25px;border-radius:6px;font-size:14px;cursor:pointer;margin:5px;">
+            <button onclick="window.close()" style="background:#dc3545;color:white;border:none;padding:8px 20px;border-radius:5px;font-size:12px;cursor:pointer;margin:3px;">
                 ❌ Close Preview
             </button>
         </div>
@@ -693,7 +697,7 @@ function showBrochurePreview(name) {
 }
 
 // =========================
-// DOWNLOAD PDF (FIXED: MULTI-PAGE FOR ALL OFFERS)
+// DOWNLOAD PDF (MULTI-PAGE, A4 FIT)
 // =========================
 async function downloadPDF(name) {
     try {
@@ -703,7 +707,7 @@ async function downloadPDF(name) {
             return;
         }
         
-        const rowsPerPage = 13;
+        const rowsPerPage = 14;
         const totalPages = Math.ceil(offers.length / rowsPerPage);
         
         console.log(`📄 Generating PDF: ${offers.length} offers, ${totalPages} pages`);
@@ -727,27 +731,42 @@ async function downloadPDF(name) {
             div.style.top = "0";
             div.style.width = "1000px";
             div.style.background = "#fff";
-            div.style.padding = "15px";
+            div.style.padding = "0px";
+            div.style.margin = "0px";
             document.body.appendChild(div);
             
-            await new Promise(r => setTimeout(r, 400));
+            await new Promise(r => setTimeout(r, 300));
             
             const canvas = await html2canvas(div, { 
-                scale: 2, 
+                scale: 2.5, 
                 useCORS: true,
                 width: 1000,
-                height: div.scrollHeight
+                height: div.scrollHeight,
+                backgroundColor: '#ffffff'
             });
             
             document.body.removeChild(div);
             
             const imgData = canvas.toDataURL('image/png');
-            const imgWidth = 190;
-            const imgHeight = (canvas.height / canvas.width) * imgWidth;
-            const x = (pageWidth - imgWidth) / 2;
-            const y = (pageHeight - imgHeight) / 2;
             
-            pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+            // Calculate image scaling to fill A4 page (start from top)
+            const imgWidth = pageWidth;
+            const imgHeight = (canvas.height / canvas.width) * imgWidth;
+            
+            // If image height exceeds page height, scale down to fit
+            let finalWidth = imgWidth;
+            let finalHeight = imgHeight;
+            if (imgHeight > pageHeight) {
+                const scale = pageHeight / imgHeight;
+                finalWidth *= scale;
+                finalHeight *= scale;
+            }
+            
+            // Center horizontally, start from top vertically
+            const x = (pageWidth - finalWidth) / 2;
+            const y = 0;
+            
+            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
         }
         
         pdf.save(`${name.replace(/[^a-z0-9]/gi, '_')}_brochure.pdf`);
@@ -760,14 +779,14 @@ async function downloadPDF(name) {
 }
 
 // =========================
-// DOWNLOAD SINGLE PDF (FIXED: Now uses downloadPDF)
+// DOWNLOAD SINGLE PDF
 // =========================
 async function downloadSinglePDF(name) {
     await downloadPDF(name);
 }
 
 // =========================
-// DOWNLOAD ALL FLYERS PDF (FIXED: Downloads all dealers)
+// DOWNLOAD ALL FLYERS PDF
 // =========================
 async function downloadAllFlyersPDF() {
     try {
@@ -802,13 +821,14 @@ function exportDealerOffersToExcel(name) {
     const data = offers.map(o => {
         const prices = calculatePrices(o);
         return {
-            Part: o.part,
+            "Part No": o.part,
+            "Description": o.description || o.partDescription || '',
+            "MRP": prices.ourMRP.toFixed(2),
             "Our Stock": prices.stock.myStock,
             "Our Price (incl. GST)": prices.ourOfferPrice.toFixed(2),
             "Discount %": prices.dis,
             "Dist. Stock": prices.stock.distributorStock,
             "Dist. Price (MRP)": prices.distOfferPrice.toFixed(2),
-            "Dist. MRP": prices.distMRP.toFixed(2),
             "Total Stock": prices.stock.totalStock,
             "Courier Charges": prices.stock.hasDistributor ? "Applicable" : "N/A"
         };
