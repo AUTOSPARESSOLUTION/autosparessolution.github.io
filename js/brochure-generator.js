@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: Multi-Page PDF + Preview + WhatsApp Personal)");
+console.log("🚀 Brochure System Loaded (FIXED: PDF Button + Multi-Page + WhatsApp Personal)");
 
 // =========================
 // DATA
@@ -760,6 +760,37 @@ async function downloadPDF(name) {
 }
 
 // =========================
+// DOWNLOAD SINGLE PDF (FIXED: Now uses downloadPDF)
+// =========================
+async function downloadSinglePDF(name) {
+    await downloadPDF(name);
+}
+
+// =========================
+// DOWNLOAD ALL FLYERS PDF (FIXED: Downloads all dealers)
+// =========================
+async function downloadAllFlyersPDF() {
+    try {
+        const dealers = await getDealersWithOffers();
+        if (dealers.length === 0) {
+            alert('No flyers found. Run Analysis first.');
+            return;
+        }
+        
+        let count = 0;
+        for (const d of dealers) {
+            await downloadPDF(d.name);
+            await new Promise(r => setTimeout(r, 500));
+            count++;
+        }
+        alert(`✅ Downloaded ${count} PDF files`);
+    } catch(err) {
+        console.error(err);
+        alert('Error downloading PDFs: ' + err.message);
+    }
+}
+
+// =========================
 // EXCEL EXPORT
 // =========================
 function exportDealerOffersToExcel(name) {
@@ -892,6 +923,8 @@ window.BrochureGenerator = {
     sendFlyerToWhatsApp,
     exportDealerOffersToExcel,
     downloadPDF,
+    downloadSinglePDF,
+    downloadAllFlyersPDF,
     sharePDFToWhatsApp,
     getDistributorStock: () => distributorStock,
     getDistributorInfo: getDistributorInfo
