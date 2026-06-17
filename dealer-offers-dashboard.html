@@ -414,20 +414,29 @@ function displayOffers(offers) {
 }
 
 // ============================================================
-// FLYER FUNCTIONS (unchanged, kept for reference)
+// FLYER FUNCTIONS (UPDATED: Multi-page PDF support)
 // ============================================================
 async function sendSingleWhatsApp(dealerName) {
     try {
-        if (typeof BrochureGenerator === 'undefined') { alert('BrochureGenerator not loaded'); return; }
+        if (typeof BrochureGenerator === 'undefined') { 
+            alert('BrochureGenerator not loaded. Please refresh.'); 
+            return; 
+        }
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         BrochureGenerator.sendFlyerToWhatsApp(dealerName);
-    } catch(err) { console.error(err); alert(err.message); }
+    } catch(err) { 
+        console.error(err); 
+        alert(err.message); 
+    }
 }
 
 async function generateAllFlyers() {
     try {
-        if (typeof BrochureGenerator === 'undefined') { alert('BrochureGenerator not loaded'); return; }
+        if (typeof BrochureGenerator === 'undefined') { 
+            alert('BrochureGenerator not loaded. Please refresh.'); 
+            return; 
+        }
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         const dealers = await BrochureGenerator.getDealersWithOffers();
@@ -450,57 +459,85 @@ async function generateAllFlyers() {
                 </div>
             `;
         });
-    } catch(err) { console.error(err); alert(err.message); }
+    } catch(err) { 
+        console.error(err); 
+        alert(err.message); 
+    }
 }
 
 async function previewFlyer(dealerName) {
     try {
+        if (typeof BrochureGenerator === 'undefined') { 
+            alert('BrochureGenerator not loaded. Please refresh.'); 
+            return; 
+        }
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         BrochureGenerator.showBrochurePreview(dealerName);
-    } catch(err) { console.error(err); alert(err.message); }
+    } catch(err) { 
+        console.error(err); 
+        alert(err.message); 
+    }
 }
 
 async function downloadSinglePDF(dealerName) {
     try {
-        const html = BrochureGenerator.generateFullBrochureHTML(dealerName);
-        if (!html) { alert('No flyer found'); return; }
-        const div = document.createElement('div');
-        div.innerHTML = html;
-        div.style.position = 'fixed'; div.style.left = '-9999px'; div.style.top = '0';
-        div.style.width = '800px'; div.style.background = 'white'; div.style.padding = '20px';
-        document.body.appendChild(div);
-        await new Promise(r => setTimeout(r, 700));
-        const canvas = await html2canvas(div, { scale: 2, useCORS: true });
-        const img = canvas.toDataURL('image/png');
-        const { jsPDF } = window.jspdf;
-        if (!jsPDF) { alert('PDF library missing'); return; }
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = 190;
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        pdf.addImage(img, 'PNG', 10, 10, pdfWidth, pdfHeight);
-        pdf.save(dealerName.replace(/[^a-z0-9]/gi, '_') + '.pdf');
-        document.body.removeChild(div);
-    } catch(err) { console.error(err); alert(err.message); }
+        if (typeof BrochureGenerator === 'undefined') { 
+            alert('BrochureGenerator not loaded. Please refresh.'); 
+            return; 
+        }
+        // This now calls the multi-page downloadPDF function
+        await BrochureGenerator.downloadPDF(dealerName);
+    } catch(err) { 
+        console.error(err); 
+        alert('PDF download failed: ' + err.message); 
+    }
 }
 
 async function downloadAllFlyersPDF() {
     try {
+        if (typeof BrochureGenerator === 'undefined') { 
+            alert('BrochureGenerator not loaded. Please refresh.'); 
+            return; 
+        }
         const dealers = await BrochureGenerator.getDealersWithOffers();
-        for (const d of dealers) { await downloadSinglePDF(d.name); await new Promise(r => setTimeout(r, 500)); }
-        alert(`Downloaded ${dealers.length} PDF files`);
-    } catch(err) { console.error(err); alert(err.message); }
+        if (dealers.length === 0) {
+            alert('No flyers found. Run Analysis first.');
+            return;
+        }
+        let count = 0;
+        for (const d of dealers) {
+            await BrochureGenerator.downloadPDF(d.name);
+            await new Promise(r => setTimeout(r, 500));
+            count++;
+        }
+        alert(`✅ Downloaded ${count} PDF files`);
+    } catch(err) { 
+        console.error(err); 
+        alert('Error downloading PDFs: ' + err.message); 
+    }
 }
 
 async function sendBulkWhatsAppFlyers() {
     try {
+        if (typeof BrochureGenerator === 'undefined') { 
+            alert('BrochureGenerator not loaded. Please refresh.'); 
+            return; 
+        }
         const dealers = await BrochureGenerator.getDealersWithOffers();
         let count = 0;
         for (const d of dealers) {
-            if (d.phone) { BrochureGenerator.sendFlyerToWhatsApp(d.name); count++; await new Promise(r => setTimeout(r, 1500)); }
+            if (d.phone) { 
+                BrochureGenerator.sendFlyerToWhatsApp(d.name); 
+                count++; 
+                await new Promise(r => setTimeout(r, 1500)); 
+            }
         }
         alert(`Opened WhatsApp for ${count} dealers`);
-    } catch(err) { console.error(err); alert(err.message); }
+    } catch(err) { 
+        console.error(err); 
+        alert(err.message); 
+    }
 }
 
 function escapeHtml(str) {
