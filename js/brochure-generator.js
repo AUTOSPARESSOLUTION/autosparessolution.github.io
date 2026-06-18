@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: Exact + Contains Match Only)");
+console.log("🚀 Brochure System Loaded (FIXED: Async + All Features)");
 
 // =========================
 // DATA
@@ -337,56 +337,60 @@ function loadOffers() {
 }
 
 // =========================
-// GET OFFERS (ONLY EXACT + CONTAINS MATCH)
+// GET OFFERS
 // =========================
 function getAllDealerOffers(name) {
     const normalized = normalizeText(name);
     
-    console.log(`🔍 Searching offers for: "${name}" (normalized: "${normalized}")`);
-    
-    // STRATEGY 1: EXACT MATCH (HIGHEST PRIORITY)
     if (dealerOfferMap[normalized]) {
-        console.log(`✅ Exact match found for: "${name}"`);
         return dealerOfferMap[normalized];
     }
     
-    // STRATEGY 2: CONTAINS MATCH
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
-        if (key.includes(normalized)) {
-            console.log(`✅ Contains match: "${key}" for "${name}"`);
+        if (key.includes(normalized) || normalized.includes(key)) {
+            console.log(`✅ Found offers by partial match: "${key}" for "${name}"`);
             return offers;
         }
     }
     
-    console.log(`❌ No offers found for: "${name}"`);
+    const words = normalized.split(' ');
+    for (const [key, offers] of Object.entries(dealerOfferMap)) {
+        for (const word of words) {
+            if (word.length > 2 && key.includes(word)) {
+                console.log(`✅ Found offers by word match: "${key}" for "${name}"`);
+                return offers;
+            }
+        }
+    }
+    
     return [];
 }
 
 // =========================
-// FIND DEALER (ONLY EXACT + CONTAINS MATCH)
+// FIND DEALER
 // =========================
 function findDealer(name) {
     const normalized = normalizeText(name);
     
-    console.log(`🔍 Finding dealer: "${name}" (normalized: "${normalized}")`);
-    
-    // STRATEGY 1: EXACT MATCH
     let dealer = dealerMaster.find(d => normalizeText(d.name) === normalized);
-    if (dealer) {
-        console.log(`✅ Exact match: "${dealer.name}" → phone: ${dealer.phone}`);
-        return dealer;
-    }
+    if (dealer) return dealer;
     
-    // STRATEGY 2: CONTAINS MATCH
     dealer = dealerMaster.find(d => 
-        normalizeText(d.name).includes(normalized)
+        normalizeText(d.name).includes(normalized) || 
+        normalized.includes(normalizeText(d.name))
     );
-    if (dealer) {
-        console.log(`✅ Contains match: "${dealer.name}" → phone: ${dealer.phone}`);
-        return dealer;
+    if (dealer) return dealer;
+    
+    const words = normalized.split(' ');
+    for (const d of dealerMaster) {
+        const normName = normalizeText(d.name);
+        for (const word of words) {
+            if (word.length > 2 && normName.includes(word)) {
+                return d;
+            }
+        }
     }
     
-    console.log(`❌ No dealer found for: "${name}"`);
     return null;
 }
 
@@ -526,12 +530,28 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
 }
 
 // =========================
-// SEND WHATSAPP
+// SEND WHATSAPP (FIXED: Added async)
 // =========================
-function sendFlyerToWhatsApp(name) {
+async function sendFlyerToWhatsApp(name) {
     console.log(`🔍 Looking for offers for: "${name}"`);
     
     let offers = getAllDealerOffers(name);
+    
+    if (offers.length === 0) {
+        const normalized = normalizeText(name);
+        const words = normalized.split(' ');
+        
+        for (const [key, offerList] of Object.entries(dealerOfferMap)) {
+            for (const word of words) {
+                if (word.length > 2 && key.includes(word)) {
+                    offers = offerList;
+                    console.log(`✅ Found offers by word match: "${key}" for "${name}"`);
+                    break;
+                }
+            }
+            if (offers.length > 0) break;
+        }
+    }
     
     if (offers.length === 0) {
         alert(`❌ No offers found for "${name}"`);
@@ -543,7 +563,6 @@ function sendFlyerToWhatsApp(name) {
     
     let dealer = findDealer(correctDealerName);
     
-    // If not found, try Customer Master directly
     if (!dealer || !dealer.phone) {
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const customerMatch = customers.find(c => normalizeText(c.name) === normalizeText(correctDealerName));
@@ -558,7 +577,6 @@ function sendFlyerToWhatsApp(name) {
         }
     }
     
-    // If still not found, try Excel Master directly
     if (!dealer || !dealer.phone) {
         try {
             const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
@@ -676,6 +694,7 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
         const description = getDescription(o.part);
         const offerType = o.offerType || '';
         const expiryDate = o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : '-';
+        const source = o.source || '';
         
         const onlyDistributor = stock.myStock === 0 && stock.distributorStock > 0;
         const noStock = stock.myStock === 0 && stock.distributorStock === 0;
@@ -731,6 +750,8 @@ function showBrochurePreview(name) {
     
     const rowsPerPage = 12;
     const totalPages = Math.ceil(offers.length / rowsPerPage);
+    
+    console.log(`📄 Preview: ${offers.length} offers, ${totalPages} pages`);
     
     let fullHtml = `<!DOCTYPE html>
     <html>
@@ -821,6 +842,8 @@ async function downloadPDF(name) {
         const rowsPerPage = 12;
         const totalPages = Math.ceil(offers.length / rowsPerPage);
         
+        console.log(`📄 Generating PDF: ${offers.length} offers, ${totalPages} pages`);
+        
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = 210;
@@ -830,6 +853,8 @@ async function downloadPDF(name) {
             if (i > 0) {
                 pdf.addPage();
             }
+            
+            console.log(`   Page ${i + 1}: Offers ${(i * rowsPerPage) + 1} to ${Math.min((i + 1) * rowsPerPage, offers.length)}`);
             
             const div = document.createElement("div");
             div.innerHTML = generateFullBrochureHTML(name, i, totalPages, rowsPerPage);
@@ -855,6 +880,7 @@ async function downloadPDF(name) {
             document.body.removeChild(div);
             
             const imgData = canvas.toDataURL('image/png');
+            
             const imgWidth = pageWidth;
             const imgHeight = (canvas.height / canvas.width) * imgWidth;
             
