@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: Part No + Description + MRP + A4 Fit)");
+console.log("🚀 Brochure System Loaded (ENHANCED: Offer Types + Expiry + Sources)");
 
 // =========================
 // DATA
@@ -9,8 +9,8 @@ let dealerMaster = [];
 let currentOffers = [];
 let dealerOfferMap = {};
 let distributorStock = [];
-let currentStock = new Map(); // Store stock data with descriptions
-let partDescriptions = new Map(); // Store descriptions from prices.csv
+let currentStock = new Map();
+let partDescriptions = new Map();
 
 // =========================
 // XLSX CHECK
@@ -239,7 +239,7 @@ async function loadDealerMaster() {
 }
 
 // =========================
-// LOAD MY STOCK (UPDATED: Also loads descriptions from Column B)
+// LOAD MY STOCK (WITH DESCRIPTIONS)
 // =========================
 async function loadMyStock() {
 
@@ -249,24 +249,40 @@ async function loadMyStock() {
 
         const csvText = await response.text();
 
-        const rows = csvText.split('\n').slice(1);
-
+        const lines = csvText.split('\n');
+        
         currentStock.clear();
         partDescriptions.clear();
 
-        for (const row of rows) {
+        let skippedHeader = false;
+        let loadedCount = 0;
+        let descCount = 0;
 
-            const cols = row.split(',');
-
-            if (!cols[0]) continue;
-
-            const part = cols[0].trim();
-
-            const stock = parseInt(cols[7]) || 0;
-
-            const price = parseFloat(cols[3]) || 0;
+        for (const line of lines) {
+            if (!line.trim()) continue;
             
-            // Get description from column B (index 1)
+            const cols = line.split(',');
+            
+            if (!skippedHeader && cols[0] && 
+                (cols[0].toLowerCase().includes('material') || 
+                 cols[0].toLowerCase().includes('part'))) {
+                skippedHeader = true;
+                continue;
+            }
+            
+            const part = cols[0]?.trim() || '';
+            if (!part) continue;
+
+            let stock = 0;
+            if (cols[7] && cols[7].trim() !== '' && cols[7].trim() !== 'NaN') {
+                stock = parseInt(cols[7].trim()) || 0;
+            }
+            
+            let price = 0;
+            if (cols[3] && cols[3].trim() !== '' && cols[3].trim() !== 'NaN') {
+                price = parseFloat(cols[3].trim()) || 0;
+            }
+            
             const description = cols[1] ? cols[1].trim() : '';
 
             currentStock.set(part, {
@@ -274,14 +290,16 @@ async function loadMyStock() {
                 price: price,
                 description: description
             });
+            loadedCount++;
             
-            // Store description separately for easy lookup
             if (description) {
                 partDescriptions.set(part, description);
+                descCount++;
             }
         }
 
-        console.log(`✅ My stock loaded: ${currentStock.size} parts with descriptions`);
+        console.log(`✅ My stock loaded: ${loadedCount} parts`);
+        console.log(`📝 Descriptions loaded: ${descCount}`);
 
     } catch (err) {
 
@@ -290,14 +308,12 @@ async function loadMyStock() {
 }
 
 // =========================
-// GET DESCRIPTION (NEW)
+// GET DESCRIPTION
 // =========================
 function getDescription(part) {
-    // First check from prices.csv via partDescriptions
     if (partDescriptions.has(part)) {
         return partDescriptions.get(part);
     }
-    // Check from currentStock
     const stockData = currentStock.get(part);
     if (stockData && stockData.description) {
         return stockData.description;
@@ -449,7 +465,7 @@ function calculatePrices(offer) {
 }
 
 // =========================
-// GENERATE WHATSAPP MESSAGE (UPDATED with Description)
+// GENERATE WHATSAPP MESSAGE (ENHANCED)
 // =========================
 function generateWhatsAppMessage(dealerName, dealer, offers) {
     let msg = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
@@ -463,14 +479,22 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
         const prices = calculatePrices(o);
         const stock = prices.stock;
         const desc = getDescription(o.part);
+        const offerType = o.offerType || '';
+        const expiryDate = o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : '';
+        const source = o.source || '';
         
         msg += `🔹 *${o.part}*`;
         if (desc) msg += ` - ${desc}`;
         msg += `\n`;
+        
+        if (offerType) msg += `   🏷️ ${offerType}\n`;
+        if (source) msg += `   📄 Source: ${source}\n`;
+        
+        msg += `   💰 Offer Price: ₹${prices.ourOfferPrice.toFixed(2)}\n`;
+        if (prices.dis > 0) msg += `   ✨ ${prices.dis}% OFF\n`;
         msg += `   📦 Our Stock: ${stock.myStock} units`;
-        if (prices.ourOfferPrice > 0) {
-            msg += ` @ ₹${prices.ourOfferPrice.toFixed(2)}/unit (incl. GST)`;
-            if (prices.dis > 0) msg += ` | ${prices.dis}% OFF`;
+        if (prices.ourOfferPrice > 0 && stock.myStock > 0) {
+            msg += ` @ ₹${prices.ourOfferPrice.toFixed(2)}/unit`;
         }
         msg += `\n`;
         
@@ -482,7 +506,9 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
             }
             msg += `\n`;
         }
-        msg += `   📊 Total Stock: ${stock.totalStock} units\n\n`;
+        msg += `   📊 Total Stock: ${stock.totalStock} units\n`;
+        if (expiryDate) msg += `   ⏰ Valid till: ${expiryDate}\n`;
+        msg += `\n`;
     }
 
     if (offers.length > 8) {
@@ -570,9 +596,9 @@ function sendFlyerToWhatsApp(name) {
 }
 
 // =========================
-// GENERATE BROCHURE HTML (Part No + Description + MRP)
+// GENERATE BROCHURE HTML (ENHANCED: Offer Type + Expiry + Source)
 // =========================
-function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 14) {
+function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 12) {
     const offers = getAllDealerOffers(name);
     const dealer = findDealer(name);
     
@@ -595,42 +621,46 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     const hasDistributorStock = offers.some(o => getDisplayStock(o).hasDistributor);
     
     let html = `
-    <div style="width:100%;max-width:1000px;background:#fff;padding:8px 12px;font-family:Arial;color:#000;margin:0 auto;page-break-after:${page < totalPages - 1 ? 'always' : 'avoid'};">
+    <div style="width:100%;max-width:1000px;background:#fff;padding:8px 10px;font-family:Arial;color:#000;margin:0 auto;page-break-after:${page < totalPages - 1 ? 'always' : 'avoid'};">
     
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #facc15;padding-bottom:4px;margin-bottom:5px;">
         <span style="color:#0a7c71;font-size:18px;font-weight:bold;">AUTO SPARES SOLUTION</span>
         <span style="font-size:10px;color:#666;">Page ${page + 1}/${totalPages}</span>
     </div>
     
-    <h2 style="font-size:14px;margin:3px 0;color:#1e293b;">${escapeHtml(name)}</h2>
+    <h2 style="font-size:14px;margin:2px 0;color:#1e293b;">${escapeHtml(name)}</h2>
     
-    <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;margin-bottom:5px;background:#f8f9fa;padding:4px 8px;border-radius:4px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:10px;margin-bottom:4px;background:#f8f9fa;padding:3px 8px;border-radius:4px;">
         <span><b>📞 Mobile:</b> ${phone || "Not available"}</span>
         <span><b>📍 District:</b> ${district || "Not specified"}</span>
-        <span style="color:#666;font-size:9px;">Showing ${start + 1} - ${end} of ${offers.length} offers</span>
+        <span style="color:#666;font-size:8px;">Showing ${start + 1} - ${end} of ${offers.length} offers</span>
     </div>
     
-    <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;">
+    <table style="width:100%;border-collapse:collapse;font-size:8px;table-layout:fixed;">
     <colgroup>
-        <col style="width:15%;">
-        <col style="width:25%;">
+        <col style="width:12%;">
+        <col style="width:18%;">
+        <col style="width:8%;">
+        <col style="width:8%;">
+        <col style="width:8%;">
+        <col style="width:8%;">
+        <col style="width:8%;">
+        <col style="width:8%;">
         <col style="width:10%;">
-        <col style="width:9%;">
-        <col style="width:11%;">
-        <col style="width:9%;">
-        <col style="width:11%;">
-        <col style="width:10%;">
+        <col style="width:12%;">
     </colgroup>
     <thead>
     <tr style="background:#facc15;">
-        <th style="padding:3px 2px;border:1px solid #ccc;text-align:left;font-size:8px;word-wrap:break-word;">Part No</th>
-        <th style="padding:3px 2px;border:1px solid #ccc;text-align:left;font-size:8px;word-wrap:break-word;">Description</th>
-        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">MRP</th>
-        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Our<br>Stock</th>
-        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Our Price<br><small>incl.GST</small></th>
-        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Dist.<br>Stock</th>
-        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Dist. Price<br><small>MRP</small></th>
-        <th style="padding:3px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">Total</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;word-wrap:break-word;">Part</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;word-wrap:break-word;">Description</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">MRP</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Disc</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Price</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Our<br>Stock</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Dist<br>Stock</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Total</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:6px;word-wrap:break-word;">Type</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:6px;word-wrap:break-word;">Expiry</th>
     </tr>
     </thead>
     <tbody>`;
@@ -639,37 +669,47 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
         const prices = calculatePrices(o);
         const stock = prices.stock;
         const description = getDescription(o.part);
+        const offerType = o.offerType || '';
+        const expiryDate = o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : '-';
+        const source = o.source || '';
+        
+        // Determine if stock is only from distributor
+        const onlyDistributor = stock.myStock === 0 && stock.distributorStock > 0;
+        const noStock = stock.myStock === 0 && stock.distributorStock === 0;
         
         html += `<tr>
-            <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:8px;"><strong>${escapeHtml(o.part || '')}</strong></td>
-            <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:8px;color:#333;">${escapeHtml(description || '-')}</td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">₹${prices.ourMRP.toFixed(2)}</td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;">${stock.myStock}</td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;color:#2563eb;font-weight:bold;">
-                ₹${prices.ourOfferPrice.toFixed(2)}
-                ${prices.dis > 0 ? `<br><span style="color:#16a34a;font-size:6px;">${prices.dis}% OFF</span>` : ''}
+            <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:7px;"><strong>${escapeHtml(o.part || '')}</strong></td>
+            <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:7px;color:#333;">${escapeHtml(description || '-')}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">${prices.ourMRP.toFixed(0)}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#16a34a;">${prices.dis}%</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#2563eb;font-weight:bold;">${prices.ourOfferPrice.toFixed(0)}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;${onlyDistributor ? 'color:#ff6b35;' : noStock ? 'color:#999;' : ''}">
+                ${stock.myStock}
+                ${onlyDistributor ? `<br><span style="color:#16a34a;font-size:5px;">(Dist only)</span>` : ''}
             </td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;${stock.distributorStock > 0 ? 'color:#16a34a;' : 'color:#999;'}">
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;${stock.distributorStock > 0 ? 'color:#16a34a;' : 'color:#999;'}">
                 ${stock.distributorStock || '-'}
             </td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;${stock.distributorStock > 0 ? 'color:#16a34a;font-weight:bold;' : 'color:#999;'}">
-                ${stock.distributorStock > 0 ? `₹${prices.distOfferPrice.toFixed(2)}` : '-'}
-                ${stock.distributorStock > 0 && prices.distMRP > 0 ? `<br><span style="font-size:6px;color:#666;">MRP ₹${prices.distMRP.toFixed(2)}</span>` : ''}
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;font-weight:bold;">${stock.totalStock}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:6px;word-wrap:break-word;">
+                ${offerType ? escapeHtml(offerType.replace('⭐ ', '').replace('🔥 ', '').replace('🏭 ', '').replace('📄 ', '').replace('📋 ', '')) : '-'}
             </td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:8px;font-weight:bold;">${stock.totalStock}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:6px;${expiryDate !== '-' ? 'color:#dc3545;' : ''}">
+                ${expiryDate}
+            </td>
         </tr>`;
     }
 
     html += `</tbody></table>`;
     
     if (hasDistributorStock) {
-        html += `<div style="margin-top:4px;padding:3px 6px;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;font-size:8px;color:#856404;">
-            ⚠️ <strong>Additional courier charges will apply for distributor stock items.</strong>
+        html += `<div style="margin-top:3px;padding:2px 6px;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;font-size:7px;color:#856404;">
+            ⚠️ <strong>Additional courier charges apply for distributor stock items.</strong>
         </div>`;
     }
     
-    html += `<div style="margin-top:4px;font-size:7px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:3px;">
-        ${new Date().toLocaleDateString()} | Auto Spares Solution | ${offers.length} offers total
+    html += `<div style="margin-top:3px;font-size:6px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:3px;">
+        ${new Date().toLocaleDateString()} | ${offers.length} offers | Valid for 15 days
     </div>`;
     html += `</div>`;
     
@@ -677,7 +717,7 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
 }
 
 // =========================
-// SHOW PREVIEW (ALL PAGES)
+// SHOW PREVIEW
 // =========================
 function showBrochurePreview(name) {
     const offers = getAllDealerOffers(name);
@@ -686,7 +726,7 @@ function showBrochurePreview(name) {
         return;
     }
     
-    const rowsPerPage = 14;
+    const rowsPerPage = 12;
     const totalPages = Math.ceil(offers.length / rowsPerPage);
     
     console.log(`📄 Preview: ${offers.length} offers, ${totalPages} pages`);
@@ -706,7 +746,7 @@ function showBrochurePreview(name) {
                 background: white; 
                 max-width: 1000px; 
                 margin: 5px auto; 
-                padding: 8px 12px; 
+                padding: 6px 10px; 
                 box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
                 border-radius: 3px; 
             }
@@ -718,13 +758,13 @@ function showBrochurePreview(name) {
                     border-radius: 0; 
                     page-break-after: always; 
                     max-width: 100%; 
-                    padding: 5px 8px; 
+                    padding: 4px 6px; 
                 }
             }
             table { 
                 width: 100%; 
                 border-collapse: collapse; 
-                font-size: 8px; 
+                font-size: 7px; 
                 table-layout: fixed; 
             }
             th, td { 
@@ -735,15 +775,15 @@ function showBrochurePreview(name) {
             }
             th { 
                 background: #facc15; 
-                font-size: 7px; 
+                font-size: 6px; 
             }
         </style>
     </head>
     <body>
-        <div style="text-align:center;padding:6px;background:#f8f9fa;border-bottom:2px solid #facc15;margin-bottom:5px;">
+        <div style="text-align:center;padding:4px;background:#f8f9fa;border-bottom:2px solid #facc15;margin-bottom:4px;">
             <span style="font-size:14px;font-weight:bold;color:#0a7c71;">📄 Brochure Preview: ${escapeHtml(name)}</span>
             <br>
-            <span style="font-size:11px;color:#666;">${offers.length} offers | ${totalPages} pages | 14 rows per page</span>
+            <span style="font-size:10px;color:#666;">${offers.length} offers | ${totalPages} pages | 12 rows per page</span>
         </div>`;
     
     for (let i = 0; i < totalPages; i++) {
@@ -751,11 +791,11 @@ function showBrochurePreview(name) {
     }
     
     fullHtml += `
-        <div style="text-align:center;padding:10px;background:#f8f9fa;border-top:2px solid #facc15;margin-top:5px;">
-            <button onclick="window.print()" style="background:#0a7c71;color:white;border:none;padding:8px 20px;border-radius:5px;font-size:12px;cursor:pointer;margin:3px;">
+        <div style="text-align:center;padding:8px;background:#f8f9fa;border-top:2px solid #facc15;margin-top:4px;">
+            <button onclick="window.print()" style="background:#0a7c71;color:white;border:none;padding:6px 16px;border-radius:4px;font-size:11px;cursor:pointer;margin:2px;">
                 🖨️ Print / Save as PDF
             </button>
-            <button onclick="window.close()" style="background:#dc3545;color:white;border:none;padding:8px 20px;border-radius:5px;font-size:12px;cursor:pointer;margin:3px;">
+            <button onclick="window.close()" style="background:#dc3545;color:white;border:none;padding:6px 16px;border-radius:4px;font-size:11px;cursor:pointer;margin:2px;">
                 ❌ Close Preview
             </button>
         </div>
@@ -767,7 +807,7 @@ function showBrochurePreview(name) {
 }
 
 // =========================
-// DOWNLOAD PDF (MULTI-PAGE, A4 FIT)
+// DOWNLOAD PDF
 // =========================
 async function downloadPDF(name) {
     try {
@@ -777,7 +817,7 @@ async function downloadPDF(name) {
             return;
         }
         
-        const rowsPerPage = 14;
+        const rowsPerPage = 12;
         const totalPages = Math.ceil(offers.length / rowsPerPage);
         
         console.log(`📄 Generating PDF: ${offers.length} offers, ${totalPages} pages`);
@@ -819,11 +859,9 @@ async function downloadPDF(name) {
             
             const imgData = canvas.toDataURL('image/png');
             
-            // Calculate image scaling to fill A4 page (start from top)
             const imgWidth = pageWidth;
             const imgHeight = (canvas.height / canvas.width) * imgWidth;
             
-            // If image height exceeds page height, scale down to fit
             let finalWidth = imgWidth;
             let finalHeight = imgHeight;
             if (imgHeight > pageHeight) {
@@ -832,7 +870,6 @@ async function downloadPDF(name) {
                 finalHeight *= scale;
             }
             
-            // Center horizontally, start from top vertically
             const x = (pageWidth - finalWidth) / 2;
             const y = 0;
             
@@ -880,7 +917,7 @@ async function downloadAllFlyersPDF() {
 }
 
 // =========================
-// EXCEL EXPORT (UPDATED with Description)
+// EXCEL EXPORT
 // =========================
 function exportDealerOffersToExcel(name) {
     if (!hasXLSX()) {
@@ -895,13 +932,14 @@ function exportDealerOffersToExcel(name) {
             "Part No": o.part,
             "Description": description || '',
             "MRP": prices.ourMRP.toFixed(2),
-            "Our Stock": prices.stock.myStock,
-            "Our Price (incl. GST)": prices.ourOfferPrice.toFixed(2),
             "Discount %": prices.dis,
+            "Offer Price": prices.ourOfferPrice.toFixed(2),
+            "Our Stock": prices.stock.myStock,
             "Dist. Stock": prices.stock.distributorStock,
-            "Dist. Price (MRP)": prices.distOfferPrice.toFixed(2),
             "Total Stock": prices.stock.totalStock,
-            "Courier Charges": prices.stock.hasDistributor ? "Applicable" : "N/A"
+            "Offer Type": o.offerType || '',
+            "Source": o.source || '',
+            "Expires": o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : ''
         };
     });
     const ws = XLSX.utils.json_to_sheet(data);
@@ -931,14 +969,7 @@ async function sharePDFToWhatsApp(name) {
         
         await downloadPDF(name);
         
-        const offers = getAllDealerOffers(name);
-        const hasDistStock = offers.some(o => getDisplayStock(o).hasDistributor);
-        let extraMsg = "";
-        if (hasDistStock) {
-            extraMsg = "\n\n⚠️ Additional courier charges will apply for distributor stock items.";
-        }
-        
-        const msg = `📄 *Your Special Offer Brochure*\n\nDear ${name},\n\nPlease find your personalized offer brochure attached as PDF.${extraMsg}\n\nThank you for your business!\n\nAuto Spares Solution`;
+        const msg = `📄 *Your Special Offer Brochure*\n\nDear ${name},\n\nPlease find your personalized offer brochure attached as PDF.\n\nThank you for your business!\n\nAuto Spares Solution`;
         let cleanPhoneNum = phone;
         if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
         
@@ -986,11 +1017,11 @@ function escapeHtml(str) {
 }
 
 // =========================
-// INIT (UPDATED: Loads descriptions too)
+// INIT
 // =========================
 async function init() {
     await loadDealerMaster();
-    await loadMyStock(); // Loads descriptions from prices.csv
+    await loadMyStock();
     await loadDistributorStock();
     loadOffers();
     console.log(`🚀 SYSTEM READY`);
@@ -1001,7 +1032,7 @@ async function init() {
 }
 
 // =========================
-// GLOBAL API (UPDATED)
+// GLOBAL API
 // =========================
 window.BrochureGenerator = {
     init,
