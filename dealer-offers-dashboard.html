@@ -414,7 +414,7 @@ function displayOffers(offers) {
 }
 
 // ============================================================
-// FLYER FUNCTIONS (UPDATED: Multi-page PDF support)
+// FLYER FUNCTIONS (UPDATED: Multi-page PDF support + wa.me)
 // ============================================================
 async function sendSingleWhatsApp(dealerName) {
     try {
@@ -518,25 +518,92 @@ async function downloadAllFlyersPDF() {
     }
 }
 
+// ============================================================
+// BULK WHATSAPP (FIXED: Uses wa.me with delay)
+// ============================================================
 async function sendBulkWhatsAppFlyers() {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
             alert('BrochureGenerator not loaded. Please refresh.'); 
             return; 
         }
+        
         const dealers = await BrochureGenerator.getDealersWithOffers();
-        let count = 0;
-        for (const d of dealers) {
-            if (d.phone) { 
-                BrochureGenerator.sendFlyerToWhatsApp(d.name); 
-                count++; 
-                await new Promise(r => setTimeout(r, 1500)); 
-            }
+        
+        if (!dealers.length) {
+            alert("No dealers found");
+            return;
         }
-        alert(`Opened WhatsApp for ${count} dealers`);
-    } catch(err) { 
-        console.error(err); 
-        alert(err.message); 
+        
+        let current = 0;
+        let successCount = 0;
+        
+        function sendNext() {
+            if (current >= dealers.length) {
+                alert(`✅ Completed! Opened WhatsApp for ${successCount} dealers.`);
+                return;
+            }
+            
+            const dealer = dealers[current];
+            const phone = dealer.phone;
+            
+            if (!phone) {
+                console.log(`⚠️ No phone for ${dealer.name}, skipping...`);
+                current++;
+                setTimeout(sendNext, 500);
+                return;
+            }
+            
+            const offers = BrochureGenerator.getAllDealerOffers(dealer.name);
+            
+            if (!offers.length) {
+                current++;
+                setTimeout(sendNext, 500);
+                return;
+            }
+            
+            // Build message
+            let msg = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
+            msg += `*Dear ${dealer.name},*\n\n`;
+            msg += `*📋 SPECIAL OFFER LIST*\n`;
+            msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+            
+            for (let o of offers.slice(0, 5)) {
+                msg += `🔹 *${o.part}*\n`;
+                msg += `   💰 ₹${(o.offerPrice || 0).toFixed(2)}\n`;
+                if (o.discount > 0) msg += `   ✨ ${o.discount}% OFF\n`;
+                msg += `   📦 Stock: ${o.totalStock || 0}\n\n`;
+            }
+            
+            if (offers.length > 5) {
+                msg += `*And ${offers.length - 5} more offers...*\n\n`;
+            }
+            
+            msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+            if (dealer.district) msg += `📍 District: ${dealer.district}\n`;
+            msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+            msg += `_Reply with part numbers and quantity_\n`;
+            msg += `*Thank you for your business!*`;
+            
+            // Use wa.me for better browser compatibility
+            const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+            window.open(url, "_blank");
+            
+            console.log(`✅ Opened WhatsApp for ${dealer.name} (${current + 1}/${dealers.length})`);
+            successCount++;
+            
+            current++;
+            setTimeout(sendNext, 2500);
+        }
+        
+        // Show initial alert
+        alert(`📱 Starting bulk WhatsApp for ${dealers.length} dealers.\n\nTabs will open one by one with a 2.5 second delay.`);
+        
+        sendNext();
+        
+    } catch(err) {
+        console.error(err);
+        alert(err.message);
     }
 }
 
