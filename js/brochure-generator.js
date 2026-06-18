@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: Priority Matching for WhatsApp)");
+console.log("🚀 Brochure System Loaded (FIXED: Excel Master Phone Lookup)");
 
 // =========================
 // DATA
@@ -11,6 +11,7 @@ let dealerOfferMap = {};
 let distributorStock = [];
 let currentStock = new Map();
 let partDescriptions = new Map();
+let dealerMasterMap = new Map(); // NEW: Fast lookup by normalized name
 
 // =========================
 // XLSX CHECK
@@ -124,31 +125,16 @@ async function loadDistributorStock() {
 }
 
 // =========================
-// LOAD DEALER MASTER
+// LOAD DEALER MASTER (UPDATED: Prioritizes Excel Master)
 // =========================
 async function loadDealerMaster() {
     
     const masterMap = new Map();
+    dealerMasterMap.clear();
     
-    const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-    console.log(`📋 Customer Master: ${customers.length} customers`);
-    
-    for (const c of customers) {
-        const name = c.name || '';
-        if (!name) continue;
-        
-        const normName = normalizeText(name);
-        const phone = c.mobileNo || c.phone || '';
-        const district = c.district || '';
-        
-        masterMap.set(normName, {
-            name: name,
-            phone: cleanPhone(phone),
-            district: district,
-            source: 'customer-master'
-        });
-    }
-    
+    // ====================================
+    // SOURCE 1: Excel Master File (HIGHEST PRIORITY for phone numbers)
+    // ====================================
     try {
         const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
         console.log(`📋 Excel Master: ${rows.length} entries`);
@@ -161,23 +147,53 @@ async function loadDealerMaster() {
             const phone = row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "";
             const district = row["District"] || row["District Name"] || row["PLACE"] || row["Location"] || "";
             
-            if (!masterMap.has(normName)) {
-                masterMap.set(normName, {
-                    name: name,
-                    phone: cleanPhone(phone),
-                    district: district,
-                    source: 'excel'
-                });
-            } else {
-                const existing = masterMap.get(normName);
-                if (!existing.phone && phone) existing.phone = cleanPhone(phone);
-                if (!existing.district && district) existing.district = district;
-            }
+            // Always add/update from Excel Master
+            masterMap.set(normName, {
+                name: name,
+                phone: cleanPhone(phone),
+                district: district,
+                source: 'excel-master',
+                priority: 1
+            });
+            console.log(`   ✅ Excel Master: ${name} → ${phone}`);
         }
     } catch(e) {
         console.warn("Excel master file not found", e);
     }
     
+    // ====================================
+    // SOURCE 2: Customer Master (fallback)
+    // ====================================
+    const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+    console.log(`📋 Customer Master: ${customers.length} customers`);
+    
+    for (const c of customers) {
+        const name = c.name || '';
+        if (!name) continue;
+        
+        const normName = normalizeText(name);
+        const phone = c.mobileNo || c.phone || '';
+        const district = c.district || '';
+        
+        // Only add if not already in Excel Master (Excel Master takes priority)
+        if (!masterMap.has(normName) || !masterMap.get(normName).phone) {
+            masterMap.set(normName, {
+                name: name,
+                phone: cleanPhone(phone),
+                district: district,
+                source: 'customer-master',
+                priority: 2
+            });
+        } else {
+            // Update missing fields from Customer Master
+            const existing = masterMap.get(normName);
+            if (!existing.district && district) existing.district = district;
+        }
+    }
+    
+    // ====================================
+    // SOURCE 3: Users and Dealers
+    // ====================================
     const users = JSON.parse(localStorage.getItem('users') || '[]');
     const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
     const allLocal = [...users, ...dealers];
@@ -190,20 +206,20 @@ async function loadDealerMaster() {
         const phone = u.phone || u.mobile || u.mobileNo || '';
         const district = u.district || '';
         
-        if (!masterMap.has(normName)) {
+        if (!masterMap.has(normName) || !masterMap.get(normName).phone) {
             masterMap.set(normName, {
                 name: name,
                 phone: cleanPhone(phone),
                 district: district,
-                source: 'user-dealer'
+                source: 'user-dealer',
+                priority: 3
             });
-        } else {
-            const existing = masterMap.get(normName);
-            if (!existing.phone && phone) existing.phone = cleanPhone(phone);
-            if (!existing.district && district) existing.district = district;
         }
     }
     
+    // ====================================
+    // SOURCE 4: Invoices
+    // ====================================
     const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
     for (const inv of allInvoices) {
         let name = inv.customerName || inv.buyer?.name || '';
@@ -213,27 +229,35 @@ async function loadDealerMaster() {
         let phone = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
         let district = inv.customerDistrict || inv.buyer?.district || inv.district || '';
         
-        if (!masterMap.has(normName)) {
+        if (!masterMap.has(normName) || !masterMap.get(normName).phone) {
             masterMap.set(normName, {
                 name: name,
                 phone: cleanPhone(phone),
                 district: district,
-                source: 'invoice'
+                source: 'invoice',
+                priority: 4
             });
-        } else {
-            const existing = masterMap.get(normName);
-            if (!existing.phone && phone) existing.phone = cleanPhone(phone);
-            if (!existing.district && district) existing.district = district;
         }
     }
     
+    // Convert to array
     dealerMaster = Array.from(masterMap.values());
     
+    // Build fast lookup map
+    for (const d of dealerMaster) {
+        dealerMasterMap.set(normalizeText(d.name), d);
+    }
+    
+    // Statistics
     const withPhone = dealerMaster.filter(d => d.phone).length;
     const withDistrict = dealerMaster.filter(d => d.district).length;
     
     console.log(`✅ Dealer Master Loaded: ${dealerMaster.length} dealers`);
     console.log(`   📞 Has Phone: ${withPhone} | 📍 Has District: ${withDistrict}`);
+    
+    // Show dealers with phone from Excel
+    const excelPhone = dealerMaster.filter(d => d.source === 'excel-master' && d.phone);
+    console.log(`   📋 Excel Master phone: ${excelPhone.length} dealers`);
     
     return dealerMaster;
 }
@@ -334,49 +358,40 @@ function loadOffers() {
         dealerOfferMap[key].push(o);
     });
     console.log(`✅ Offers Loaded: ${currentOffers.length}`);
-    console.log(`📊 Dealer keys in map:`, Object.keys(dealerOfferMap).slice(0, 10));
+    console.log(`📊 Dealer keys:`, Object.keys(dealerOfferMap).slice(0, 10));
 }
 
 // =========================
-// GET OFFERS (FIXED: Priority-based matching)
+// GET OFFERS (FIXED: Priority-based)
 // =========================
 function getAllDealerOffers(name) {
     const normalized = normalizeText(name);
     
     console.log(`🔍 Searching offers for: "${name}" (normalized: "${normalized}")`);
     
-    // STRATEGY 1: EXACT MATCH (HIGHEST PRIORITY)
+    // STRATEGY 1: EXACT MATCH
     if (dealerOfferMap[normalized]) {
         console.log(`✅ Exact match found for: "${name}"`);
         return dealerOfferMap[normalized];
     }
     
-    // STRATEGY 2: CASE-INSENSITIVE EXACT MATCH (check if any key equals normalized)
+    // STRATEGY 2: CONTAINS MATCH
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
-        if (key === normalized) {
-            console.log(`✅ Case-insensitive exact match: "${key}" for "${name}"`);
+        if (key === normalized || key.includes(normalized)) {
+            console.log(`✅ Contains match: "${key}" for "${name}"`);
             return offers;
         }
     }
     
-    // STRATEGY 3: CONTAINS MATCH (key contains the full normalized name)
-    for (const [key, offers] of Object.entries(dealerOfferMap)) {
-        if (key.includes(normalized)) {
-            console.log(`✅ Contains match: "${key}" contains "${normalized}"`);
-            return offers;
-        }
-    }
-    
-    // STRATEGY 4: REVERSE CONTAINS (normalized contains the key - for partial names)
+    // STRATEGY 3: REVERSE CONTAINS
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
         if (normalized.includes(key) && key.length > 3) {
-            console.log(`✅ Reverse contains match: "${normalized}" contains "${key}"`);
+            console.log(`✅ Reverse contains: "${key}" in "${normalized}"`);
             return offers;
         }
     }
     
-    // STRATEGY 5: WORD MATCH (only if all previous fail - LOWEST PRIORITY)
-    // But ensure we match the MOST words, not the first match
+    // STRATEGY 4: WORD MATCH (with best score)
     const words = normalized.split(' ');
     let bestMatch = null;
     let bestScore = 0;
@@ -395,34 +410,51 @@ function getAllDealerOffers(name) {
     }
     
     if (bestMatch && bestScore > 0) {
-        console.log(`✅ Word match found: "${bestMatch.key}" with score ${bestScore} for "${name}"`);
+        console.log(`✅ Word match: "${bestMatch.key}" (score ${bestScore}) for "${name}"`);
         return bestMatch.offers;
     }
     
     console.log(`❌ No offers found for: "${name}"`);
-    console.log(`   Available keys:`, Object.keys(dealerOfferMap).slice(0, 5));
     return [];
 }
 
 // =========================
-// FIND DEALER (FIXED: Priority-based matching)
+// FIND DEALER (FIXED: Excel Master priority)
 // =========================
 function findDealer(name) {
     const normalized = normalizeText(name);
     
-    // STRATEGY 1: EXACT MATCH
+    console.log(`🔍 Finding dealer: "${name}" (normalized: "${normalized}")`);
+    
+    // STRATEGY 1: Check fast lookup map
+    if (dealerMasterMap.has(normalized)) {
+        const dealer = dealerMasterMap.get(normalized);
+        console.log(`✅ Dealer found in map: "${dealer.name}" → phone: ${dealer.phone}`);
+        return dealer;
+    }
+    
+    // STRATEGY 2: Direct match in dealerMaster
     let dealer = dealerMaster.find(d => normalizeText(d.name) === normalized);
-    if (dealer) return dealer;
+    if (dealer) {
+        console.log(`✅ Dealer found by direct match: "${dealer.name}" → phone: ${dealer.phone}`);
+        return dealer;
+    }
     
-    // STRATEGY 2: CONTAINS MATCH
+    // STRATEGY 3: Contains match
     dealer = dealerMaster.find(d => normalizeText(d.name).includes(normalized));
-    if (dealer) return dealer;
+    if (dealer) {
+        console.log(`✅ Dealer found by contains: "${dealer.name}" → phone: ${dealer.phone}`);
+        return dealer;
+    }
     
-    // STRATEGY 3: REVERSE CONTAINS
+    // STRATEGY 4: Reverse contains
     dealer = dealerMaster.find(d => normalized.includes(normalizeText(d.name)) && normalizeText(d.name).length > 3);
-    if (dealer) return dealer;
+    if (dealer) {
+        console.log(`✅ Dealer found by reverse contains: "${dealer.name}" → phone: ${dealer.phone}`);
+        return dealer;
+    }
     
-    // STRATEGY 4: WORD MATCH (with best score)
+    // STRATEGY 5: Word match
     const words = normalized.split(' ');
     let bestMatch = null;
     let bestScore = 0;
@@ -442,7 +474,7 @@ function findDealer(name) {
     }
     
     if (bestMatch && bestScore > 0) {
-        console.log(`✅ Dealer found by word match: "${bestMatch.name}" for "${name}"`);
+        console.log(`✅ Dealer found by word match: "${bestMatch.name}" → phone: ${bestMatch.phone}`);
         return bestMatch;
     }
     
@@ -574,9 +606,9 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
 // SEND WHATSAPP (FIXED)
 // =========================
 function sendFlyerToWhatsApp(name) {
-    console.log(`🔍 Looking for offers for: "${name}"`);
+    console.log(`🔍 WhatsApp request for: "${name}"`);
     
-    // Get offers using the priority matching
+    // Get offers using priority matching
     let offers = getAllDealerOffers(name);
     
     if (offers.length === 0) {
@@ -588,13 +620,16 @@ Please run Analysis first.`);
     
     // IMPORTANT: Use the EXACT dealer name from the offer
     const correctDealerName = offers[0].dealer;
-    console.log(`📛 Using correct dealer name: "${correctDealerName}" (was: "${name}")`);
+    console.log(`📛 Correct dealer name: "${correctDealerName}" (was: "${name}")`);
     
-    // Find dealer using priority matching
+    // Find dealer using priority matching (Excel Master priority)
     let dealer = findDealer(correctDealerName);
     
-    // If not found, try to find by direct match in Customer Master
+    // If dealer found but no phone, try direct lookup in all sources
     if (!dealer || !dealer.phone) {
+        console.log(`⚠️ No phone found in dealerMaster, trying direct sources...`);
+        
+        // Try Customer Master directly
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         const customerMatch = customers.find(c => normalizeText(c.name) === normalizeText(correctDealerName));
         if (customerMatch && (customerMatch.mobileNo || customerMatch.phone)) {
@@ -602,16 +637,44 @@ Please run Analysis first.`);
                 name: customerMatch.name,
                 phone: cleanPhone(customerMatch.mobileNo || customerMatch.phone),
                 district: customerMatch.district || '',
-                source: 'customer-master'
+                source: 'customer-master-direct'
             };
             console.log(`✅ Found phone from Customer Master: ${dealer.phone}`);
+        }
+    }
+    
+    // If still no phone, try Excel Master directly
+    if (!dealer || !dealer.phone) {
+        try {
+            const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
+            for (const row of rows) {
+                const name = row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || "";
+                if (normalizeText(name) === normalizeText(correctDealerName)) {
+                    const phone = row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "";
+                    if (phone) {
+                        dealer = {
+                            name: name,
+                            phone: cleanPhone(phone),
+                            district: row["District"] || "",
+                            source: 'excel-master-direct'
+                        };
+                        console.log(`✅ Found phone from Excel Master: ${dealer.phone}`);
+                        break;
+                    }
+                }
+            }
+        } catch(e) {
+            console.warn("Could not read Excel Master directly", e);
         }
     }
     
     if (!dealer || !dealer.phone) {
         alert(`❌ Phone number not found for "${correctDealerName}"
 
-Please add mobile number in Customer Master.`);
+Please add mobile number in:
+1. Customer Master (customers localStorage)
+2. Excel Master (RETAILER data Deatils.xlsx)
+3. Or Users/Dealers localStorage`);
         return;
     }
     
@@ -624,7 +687,7 @@ Please add mobile number in Customer Master.`);
     const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
     window.location.href = url;
     
-    console.log(`✅ WhatsApp opened for "${correctDealerName}" (${cleanPhoneNum}) | Offers: ${offers.length}`);
+    console.log(`✅ WhatsApp opened for "${correctDealerName}" (${cleanPhoneNum}) | Source: ${dealer.source} | Offers: ${offers.length}`);
 }
 
 // =========================
@@ -948,7 +1011,7 @@ async function sharePDFToWhatsApp(name) {
 }
 
 // =========================
-// GET DEALERS WITH OFFERS (FIXED: Only exact matches)
+// GET DEALERS WITH OFFERS
 // =========================
 async function getDealersWithOffers() {
     await loadDealerMaster();
@@ -956,7 +1019,6 @@ async function getDealersWithOffers() {
     const result = [];
     const processed = new Set();
     
-    // Use the dealerOfferMap keys directly
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
         if (offers.length > 0 && !processed.has(key)) {
             processed.add(key);
@@ -970,7 +1032,6 @@ async function getDealersWithOffers() {
                 }
             }
             
-            // If not found in master, use the offer's dealer name
             const dealerName = offers[0].dealer || key;
             
             result.push({
@@ -978,7 +1039,8 @@ async function getDealersWithOffers() {
                 phone: dealer?.phone || '',
                 district: dealer?.district || '',
                 offerCount: offers.length,
-                hasPhone: !!dealer?.phone
+                hasPhone: !!dealer?.phone,
+                source: dealer?.source || 'unknown'
             });
         }
     }
