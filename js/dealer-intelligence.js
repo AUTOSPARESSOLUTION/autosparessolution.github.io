@@ -1,4 +1,4 @@
-// dealer-intelligence.js - ENHANCED VERSION
+// dealer-intelligence.js - ENHANCED VERSION (FIXED)
 // Features: Quotations, Proforma, Purchase Invoices, District-wise, Enquiry System
 
 (function () {
@@ -32,7 +32,6 @@
 
         analysisMonths: 6,
         
-        // NEW: Enhanced offer settings
         offerSettings: {
             maxDiscount: 8,
             minDiscount: 1,
@@ -40,7 +39,7 @@
             newCustomerBonus: 2,
             urgentStockBonus: 2,
             seasonalBoost: 1,
-            enquiryResponseTime: 24, // Hours
+            enquiryResponseTime: 24,
             proformaValidDays: 7
         }
     };
@@ -58,9 +57,6 @@
     let retailerMaster = new Map();
     let dealerPurchaseHistory = new Map();
     
-    // ===================================================
-    // NEW DATA STRUCTURES
-    // ===================================================
     let quotations = [];
     let proformas = [];
     let purchaseInvoices = [];
@@ -94,7 +90,7 @@
     }
 
     // ===================================================
-    // LOAD EXCEL FILE (from server)
+    // LOAD EXCEL FILE
     // ===================================================
 
     async function loadExcelFile(url, sheetName = null) {
@@ -225,7 +221,6 @@
 
         retailerMaster.clear();
         
-        // SOURCE 1: Customer Master
         const customers = JSON.parse(localStorage.getItem('customers') || '[]');
         console.log(`📋 Customer Master loaded: ${customers.length} customers`);
         
@@ -245,7 +240,6 @@
             });
         }
         
-        // SOURCE 2: Excel Master File
         try {
             const rows = await loadExcelFile('data/RETAILER data details.xlsx', 'SAPUI5 Export');
             console.log(`📋 Excel Master loaded: ${rows.length} entries`);
@@ -281,7 +275,6 @@
             console.warn("Excel master file not found", e);
         }
         
-        // SOURCE 3: Users and Dealers
         const users = JSON.parse(localStorage.getItem('users') || '[]');
         const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
         const allLocal = [...users, ...dealers];
@@ -311,7 +304,6 @@
             }
         }
         
-        // SOURCE 4: Invoices
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         for (const inv of allInvoices) {
             let dealer = inv.customerName || inv.buyer?.name || '';
@@ -338,9 +330,6 @@
             }
         }
         
-        // ====================================
-        // Statistics
-        // ====================================
         let withPhone = 0;
         let withDistrict = 0;
         for (const [name, data] of retailerMaster) {
@@ -459,7 +448,6 @@
                         'Excel Offtake'
                 });
                 
-                // Track dealer purchase history
                 if (!dealerPurchaseHistory.has(dealer)) {
                     dealerPurchaseHistory.set(dealer, {
                         totalParts: 0,
@@ -473,7 +461,6 @@
                 history.totalQty += avgQty;
                 history.partCount += 1;
                 
-                // Track district data
                 if (district) {
                     if (!districtData.has(district)) {
                         districtData.set(district, {
@@ -593,7 +580,7 @@
     }
 
     // ===================================================
-    // ANALYSE INVOICES (Includes Quotations & Proformas)
+    // ANALYSE INVOICES
     // ===================================================
 
     function analyseInvoices() {
@@ -603,14 +590,12 @@
                 localStorage.getItem('allInvoices') || '[]'
             );
 
-        // Load quotations from localStorage
         quotations = JSON.parse(localStorage.getItem('quotations') || '[]');
         proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
         enquiries = JSON.parse(localStorage.getItem('enquiries') || '[]');
 
         dealerPartAverages.clear();
 
-        // Process invoices
         for (const inv of allInvoices) {
 
             if (!Array.isArray(inv.items)) {
@@ -652,7 +637,6 @@
             }
         }
         
-        // Process quotations
         for (const quote of quotations) {
             if (!quote.items) continue;
             
@@ -678,7 +662,6 @@
             }
         }
         
-        // Process proformas
         for (const proforma of proformas) {
             if (!proforma.items) continue;
             
@@ -709,13 +692,12 @@
     }
 
     // ===================================================
-    // AREA MULTIPLIER (Enhanced with district data)
+    // AREA MULTIPLIER
     // ===================================================
 
     function getAreaDemandMultiplier(area) {
 
         if (!areaDemand.has(area)) {
-            // Use district data if available
             if (districtData.has(area)) {
                 const distData = districtData.get(area);
                 if (distData.totalDemand > 1000) {
@@ -743,7 +725,7 @@
     }
 
     // ===================================================
-    // CALCULATE OFFER (Enhanced with district data)
+    // CALCULATE OFFER
     // ===================================================
 
     function calculateOffer(
@@ -757,7 +739,7 @@
         const distItem = distributorStock.find(d => d.part === part);
         const distributorStockQty = distItem?.stock || 0;
         
-        // Create offer if: MY stock > 0 OR (MY stock = 0 AND Dist stock > 0)
+        // FIX: Only skip if BOTH are 0 (preserve existing behavior)
         if (myStock <= 0 && distributorStockQty <= 0) {
             return null;
         }
@@ -770,9 +752,7 @@
             finalPrice = distItem.price;
         }
 
-        // DYNAMIC DISCOUNT CALCULATION
-        
-        // 1. Base discount from volume tier
+        // BASE DISCOUNT from volume tier
         let volumeTier = CONFIG.volumeTiers[5];
         for (const tier of CONFIG.volumeTiers) {
             if (avgQty >= tier.min) {
@@ -782,27 +762,27 @@
         }
         let discount = volumeTier.discount;
         
-        // 2. Area multiplier (enhanced with district data)
+        // Area multiplier
         const multiplier = getAreaDemandMultiplier(district);
         discount = Math.min(discount * multiplier, CONFIG.offerSettings.maxDiscount);
         
-        // 3. Loyalty bonus
+        // Loyalty bonus
         const dealerHistory = dealerPurchaseHistory.get(dealer);
         if (dealerHistory && dealerHistory.totalQty > 50) {
             discount += CONFIG.offerSettings.loyaltyBonus;
         }
         
-        // 4. New customer bonus
+        // New customer bonus
         if (dealerHistory && dealerHistory.partCount <= 3 && avgQty > 0) {
             discount += CONFIG.offerSettings.newCustomerBonus;
         }
         
-        // 5. Urgent stock bonus
+        // Urgent stock bonus
         if (totalStock < CONFIG.lowStockThreshold && totalStock > 0) {
             discount += CONFIG.offerSettings.urgentStockBonus;
         }
         
-        // 6. Seasonal boost
+        // Seasonal boost
         const currentMonth = new Date().getMonth();
         const festiveMonths = [10, 11, 12];
         if (festiveMonths.includes(currentMonth)) {
@@ -812,11 +792,9 @@
         discount = Math.min(Math.round(discount), CONFIG.offerSettings.maxDiscount);
         discount = Math.max(discount, CONFIG.offerSettings.minDiscount);
 
-        // PRICE CALCULATION
         const offerPrice = finalPrice * (1 - discount / 100);
         const basicPrice = finalPrice - (finalPrice * 31.77 / 100);
 
-        // OFFER TYPE DETERMINATION
         let offerType = volumeTier.label;
         if (myStock === 0 && distributorStockQty > 0) {
             offerType = "🏭 Distributor Backup";
@@ -868,23 +846,22 @@
 
             source,
             
-            // Track offer generation
             generatedAt: new Date().toISOString(),
-            expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString() // 15 days expiry
+            expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
         };
     }
 
     // ===================================================
-    // GENERATE OFFERS
+    // GENERATE OFFERS - FIXED: Don't clear before generation
     // ===================================================
 
     async function generateOffers() {
 
         areaDemand.clear();
         
-        // Clear old offers
-        localStorage.removeItem('dealerOffers');
-        console.log("🗑️ Old offers cleared from localStorage");
+        // FIX: Don't clear localStorage before generation
+        // Let the generation complete, then overwrite
+        console.log("🔄 Generating new offers...");
 
         await loadRetailerMaster();
 
@@ -902,6 +879,7 @@
 
         const processed = new Set();
 
+        // Process from invoices
         for (const [key, data] of dealerPartAverages) {
 
             const master =
@@ -933,6 +911,7 @@
             }
         }
 
+        // Process from retailer sales data
         for (const retailer of dealerData) {
 
             const uniqueKey =
@@ -971,6 +950,7 @@
 
         activeOffers = offers;
 
+        // Overwrite old offers
         saveOffersToStorage();
 
         console.log(`✅ Offers generated: ${offers.length}`);
@@ -980,7 +960,6 @@
             return acc;
         }, {}));
         
-        // Save district insights
         saveDistrictInsights();
 
         return offers;
@@ -1019,7 +998,7 @@
             quantity: quantity || 1,
             message: message || '',
             contactInfo: contactInfo || {},
-            status: 'pending', // pending, responded, closed
+            status: 'pending',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             response: null,
@@ -1029,12 +1008,10 @@
         enquiries.push(enquiry);
         localStorage.setItem('enquiries', JSON.stringify(enquiries));
         
-        // Auto-connect: Check if we have offers for this dealer
         const dealerOffers = activeOffers.filter(o => 
             normalizeText(o.dealer) === normalizeText(dealerName)
         );
         
-        // Auto-respond if we have offers
         if (dealerOffers.length > 0) {
             const response = generateAutoResponse(enquiry, dealerOffers);
             respondToEnquiry(enquiry.id, response);
@@ -1083,7 +1060,6 @@
         localStorage.setItem('enquiries', JSON.stringify(enquiries));
         console.log(`✅ Enquiry ${enquiryId} responded`);
         
-        // Store in localStorage for WhatsApp sending
         localStorage.setItem('pendingWhatsAppMessage', JSON.stringify({
             phone: enquiry.contactInfo?.phone || '',
             message: response,
@@ -1114,7 +1090,7 @@
             customerName: customerName,
             items: items,
             validDays: validDays,
-            status: 'draft', // draft, sent, accepted, rejected
+            status: 'draft',
             createdAt: new Date().toISOString(),
             validUntil: new Date(Date.now() + validDays * 24 * 60 * 60 * 1000).toISOString()
         };
@@ -1135,7 +1111,7 @@
             customerName: customerName,
             items: items,
             validDays: validDays,
-            status: 'draft', // draft, sent, accepted, rejected
+            status: 'draft',
             createdAt: new Date().toISOString(),
             validUntil: new Date(Date.now() + validDays * 24 * 60 * 60 * 1000).toISOString()
         };
@@ -1168,6 +1144,7 @@
                         activeOffers
                 })
             );
+            console.log(`💾 Saved ${activeOffers.length} offers to localStorage`);
         } catch(err) {
             console.warn("Could not save offers to localStorage (quota exceeded)", err.message);
         }
@@ -1413,22 +1390,18 @@ https://autosparessolution.com
 
         loadRetailerMaster,
 
-        // NEW: Quotation System
         createQuotation,
         getQuotations,
 
-        // NEW: Proforma System
         createProforma,
         getProformas,
 
-        // NEW: Enquiry System
         createEnquiry,
         respondToEnquiry,
         getEnquiries,
         getEnquiryById,
         generateAutoResponse,
 
-        // NEW: District Insights
         getDistrictInsights,
 
         CONFIG
