@@ -1,6 +1,6 @@
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: Async + All Features)");
+console.log("🚀 Brochure System Loaded (FIXED: All Issues)");
 
 // =========================
 // DATA
@@ -322,18 +322,34 @@ function getDescription(part) {
 }
 
 // =========================
-// LOAD OFFERS
+// LOAD OFFERS (FIXED: Handles both array and object)
 // =========================
 function loadOffers() {
-    const data = JSON.parse(localStorage.getItem("dealerOffers") || "{}");
-    currentOffers = Array.isArray(data.offers) ? data.offers : [];
+    const rawData = JSON.parse(localStorage.getItem("dealerOffers") || "{}");
+    
+    // Handle both formats:
+    // Format 1: { offers: [...] }
+    // Format 2: [...]
+    if (Array.isArray(rawData)) {
+        currentOffers = rawData;
+        console.log(`✅ Offers loaded as array: ${currentOffers.length}`);
+    } else if (rawData && Array.isArray(rawData.offers)) {
+        currentOffers = rawData.offers;
+        console.log(`✅ Offers loaded from offers property: ${currentOffers.length}`);
+    } else {
+        currentOffers = [];
+        console.log(`⚠️ No offers found in localStorage`);
+    }
+    
     dealerOfferMap = {};
+    
     currentOffers.forEach(o => {
         const key = normalizeText(o.dealer);
         if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
         dealerOfferMap[key].push(o);
     });
-    console.log(`✅ Offers Loaded: ${currentOffers.length}`);
+    
+    console.log(`📊 Dealer keys in map: ${Object.keys(dealerOfferMap).length}`);
 }
 
 // =========================
