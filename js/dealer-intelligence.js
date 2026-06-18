@@ -1,9 +1,10 @@
 // dealer-intelligence.js - COMPLETE FIXED VERSION
-// NO MIX: Each offer is either Our Stock OR Distributor Stock
+// FIX 1: Distributor Stock = MRP ONLY (NO 31.77%, NO DISCOUNT)
+// FIX 2: Individual stock display (Our Stock OR Dist Stock, NOT combined)
 
 (function () {
 
-    console.log("🚀 Dealer Intelligence System loaded (NO MIX - Separate Offers)");
+    console.log("🚀 Dealer Intelligence System loaded (FIXED: Individual Stock Display)");
 
     // ===================================================
     // CONFIGURATION
@@ -542,7 +543,7 @@
     }
 
     // ===================================================
-    // CALCULATE OFFER (NO MIX - Separate offers)
+    // CALCULATE OFFER - FIXED: Individual Stock Display
     // ===================================================
 
     function calculateOffer(
@@ -551,19 +552,16 @@
         avgQty,
         district,
         source,
-        stockType // NEW: 'my-stock' or 'distributor-stock'
+        stockType
     ) {
-        
-        // ================================================
-        // NO MIX: Each offer is EITHER my stock OR distributor stock
-        // ================================================
         
         let myStock = 0;
         let distributorStockQty = 0;
         let finalPrice = 0;
-        let priceSource = '';
         let offerType = '';
         let stockQty = 0;
+        let basicPrice = 0;
+        let discount = 0;
         
         if (stockType === 'my-stock') {
             // ============================================
@@ -572,45 +570,15 @@
             myStock = currentStock.get(part)?.stock || 0;
             
             if (myStock <= 0) {
-                return null; // No our stock available
+                return null;
             }
             
             distributorStockQty = 0;
             finalPrice = currentStock.get(part)?.price || 0;
-            priceSource = 'my-stock';
             stockQty = myStock;
             
-        } else if (stockType === 'distributor-stock') {
-            // ============================================
-            // DISTRIBUTOR STOCK OFFER (MRP - NO DISCOUNT)
-            // ============================================
-            const distItem = distributorStock.find(d => d.part === part);
-            
-            if (!distItem || distItem.stock <= 0) {
-                return null; // No distributor stock available
-            }
-            
-            myStock = 0;
-            distributorStockQty = distItem.stock;
-            finalPrice = distItem.price || 0;
-            priceSource = 'distributor-stock';
-            stockQty = distributorStockQty;
-            
-            if (finalPrice <= 0) {
-                return null; // No price available
-            }
-        } else {
-            return null; // Invalid stock type
-        }
-
-        // ================================================
-        // CALCULATE DISCOUNT (ONLY for MY stock)
-        // ================================================
-        let discount = 0;
-        let volumeTier = CONFIG.volumeTiers[5];
-        
-        if (stockType === 'my-stock') {
-            // 1. BASE DISCOUNT from volume tier
+            // Calculate discount (ONLY for our stock)
+            let volumeTier = CONFIG.volumeTiers[5];
             for (const tier of CONFIG.volumeTiers) {
                 if (avgQty >= tier.min) {
                     volumeTier = tier;
@@ -619,107 +587,132 @@
             }
             discount = volumeTier.discount;
             
-            // 2. AREA MULTIPLIER
+            // Area multiplier
             const multiplier = getAreaDemandMultiplier(district);
             discount = Math.min(discount * multiplier, CONFIG.dynamicOffers.maxDiscount);
             
-            // 3. LOYALTY BONUS
+            // Loyalty bonus
             const dealerHistory = dealerPurchaseHistory.get(dealer);
             if (dealerHistory && dealerHistory.totalQty > 50) {
                 discount += CONFIG.dynamicOffers.loyaltyBonus;
             }
             
-            // 4. NEW CUSTOMER BONUS
+            // New customer bonus
             if (dealerHistory && dealerHistory.partCount <= 3 && avgQty > 0) {
                 discount += CONFIG.dynamicOffers.newCustomerBonus;
             }
             
-            // 5. URGENT STOCK BONUS
+            // Urgent stock bonus
             if (myStock < CONFIG.lowStockThreshold && myStock > 0) {
                 discount += CONFIG.dynamicOffers.urgentStockBonus;
             }
             
-            // 6. SEASONAL BOOST
+            // Seasonal boost
             const currentMonth = new Date().getMonth();
             const festiveMonths = [10, 11, 12];
             if (festiveMonths.includes(currentMonth)) {
                 discount += CONFIG.dynamicOffers.seasonalBoost;
             }
             
-            // Cap and floor discount
             discount = Math.min(Math.round(discount), CONFIG.dynamicOffers.maxDiscount);
             discount = Math.max(discount, CONFIG.dynamicOffers.minDiscount);
             
-            // Set offer type based on discount
+            // Calculate Basic Price (31.77% deduction) and Offer Price
+            basicPrice = finalPrice - (finalPrice * 31.77 / 100);
+            const offerPrice = basicPrice * (1 - discount / 100);
+            
             if (discount >= 6) {
                 offerType = "⭐ Premium Deal";
             } else {
                 offerType = volumeTier.label;
             }
             
-        } else {
-            // Distributor stock = NO DISCOUNT
+            return {
+                dealer,
+                part,
+                avgQty,
+                pincode: district,
+                district: district,
+                myStock: myStock,
+                distributorStock: 0,
+                totalStock: myStock,
+                discount: discount,
+                offerType: offerType,
+                minQty: 1,
+                mrp: finalPrice,
+                originalPrice: finalPrice,
+                basicPrice: basicPrice,
+                offerPrice: offerPrice,
+                stockType: 'my-stock',
+                priceSource: 'my-stock',
+                source: source,
+                generatedAt: new Date().toISOString(),
+                expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+            };
+            
+        } else if (stockType === 'distributor-stock') {
+            // ============================================
+            // DISTRIBUTOR STOCK OFFER - MRP ONLY (NO 31.77%, NO DISCOUNT)
+            // ============================================
+            const distItem = distributorStock.find(d => d.part === part);
+            
+            if (!distItem || distItem.stock <= 0) {
+                return null;
+            }
+            
+            myStock = 0;
+            distributorStockQty = distItem.stock;
+            finalPrice = distItem.price || 0;
+            stockQty = distributorStockQty;
+            
+            if (finalPrice <= 0) {
+                return null;
+            }
+            
+            // NO 31.77% deduction, NO discount - just MRP
+            basicPrice = finalPrice; // MRP as Basic Price
             discount = 0;
+            const offerPrice = finalPrice; // Offer Price = MRP
+            
             offerType = "🏭 Distributor Stock (MRP)";
+            
+            return {
+                dealer,
+                part,
+                avgQty,
+                pincode: district,
+                district: district,
+                myStock: 0,
+                distributorStock: distributorStockQty,
+                totalStock: distributorStockQty,
+                discount: 0,
+                offerType: offerType,
+                minQty: 1,
+                mrp: finalPrice,
+                originalPrice: finalPrice,
+                basicPrice: basicPrice,  // MRP only, no 31.77% deduction
+                offerPrice: offerPrice,  // MRP only, no discount
+                stockType: 'distributor-stock',
+                priceSource: 'distributor-stock',
+                source: source,
+                generatedAt: new Date().toISOString(),
+                expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+            };
         }
-
-        // ================================================
-        // PRICE CALCULATION
-        // ================================================
-        const basicPrice = finalPrice - (finalPrice * 31.77 / 100);
-        const offerPrice = stockType === 'my-stock' 
-            ? finalPrice * (1 - discount / 100)  // With discount
-            : finalPrice;                        // MRP - NO DISCOUNT
-
-        // ================================================
-        // OFFER TYPE
-        // ================================================
-        let finalOfferType = offerType;
-        if (source === 'Quotation') {
-            finalOfferType = "📄 Quotation Based";
-        }
-        if (source === 'Proforma Invoice') {
-            finalOfferType = "📋 Proforma Based";
-        }
-        if (stockType === 'distributor-stock') {
-            finalOfferType = "🏭 Distributor Stock (MRP)";
-        }
-
-        return {
-            dealer,
-            part,
-            avgQty,
-            pincode: district,
-            district: district,
-            myStock: myStock,
-            distributorStock: distributorStockQty,
-            totalStock: stockQty,
-            discount: discount,
-            offerType: finalOfferType,
-            minQty: 1,
-            mrp: finalPrice,
-            originalPrice: finalPrice,
-            basicPrice: basicPrice,
-            offerPrice: offerPrice,
-            priceSource: priceSource,
-            stockType: stockType,
-            source: source,
-            generatedAt: new Date().toISOString(),
-            expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
-        };
+        
+        return null;
     }
 
     // ===================================================
-    // GENERATE OFFERS (NO MIX)
+    // GENERATE OFFERS
     // ===================================================
 
     async function generateOffers() {
 
         areaDemand.clear();
         
-        console.log("🔄 Generating new offers (NO MIX)...");
+        console.log("🔄 Generating new offers...");
         
-        // ALWAYS FETCH LATEST STOCK
         await loadMyStock();
         await loadDistributorStockAuto();
         
@@ -734,9 +727,7 @@
         const offers = [];
         const processed = new Set();
 
-        // ================================================
-        // GENERATE OFFERS FOR EACH DEALER-PART
-        // ================================================
+        // Process from invoices
         for (const [key, data] of dealerPartAverages) {
 
             const master = retailerMaster.get(String(data.dealer).trim()) || {};
@@ -746,23 +737,15 @@
             const district = master.district || '';
             const source = data.source || 'Invoice History';
             
-            // Check stock availability
             const myStock = currentStock.get(part)?.stock || 0;
             const distItem = distributorStock.find(d => d.part === part);
             const distStock = distItem?.stock || 0;
             const distPrice = distItem?.price || 0;
             
-            // ============================================
-            // 1. Create OUR STOCK offer (if available)
-            // ============================================
+            // Our Stock offer
             if (myStock > 0) {
                 const offer = calculateOffer(
-                    dealerName,
-                    part,
-                    avgQty,
-                    district,
-                    source,
-                    'my-stock'
+                    dealerName, part, avgQty, district, source, 'my-stock'
                 );
                 if (offer) {
                     offers.push(offer);
@@ -770,17 +753,10 @@
                 }
             }
             
-            // ============================================
-            // 2. Create DISTRIBUTOR STOCK offer (if available AND price > 0)
-            // ============================================
+            // Distributor Stock offer (MRP only)
             if (distStock > 0 && distPrice > 0) {
                 const offer = calculateOffer(
-                    dealerName,
-                    part,
-                    avgQty,
-                    district,
-                    source,
-                    'distributor-stock'
+                    dealerName, part, avgQty, district, source, 'distributor-stock'
                 );
                 if (offer) {
                     offers.push(offer);
@@ -789,9 +765,7 @@
             }
         }
 
-        // ================================================
-        // PROCESS RETAILER SALES DATA
-        // ================================================
+        // Process from retailer sales
         for (const retailer of dealerData) {
 
             const dealerName = retailer.dealer;
@@ -800,29 +774,19 @@
             const district = retailer.district;
             const source = retailer.source || 'Excel Offtake';
             
-            // Check if already processed
             const myKey = `${dealerName}|${part}|my-stock`;
             const distKey = `${dealerName}|${part}|distributor-stock`;
             
-            if (processed.has(myKey) && processed.has(distKey)) {
-                continue;
-            }
+            if (processed.has(myKey) && processed.has(distKey)) continue;
             
-            // Check stock availability
             const myStock = currentStock.get(part)?.stock || 0;
             const distItem = distributorStock.find(d => d.part === part);
             const distStock = distItem?.stock || 0;
             const distPrice = distItem?.price || 0;
             
-            // OUR STOCK offer
             if (myStock > 0 && !processed.has(myKey)) {
                 const offer = calculateOffer(
-                    dealerName,
-                    part,
-                    avgQty,
-                    district,
-                    source,
-                    'my-stock'
+                    dealerName, part, avgQty, district, source, 'my-stock'
                 );
                 if (offer) {
                     offers.push(offer);
@@ -830,15 +794,9 @@
                 }
             }
             
-            // DISTRIBUTOR STOCK offer
             if (distStock > 0 && distPrice > 0 && !processed.has(distKey)) {
                 const offer = calculateOffer(
-                    dealerName,
-                    part,
-                    avgQty,
-                    district,
-                    source,
-                    'distributor-stock'
+                    dealerName, part, avgQty, district, source, 'distributor-stock'
                 );
                 if (offer) {
                     offers.push(offer);
@@ -853,13 +811,12 @@
 
         saveOffersToStorage();
 
-        // Summary
         const myStockOffers = offers.filter(o => o.stockType === 'my-stock');
         const distStockOffers = offers.filter(o => o.stockType === 'distributor-stock');
 
         console.log(`✅ Offers generated: ${offers.length}`);
-        console.log(`   📦 My Stock Offers: ${myStockOffers.length} (with discount)`);
-        console.log(`   🏭 Distributor Stock Offers: ${distStockOffers.length} (MRP - NO DISCOUNT)`);
+        console.log(`   📦 My Stock Offers: ${myStockOffers.length}`);
+        console.log(`   🏭 Distributor Stock Offers: ${distStockOffers.length}`);
         console.log(`📊 Offer types:`, offers.reduce((acc, o) => {
             acc[o.offerType] = (acc[o.offerType] || 0) + 1;
             return acc;
@@ -894,10 +851,10 @@
     function exportOffersCSV() {
         if (activeOffers.length === 0) return null;
 
-        let csv = "Dealer,Part No,MRP,Basic Price,Discount %,Offer Price,Stock Type,Stock Qty,Offer Type,Source,Expires\n";
+        let csv = "Dealer,Part No,MRP,Basic Price,Discount %,Offer Price,Our Stock,Dist Stock,Total Stock,Stock Type,Offer Type,Source,Expires\n";
 
         for (const o of activeOffers) {
-            csv += `"${o.dealer}",${o.part},${o.mrp.toFixed(2)},${o.basicPrice.toFixed(2)},${o.discount},${o.offerPrice.toFixed(2)},"${o.stockType || 'unknown'}",${o.totalStock},"${o.offerType || 'Standard'}","${o.source || 'Unknown'}",${o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : 'N/A'}\n`;
+            csv += `"${o.dealer}",${o.part},${o.mrp.toFixed(2)},${o.basicPrice.toFixed(2)},${o.discount},${o.offerPrice.toFixed(2)},${o.myStock},${o.distributorStock},${o.totalStock},"${o.stockType || 'unknown'}","${o.offerType || 'Standard'}","${o.source || 'Unknown'}",${o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : 'N/A'}\n`;
         }
 
         return csv;
@@ -917,11 +874,11 @@
         msg += `${offer.offerType ? `🏷️ ${offer.offerType}\n` : ''}`;
         msg += `\n`;
         msg += `MRP: ₹${offer.mrp.toFixed(2)}\n`;
-        msg += `Basic Price: ₹${offer.basicPrice.toFixed(2)}\n`;
         
         if (isDistributorStock) {
-            msg += `⚠️ Distributor Stock: NO DISCOUNT (MRP)\n`;
+            msg += `⚠️ Distributor Stock: MRP (NO DISCOUNT)\n`;
         } else {
+            msg += `Basic Price: ₹${offer.basicPrice.toFixed(2)}\n`;
             msg += `Extra Discount: ${offer.discount}% OFF\n`;
         }
         
@@ -999,7 +956,7 @@
 
     async function runFullAnalysis() {
 
-        console.log("Running full analysis (NO MIX)...");
+        console.log("Running full analysis...");
 
         const offers = await generateOffers();
 
