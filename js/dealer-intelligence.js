@@ -1,10 +1,37 @@
 // dealer-intelligence.js - COMPLETE FIXED VERSION
-// FIX 1: Distributor Stock = MRP ONLY (NO 31.77%, NO DISCOUNT)
-// FIX 2: Individual stock display (Our Stock OR Dist Stock, NOT combined)
+// All issues resolved: Dealer matching, Stock display, Offer generation
 
 (function () {
 
-    console.log("🚀 Dealer Intelligence System loaded (FIXED: Individual Stock Display)");
+    console.log("🚀 Dealer Intelligence System loaded");
+
+    // ===================================================
+    // DEPENDENCIES
+    // ===================================================
+
+    const Utils = window.Utils || {
+        normalizeText: function(t) { 
+            return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); 
+        },
+        showToast: function(msg) { console.log(msg); },
+        safeNumber: function(n) { return Number(n) || 0; },
+        getStorageItem: function(k) { 
+            try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; }
+        },
+        setStorageItem: function(k, v) { 
+            try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e) { return false; }
+        },
+        removeStorageItem: function(k) { localStorage.removeItem(k); },
+        detectPartColumn: function() { return null; },
+        detectStockColumn: function() { return null; }
+    };
+
+    const normalizeText = Utils.normalizeText;
+    const showToast = Utils.showToast;
+    const safeNumber = Utils.safeNumber;
+    const getStorageItem = Utils.getStorageItem;
+    const setStorageItem = Utils.setStorageItem;
+    const removeStorageItem = Utils.removeStorageItem;
 
     // ===================================================
     // CONFIGURATION
@@ -49,37 +76,23 @@
     let currentStock = new Map();
     let activeOffers = [];
     let distributorStock = [];
+    let distributorStockMap = new Map();
     let dealerData = [];
     let retailerMaster = new Map();
     let dealerPurchaseHistory = new Map();
+    let excelCache = new Map();
+    let isRunning = false;
 
     // ===================================================
-    // HELPER FUNCTIONS
-    // ===================================================
-
-    function normalizeText(t) {
-        return String(t || "")
-            .replace(/[\u200B-\u200D\uFEFF]/g, "")
-            .replace(/\n|\r|\t/g, " ")
-            .replace(/\s+/g, " ")
-            .trim()
-            .toUpperCase();
-    }
-
-    function cleanPhone(p) {
-        let x = String(p || "").replace(/\D/g, "");
-        if (!x) return "";
-        if (x.length === 10) return "91" + x;
-        if (x.length === 11 && x.startsWith("0")) return "91" + x.substring(1);
-        if (x.length === 12 && x.startsWith("91")) return x;
-        return x;
-    }
-
-    // ===================================================
-    // LOAD EXCEL FILE
+    // LOAD EXCEL FILE (CACHED)
     // ===================================================
 
     async function loadExcelFile(url, sheetName = null) {
+
+        const cacheKey = url + (sheetName || '');
+        if (excelCache.has(cacheKey)) {
+            return excelCache.get(cacheKey);
+        }
 
         try {
 
@@ -99,7 +112,9 @@
                 sheet = workbook.Sheets[workbook.SheetNames[0]];
             }
 
-            return XLSX.utils.sheet_to_json(sheet);
+            const data = XLSX.utils.sheet_to_json(sheet);
+            excelCache.set(cacheKey, data);
+            return data;
 
         } catch (err) {
 
@@ -109,31 +124,29 @@
     }
 
     // ===================================================
-    // LOAD DISTRIBUTOR STOCK
+    // LOAD DISTRIBUTOR STOCK (FLEXIBLE COLUMN DETECTION)
     // ===================================================
 
     async function loadDistributorStockAuto() {
 
-        const localStock = localStorage.getItem('distributorStock');
+        const localStock = getStorageItem('distributorStock');
         
-        if (localStock) {
-            try {
-                const parsedStock = JSON.parse(localStock);
-                if (parsedStock && parsedStock.length > 0) {
-                    distributorStock = parsedStock.map(item => ({
-                        part: String(item.part || item['Part No'] || '').trim(),
-                        distributor: String(item.distributor || item['Distributor Name'] || ''),
-                        stock: Number(item.stock || item['Available Stock'] || 0),
-                        price: Number(item.price || 0),
-                        leadTime: Number(item.leadTime || item['Lead Time (Days)'] || 3)
-                    })).filter(item => item.part && item.stock > 0);
-                    
-                    console.log(`✅ Distributor stock loaded from localStorage: ${distributorStock.length} items`);
-                    return;
-                }
-            } catch(e) {
-                console.warn("Error parsing localStorage stock", e);
-            }
+        if (localStock && localStock.length > 0) {
+            distributorStock = localStock.map(item => ({
+                part: normalizeText(item.part || item['Part No'] || ''),
+                distributor: String(item.distributor || item['Distributor Name'] || ''),
+                stock: safeNumber(item.stock || item['Available Stock'] || 0),
+                price: safeNumber(item.price || 0),
+                leadTime: safeNumber(item.leadTime || item['Lead Time (Days)'] || 3)
+            })).filter(item => item.part && item.stock > 0);
+            
+            distributorStockMap.clear();
+            distributorStock.forEach(item => {
+                distributorStockMap.set(item.part, item);
+            });
+            
+            console.log(`✅ Distributor stock loaded from localStorage: ${distributorStock.length} items`);
+            return;
         }
         
         try {
@@ -143,34 +156,63 @@
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
                 
-                let part = row['Part No'] || row['part_no'] || row['PartNumber'] || row['Part'];
-                if (!part) continue;
-                
-                let distributor = row['Distributor Name'] || row['Distributor'] || row['distributor'] || 'Auto Links';
-                
-                let stockQty = 0;
-                for (let key in row) {
-                    const value = Number(row[key]);
-                    if (!isNaN(value) && value > 0) {
-                        if (key.toLowerCase().includes('stock') || 
-                            key.toLowerCase().includes('qty') || 
-                            key.toLowerCase().includes('available')) {
-                            stockQty = value;
+                // Flexible part detection
+                let part = null;
+                const partPatterns = ['Part No', 'PART NO', 'PartNumber', 'Part Number', 'Item Code', 'Material Code', 'PARTNO'];
+                for (const pattern of partPatterns) {
+                    if (row[pattern]) { part = row[pattern]; break; }
+                }
+                // Try any column that contains 'part' or 'item'
+                if (!part) {
+                    for (const key of Object.keys(row)) {
+                        const lower = key.toLowerCase();
+                        if (lower.includes('part') || lower.includes('item') || lower.includes('material')) {
+                            part = row[key];
                             break;
                         }
                     }
                 }
+                if (!part) continue;
                 
+                let distributor = row['Distributor Name'] || row['Distributor'] || row['distributor'] || 'Auto Links';
+                
+                // Flexible stock detection
+                let stockQty = 0;
+                const stockPatterns = ['Available Stock', 'AVAILABLE STOCK', 'Stock', 'Qty', 'QTY', 'Current Stock', 'Free Stock'];
+                for (const pattern of stockPatterns) {
+                    if (row[pattern]) { stockQty = safeNumber(row[pattern]); break; }
+                }
+                // Try any column that contains 'stock' or 'qty'
                 if (stockQty === 0) {
-                    stockQty = Number(row['Available Stock'] || row['stock'] || row['Stock'] || 0);
+                    for (const key of Object.keys(row)) {
+                        const lower = key.toLowerCase();
+                        if (lower.includes('stock') || lower.includes('qty') || lower.includes('available')) {
+                            stockQty = safeNumber(row[key]);
+                            if (stockQty > 0) break;
+                        }
+                    }
                 }
                 
-                let price = Number(row['Price'] || row['price'] || 0);
-                let leadTime = Number(row['Lead Time (Days)'] || row['leadTime'] || 3);
+                let price = 0;
+                const pricePatterns = ['Price', 'MRP', 'Rate', 'Cost'];
+                for (const pattern of pricePatterns) {
+                    if (row[pattern]) { price = safeNumber(row[pattern]); break; }
+                }
+                if (price === 0) {
+                    for (const key of Object.keys(row)) {
+                        const lower = key.toLowerCase();
+                        if (lower.includes('price') || lower.includes('mrp') || lower.includes('rate')) {
+                            price = safeNumber(row[key]);
+                            if (price > 0) break;
+                        }
+                    }
+                }
+                
+                let leadTime = safeNumber(row['Lead Time (Days)'] || row['leadTime'] || 3);
                 
                 if (part && stockQty > 0) {
                     distributorStock.push({
-                        part: String(part).trim(),
+                        part: normalizeText(part),
                         distributor: String(distributor).trim(),
                         stock: stockQty,
                         price: price,
@@ -179,32 +221,39 @@
                 }
             }
 
-            console.log(`✅ Distributor stock loaded from Excel file: ${distributorStock.length} items`);
+            distributorStockMap.clear();
+            distributorStock.forEach(item => {
+                distributorStockMap.set(item.part, item);
+            });
+
+            console.log(`✅ Distributor stock loaded from Excel: ${distributorStock.length} items`);
 
         } catch(err) {
 
             console.warn("Could not load distributor-stock.xlsx", err);
             distributorStock = [];
+            distributorStockMap.clear();
         }
     }
 
     // ===================================================
-    // LOAD RETAILER MASTER
+    // LOAD RETAILER MASTER (NORMALIZED)
     // ===================================================
 
     async function loadRetailerMaster() {
 
         retailerMaster.clear();
         
-        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        console.log(`📋 Customer Master loaded: ${customers.length} customers`);
+        const customers = getStorageItem('customers') || [];
+        console.log(`📋 Customer Master: ${customers.length} customers`);
         
         for (const c of customers) {
-            const dealer = c.name || '';
+            const dealer = normalizeText(c.name);
             if (!dealer) continue;
             
             retailerMaster.set(dealer, {
-                dealer: dealer,
+                dealer: c.name,
+                normalized: dealer,
                 district: c.district || '',
                 mobile: c.mobileNo || c.phone || '',
                 phone: c.mobileNo || c.phone || '',
@@ -217,18 +266,20 @@
         
         try {
             const rows = await loadExcelFile('data/RETAILER data details.xlsx', 'SAPUI5 Export');
-            console.log(`📋 Excel Master loaded: ${rows.length} entries`);
+            console.log(`📋 Excel Master: ${rows.length} entries`);
             
             for (const row of rows) {
-                const dealer = String(row['Retailer Name'] || '').trim();
-                if (!dealer) continue;
+                const dealerRaw = String(row['Retailer Name'] || '').trim();
+                if (!dealerRaw) continue;
                 
+                const dealer = normalizeText(dealerRaw);
                 const district = row['District'] || '';
                 const mobile = row['Mobile No'] || '';
                 
                 if (!retailerMaster.has(dealer)) {
                     retailerMaster.set(dealer, {
-                        dealer: dealer,
+                        dealer: dealerRaw,
+                        normalized: dealer,
                         district: district,
                         mobile: mobile,
                         phone: mobile,
@@ -250,20 +301,22 @@
             console.warn("Excel master file not found", e);
         }
         
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
+        const users = getStorageItem('users') || [];
+        const dealers = getStorageItem('dealers') || [];
         const allLocal = [...users, ...dealers];
         
         for (const u of allLocal) {
-            const dealer = u.name || u.business || '';
-            if (!dealer) continue;
+            const dealerRaw = u.name || u.business || '';
+            if (!dealerRaw) continue;
             
+            const dealer = normalizeText(dealerRaw);
             const district = u.district || '';
             const mobile = u.phone || u.mobile || '';
             
             if (!retailerMaster.has(dealer)) {
                 retailerMaster.set(dealer, {
-                    dealer: dealer,
+                    dealer: dealerRaw,
+                    normalized: dealer,
                     district: district,
                     mobile: mobile,
                     phone: mobile,
@@ -279,17 +332,19 @@
             }
         }
         
-        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        const allInvoices = getStorageItem('allInvoices') || [];
         for (const inv of allInvoices) {
-            let dealer = inv.customerName || inv.buyer?.name || '';
-            if (!dealer) continue;
+            let dealerRaw = inv.customerName || inv.buyer?.name || '';
+            if (!dealerRaw) continue;
             
+            const dealer = normalizeText(dealerRaw);
             let mobile = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
             let district = inv.customerDistrict || inv.buyer?.district || inv.district || '';
             
             if (!retailerMaster.has(dealer)) {
                 retailerMaster.set(dealer, {
-                    dealer: dealer,
+                    dealer: dealerRaw,
+                    normalized: dealer,
                     district: district,
                     mobile: mobile,
                     phone: mobile,
@@ -312,7 +367,7 @@
             if (data.district) withDistrict++;
         }
         
-        console.log(`✅ Retailer master loaded: ${retailerMaster.size} dealers`);
+        console.log(`✅ Retailer master: ${retailerMaster.size} dealers`);
         console.log(`   📞 Has phone: ${withPhone} | 📍 Has district: ${withDistrict}`);
     }
 
@@ -336,8 +391,9 @@
 
             for (const row of rows) {
 
-                const dealer = String(row['Retailer Name'] || '').trim();
-                const part = String(row['Part No'] || '').trim();
+                const dealerRaw = String(row['Retailer Name'] || '').trim();
+                const dealer = normalizeText(dealerRaw);
+                const part = normalizeText(row['Part No'] || '');
 
                 if (!dealer || !part) continue;
 
@@ -349,12 +405,12 @@
                 let monthCount = 0;
 
                 for (const m of months) {
-                    const qty = parseFloat(row[m]) || 0;
+                    const qty = safeNumber(row[m]);
                     totalQty += qty;
                     if (qty > 0) monthCount++;
                 }
 
-                const grandTotal = parseFloat(row['Grand Total']) || 0;
+                const grandTotal = safeNumber(row['Grand Total']);
 
                 if (grandTotal > 0 && totalQty === 0) {
                     totalQty = grandTotal;
@@ -370,6 +426,7 @@
 
                 dealerData.push({
                     dealer: dealer,
+                    dealerRaw: dealerRaw,
                     part: part,
                     avgQty: avgQty,
                     district: district || master.district || '',
@@ -392,39 +449,69 @@
             }
         }
 
-        console.log(`✅ Retailer sales loaded: ${dealerData.length}`);
+        console.log(`✅ Retailer sales: ${dealerData.length}`);
         console.log(`📊 Dealers tracked: ${dealerPurchaseHistory.size}`);
     }
 
     // ===================================================
-    // LOAD MY STOCK (ALWAYS FETCH LATEST)
+    // LOAD MY STOCK
     // ===================================================
 
     async function loadMyStock() {
 
         try {
 
-            console.log("🔄 Fetching latest stock from prices.csv...");
+            console.log("🔄 Fetching latest stock...");
 
             const response = await fetch('prices.csv');
             const csvText = await response.text();
-            const rows = csvText.split('\n').slice(1);
+            
+            let parsedData;
+            if (typeof Papa !== 'undefined') {
+                const result = Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    trimHeaders: true
+                });
+                parsedData = result.data;
+            } else {
+                const workbook = XLSX.read(csvText, { type: 'string' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                parsedData = rows.slice(1).map(row => ({
+                    'Material No': row[0],
+                    'Description': row[1],
+                    'Price': row[3],
+                    'Stock': row[7],
+                    'Application': row[4] || ''
+                }));
+            }
 
             currentStock.clear();
 
-            for (const row of rows) {
+            const headers = Object.keys(parsedData[0] || {});
+            const partCol = headers.find(h => h.toLowerCase().includes('material') || h.toLowerCase().includes('part'));
+            const descCol = headers.find(h => h.toLowerCase().includes('description'));
+            const appCol = headers.find(h => h.toLowerCase().includes('application'));
+            const priceCol = headers.find(h => h.toLowerCase().includes('price'));
+            const stockCol = headers.find(h => h.toLowerCase().includes('stock') || h.toLowerCase().includes('qty'));
 
-                const cols = row.split(',');
+            for (const row of parsedData) {
+                if (!row || !row[partCol]) continue;
 
-                if (!cols[0]) continue;
+                const part = normalizeText(row[partCol]);
+                if (!part) continue;
 
-                const part = cols[0].trim();
-                const stock = parseInt(cols[7]) || 0;
-                const price = parseFloat(cols[3]) || 0;
+                const stock = safeNumber(row[stockCol]);
+                const price = safeNumber(row[priceCol]);
+                const description = row[descCol] ? String(row[descCol]).trim() : '';
+                const application = row[appCol] ? String(row[appCol]).trim() : '';
 
                 currentStock.set(part, {
                     stock,
-                    price
+                    price,
+                    description,
+                    application
                 });
             }
 
@@ -437,13 +524,14 @@
                 }
             }
 
-            console.log(`✅ My stock loaded: ${currentStock.size} parts`);
+            console.log(`✅ My stock: ${currentStock.size} parts`);
             console.log(`   📦 Parts with stock > 0: ${partsWithStock}`);
             console.log(`   📦 Total stock units: ${totalStock}`);
 
         } catch (err) {
 
-            console.error("Error loading prices.csv:", err);
+            console.error("Error loading stock:", err);
+            showToast("Error loading stock data", "error");
         }
     }
 
@@ -487,7 +575,7 @@
 
     function analyseInvoices() {
 
-        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        const allInvoices = getStorageItem('allInvoices') || [];
 
         dealerPartAverages.clear();
 
@@ -495,20 +583,24 @@
 
             if (!Array.isArray(inv.items)) continue;
 
-            let dealerName = inv.customerName || '';
+            let dealerRaw = inv.customerName || '';
 
-            if (!dealerName) {
-                dealerName = inv.customerEmail || 'Guest';
+            if (!dealerRaw) {
+                dealerRaw = inv.customerEmail || 'Guest';
             }
+
+            const dealer = normalizeText(dealerRaw);
 
             for (const item of inv.items) {
 
-                const key = `${dealerName}|${item.part}`;
+                const part = normalizeText(item.part);
+                const key = `${dealer}|${part}`;
 
                 dealerPartAverages.set(key, {
-                    dealer: dealerName,
-                    part: item.part,
-                    avgQty: parseFloat(item.qty) || 0,
+                    dealer: dealer,
+                    dealerRaw: dealerRaw,
+                    part: part,
+                    avgQty: safeNumber(item.qty),
                     pincode: inv.customerPincode || '',
                     district: '',
                     source: 'Invoice History'
@@ -543,7 +635,25 @@
     }
 
     // ===================================================
-    // CALCULATE OFFER - FIXED: Individual Stock Display
+    // CENTRALIZED PRICE CALCULATION
+    // ===================================================
+
+    function calculateNetPrice(mrp, discount = 0) {
+        const basic = mrp - (mrp * 31.77 / 100);
+        const afterDiscount = basic - (basic * discount / 100);
+        const withGST = afterDiscount * 1.18;
+        return {
+            mrp: mrp,
+            basicPrice: basic,
+            discount: discount,
+            discountedPrice: afterDiscount,
+            finalPrice: withGST,
+            gst: withGST - afterDiscount
+        };
+    }
+
+    // ===================================================
+    // CALCULATE OFFER
     // ===================================================
 
     function calculateOffer(
@@ -559,25 +669,28 @@
         let distributorStockQty = 0;
         let finalPrice = 0;
         let offerType = '';
-        let stockQty = 0;
         let basicPrice = 0;
         let discount = 0;
+        let description = '';
+        let application = '';
         
         if (stockType === 'my-stock') {
             // ============================================
             // OUR STOCK OFFER (WITH DISCOUNT)
             // ============================================
-            myStock = currentStock.get(part)?.stock || 0;
+            const stockData = currentStock.get(part);
+            if (!stockData) return null;
             
-            if (myStock <= 0) {
-                return null;
-            }
+            myStock = stockData.stock || 0;
+            if (myStock <= 0) return null;
+            
+            description = stockData.description || '';
+            application = stockData.application || '';
             
             distributorStockQty = 0;
-            finalPrice = currentStock.get(part)?.price || 0;
-            stockQty = myStock;
+            finalPrice = stockData.price || 0;
             
-            // Calculate discount (ONLY for our stock)
+            // Calculate discount
             let volumeTier = CONFIG.volumeTiers[5];
             for (const tier of CONFIG.volumeTiers) {
                 if (avgQty >= tier.min) {
@@ -587,27 +700,22 @@
             }
             discount = volumeTier.discount;
             
-            // Area multiplier
             const multiplier = getAreaDemandMultiplier(district);
             discount = Math.min(discount * multiplier, CONFIG.dynamicOffers.maxDiscount);
             
-            // Loyalty bonus
             const dealerHistory = dealerPurchaseHistory.get(dealer);
             if (dealerHistory && dealerHistory.totalQty > 50) {
                 discount += CONFIG.dynamicOffers.loyaltyBonus;
             }
             
-            // New customer bonus
             if (dealerHistory && dealerHistory.partCount <= 3 && avgQty > 0) {
                 discount += CONFIG.dynamicOffers.newCustomerBonus;
             }
             
-            // Urgent stock bonus
             if (myStock < CONFIG.lowStockThreshold && myStock > 0) {
                 discount += CONFIG.dynamicOffers.urgentStockBonus;
             }
             
-            // Seasonal boost
             const currentMonth = new Date().getMonth();
             const festiveMonths = [10, 11, 12];
             if (festiveMonths.includes(currentMonth)) {
@@ -617,9 +725,9 @@
             discount = Math.min(Math.round(discount), CONFIG.dynamicOffers.maxDiscount);
             discount = Math.max(discount, CONFIG.dynamicOffers.minDiscount);
             
-            // Calculate Basic Price (31.77% deduction) and Offer Price
-            basicPrice = finalPrice - (finalPrice * 31.77 / 100);
-            const offerPrice = basicPrice * (1 - discount / 100);
+            const pricing = calculateNetPrice(finalPrice, discount);
+            basicPrice = pricing.basicPrice;
+            const offerPrice = pricing.finalPrice;
             
             if (discount >= 6) {
                 offerType = "⭐ Premium Deal";
@@ -628,14 +736,16 @@
             }
             
             return {
-                dealer,
-                part,
-                avgQty,
+                dealer: dealer,
+                dealerRaw: dealer,
+                part: part,
+                description: description,
+                application: application,
+                avgQty: avgQty,
                 pincode: district,
                 district: district,
                 myStock: myStock,
                 distributorStock: 0,
-                totalStock: myStock,
                 discount: discount,
                 offerType: offerType,
                 minQty: 1,
@@ -643,6 +753,7 @@
                 originalPrice: finalPrice,
                 basicPrice: basicPrice,
                 offerPrice: offerPrice,
+                gst: pricing.gst,
                 stockType: 'my-stock',
                 priceSource: 'my-stock',
                 source: source,
@@ -652,46 +763,51 @@
             
         } else if (stockType === 'distributor-stock') {
             // ============================================
-            // DISTRIBUTOR STOCK OFFER - MRP ONLY (NO 31.77%, NO DISCOUNT)
+            // DISTRIBUTOR STOCK OFFER - MRP ONLY
             // ============================================
-            const distItem = distributorStock.find(d => d.part === part);
+            const distItem = distributorStockMap.get(part);
             
             if (!distItem || distItem.stock <= 0) {
                 return null;
             }
             
+            const stockData = currentStock.get(part);
+            description = stockData?.description || '';
+            application = stockData?.application || '';
+            
             myStock = 0;
             distributorStockQty = distItem.stock;
             finalPrice = distItem.price || 0;
-            stockQty = distributorStockQty;
             
             if (finalPrice <= 0) {
                 return null;
             }
             
-            // NO 31.77% deduction, NO discount - just MRP
-            basicPrice = finalPrice; // MRP as Basic Price
+            basicPrice = finalPrice;
             discount = 0;
-            const offerPrice = finalPrice; // Offer Price = MRP
+            const offerPrice = finalPrice;
             
             offerType = "🏭 Distributor Stock (MRP)";
             
             return {
-                dealer,
-                part,
-                avgQty,
+                dealer: dealer,
+                dealerRaw: dealer,
+                part: part,
+                description: description,
+                application: application,
+                avgQty: avgQty,
                 pincode: district,
                 district: district,
                 myStock: 0,
                 distributorStock: distributorStockQty,
-                totalStock: distributorStockQty,
                 discount: 0,
                 offerType: offerType,
                 minQty: 1,
                 mrp: finalPrice,
                 originalPrice: finalPrice,
-                basicPrice: basicPrice,  // MRP only, no 31.77% deduction
-                offerPrice: offerPrice,  // MRP only, no discount
+                basicPrice: basicPrice,
+                offerPrice: offerPrice,
+                gst: 0,
                 stockType: 'distributor-stock',
                 priceSource: 'distributor-stock',
                 source: source,
@@ -713,6 +829,11 @@
         
         console.log("🔄 Generating new offers...");
         
+        // Clear old offers
+        activeOffers = [];
+        removeStorageItem('dealerOffers');
+        console.log("🧹 Cleared old offers");
+        
         await loadMyStock();
         await loadDistributorStockAuto();
         
@@ -730,37 +851,35 @@
         // Process from invoices
         for (const [key, data] of dealerPartAverages) {
 
-            const master = retailerMaster.get(String(data.dealer).trim()) || {};
-            const dealerName = data.dealer;
+            const master = retailerMaster.get(data.dealer) || {};
+            const dealer = data.dealer;
             const part = data.part;
             const avgQty = data.avgQty;
             const district = master.district || '';
             const source = data.source || 'Invoice History';
             
             const myStock = currentStock.get(part)?.stock || 0;
-            const distItem = distributorStock.find(d => d.part === part);
+            const distItem = distributorStockMap.get(part);
             const distStock = distItem?.stock || 0;
             const distPrice = distItem?.price || 0;
             
-            // Our Stock offer
             if (myStock > 0) {
                 const offer = calculateOffer(
-                    dealerName, part, avgQty, district, source, 'my-stock'
+                    dealer, part, avgQty, district, source, 'my-stock'
                 );
                 if (offer) {
                     offers.push(offer);
-                    processed.add(`${dealerName}|${part}|my-stock`);
+                    processed.add(`${dealer}|${part}|my-stock`);
                 }
             }
             
-            // Distributor Stock offer (MRP only)
             if (distStock > 0 && distPrice > 0) {
                 const offer = calculateOffer(
-                    dealerName, part, avgQty, district, source, 'distributor-stock'
+                    dealer, part, avgQty, district, source, 'distributor-stock'
                 );
                 if (offer) {
                     offers.push(offer);
-                    processed.add(`${dealerName}|${part}|distributor-stock`);
+                    processed.add(`${dealer}|${part}|distributor-stock`);
                 }
             }
         }
@@ -768,25 +887,25 @@
         // Process from retailer sales
         for (const retailer of dealerData) {
 
-            const dealerName = retailer.dealer;
+            const dealer = retailer.dealer;
             const part = retailer.part;
             const avgQty = retailer.avgQty;
             const district = retailer.district;
             const source = retailer.source || 'Excel Offtake';
             
-            const myKey = `${dealerName}|${part}|my-stock`;
-            const distKey = `${dealerName}|${part}|distributor-stock`;
+            const myKey = `${dealer}|${part}|my-stock`;
+            const distKey = `${dealer}|${part}|distributor-stock`;
             
             if (processed.has(myKey) && processed.has(distKey)) continue;
             
             const myStock = currentStock.get(part)?.stock || 0;
-            const distItem = distributorStock.find(d => d.part === part);
+            const distItem = distributorStockMap.get(part);
             const distStock = distItem?.stock || 0;
             const distPrice = distItem?.price || 0;
             
             if (myStock > 0 && !processed.has(myKey)) {
                 const offer = calculateOffer(
-                    dealerName, part, avgQty, district, source, 'my-stock'
+                    dealer, part, avgQty, district, source, 'my-stock'
                 );
                 if (offer) {
                     offers.push(offer);
@@ -796,7 +915,7 @@
             
             if (distStock > 0 && distPrice > 0 && !processed.has(distKey)) {
                 const offer = calculateOffer(
-                    dealerName, part, avgQty, district, source, 'distributor-stock'
+                    dealer, part, avgQty, district, source, 'distributor-stock'
                 );
                 if (offer) {
                     offers.push(offer);
@@ -806,126 +925,127 @@
         }
 
         offers.sort((a, b) => b.discount - a.discount);
-
         activeOffers = offers;
 
-        saveOffersToStorage();
+        // Save with proper structure
+        const data = {
+            generatedAt: new Date().toISOString(),
+            offerCount: activeOffers.length,
+            offers: activeOffers,
+            version: "2.0"
+        };
+        setStorageItem('dealerOffers', data);
 
-        const myStockOffers = offers.filter(o => o.stockType === 'my-stock');
-        const distStockOffers = offers.filter(o => o.stockType === 'distributor-stock');
+        const myStockOffers = activeOffers.filter(o => o.stockType === 'my-stock');
+        const distStockOffers = activeOffers.filter(o => o.stockType === 'distributor-stock');
 
-        console.log(`✅ Offers generated: ${offers.length}`);
+        console.log(`✅ Offers generated: ${activeOffers.length}`);
         console.log(`   📦 My Stock Offers: ${myStockOffers.length}`);
         console.log(`   🏭 Distributor Stock Offers: ${distStockOffers.length}`);
-        console.log(`📊 Offer types:`, offers.reduce((acc, o) => {
-            acc[o.offerType] = (acc[o.offerType] || 0) + 1;
-            return acc;
-        }, {}));
 
-        return offers;
+        return activeOffers;
     }
 
     // ===================================================
-    // SAVE OFFERS
+    // GET FUNCTIONS
     // ===================================================
 
-    function saveOffersToStorage() {
+    function getDistributorStock() {
+        return distributorStock;
+    }
+
+    function getDistributorStockMap() {
+        return distributorStockMap;
+    }
+
+    function getRetailerMaster() {
+        return retailerMaster;
+    }
+
+    function getCurrentStock() {
+        return currentStock;
+    }
+
+    function getActiveOffers() {
+        return activeOffers;
+    }
+
+    // ===================================================
+    // RUN FULL ANALYSIS (WITH BUTTON STATE)
+    // ===================================================
+
+    async function runFullAnalysis() {
+
+        if (isRunning) {
+            showToast('Analysis already running...', 'warning');
+            return;
+        }
+
+        isRunning = true;
+        
+        // Disable button if exists
+        const btn = document.getElementById('runAnalysisBtn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+        }
+
         try {
-            localStorage.setItem(
-                'dealerOffers',
-                JSON.stringify({
-                    generatedAt: new Date().toISOString(),
-                    offerCount: activeOffers.length,
-                    offers: activeOffers
-                })
-            );
-        } catch(err) {
-            console.warn("Could not save offers to localStorage (quota exceeded)", err.message);
+            console.log("Running full analysis...");
+            showToast('Running analysis...', 'info');
+            
+            // Clear old offers
+            activeOffers = [];
+            removeStorageItem('dealerOffers');
+
+            const offers = await generateOffers();
+
+            const result = {
+                timestamp: new Date().toISOString(),
+                offersGenerated: offers.length,
+                myStockOffers: offers.filter(o => o.stockType === 'my-stock').length,
+                distStockOffers: offers.filter(o => o.stockType === 'distributor-stock').length,
+                highDiscountOffers: offers.filter(o => o.discount >= 5).length,
+                lowStockAlerts: offers.filter(o => (o.myStock + o.distributorStock) < CONFIG.lowStockThreshold).length,
+                areasAnalysed: areaDemand.size,
+                offers: offers.slice(0, 50)
+            };
+
+            showToast(`✅ Analysis complete: ${offers.length} offers generated`, 'success');
+            return result;
+
+        } catch (err) {
+            console.error('Analysis error:', err);
+            showToast('Analysis failed: ' + err.message, 'error');
+            throw err;
+        } finally {
+            isRunning = false;
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync"></i> Run Analysis';
+            }
         }
     }
 
     // ===================================================
-    // EXPORT CSV
+    // CLEAR OFFERS
     // ===================================================
 
-    function exportOffersCSV() {
-        if (activeOffers.length === 0) return null;
-
-        let csv = "Dealer,Part No,MRP,Basic Price,Discount %,Offer Price,Our Stock,Dist Stock,Total Stock,Stock Type,Offer Type,Source,Expires\n";
-
-        for (const o of activeOffers) {
-            csv += `"${o.dealer}",${o.part},${o.mrp.toFixed(2)},${o.basicPrice.toFixed(2)},${o.discount},${o.offerPrice.toFixed(2)},${o.myStock},${o.distributorStock},${o.totalStock},"${o.stockType || 'unknown'}","${o.offerType || 'Standard'}","${o.source || 'Unknown'}",${o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : 'N/A'}\n`;
-        }
-
-        return csv;
+    function clearOffers() {
+        activeOffers = [];
+        removeStorageItem('dealerOffers');
+        console.log("🧹 All offers cleared");
+        showToast('All offers cleared', 'warning');
     }
 
     // ===================================================
-    // WHATSAPP MESSAGE
+    // CLEAR CACHE
     // ===================================================
 
-    function generateWhatsAppMessage(offer) {
-
-        const expiryDate = offer.expiresAt ? new Date(offer.expiresAt).toLocaleDateString() : 'N/A';
-        const isDistributorStock = offer.stockType === 'distributor-stock';
-
-        let msg = `Dear ${offer.dealer},\n\n`;
-        msg += `🎉 Special Offer for ${offer.part}\n`;
-        msg += `${offer.offerType ? `🏷️ ${offer.offerType}\n` : ''}`;
-        msg += `\n`;
-        msg += `MRP: ₹${offer.mrp.toFixed(2)}\n`;
-        
-        if (isDistributorStock) {
-            msg += `⚠️ Distributor Stock: MRP (NO DISCOUNT)\n`;
-        } else {
-            msg += `Basic Price: ₹${offer.basicPrice.toFixed(2)}\n`;
-            msg += `Extra Discount: ${offer.discount}% OFF\n`;
-        }
-        
-        msg += `Offer Price: ₹${offer.offerPrice.toFixed(2)}\n`;
-        msg += `\n`;
-        msg += `Available Stock: ${offer.totalStock} units\n`;
-        if (isDistributorStock) {
-            msg += `🏭 Source: Distributor Stock\n`;
-        } else {
-            msg += `📦 Source: Our Stock\n`;
-        }
-        msg += `\n`;
-        msg += `District: ${offer.district || 'N/A'}\n`;
-        msg += `⏰ Offer valid until: ${expiryDate}\n`;
-        
-        if (isDistributorStock) {
-            msg += `\n⚠️ Additional courier charges apply for distributor stock items.\n`;
-        }
-        
-        msg += `\nReply YES to confirm order.\n`;
-        msg += `Auto Spares Solution\n`;
-        msg += `https://autosparessolution.com`;
-
-        return msg;
-    }
-
-    // ===================================================
-    // AREA INSIGHTS
-    // ===================================================
-
-    function getAreaInsights() {
-
-        const insights = [];
-
-        for (const [district, data] of areaDemand) {
-
-            insights.push({
-                district,
-                totalDemand: data.totalQty,
-                dealerCount: data.dealerCount.size,
-                topParts: Array.from(data.partWise.entries())
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5)
-            });
-        }
-
-        return insights.sort((a, b) => b.totalDemand - a.totalDemand);
+    function clearCache() {
+        excelCache.clear();
+        console.log("🧹 Excel cache cleared");
+        showToast('Cache cleared', 'info');
     }
 
     // ===================================================
@@ -939,37 +1059,19 @@
     }
 
     // ===================================================
-    // GET FUNCTIONS
+    // EXPORT
     // ===================================================
 
-    function getDistributorStock() {
-        return distributorStock;
-    }
+    function exportOffersCSV() {
+        if (activeOffers.length === 0) return null;
 
-    function getRetailerMaster() {
-        return retailerMaster;
-    }
+        let csv = "Dealer,Part No,Description,Application,MRP,Basic Price,Discount %,Offer Price,GST,Our Stock,Dist Stock,Stock Type,Offer Type,Source,Expires\n";
 
-    // ===================================================
-    // RUN
-    // ===================================================
+        for (const o of activeOffers) {
+            csv += `"${o.dealer}",${o.part},"${o.description || ''}","${o.application || ''}",${o.mrp.toFixed(2)},${o.basicPrice.toFixed(2)},${o.discount},${o.offerPrice.toFixed(2)},${o.gst ? o.gst.toFixed(2) : 0},${o.myStock},${o.distributorStock},"${o.stockType || 'unknown'}","${o.offerType || 'Standard'}","${o.source || 'Unknown'}",${o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : 'N/A'}\n`;
+        }
 
-    async function runFullAnalysis() {
-
-        console.log("Running full analysis...");
-
-        const offers = await generateOffers();
-
-        return {
-            timestamp: new Date().toISOString(),
-            offersGenerated: offers.length,
-            myStockOffers: offers.filter(o => o.stockType === 'my-stock').length,
-            distStockOffers: offers.filter(o => o.stockType === 'distributor-stock').length,
-            highDiscountOffers: offers.filter(o => o.discount >= 5).length,
-            lowStockAlerts: offers.filter(o => o.totalStock < CONFIG.lowStockThreshold).length,
-            areasAnalysed: areaDemand.size,
-            offers: offers.slice(0, 50)
-        };
+        return csv;
     }
 
     // ===================================================
@@ -977,7 +1079,11 @@
     // ===================================================
 
     setTimeout(async () => {
-        await runFullAnalysis();
+        try {
+            await runFullAnalysis();
+        } catch(err) {
+            console.error("Auto-run failed:", err);
+        }
     }, 3000);
 
     // ===================================================
@@ -987,14 +1093,19 @@
     window.DealerIntelligence = {
         runFullAnalysis,
         generateOffers,
-        getAreaInsights,
-        exportOffersCSV,
-        generateWhatsAppMessage,
-        refreshStock,
         getDistributorStock,
+        getDistributorStockMap,
         getRetailerMaster,
+        getCurrentStock,
+        getActiveOffers,
         loadRetailerMaster,
-        CONFIG
+        clearOffers,
+        clearCache,
+        refreshStock,
+        exportOffersCSV,
+        calculateNetPrice,
+        CONFIG,
+        isRunning: () => isRunning
     };
 
 })();
