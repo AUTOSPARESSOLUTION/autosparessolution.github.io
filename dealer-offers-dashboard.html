@@ -7,7 +7,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="js/utils.js"></script>
     <script src="js/dealer-intelligence.js"></script>
     <script src="js/brochure-generator.js"></script>
     <style>
@@ -37,13 +40,20 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            font-size: 14px;
+            text-decoration: none;
+            transition: all 0.2s;
         }
-        .btn:hover { opacity: 0.9; }
+        .btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-whatsapp { background: #25D366; }
         .btn-purple { background: #9333ea; }
         .btn-success { background: #16a34a; }
         .btn-secondary { background: #475569; }
         .btn-danger { background: #dc2626; }
+        .btn-warning { background: #f59e0b; color: #1e293b; }
+        .btn-small { padding: 5px 10px; font-size: 11px; }
+        .btn-excel { background: #217346; }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -55,6 +65,7 @@
             padding: 15px;
             border-radius: 10px;
             text-align: center;
+            border: 1px solid #1e293b;
         }
         .stat-number {
             font-size: 32px;
@@ -69,7 +80,7 @@
         th, td {
             border: 1px solid #334155;
             padding: 8px;
-            font-size: 14px;
+            font-size: 13px;
             text-align: left;
         }
         th { background: #0f172a; color: #facc15; }
@@ -113,14 +124,36 @@
         }
         .file-input-label:hover { background: #1d4ed8; }
         #distributorFiles { display: none; }
-        .stock-dist-badge {
-            background: #16a34a;
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            margin-left: 5px;
-            white-space: nowrap;
+        .stock-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
+        .stock-own { color: #4ade80; }
+        .stock-dist { color: #facc15; }
+        .whatsapp-bulk-section {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid #334155;
+        }
+        .dealer-list {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .dealer-list-item {
+            padding: 4px 8px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+        }
+        .text-muted { color: #94a3b8; }
+        .text-success { color: #4ade80; }
+        .text-warning { color: #facc15; }
+        .progress-text { font-size: 12px; color: #94a3b8; margin-left: 10px; }
         @media (max-width: 768px) {
             .btn { padding: 6px 10px; font-size: 12px; }
             th, td { font-size: 11px; padding: 5px; }
@@ -131,21 +164,30 @@
 <body>
 <div class="container">
     <h1><i class="fas fa-chart-line"></i> Dealer Intelligence Dashboard</h1>
+    <p class="text-muted" style="margin-bottom:15px;">Auto Spares Solution - Dealer Offer Management System</p>
 
-    <!-- Distributor Stock Upload Section with Visual Badge -->
+    <!-- Distributor Stock Upload Section -->
     <div class="upload-section">
-        <h3><i class="fas fa-warehouse"></i> Distributor Stock</h3>
+        <h3><i class="fas fa-warehouse"></i> Distributor Stock Management</h3>
         <p>Upload stock lists from your distributors. <strong>New uploads will REPLACE all existing data.</strong></p>
-        <label class="file-input-label" for="distributorFiles">
-            <i class="fas fa-upload"></i> Select Excel Files
-        </label>
-        <input type="file" id="distributorFiles" accept=".xlsx,.xls,.csv" multiple>
-        <button class="btn btn-secondary" onclick="uploadMultipleDistributorFiles()">
-            <i class="fas fa-cloud-upload-alt"></i> Upload & Replace
-        </button>
-        <button class="btn btn-danger" onclick="clearDistributorStock()">
-            <i class="fas fa-trash"></i> Clear All Data
-        </button>
+        <div class="flex">
+            <label class="file-input-label" for="distributorFiles">
+                <i class="fas fa-upload"></i> Select Excel Files
+            </label>
+            <input type="file" id="distributorFiles" accept=".xlsx,.xls,.csv" multiple>
+            <button class="btn btn-secondary" onclick="uploadMultipleDistributorFiles()">
+                <i class="fas fa-cloud-upload-alt"></i> Upload & Replace
+            </button>
+            <button class="btn btn-danger" onclick="clearDistributorStock()">
+                <i class="fas fa-trash"></i> Clear Stock
+            </button>
+            <button class="btn btn-warning" onclick="clearAllOffers()">
+                <i class="fas fa-trash-alt"></i> Clear Offers
+            </button>
+            <button class="btn btn-secondary" onclick="clearCache()">
+                <i class="fas fa-broom"></i> Clear Cache
+            </button>
+        </div>
         <div id="distributorStockBadge" class="distributor-badge badge-inactive">
             <i class="fas fa-spinner fa-spin"></i> Loading...
         </div>
@@ -155,7 +197,7 @@
     <!-- Stats Grid -->
     <div class="stats-grid">
         <div class="stat-card"><div class="stat-number" id="totalOffers">0</div><div>Total Offers</div></div>
-        <div class="stat-card"><div class="stat-number" id="highDiscount">0</div><div>High Discount</div></div>
+        <div class="stat-card"><div class="stat-number" id="highDiscount">0</div><div>High Discount (5%+)</div></div>
         <div class="stat-card"><div class="stat-number" id="lowStockCount">0</div><div>Low Stock Alerts</div></div>
         <div class="stat-card"><div class="stat-number" id="areasCount">0</div><div>Areas</div></div>
         <div class="stat-card"><div class="stat-number" id="distributorPartsCount">0</div><div>Distributor Parts</div><small id="distributorUnitsCount" style="font-size:12px;">0 units</small></div>
@@ -163,10 +205,29 @@
 
     <!-- Action Buttons -->
     <div class="flex">
-        <button class="btn btn-success" onclick="runAnalysis()"><i class="fas fa-sync"></i> Run Analysis</button>
-        <button class="btn" onclick="generateAllFlyers()"><i class="fas fa-file-alt"></i> Generate Flyers</button>
-        <button class="btn btn-purple" onclick="downloadAllFlyersPDF()"><i class="fas fa-file-pdf"></i> Download PDF</button>
-        <button class="btn btn-whatsapp" onclick="sendBulkWhatsAppFlyers()"><i class="fab fa-whatsapp"></i> Send Flyers</button>
+        <button class="btn btn-success" id="runAnalysisBtn" onclick="runAnalysis()">
+            <i class="fas fa-sync"></i> Run Analysis
+        </button>
+        <button class="btn" onclick="generateAllFlyers()">
+            <i class="fas fa-file-alt"></i> Generate Flyers
+        </button>
+        <button class="btn btn-purple" onclick="downloadAllFlyersPDF()">
+            <i class="fas fa-file-pdf"></i> Download All PDF
+        </button>
+        <button class="btn btn-excel" onclick="exportAllExcel()">
+            <i class="fas fa-file-excel"></i> Export All Excel
+        </button>
+    </div>
+
+    <!-- WhatsApp Bulk Section -->
+    <div class="whatsapp-bulk-section">
+        <h3><i class="fab fa-whatsapp"></i> Send WhatsApp Messages</h3>
+        <p>Click below to start sending WhatsApp messages one by one. Each will open in a new tab.</p>
+        <button class="btn btn-whatsapp" onclick="startBulkWhatsApp()">
+            <i class="fab fa-whatsapp"></i> Start Bulk WhatsApp
+        </button>
+        <span id="whatsappProgress" class="progress-text"></span>
+        <div id="whatsappDealerList" class="dealer-list"></div>
     </div>
 
     <!-- Offers Table -->
@@ -174,7 +235,17 @@
     <div style="overflow-x: auto;">
         <table id="offersTable">
             <thead>
-                <tr><th>Dealer</th><th>Part</th><th>District</th><th>Stock (Your + Dist)</th><th>Discount</th><th>Offer Price</th><th>Action</th></tr>
+                <tr>
+                    <th>Dealer</th>
+                    <th>Part</th>
+                    <th>Description</th>
+                    <th>Application</th>
+                    <th>District</th>
+                    <th>Stock</th>
+                    <th>Discount</th>
+                    <th>Offer Price</th>
+                    <th>Action</th>
+                </tr>
             </thead>
             <tbody id="offersTbody"></tbody>
         </table>
@@ -199,33 +270,37 @@ function readExcelFile(file) {
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(sheet);
                 
-                console.log("Column names found:", Object.keys(rows[0]));
-                
                 const stock = [];
                 for (let i = 0; i < rows.length; i++) {
                     const row = rows[i];
                     
-                    // Get part number
-                    let part = row['Part No'];
-                    if (!part) part = row['PartNumber'];
-                    if (!part) part = row['part_no'];
-                    if (!part) part = row['Part'];
-                    
+                    // Flexible part detection
+                    let part = null;
+                    const partPatterns = ['Part No', 'PART NO', 'PartNumber', 'Part Number', 'Item Code', 'Material Code'];
+                    for (const pattern of partPatterns) {
+                        if (row[pattern]) { part = row[pattern]; break; }
+                    }
+                    if (!part) {
+                        for (const key of Object.keys(row)) {
+                            if (key.toLowerCase().includes('part') || key.toLowerCase().includes('item')) {
+                                part = row[key];
+                                break;
+                            }
+                        }
+                    }
                     if (!part) continue;
                     
-                    // Find stock value - check ALL columns
+                    // Flexible stock detection
                     let stockQty = 0;
-                    for (let key in row) {
-                        const value = Number(row[key]);
-                        if (!isNaN(value) && value > 0) {
-                            // If this looks like a stock quantity (not price, not lead time)
-                            if (key.toLowerCase().includes('stock') || 
-                                key.toLowerCase().includes('qty') || 
-                                key.toLowerCase().includes('available') ||
-                                (value > 0 && value < 10000 && key.length < 20)) {
-                                stockQty = value;
-                                console.log("Found stock for part " + part + " in column '" + key + "': " + stockQty);
-                                break;
+                    const stockPatterns = ['Available Stock', 'AVAILABLE STOCK', 'Stock', 'Qty', 'QTY', 'Current Stock'];
+                    for (const pattern of stockPatterns) {
+                        if (row[pattern]) { stockQty = Number(row[pattern]); break; }
+                    }
+                    if (stockQty === 0) {
+                        for (const key of Object.keys(row)) {
+                            if (key.toLowerCase().includes('stock') || key.toLowerCase().includes('qty')) {
+                                stockQty = Number(row[key]);
+                                if (stockQty > 0) break;
                             }
                         }
                     }
@@ -240,17 +315,8 @@ function readExcelFile(file) {
                         });
                     }
                 }
-                
-                console.log("Total items with stock > 0:", stock.length);
-                if (stock.length > 0) {
-                    console.log("Sample item:", stock[0]);
-                } else {
-                    console.log("WARNING: No items with stock > 0 found!");
-                    console.log("First row had these values:", rows[0]);
-                }
                 resolve(stock);
             } catch(err) { 
-                console.error("Error:", err);
                 reject(err); 
             }
         };
@@ -258,8 +324,9 @@ function readExcelFile(file) {
         reader.readAsArrayBuffer(file);
     });
 }
+
 // ============================================================
-// UPDATE DISTRIBUTOR STOCK BADGE & STATS
+// UPDATE DISTRIBUTOR STOCK BADGE
 // ============================================================
 function updateDistributorIndicators() {
     const stock = JSON.parse(localStorage.getItem('distributorStock') || '[]');
@@ -290,7 +357,7 @@ function clearDistributorStock() {
         localStorage.removeItem('distributorStock');
         updateDistributorIndicators();
         document.getElementById('distributorStatus').innerHTML = '🗑️ All distributor stock cleared.';
-        alert('Distributor stock cleared.');
+        showToast('Distributor stock cleared', 'warning');
         if (typeof DealerIntelligence !== 'undefined' && DealerIntelligence.refreshStock) {
             DealerIntelligence.refreshStock();
         }
@@ -299,12 +366,47 @@ function clearDistributorStock() {
 }
 
 // ============================================================
-// UPLOAD MULTIPLE DISTRIBUTOR FILES (REPLACE OLD DATA)
+// CLEAR ALL OFFERS
+// ============================================================
+function clearAllOffers() {
+    if (confirm('⚠️ This will DELETE ALL offers. This action cannot be undone. Are you sure?')) {
+        localStorage.removeItem('offers');
+        localStorage.removeItem('dealerOffers');
+        
+        if (window.BrochureGenerator) {
+            BrochureGenerator.clearOffers();
+        }
+        if (window.DealerIntelligence) {
+            DealerIntelligence.clearOffers();
+        }
+        
+        showToast('All offers cleared', 'warning');
+        document.getElementById('offersTbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:#facc15;">All offers cleared. Run analysis to generate new offers.</td></tr>';
+        document.getElementById('totalOffers').innerText = '0';
+        document.getElementById('highDiscount').innerText = '0';
+        document.getElementById('lowStockCount').innerText = '0';
+        document.getElementById('flyerList').innerHTML = '';
+        
+        setTimeout(() => runAnalysis(), 500);
+    }
+}
+
+// ============================================================
+// CLEAR CACHE
+// ============================================================
+function clearCache() {
+    if (window.DealerIntelligence) DealerIntelligence.clearCache();
+    if (window.BrochureGenerator) BrochureGenerator.clearCache();
+    showToast('Cache cleared', 'info');
+}
+
+// ============================================================
+// UPLOAD MULTIPLE DISTRIBUTOR FILES (WITH PROGRESS)
 // ============================================================
 async function uploadMultipleDistributorFiles() {
     const files = document.getElementById('distributorFiles').files;
     if (files.length === 0) {
-        alert("Please select one or more Excel files");
+        showToast('Please select one or more Excel files', 'warning');
         return;
     }
     
@@ -313,28 +415,37 @@ async function uploadMultipleDistributorFiles() {
     }
     
     const statusSpan = document.getElementById('distributorStatus');
-    statusSpan.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    statusSpan.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing files...';
     
-    let allStock = [];
+    // Process files in parallel for speed
+    const filePromises = [];
     for (let file of files) {
-        try {
-            const stockData = await readExcelFile(file);
-            console.log(`File ${file.name}: ${stockData.length} items with stock > 0`);
-            allStock = allStock.concat(stockData);
-        } catch(err) {
-            console.error(`Error reading ${file.name}:`, err);
-        }
+        filePromises.push(
+            readExcelFile(file)
+                .then(stockData => {
+                    console.log(`File ${file.name}: ${stockData.length} items`);
+                    return stockData;
+                })
+                .catch(err => {
+                    console.error(`Error reading ${file.name}:`, err);
+                    return [];
+                })
+        );
     }
     
-    console.log(`Total items before merge: ${allStock.length}`);
+    const results = await Promise.all(filePromises);
+    let allStock = [];
+    for (const result of results) {
+        allStock = allStock.concat(result);
+    }
     
     if (allStock.length === 0) {
-        statusSpan.innerHTML = '❌ No valid stock data found in selected files. Check column names: "Part No", "Available Stock"';
-        alert('No valid stock data. Make sure your Excel has columns: "Part No" and "Available Stock"');
+        statusSpan.innerHTML = '❌ No valid stock data found. Check column names.';
+        showToast('No valid stock data found', 'error');
         return;
     }
     
-    // Merge duplicates from the NEW upload only
+    // Merge duplicates
     const mergedMap = new Map();
     for (const item of allStock) {
         const key = `${item.part}|${item.distributor}`;
@@ -342,23 +453,22 @@ async function uploadMultipleDistributorFiles() {
             const existing = mergedMap.get(key);
             existing.stock += item.stock;
             if (item.price && item.price < existing.price) existing.price = item.price;
-            if (item.leadTime && item.leadTime < existing.leadTime) existing.leadTime = item.leadTime;
         } else {
             mergedMap.set(key, { ...item });
         }
     }
     
     const combinedStock = Array.from(mergedMap.values());
-    console.log(`Total items after merge: ${combinedStock.length}`);
-    console.log("Sample merged item:", combinedStock[0]);
-    
-    // Calculate total units
     const totalUnits = combinedStock.reduce((sum, item) => sum + item.stock, 0);
-    console.log(`Total units across all parts: ${totalUnits}`);
     
+    localStorage.removeItem('distributorStock');
     localStorage.setItem('distributorStock', JSON.stringify(combinedStock));
+    
+    window.dispatchEvent(new Event('distributorStockUpdated'));
+    
     updateDistributorIndicators();
-    statusSpan.innerHTML = `✅ REPLACED with ${files.length} file(s), total ${combinedStock.length} entries, ${totalUnits} units.`;
+    statusSpan.innerHTML = `✅ Uploaded ${files.length} file(s), ${combinedStock.length} items, ${totalUnits} units.`;
+    showToast(`✅ Uploaded ${combinedStock.length} items, ${totalUnits} units`, 'success');
     
     if (typeof DealerIntelligence !== 'undefined' && DealerIntelligence.refreshStock) {
         await DealerIntelligence.refreshStock();
@@ -367,59 +477,90 @@ async function uploadMultipleDistributorFiles() {
 }
 
 // ============================================================
-// RUN ANALYSIS
+// RUN ANALYSIS (WITH BUTTON STATE)
 // ============================================================
 async function runAnalysis() {
+    const btn = document.getElementById('runAnalysisBtn');
+    
     try {
         if (typeof DealerIntelligence === 'undefined') {
-            alert('DealerIntelligence not loaded.');
+            showToast('DealerIntelligence not loaded', 'error');
             return;
         }
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+        
+        showToast('Running analysis...', 'info');
+        
+        localStorage.removeItem('offers');
+        localStorage.removeItem('dealerOffers');
+        
+        if (window.BrochureGenerator) {
+            BrochureGenerator.clearOffers();
+        }
+        
         const result = await DealerIntelligence.runFullAnalysis();
         document.getElementById('totalOffers').innerText = result.offersGenerated || 0;
         document.getElementById('highDiscount').innerText = result.highDiscountOffers || 0;
         document.getElementById('lowStockCount').innerText = result.lowStockAlerts || 0;
         document.getElementById('areasCount').innerText = result.areasAnalysed || 0;
         displayOffers(result.offers || []);
+        
+        showToast(`✅ Analysis complete: ${result.offersGenerated} offers generated`, 'success');
+        console.log('✅ Analysis complete.');
     } catch(err) {
         console.error(err);
-        alert('Analysis failed: ' + err.message);
+        showToast('Analysis failed: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync"></i> Run Analysis';
     }
 }
 
+// ============================================================
+// DISPLAY OFFERS
+// ============================================================
 function displayOffers(offers) {
     const tbody = document.getElementById('offersTbody');
     tbody.innerHTML = '';
     if (!offers || offers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No offers generated. Run analysis first.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">No offers generated. Run analysis first.</td></tr>';
         return;
     }
     offers.slice(0, 50).forEach(o => {
         const row = tbody.insertRow();
         row.insertCell(0).innerText = o.dealer || '';
         row.insertCell(1).innerText = o.part || '';
-        row.insertCell(2).innerText = o.pincode || '-';
+        row.insertCell(2).innerText = (o.description || '-').substring(0, 30);
+        row.insertCell(3).innerText = (o.application || '-').substring(0, 25);
+        row.insertCell(4).innerText = o.district || o.pincode || '-';
         
-        // Stock cell with distributor badge
-        let stockHtml = `${o.totalStock || 0}`;
-        if (o.distributorStock > 0) {
-            stockHtml += ` <span class="stock-dist-badge">+${o.distributorStock} from Dist</span>`;
+        const ourStock = o.myStock || o.stock || 0;
+        const distStock = o.distributorStock || 0;
+        let stockHtml = `<div class="stock-cell">`;
+        stockHtml += `<div class="stock-own">📦 Our: ${ourStock}</div>`;
+        if (distStock > 0) {
+            stockHtml += `<div class="stock-dist">🏭 Dist: ${distStock}</div>`;
         }
-        row.insertCell(3).innerHTML = stockHtml;
+        stockHtml += `</div>`;
+        row.insertCell(5).innerHTML = stockHtml;
         
-        row.insertCell(4).innerText = (o.discount || 0) + '%';
-        row.insertCell(5).innerText = '₹' + Number(o.offerPrice || 0).toFixed(2);
-        row.insertCell(6).innerHTML = `<button class="btn btn-whatsapp" style="padding:5px 10px;" onclick="sendSingleWhatsApp('${escapeHtml(o.dealer).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i></button>`;
+        const discount = o.discount || 0;
+        const isDistributor = o.stockType === 'distributor-stock';
+        row.insertCell(6).innerHTML = isDistributor ? `<span style="color:#facc15;">${discount}% (MRP)</span>` : `${discount}%`;
+        row.insertCell(7).innerText = '₹' + Number(o.offerPrice || 0).toFixed(2);
+        row.insertCell(8).innerHTML = `<button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(o.dealer).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i></button>`;
     });
 }
 
 // ============================================================
-// FLYER FUNCTIONS (UPDATED: Multi-page PDF support + wa.me)
+// FLYER FUNCTIONS
 // ============================================================
 async function sendSingleWhatsApp(dealerName) {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
-            alert('BrochureGenerator not loaded. Please refresh.'); 
+            showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
         await BrochureGenerator.loadDealerMaster();
@@ -427,48 +568,59 @@ async function sendSingleWhatsApp(dealerName) {
         BrochureGenerator.sendFlyerToWhatsApp(dealerName);
     } catch(err) { 
         console.error(err); 
-        alert(err.message); 
+        showToast(err.message, 'error');
     }
 }
 
 async function generateAllFlyers() {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
-            alert('BrochureGenerator not loaded. Please refresh.'); 
+            showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
+        
+        showToast('Generating flyers...', 'info');
+        
         await BrochureGenerator.loadDealerMaster();
+        BrochureGenerator.clearOffers();
         BrochureGenerator.loadOffers();
+        
         const dealers = await BrochureGenerator.getDealersWithOffers();
         const div = document.getElementById('flyerList');
         div.innerHTML = '';
-        if (!dealers.length) {
+        
+        if (!dealers || dealers.length === 0) {
             div.innerHTML = '<div style="color:#facc15;padding:20px;">No flyers found. Run Analysis first.</div>';
+            showToast('No flyers found', 'warning');
             return;
         }
+        
         dealers.forEach(d => {
             div.innerHTML += `
                 <div class="flyer-card">
                     <div class="flyer-title">${escapeHtml(d.name)}</div>
                     <div>Total Offers: ${d.offerCount || 0}</div>
+                    <div style="font-size:11px;color:#94a3b8;">${d.hasPhone ? '📞 Has Phone' : '⚠️ No Phone'}</div>
                     <div class="flyer-buttons">
-                        <button class="btn" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
-                        <button class="btn btn-purple" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
-                        <button class="btn btn-whatsapp" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+                        <button class="btn btn-small" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
+                        <button class="btn btn-purple btn-small" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
+                        <button class="btn btn-excel btn-small" onclick="exportSingleExcel('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📊 Excel</button>
+                        <button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i></button>
                     </div>
                 </div>
             `;
         });
+        showToast(`✅ Generated ${dealers.length} flyers`, 'success');
     } catch(err) { 
         console.error(err); 
-        alert(err.message); 
+        showToast(err.message, 'error');
     }
 }
 
 async function previewFlyer(dealerName) {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
-            alert('BrochureGenerator not loaded. Please refresh.'); 
+            showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
         await BrochureGenerator.loadDealerMaster();
@@ -476,33 +628,34 @@ async function previewFlyer(dealerName) {
         BrochureGenerator.showBrochurePreview(dealerName);
     } catch(err) { 
         console.error(err); 
-        alert(err.message); 
+        showToast(err.message, 'error');
     }
 }
 
 async function downloadSinglePDF(dealerName) {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
-            alert('BrochureGenerator not loaded. Please refresh.'); 
+            showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
-        // This now calls the multi-page downloadPDF function
+        await BrochureGenerator.loadDealerMaster();
+        BrochureGenerator.loadOffers();
         await BrochureGenerator.downloadPDF(dealerName);
     } catch(err) { 
         console.error(err); 
-        alert('PDF download failed: ' + err.message); 
+        showToast('PDF download failed: ' + err.message, 'error');
     }
 }
 
 async function downloadAllFlyersPDF() {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
-            alert('BrochureGenerator not loaded. Please refresh.'); 
+            showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
         const dealers = await BrochureGenerator.getDealersWithOffers();
-        if (dealers.length === 0) {
-            alert('No flyers found. Run Analysis first.');
+        if (!dealers || dealers.length === 0) {
+            showToast('No flyers found. Run Analysis first.', 'warning');
             return;
         }
         let count = 0;
@@ -511,105 +664,200 @@ async function downloadAllFlyersPDF() {
             await new Promise(r => setTimeout(r, 500));
             count++;
         }
-        alert(`✅ Downloaded ${count} PDF files`);
+        showToast(`✅ Downloaded ${count} PDF files`, 'success');
     } catch(err) { 
         console.error(err); 
-        alert('Error downloading PDFs: ' + err.message); 
+        showToast('Error downloading PDFs: ' + err.message, 'error');
     }
 }
 
 // ============================================================
-// BULK WHATSAPP (FIXED: Uses wa.me with delay)
+// EXCEL EXPORT FUNCTIONS
 // ============================================================
-async function sendBulkWhatsAppFlyers() {
+async function exportSingleExcel(dealerName) {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
-            alert('BrochureGenerator not loaded. Please refresh.'); 
+            showToast('BrochureGenerator not loaded', 'error');
+            return; 
+        }
+        await BrochureGenerator.loadDealerMaster();
+        BrochureGenerator.loadOffers();
+        BrochureGenerator.exportDealerOffersToExcel(dealerName);
+    } catch(err) { 
+        console.error(err); 
+        showToast('Excel export failed: ' + err.message, 'error');
+    }
+}
+
+async function exportAllExcel() {
+    try {
+        if (typeof BrochureGenerator === 'undefined') { 
+            showToast('BrochureGenerator not loaded', 'error');
+            return; 
+        }
+        const dealers = await BrochureGenerator.getDealersWithOffers();
+        if (!dealers || dealers.length === 0) {
+            showToast('No flyers found. Run Analysis first.', 'warning');
+            return;
+        }
+        let count = 0;
+        for (const d of dealers) {
+            BrochureGenerator.exportDealerOffersToExcel(d.name);
+            await new Promise(r => setTimeout(r, 300));
+            count++;
+        }
+        showToast(`✅ Exported ${count} Excel files`, 'success');
+    } catch(err) { 
+        console.error(err); 
+        showToast('Error exporting Excel: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// BULK WHATSAPP (WITH PROPER PROGRESS)
+// ============================================================
+let whatsAppQueue = [];
+let isWhatsAppRunning = false;
+let totalDealers = 0;
+let sentCount = 0;
+
+async function startBulkWhatsApp() {
+    try {
+        if (typeof BrochureGenerator === 'undefined') { 
+            showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
         
+        await BrochureGenerator.loadDealerMaster();
+        BrochureGenerator.loadOffers();
+        
         const dealers = await BrochureGenerator.getDealersWithOffers();
         
-        if (!dealers.length) {
-            alert("No dealers found");
+        if (!dealers || dealers.length === 0) {
+            showToast('No dealers found with offers. Run analysis first.', 'warning');
             return;
         }
         
-        let current = 0;
-        let successCount = 0;
+        const dealersWithPhone = dealers.filter(d => d.phone && d.phone.length >= 10);
         
-        function sendNext() {
-            if (current >= dealers.length) {
-                alert(`✅ Completed! Opened WhatsApp for ${successCount} dealers.`);
-                return;
-            }
-            
-            const dealer = dealers[current];
-            const phone = dealer.phone;
-            
-            if (!phone) {
-                console.log(`⚠️ No phone for ${dealer.name}, skipping...`);
-                current++;
-                setTimeout(sendNext, 500);
-                return;
-            }
-            
-            const offers = BrochureGenerator.getAllDealerOffers(dealer.name);
-            
-            if (!offers.length) {
-                current++;
-                setTimeout(sendNext, 500);
-                return;
-            }
-            
-            // Build message
-            let msg = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
-            msg += `*Dear ${dealer.name},*\n\n`;
-            msg += `*📋 SPECIAL OFFER LIST*\n`;
-            msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-            
-            for (let o of offers.slice(0, 5)) {
-                msg += `🔹 *${o.part}*\n`;
-                msg += `   💰 ₹${(o.offerPrice || 0).toFixed(2)}\n`;
-                if (o.discount > 0) msg += `   ✨ ${o.discount}% OFF\n`;
-                msg += `   📦 Stock: ${o.totalStock || 0}\n\n`;
-            }
-            
-            if (offers.length > 5) {
-                msg += `*And ${offers.length - 5} more offers...*\n\n`;
-            }
-            
-            msg += `━━━━━━━━━━━━━━━━━━━━\n`;
-            if (dealer.district) msg += `📍 District: ${dealer.district}\n`;
-            msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-            msg += `_Reply with part numbers and quantity_\n`;
-            msg += `*Thank you for your business!*`;
-            
-            // Use wa.me for better browser compatibility
-            const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-            window.open(url, "_blank");
-            
-            console.log(`✅ Opened WhatsApp for ${dealer.name} (${current + 1}/${dealers.length})`);
-            successCount++;
-            
-            current++;
-            setTimeout(sendNext, 2500);
+        if (!dealersWithPhone.length) {
+            showToast('No dealers have phone numbers. Please update dealer master.', 'warning');
+            return;
         }
         
-        // Show initial alert
-        alert(`📱 Starting bulk WhatsApp for ${dealers.length} dealers.\n\nTabs will open one by one with a 2.5 second delay.`);
+        const listDiv = document.getElementById('whatsappDealerList');
+        listDiv.innerHTML = `<strong>${dealersWithPhone.length} dealers with phone numbers:</strong>`;
+        dealersWithPhone.forEach((d, i) => {
+            listDiv.innerHTML += `<div class="dealer-list-item"><span>${i+1}. ${d.name}</span><span>${d.phone}</span></div>`;
+        });
         
-        sendNext();
+        whatsAppQueue = dealersWithPhone;
+        totalDealers = dealersWithPhone.length;
+        sentCount = 0;
+        isWhatsAppRunning = false;
+        
+        const progress = document.getElementById('whatsappProgress');
+        progress.innerHTML = `Ready to send to ${totalDealers} dealers`;
+        
+        if (confirm(`📱 Found ${totalDealers} dealers with phone numbers.\n\nClick OK to start sending WhatsApp messages one by one.\n\nEach will open in a new tab.`)) {
+            processWhatsAppQueue();
+        }
         
     } catch(err) {
         console.error(err);
-        alert(err.message);
+        showToast(err.message, 'error');
     }
 }
 
+function processWhatsAppQueue() {
+    if (isWhatsAppRunning) return;
+    if (whatsAppQueue.length === 0) {
+        document.getElementById('whatsappProgress').innerHTML = `✅ All ${totalDealers} messages sent!`;
+        showToast(`✅ All ${totalDealers} WhatsApp messages sent!`, 'success');
+        return;
+    }
+    
+    isWhatsAppRunning = true;
+    const dealer = whatsAppQueue.shift();
+    sentCount++;
+    const progress = document.getElementById('whatsappProgress');
+    progress.innerHTML = `Sending ${sentCount}/${totalDealers}...`;
+    
+    const offers = BrochureGenerator.getAllDealerOffers(dealer.name);
+    
+    let msg = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
+    msg += `*Dear ${dealer.name},*\n\n`;
+    msg += `*📋 SPECIAL OFFER LIST*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    let count = 0;
+    for (let o of offers) {
+        if (count >= 5) {
+            msg += `\n*And ${offers.length - 5} more offers...*\n`;
+            break;
+        }
+        const isDistributor = o.stockType === 'distributor-stock';
+        msg += `🔹 *${o.part}*\n`;
+        if (o.description) msg += `   ${o.description.substring(0, 30)}\n`;
+        msg += `   💰 ₹${(o.offerPrice || 0).toFixed(2)}\n`;
+        if (isDistributor) {
+            msg += `   🏭 Distributor Stock (MRP)\n`;
+        } else if (o.discount > 0) {
+            msg += `   ✨ ${o.discount}% OFF\n`;
+        }
+        msg += `   📦 Our: ${o.myStock || o.stock || 0}`;
+        if (o.distributorStock > 0) {
+            msg += ` | Dist: ${o.distributorStock}`;
+        }
+        msg += `\n\n`;
+        count++;
+    }
+    
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    if (dealer.district) msg += `📍 District: ${dealer.district}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `_Reply with part numbers and quantity_\n`;
+    msg += `*Thank you for your business!*`;
+    
+    // Limit message length
+    if (msg.length > 3000) {
+        msg = msg.substring(0, 2900) + "\n\n... (truncated)\nReply YES to confirm order.";
+    }
+    
+    const phone = dealer.phone.replace(/\D/g, '');
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
+    
+    setTimeout(() => {
+        isWhatsAppRunning = false;
+        processWhatsAppQueue();
+    }, 2500);
+}
+
+// ============================================================
+// ESCAPE HTML
+// ============================================================
 function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// ============================================================
+// TOAST (fallback if Utils not loaded)
+// ============================================================
+function showToast(message, type = 'info') {
+    if (window.Utils && Utils.showToast) {
+        Utils.showToast(message, type);
+        return;
+    }
+    // Fallback
+    console.log(`[${type}] ${message}`);
+    alert(message);
 }
 
 // ============================================================
@@ -621,10 +869,10 @@ window.addEventListener('load', () => {
         if (typeof DealerIntelligence !== 'undefined') {
             runAnalysis();
         } else {
-            document.getElementById('offersTbody').innerHTML = '<tr><td colspan="7" style="text-align:center; color:#f87171;">⚠️ DealerIntelligence not loaded. Please ensure js/dealer-intelligence.js exists.</td></tr>';
+            document.getElementById('offersTbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:#f87171;">⚠️ DealerIntelligence not loaded. Please ensure js/dealer-intelligence.js exists.</td></tr>';
         }
     }, 1500);
 });
 </script>
 </body>
-</html>
+    </html>
