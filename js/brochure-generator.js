@@ -1,28 +1,88 @@
+// brochure-generator.js - COMPLETE FIXED VERSION
+// All issues resolved: Dealer matching, PDF layout, Excel export, Flyer generation
+
 (function () {
 
-console.log("🚀 Brochure System Loaded (FIXED: All Issues)");
+console.log("🚀 Brochure System Loaded");
 
-// =========================
+// ===================================================
+// DEPENDENCIES
+// ===================================================
+
+const Utils = window.Utils || {
+    normalizeText: function(t) { 
+        return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); 
+    },
+    normalizeDealerName: function(t) { 
+        return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); 
+    },
+    showToast: function(msg) { console.log(msg); },
+    safeNumber: function(n) { return Number(n) || 0; },
+    escapeHtml: function(s) { return String(s).replace(/[&<>"]/g, function(m) {
+        return m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '>' ? '&gt;' : '&quot;';
+    }); },
+    getStorageItem: function(k) { 
+        try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; }
+    },
+    formatDate: function(d) { return new Date(d).toLocaleDateString(); },
+    getExpiryDate: function() { 
+        const d = new Date(); d.setDate(d.getDate() + 15); return d.toISOString(); 
+    },
+    formatPhoneForWhatsApp: function(p) {
+        let cleaned = String(p || '').replace(/\D/g, '');
+        if (!cleaned) return '';
+        if (cleaned.length === 10) return '91' + cleaned;
+        if (cleaned.length === 11 && cleaned.startsWith('0')) return '91' + cleaned.substring(1);
+        if (cleaned.length === 12 && cleaned.startsWith('91')) return cleaned;
+        return cleaned;
+    },
+    getColumnWidths: function() {
+        return {
+            part: { cellWidth: 22 },
+            description: { cellWidth: 50 },
+            application: { cellWidth: 40 },
+            mrp: { cellWidth: 15 },
+            basicPrice: { cellWidth: 18 },
+            discount: { cellWidth: 12 },
+            netPrice: { cellWidth: 20 },
+            stock: { cellWidth: 15 }
+        };
+    }
+};
+
+const normalizeText = Utils.normalizeText;
+const normalizeDealerName = Utils.normalizeDealerName;
+const showToast = Utils.showToast;
+const safeNumber = Utils.safeNumber;
+const escapeHtml = Utils.escapeHtml;
+const getStorageItem = Utils.getStorageItem;
+const formatDate = Utils.formatDate;
+const formatPhoneForWhatsApp = Utils.formatPhoneForWhatsApp;
+const getColumnWidths = Utils.getColumnWidths;
+
+// ===================================================
 // DATA
-// =========================
+// ===================================================
 let dealerMaster = [];
+let dealerMasterMap = new Map();
 let currentOffers = [];
 let dealerOfferMap = {};
 let distributorStock = [];
+let distributorStockMap = new Map();
 let currentStock = new Map();
 let partDescriptions = new Map();
+let partApplications = new Map();
+let excelCache = new Map();
 
-// =========================
-// XLSX CHECK
-// =========================
-function hasXLSX() {
-    return typeof XLSX !== "undefined";
-}
-
-// =========================
-// LOAD EXCEL
-// =========================
+// ===================================================
+// LOAD EXCEL (CACHED)
+// ===================================================
 async function loadExcelFile(url, sheetName = null) {
+
+    const cacheKey = url + (sheetName || '');
+    if (excelCache.has(cacheKey)) {
+        return excelCache.get(cacheKey);
+    }
 
     try {
 
@@ -36,7 +96,9 @@ async function loadExcelFile(url, sheetName = null) {
             ? wb.Sheets[sheetName]
             : wb.Sheets[wb.SheetNames[0]];
 
-        return XLSX.utils.sheet_to_json(sheet);
+        const data = XLSX.utils.sheet_to_json(sheet);
+        excelCache.set(cacheKey, data);
+        return data;
 
     } catch (err) {
 
@@ -45,45 +107,144 @@ async function loadExcelFile(url, sheetName = null) {
     }
 }
 
-// =========================
-// NORMALIZE TEXT
-// =========================
-function normalizeText(t) {
-    return String(t || "")
-        .replace(/[\u200B-\u200D\uFEFF]/g, "")
-        .replace(/\n|\r|\t/g, " ")
-        .replace(/[^a-zA-Z0-9]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toUpperCase();
+// ===================================================
+// LOAD DEALER MASTER (NORMALIZED)
+// ===================================================
+async function loadDealerMaster() {
+    
+    const masterMap = new Map();
+    
+    // Customer Master
+    const customers = getStorageItem('customers') || [];
+    console.log(`📋 Customer Master: ${customers.length} customers`);
+    
+    for (const c of customers) {
+        const name = c.name || '';
+        if (!name) continue;
+        
+        const normName = normalizeDealerName(name);
+        const phone = c.mobileNo || c.phone || '';
+        const district = c.district || '';
+        
+        masterMap.set(normName, {
+            name: name,
+            normalized: normName,
+            phone: phone.replace(/\D/g, ''),
+            district: district,
+            source: 'customer-master'
+        });
+    }
+    
+    // Excel Master
+    try {
+        const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
+        console.log(`📋 Excel Master: ${rows.length} entries`);
+        
+        for (const row of rows) {
+            const name = row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || row["Name"] || "";
+            if (!name) continue;
+            
+            const normName = normalizeDealerName(name);
+            const phone = row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "";
+            const district = row["District"] || row["District Name"] || row["PLACE"] || row["Location"] || "";
+            
+            if (!masterMap.has(normName)) {
+                masterMap.set(normName, {
+                    name: name,
+                    normalized: normName,
+                    phone: phone.replace(/\D/g, ''),
+                    district: district,
+                    source: 'excel'
+                });
+            } else {
+                const existing = masterMap.get(normName);
+                if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
+                if (!existing.district && district) existing.district = district;
+            }
+        }
+    } catch(e) {
+        console.warn("Excel master file not found", e);
+    }
+    
+    // Users & Dealers
+    const users = getStorageItem('users') || [];
+    const dealers = getStorageItem('dealers') || [];
+    const allLocal = [...users, ...dealers];
+    
+    for (const u of allLocal) {
+        const name = u.name || u.business || '';
+        if (!name) continue;
+        
+        const normName = normalizeDealerName(name);
+        const phone = u.phone || u.mobile || u.mobileNo || '';
+        const district = u.district || '';
+        
+        if (!masterMap.has(normName)) {
+            masterMap.set(normName, {
+                name: name,
+                normalized: normName,
+                phone: phone.replace(/\D/g, ''),
+                district: district,
+                source: 'user-dealer'
+            });
+        } else {
+            const existing = masterMap.get(normName);
+            if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
+            if (!existing.district && district) existing.district = district;
+        }
+    }
+    
+    // Invoices
+    const allInvoices = getStorageItem('allInvoices') || [];
+    for (const inv of allInvoices) {
+        let name = inv.customerName || inv.buyer?.name || '';
+        if (!name) continue;
+        
+        const normName = normalizeDealerName(name);
+        let phone = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
+        let district = inv.customerDistrict || inv.buyer?.district || inv.district || '';
+        
+        if (!masterMap.has(normName)) {
+            masterMap.set(normName, {
+                name: name,
+                normalized: normName,
+                phone: phone.replace(/\D/g, ''),
+                district: district,
+                source: 'invoice'
+            });
+        } else {
+            const existing = masterMap.get(normName);
+            if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
+            if (!existing.district && district) existing.district = district;
+        }
+    }
+    
+    dealerMaster = Array.from(masterMap.values());
+    dealerMasterMap = masterMap;
+    
+    const withPhone = dealerMaster.filter(d => d.phone).length;
+    const withDistrict = dealerMaster.filter(d => d.district).length;
+    
+    console.log(`✅ Dealer Master: ${dealerMaster.length} dealers`);
+    console.log(`   📞 Has Phone: ${withPhone} | 📍 Has District: ${withDistrict}`);
+    
+    return dealerMaster;
 }
 
-// =========================
-// PHONE CLEANER
-// =========================
-function cleanPhone(p) {
-    let x = String(p || "").replace(/\D/g, "");
-    if (!x) return "";
-    if (x.length === 10) return "91" + x;
-    if (x.length === 11 && x.startsWith("0")) return "91" + x.substring(1);
-    if (x.length === 12 && x.startsWith("91")) return x;
-    if (x.length > 12) return "91" + x.slice(-10);
-    return x;
-}
-
-// =========================
+// ===================================================
 // LOAD DISTRIBUTOR STOCK
-// =========================
+// ===================================================
 async function loadDistributorStock() {
     try {
-        const localStock = localStorage.getItem('distributorStock');
-        if (localStock) {
-            const parsed = JSON.parse(localStock);
-            if (parsed && parsed.length > 0) {
-                distributorStock = parsed;
-                console.log(`✅ Distributor stock loaded from localStorage: ${distributorStock.length} items`);
-                return distributorStock;
-            }
+        const localStock = getStorageItem('distributorStock');
+        if (localStock && localStock.length > 0) {
+            distributorStock = localStock;
+            distributorStockMap.clear();
+            distributorStock.forEach(item => {
+                distributorStockMap.set(normalizeText(item.part), item);
+            });
+            console.log(`✅ Distributor stock: ${distributorStock.length} items`);
+            return distributorStock;
         }
         
         const rows = await loadExcelFile("./data/distributor-stock.xlsx");
@@ -106,7 +267,7 @@ async function loadDistributorStock() {
             }
             
             return {
-                part: String(row['Part No'] || row['part_no'] || row['PartNumber'] || '').trim(),
+                part: normalizeText(row['Part No'] || row['part_no'] || row['PartNumber'] || ''),
                 distributor: row['Distributor Name'] || 'Auto Links',
                 stock: stockQty,
                 price: Number(row['Price'] || row['price'] || 0),
@@ -114,328 +275,284 @@ async function loadDistributorStock() {
             };
         }).filter(item => item.part && item.stock > 0);
         
-        console.log(`✅ Distributor stock loaded: ${distributorStock.length} items`);
+        distributorStockMap.clear();
+        distributorStock.forEach(item => {
+            distributorStockMap.set(item.part, item);
+        });
+        
+        console.log(`✅ Distributor stock: ${distributorStock.length} items`);
         
     } catch (err) {
         console.warn("Could not load distributor stock:", err);
         distributorStock = [];
+        distributorStockMap.clear();
     }
     return distributorStock;
 }
 
-// =========================
-// LOAD DEALER MASTER
-// =========================
-async function loadDealerMaster() {
-    
-    const masterMap = new Map();
-    
-    const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-    console.log(`📋 Customer Master: ${customers.length} customers`);
-    
-    for (const c of customers) {
-        const name = c.name || '';
-        if (!name) continue;
-        
-        const normName = normalizeText(name);
-        const phone = c.mobileNo || c.phone || '';
-        const district = c.district || '';
-        
-        masterMap.set(normName, {
-            name: name,
-            phone: cleanPhone(phone),
-            district: district,
-            source: 'customer-master'
-        });
-    }
-    
-    try {
-        const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
-        console.log(`📋 Excel Master: ${rows.length} entries`);
-        
-        for (const row of rows) {
-            const name = row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || row["Name"] || "";
-            if (!name) continue;
-            
-            const normName = normalizeText(name);
-            const phone = row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "";
-            const district = row["District"] || row["District Name"] || row["PLACE"] || row["Location"] || "";
-            
-            if (!masterMap.has(normName)) {
-                masterMap.set(normName, {
-                    name: name,
-                    phone: cleanPhone(phone),
-                    district: district,
-                    source: 'excel'
-                });
-            } else {
-                const existing = masterMap.get(normName);
-                if (!existing.phone && phone) existing.phone = cleanPhone(phone);
-                if (!existing.district && district) existing.district = district;
-            }
-        }
-    } catch(e) {
-        console.warn("Excel master file not found", e);
-    }
-    
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
-    const allLocal = [...users, ...dealers];
-    
-    for (const u of allLocal) {
-        const name = u.name || u.business || '';
-        if (!name) continue;
-        
-        const normName = normalizeText(name);
-        const phone = u.phone || u.mobile || u.mobileNo || '';
-        const district = u.district || '';
-        
-        if (!masterMap.has(normName)) {
-            masterMap.set(normName, {
-                name: name,
-                phone: cleanPhone(phone),
-                district: district,
-                source: 'user-dealer'
-            });
-        } else {
-            const existing = masterMap.get(normName);
-            if (!existing.phone && phone) existing.phone = cleanPhone(phone);
-            if (!existing.district && district) existing.district = district;
-        }
-    }
-    
-    const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-    for (const inv of allInvoices) {
-        let name = inv.customerName || inv.buyer?.name || '';
-        if (!name) continue;
-        
-        const normName = normalizeText(name);
-        let phone = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
-        let district = inv.customerDistrict || inv.buyer?.district || inv.district || '';
-        
-        if (!masterMap.has(normName)) {
-            masterMap.set(normName, {
-                name: name,
-                phone: cleanPhone(phone),
-                district: district,
-                source: 'invoice'
-            });
-        } else {
-            const existing = masterMap.get(normName);
-            if (!existing.phone && phone) existing.phone = cleanPhone(phone);
-            if (!existing.district && district) existing.district = district;
-        }
-    }
-    
-    dealerMaster = Array.from(masterMap.values());
-    
-    const withPhone = dealerMaster.filter(d => d.phone).length;
-    const withDistrict = dealerMaster.filter(d => d.district).length;
-    
-    console.log(`✅ Dealer Master Loaded: ${dealerMaster.length} dealers`);
-    console.log(`   📞 Has Phone: ${withPhone} | 📍 Has District: ${withDistrict}`);
-    
-    return dealerMaster;
-}
-
-// =========================
-// LOAD MY STOCK (WITH DESCRIPTIONS)
-// =========================
+// ===================================================
+// LOAD MY STOCK
+// ===================================================
 async function loadMyStock() {
 
     try {
 
         const response = await fetch('prices.csv');
-
         const csvText = await response.text();
 
-        const lines = csvText.split('\n');
+        let rows;
+        if (typeof Papa !== 'undefined') {
+            const result = Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                trimHeaders: true
+            });
+            rows = result.data;
+        } else {
+            const workbook = XLSX.read(csvText, { type: 'string' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+            const headers = data[0] || [];
+            rows = data.slice(1).map(row => {
+                const obj = {};
+                headers.forEach((h, i) => {
+                    obj[h] = row[i] || '';
+                });
+                return obj;
+            });
+        }
         
         currentStock.clear();
         partDescriptions.clear();
+        partApplications.clear();
 
-        let skippedHeader = false;
-        let loadedCount = 0;
-        let descCount = 0;
+        const headers = Object.keys(rows[0] || {});
+        const partCol = headers.find(h => h.toLowerCase().includes('material') || h.toLowerCase().includes('part'));
+        const descCol = headers.find(h => h.toLowerCase().includes('description'));
+        const appCol = headers.find(h => h.toLowerCase().includes('application'));
+        const priceCol = headers.find(h => h.toLowerCase().includes('price'));
+        const stockCol = headers.find(h => h.toLowerCase().includes('stock') || h.toLowerCase().includes('qty'));
 
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            
-            const cols = line.split(',');
-            
-            if (!skippedHeader && cols[0] && 
-                (cols[0].toLowerCase().includes('material') || 
-                 cols[0].toLowerCase().includes('part'))) {
-                skippedHeader = true;
-                continue;
-            }
-            
-            const part = cols[0]?.trim() || '';
+        for (const row of rows) {
+            if (!row || !row[partCol]) continue;
+
+            const part = normalizeText(row[partCol]);
             if (!part) continue;
 
-            let stock = 0;
-            if (cols[7] && cols[7].trim() !== '' && cols[7].trim() !== 'NaN') {
-                stock = parseInt(cols[7].trim()) || 0;
-            }
-            
-            let price = 0;
-            if (cols[3] && cols[3].trim() !== '' && cols[3].trim() !== 'NaN') {
-                price = parseFloat(cols[3].trim()) || 0;
-            }
-            
-            const description = cols[1] ? cols[1].trim() : '';
+            const stock = Number(row[stockCol]) || 0;
+            const price = Number(row[priceCol]) || 0;
+            const description = row[descCol] ? String(row[descCol]).trim() : '';
+            const application = row[appCol] ? String(row[appCol]).trim() : '';
 
             currentStock.set(part, {
-                stock: stock,
-                price: price,
-                description: description
+                stock,
+                price,
+                description,
+                application
             });
-            loadedCount++;
             
-            if (description) {
-                partDescriptions.set(part, description);
-                descCount++;
-            }
+            if (description) partDescriptions.set(part, description);
+            if (application) partApplications.set(part, application);
         }
 
-        console.log(`✅ My stock loaded: ${loadedCount} parts`);
-        console.log(`📝 Descriptions loaded: ${descCount}`);
+        console.log(`✅ My stock: ${currentStock.size} parts`);
 
     } catch (err) {
 
-        console.error("Error loading prices.csv:", err);
+        console.error("Error loading stock:", err);
+        showToast("Error loading stock data", "error");
     }
 }
 
-// =========================
-// GET DESCRIPTION
-// =========================
-function getDescription(part) {
-    if (partDescriptions.has(part)) {
-        return partDescriptions.get(part);
-    }
-    const stockData = currentStock.get(part);
-    if (stockData && stockData.description) {
-        return stockData.description;
-    }
-    return '';
-}
-
-// =========================
-// LOAD OFFERS (FIXED: Handles both array and object)
-// =========================
+// ===================================================
+// LOAD OFFERS
+// ===================================================
 function loadOffers() {
-    const rawData = JSON.parse(localStorage.getItem("dealerOffers") || "{}");
-    
-    // Handle both formats:
-    // Format 1: { offers: [...] }
-    // Format 2: [...]
-    if (Array.isArray(rawData)) {
-        currentOffers = rawData;
-        console.log(`✅ Offers loaded as array: ${currentOffers.length}`);
-    } else if (rawData && Array.isArray(rawData.offers)) {
-        currentOffers = rawData.offers;
-        console.log(`✅ Offers loaded from offers property: ${currentOffers.length}`);
-    } else {
-        currentOffers = [];
-        console.log(`⚠️ No offers found in localStorage`);
-    }
-    
+    currentOffers = [];
     dealerOfferMap = {};
     
+    const rawData = getStorageItem('dealerOffers');
+    
+    if (rawData && Array.isArray(rawData.offers)) {
+        currentOffers = rawData.offers;
+        console.log(`✅ Offers loaded: ${currentOffers.length}`);
+    } else if (Array.isArray(rawData)) {
+        currentOffers = rawData;
+        console.log(`✅ Offers loaded as array: ${currentOffers.length}`);
+    } else {
+        currentOffers = [];
+        console.log(`⚠️ No offers found`);
+    }
+    
+    // Build dealer map using normalized names
     currentOffers.forEach(o => {
-        const key = normalizeText(o.dealer);
+        const key = normalizeDealerName(o.dealer || o.dealerRaw || '');
+        if (!key) return;
         if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
         dealerOfferMap[key].push(o);
     });
     
-    console.log(`📊 Dealer keys in map: ${Object.keys(dealerOfferMap).length}`);
+    console.log(`📊 Dealers with offers: ${Object.keys(dealerOfferMap).length}`);
 }
 
-// =========================
-// GET OFFERS
-// =========================
-function getAllDealerOffers(name) {
-    const normalized = normalizeText(name);
+// ===================================================
+// GET DEALERS WITH OFFERS (FIXED)
+// ===================================================
+async function getDealersWithOffers() {
+    await loadDealerMaster();
+    loadOffers();
     
-    if (dealerOfferMap[normalized]) {
-        return dealerOfferMap[normalized];
-    }
+    const result = [];
+    const processed = new Set();
     
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
-        if (key.includes(normalized) || normalized.includes(key)) {
-            console.log(`✅ Found offers by partial match: "${key}" for "${name}"`);
-            return offers;
+        if (offers.length === 0 || processed.has(key)) continue;
+        processed.add(key);
+        
+        // Find dealer using normalized key
+        let dealer = dealerMasterMap.get(key);
+        
+        // If not found, try to find by name
+        if (!dealer) {
+            const firstOffer = offers[0];
+            const searchName = firstOffer.dealer || firstOffer.dealerRaw || '';
+            dealer = findDealer(searchName);
         }
+        
+        const firstOffer = offers[0];
+        result.push({
+            name: firstOffer.dealer || firstOffer.dealerRaw || key,
+            normalized: key,
+            phone: dealer?.phone || '',
+            district: dealer?.district || '',
+            offerCount: offers.length,
+            hasPhone: !!dealer?.phone
+        });
     }
     
-    const words = normalized.split(' ');
-    for (const [key, offers] of Object.entries(dealerOfferMap)) {
-        for (const word of words) {
-            if (word.length > 2 && key.includes(word)) {
-                console.log(`✅ Found offers by word match: "${key}" for "${name}"`);
-                return offers;
-            }
-        }
-    }
-    
-    return [];
+    console.log(`✅ Found ${result.length} dealers with offers`);
+    return result;
 }
 
-// =========================
-// FIND DEALER
-// =========================
+// ===================================================
+// FIND DEALER (IMPROVED)
+// ===================================================
 function findDealer(name) {
-    const normalized = normalizeText(name);
+    if (!name) return null;
     
-    let dealer = dealerMaster.find(d => normalizeText(d.name) === normalized);
-    if (dealer) return dealer;
+    const normalized = normalizeDealerName(name);
     
-    dealer = dealerMaster.find(d => 
-        normalizeText(d.name).includes(normalized) || 
-        normalized.includes(normalizeText(d.name))
-    );
-    if (dealer) return dealer;
+    // Priority 1: Exact match
+    if (dealerMasterMap.has(normalized)) {
+        return dealerMasterMap.get(normalized);
+    }
     
-    const words = normalized.split(' ');
-    for (const d of dealerMaster) {
-        const normName = normalizeText(d.name);
-        for (const word of words) {
-            if (word.length > 2 && normName.includes(word)) {
-                return d;
+    // Priority 2: Contains match with confidence
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    for (const [key, dealer] of dealerMasterMap) {
+        if (key.includes(normalized) || normalized.includes(key)) {
+            const score = Math.min(key.length, normalized.length) / Math.max(key.length, normalized.length);
+            if (score > bestScore && score > 0.6) {
+                bestScore = score;
+                bestMatch = dealer;
             }
         }
+    }
+    
+    if (bestMatch) {
+        console.log(`✅ Found dealer by contains match (${Math.round(bestScore * 100)}%): "${name}"`);
+        return bestMatch;
+    }
+    
+    // Priority 3: Word match
+    const words = normalized.split(' ').filter(w => w.length > 2);
+    let wordMatch = null;
+    let wordScore = 0;
+    
+    for (const [key, dealer] of dealerMasterMap) {
+        let matches = 0;
+        for (const word of words) {
+            if (key.includes(word)) matches++;
+        }
+        const score = words.length > 0 ? matches / words.length : 0;
+        if (score > wordScore && score > 0.5) {
+            wordScore = score;
+            wordMatch = dealer;
+        }
+    }
+    
+    if (wordMatch) {
+        console.log(`✅ Found dealer by word match (${Math.round(wordScore * 100)}%): "${name}"`);
+        return wordMatch;
     }
     
     return null;
 }
 
-// =========================
-// GET DISTRIBUTOR INFO
-// =========================
-function getDistributorInfo(part) {
-    return distributorStock.find(d => d.part === part) || null;
-}
-
-// =========================
-// PRICE ENGINE
-// =========================
-function getMRP(o) {
-    const distInfo = getDistributorInfo(o.part);
-    if (distInfo && distInfo.stock > 0 && distInfo.price > 0) {
-        return distInfo.price;
+// ===================================================
+// GET ALL DEALER OFFERS
+// ===================================================
+function getAllDealerOffers(name) {
+    if (!name) return [];
+    
+    const normalized = normalizeDealerName(name);
+    
+    // Try exact match
+    if (dealerOfferMap[normalized]) {
+        return dealerOfferMap[normalized];
     }
-    return Number(o.originalPrice || o.mrp || o.MRP || 0);
+    
+    // Try contains match
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    for (const [key, offers] of Object.entries(dealerOfferMap)) {
+        if (key.includes(normalized) || normalized.includes(key)) {
+            const score = Math.min(key.length, normalized.length) / Math.max(key.length, normalized.length);
+            if (score > bestScore && score > 0.6) {
+                bestScore = score;
+                bestMatch = offers;
+            }
+        }
+    }
+    
+    if (bestMatch) {
+        console.log(`✅ Found offers by contains match (${Math.round(bestScore * 100)}%)`);
+        return bestMatch;
+    }
+    
+    // Try word match
+    const words = normalized.split(' ').filter(w => w.length > 2);
+    let wordMatch = null;
+    let wordScore = 0;
+    
+    for (const [key, offers] of Object.entries(dealerOfferMap)) {
+        let matches = 0;
+        for (const word of words) {
+            if (key.includes(word)) matches++;
+        }
+        const score = words.length > 0 ? matches / words.length : 0;
+        if (score > wordScore && score > 0.5) {
+            wordScore = score;
+            wordMatch = offers;
+        }
+    }
+    
+    return wordMatch || [];
 }
 
-function getBasic(mrp) {
-    return mrp - (mrp * 31.77 / 100);
+// ===================================================
+// GET DISTRIBUTOR INFO
+// ===================================================
+function getDistributorInfo(part) {
+    return distributorStockMap.get(normalizeText(part)) || null;
 }
 
-function getDiscount(o) {
-    return Number(o.discount || 0);
-}
-
+// ===================================================
+// PRICE CALCULATIONS
+// ===================================================
 function calculateOurPrice(mrp, discount) {
     const basic = mrp - (mrp * 31.77 / 100);
     const afterDiscount = basic - (basic * discount / 100);
@@ -446,26 +563,26 @@ function calculateDistributorPrice(mrp) {
     return mrp;
 }
 
-function getDisplayStock(offer) {
-    const myStock = offer.myStock || offer.totalStock || 0;
+function getStockInfo(offer) {
+    const myStock = offer.myStock || offer.stock || 0;
     const distInfo = getDistributorInfo(offer.part);
     const distributorStockQty = distInfo?.stock || offer.distributorStock || 0;
+    const distMRP = distInfo?.price || 0;
     
     return {
-        myStock: myStock,
-        distributorStock: distributorStockQty,
-        totalStock: myStock + distributorStockQty,
-        hasDistributor: distributorStockQty > 0,
-        distMRP: distInfo?.price || 0
+        ourStock: myStock,
+        distStock: distributorStockQty,
+        hasDistStock: distributorStockQty > 0,
+        distMRP: distMRP
     };
 }
 
 function calculatePrices(offer) {
-    const dis = getDiscount(offer);
-    const stock = getDisplayStock(offer);
+    const discount = Number(offer.discount || 0);
+    const stock = getStockInfo(offer);
     
     const ourMRP = offer.originalPrice || offer.mrp || 0;
-    const ourOfferPrice = calculateOurPrice(ourMRP, dis);
+    const ourOfferPrice = calculateOurPrice(ourMRP, discount);
     
     const distMRP = stock.distMRP || 0;
     const distOfferPrice = calculateDistributorPrice(distMRP);
@@ -475,14 +592,14 @@ function calculatePrices(offer) {
         ourOfferPrice: ourOfferPrice,
         distMRP: distMRP,
         distOfferPrice: distOfferPrice,
-        dis: dis,
+        discount: discount,
         stock: stock
     };
 }
 
-// =========================
+// ===================================================
 // GENERATE WHATSAPP MESSAGE
-// =========================
+// ===================================================
 function generateWhatsAppMessage(dealerName, dealer, offers) {
     let msg = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
     msg += `*Dear ${dealerName},*\n\n`;
@@ -490,52 +607,45 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
     msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     let hasDistributorStock = false;
+    let charCount = msg.length;
+    const MAX_CHARS = 3000;
     
-    for (let o of offers.slice(0, 8)) {
+    for (let o of offers) {
         const prices = calculatePrices(o);
         const stock = prices.stock;
-        const desc = getDescription(o.part);
-        const offerType = o.offerType || '';
-        const expiryDate = o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : '';
-        const source = o.source || '';
+        const desc = o.description || '';
+        const app = o.application || '';
         
-        msg += `🔹 *${o.part}*`;
-        if (desc) msg += ` - ${desc}`;
-        msg += `\n`;
+        let item = `🔹 *${o.part}*\n`;
+        if (desc) item += `   📝 ${desc.substring(0, 30)}\n`;
+        if (app) item += `   🔧 ${app.substring(0, 30)}\n`;
         
-        if (offerType) msg += `   🏷️ ${offerType}\n`;
-        if (source) msg += `   📄 Source: ${source}\n`;
-        
-        msg += `   💰 Offer Price: ₹${prices.ourOfferPrice.toFixed(2)}\n`;
-        if (prices.dis > 0) msg += `   ✨ ${prices.dis}% OFF\n`;
-        msg += `   📦 Our Stock: ${stock.myStock} units`;
-        if (prices.ourOfferPrice > 0 && stock.myStock > 0) {
-            msg += ` @ ₹${prices.ourOfferPrice.toFixed(2)}/unit`;
+        if (stock.ourStock > 0) {
+            item += `   📦 Our: ${stock.ourStock} @ ₹${prices.ourOfferPrice.toFixed(2)}`;
+            if (prices.discount > 0) item += ` (${prices.discount}% OFF)`;
+            item += `\n`;
         }
-        msg += `\n`;
         
-        if (stock.distributorStock > 0) {
+        if (stock.hasDistStock) {
             hasDistributorStock = true;
-            msg += `   🏭 Dist. Stock: ${stock.distributorStock} units`;
-            if (prices.distOfferPrice > 0) {
-                msg += ` @ ₹${prices.distOfferPrice.toFixed(2)}/unit (MRP)`;
-            }
-            msg += `\n`;
+            item += `   🏭 Dist: ${stock.distStock} @ ₹${prices.distOfferPrice.toFixed(2)} (MRP)\n`;
         }
-        msg += `   📊 Total Stock: ${stock.totalStock} units\n`;
-        if (expiryDate) msg += `   ⏰ Valid till: ${expiryDate}\n`;
-        msg += `\n`;
-    }
-
-    if (offers.length > 8) {
-        msg += `*And ${offers.length - 8} more offers...*\n\n`;
+        item += `\n`;
+        
+        if (charCount + item.length > MAX_CHARS) {
+            msg += `\n*And ${offers.length - (offers.indexOf(o) + 1)} more offers...*\n`;
+            break;
+        }
+        
+        msg += item;
+        charCount += item.length;
     }
 
     msg += `━━━━━━━━━━━━━━━━━━━━\n`;
     if (dealer?.district) msg += `📍 District: ${dealer.district}\n`;
     
     if (hasDistributorStock) {
-        msg += `\n⚠️ *Additional courier charges will apply for distributor stock items.*\n`;
+        msg += `\n⚠️ *Additional courier charges apply for distributor stock items.*\n`;
     }
     
     msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
@@ -545,98 +655,66 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
     return msg;
 }
 
-// =========================
-// SEND WHATSAPP (FIXED: Added async)
-// =========================
+// ===================================================
+// SEND WHATSAPP (FIXED)
+// ===================================================
 async function sendFlyerToWhatsApp(name) {
     console.log(`🔍 Looking for offers for: "${name}"`);
+    
+    // Load fresh data
+    await loadDealerMaster();
+    loadOffers();
     
     let offers = getAllDealerOffers(name);
     
     if (offers.length === 0) {
-        const normalized = normalizeText(name);
-        const words = normalized.split(' ');
-        
-        for (const [key, offerList] of Object.entries(dealerOfferMap)) {
-            for (const word of words) {
-                if (word.length > 2 && key.includes(word)) {
-                    offers = offerList;
-                    console.log(`✅ Found offers by word match: "${key}" for "${name}"`);
-                    break;
-                }
-            }
-            if (offers.length > 0) break;
-        }
-    }
-    
-    if (offers.length === 0) {
-        alert(`❌ No offers found for "${name}"`);
+        showToast(`❌ No offers found for "${name}"`, "error");
         return;
     }
     
-    const correctDealerName = offers[0].dealer;
-    console.log(`📛 Using correct dealer name: "${correctDealerName}" (was: "${name}")`);
+    const firstOffer = offers[0];
+    const dealerName = firstOffer.dealer || firstOffer.dealerRaw || name;
     
-    let dealer = findDealer(correctDealerName);
+    let dealer = findDealer(dealerName);
     
     if (!dealer || !dealer.phone) {
-        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        const customerMatch = customers.find(c => normalizeText(c.name) === normalizeText(correctDealerName));
+        // Try customer master directly
+        const customers = getStorageItem('customers') || [];
+        const customerMatch = customers.find(c => normalizeDealerName(c.name) === normalizeDealerName(dealerName));
         if (customerMatch && (customerMatch.mobileNo || customerMatch.phone)) {
             dealer = {
                 name: customerMatch.name,
-                phone: cleanPhone(customerMatch.mobileNo || customerMatch.phone),
+                normalized: normalizeDealerName(customerMatch.name),
+                phone: customerMatch.mobileNo || customerMatch.phone || '',
                 district: customerMatch.district || '',
                 source: 'customer-master'
             };
-            console.log(`✅ Found phone from Customer Master: ${dealer.phone}`);
         }
     }
     
     if (!dealer || !dealer.phone) {
-        try {
-            const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
-            for (const row of rows) {
-                const name = row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || "";
-                if (normalizeText(name) === normalizeText(correctDealerName)) {
-                    const phone = row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "";
-                    if (phone) {
-                        dealer = {
-                            name: name,
-                            phone: cleanPhone(phone),
-                            district: row["District"] || "",
-                            source: 'excel-master-direct'
-                        };
-                        console.log(`✅ Found phone from Excel Master: ${dealer.phone}`);
-                        break;
-                    }
-                }
-            }
-        } catch(e) {
-            console.warn("Could not read Excel Master directly", e);
-        }
-    }
-    
-    if (!dealer || !dealer.phone) {
-        alert(`❌ Phone number not found for "${correctDealerName}"`);
+        showToast(`❌ Phone number not found for "${dealerName}"`, "error");
         return;
     }
     
-    const msg = generateWhatsAppMessage(correctDealerName, dealer, offers);
-    let cleanPhoneNum = dealer.phone;
+    const msg = generateWhatsAppMessage(dealerName, dealer, offers);
+    const cleanPhoneNum = formatPhoneForWhatsApp(dealer.phone);
     
-    if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
-    if (cleanPhoneNum.length === 11 && cleanPhoneNum.startsWith('0')) cleanPhoneNum = '91' + cleanPhoneNum.substring(1);
+    if (!cleanPhoneNum) {
+        showToast(`❌ Invalid phone number for "${dealerName}"`, "error");
+        return;
+    }
     
-    const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
-    window.location.href = url;
+    const url = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
     
-    console.log(`✅ WhatsApp opened for "${correctDealerName}" (${cleanPhoneNum}) | Source: ${dealer.source} | Offers: ${offers.length}`);
+    showToast(`✅ WhatsApp opened for "${dealerName}"`, "success");
+    console.log(`✅ WhatsApp opened for "${dealerName}" (${cleanPhoneNum}) | Offers: ${offers.length}`);
 }
 
-// =========================
-// GENERATE BROCHURE HTML
-// =========================
+// ===================================================
+// GENERATE BROCHURE HTML (WITH ALL COLUMNS)
+// ===================================================
 function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 12) {
     const offers = getAllDealerOffers(name);
     const dealer = findDealer(name);
@@ -645,10 +723,10 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     let district = dealer?.district || '';
     
     if (!phone) {
-        const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-        const match = customers.find(c => normalizeText(c.name) === normalizeText(name));
+        const customers = getStorageItem('customers') || [];
+        const match = customers.find(c => normalizeDealerName(c.name) === normalizeDealerName(name));
         if (match) {
-            phone = cleanPhone(match.mobileNo || match.phone || '');
+            phone = match.mobileNo || match.phone || '';
             district = match.district || '';
         }
     }
@@ -657,10 +735,10 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     const end = Math.min(start + rowsPerPage, offers.length);
     const pageOffers = offers.slice(start, end);
     
-    const hasDistributorStock = offers.some(o => getDisplayStock(o).hasDistributor);
+    const hasDistributorStock = offers.some(o => getStockInfo(o).hasDistStock);
     
     let html = `
-    <div style="width:100%;max-width:1000px;background:#fff;padding:8px 10px;font-family:Arial;color:#000;margin:0 auto;page-break-after:${page < totalPages - 1 ? 'always' : 'avoid'};">
+    <div style="width:100%;max-width:1100px;background:#fff;padding:8px 10px;font-family:Arial;color:#000;margin:0 auto;page-break-after:${page < totalPages - 1 ? 'always' : 'avoid'};">
     
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #facc15;padding-bottom:4px;margin-bottom:5px;">
         <span style="color:#0a7c71;font-size:18px;font-weight:bold;">AUTO SPARES SOLUTION</span>
@@ -677,29 +755,33 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     
     <table style="width:100%;border-collapse:collapse;font-size:8px;table-layout:fixed;">
     <colgroup>
-        <col style="width:12%;">
+        <col style="width:10%;">
         <col style="width:18%;">
-        <col style="width:8%;">
-        <col style="width:8%;">
-        <col style="width:8%;">
-        <col style="width:8%;">
-        <col style="width:8%;">
+        <col style="width:15%;">
         <col style="width:8%;">
         <col style="width:10%;">
+        <col style="width:8%;">
         <col style="width:12%;">
+        <col style="width:8%;">
+        <col style="width:8%;">
+        <col style="width:8%;">
+        <col style="width:8%;">
+        <col style="width:8%;">
     </colgroup>
     <thead>
     <tr style="background:#facc15;">
-        <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;word-wrap:break-word;">Part</th>
-        <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;word-wrap:break-word;">Description</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;">Part No</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;">Description</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;">Application</th>
         <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">MRP</th>
-        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Disc</th>
-        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Price</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Basic Price<br>(Less 31.77%)</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Spl Dis %</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Net Price<br>Incl GST</th>
         <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Our<br>Stock</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Dist<br>MRP</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Dist<br>Price</th>
         <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Dist<br>Stock</th>
-        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Total</th>
-        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:6px;word-wrap:break-word;">Type</th>
-        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:6px;word-wrap:break-word;">Expiry</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Expiry</th>
     </tr>
     </thead>
     <tbody>`;
@@ -707,34 +789,23 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     for (const o of pageOffers) {
         const prices = calculatePrices(o);
         const stock = prices.stock;
-        const description = getDescription(o.part);
-        const offerType = o.offerType || '';
-        const expiryDate = o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : '-';
-        const source = o.source || '';
-        
-        const onlyDistributor = stock.myStock === 0 && stock.distributorStock > 0;
-        const noStock = stock.myStock === 0 && stock.distributorStock === 0;
+        const description = o.description || '';
+        const application = o.application || '';
+        const expiryDate = o.expiresAt ? formatDate(o.expiresAt) : '-';
         
         html += `<tr>
             <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:7px;"><strong>${escapeHtml(o.part || '')}</strong></td>
             <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:7px;color:#333;">${escapeHtml(description || '-')}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:7px;color:#555;">${escapeHtml(application || '-')}</td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">${prices.ourMRP.toFixed(0)}</td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#16a34a;">${prices.dis}%</td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#2563eb;font-weight:bold;">${prices.ourOfferPrice.toFixed(0)}</td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;${onlyDistributor ? 'color:#ff6b35;' : noStock ? 'color:#999;' : ''}">
-                ${stock.myStock}
-                ${onlyDistributor ? `<br><span style="color:#16a34a;font-size:5px;">(Dist only)</span>` : ''}
-            </td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;${stock.distributorStock > 0 ? 'color:#16a34a;' : 'color:#999;'}">
-                ${stock.distributorStock || '-'}
-            </td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;font-weight:bold;">${stock.totalStock}</td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:6px;word-wrap:break-word;">
-                ${offerType ? escapeHtml(offerType.replace('⭐ ', '').replace('🔥 ', '').replace('🏭 ', '').replace('📄 ', '').replace('📋 ', '')) : '-'}
-            </td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:6px;${expiryDate !== '-' ? 'color:#dc3545;' : ''}">
-                ${expiryDate}
-            </td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">${(o.basicPrice || prices.ourMRP).toFixed(0)}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#16a34a;">${prices.discount}%</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#2563eb;font-weight:bold;">${stock.ourStock > 0 ? prices.ourOfferPrice.toFixed(0) : '-'}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">${stock.ourStock || 0}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;${stock.hasDistStock ? 'color:#facc15;' : 'color:#999;'}">${stock.hasDistStock ? prices.distMRP.toFixed(0) : '-'}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#9333ea;font-weight:bold;">${stock.hasDistStock ? prices.distOfferPrice.toFixed(0) : '-'}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;${stock.hasDistStock ? 'color:#16a34a;' : 'color:#999;'}">${stock.hasDistStock ? stock.distStock : '-'}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:6px;${expiryDate !== '-' ? 'color:#dc3545;' : ''}">${expiryDate}</td>
         </tr>`;
     }
 
@@ -754,25 +825,42 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     return html;
 }
 
-// =========================
-// SHOW PREVIEW
-// =========================
+// ===================================================
+// SHOW PREVIEW (WITH PAGINATION)
+// ===================================================
+let previewCurrentPage = 0;
+let previewTotalPages = 1;
+let previewDealerName = '';
+let previewRowsPerPage = 12;
+let previewWindow = null;
+
 function showBrochurePreview(name) {
     const offers = getAllDealerOffers(name);
     if (offers.length === 0) {
-        alert(`No offers found for "${name}"`);
+        showToast(`No offers found for "${name}"`, "error");
         return;
     }
     
-    const rowsPerPage = 12;
-    const totalPages = Math.ceil(offers.length / rowsPerPage);
+    previewDealerName = name;
+    previewCurrentPage = 0;
+    previewRowsPerPage = 12;
+    previewTotalPages = Math.ceil(offers.length / previewRowsPerPage);
     
-    console.log(`📄 Preview: ${offers.length} offers, ${totalPages} pages`);
+    renderPreviewPage();
+}
+
+function renderPreviewPage() {
+    const name = previewDealerName;
+    const page = previewCurrentPage;
+    const totalPages = previewTotalPages;
+    const rowsPerPage = previewRowsPerPage;
+    const offers = getAllDealerOffers(name);
     
     let fullHtml = `<!DOCTYPE html>
     <html>
     <head>
         <title>Brochure - ${name}</title>
+        <meta charset="UTF-8">
         <style>
             body { 
                 font-family: Arial, sans-serif; 
@@ -782,7 +870,7 @@ function showBrochurePreview(name) {
             }
             .page { 
                 background: white; 
-                max-width: 1000px; 
+                max-width: 1100px; 
                 margin: 5px auto; 
                 padding: 6px 10px; 
                 box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
@@ -815,129 +903,246 @@ function showBrochurePreview(name) {
                 background: #facc15; 
                 font-size: 6px; 
             }
+            .pagination {
+                text-align: center;
+                padding: 10px;
+                background: #f8f9fa;
+                border-top: 2px solid #facc15;
+                margin-top: 4px;
+                position: sticky;
+                bottom: 0;
+            }
+            .pagination button {
+                background: #0a7c71;
+                color: white;
+                border: none;
+                padding: 6px 16px;
+                border-radius: 4px;
+                font-size: 11px;
+                cursor: pointer;
+                margin: 2px;
+            }
+            .pagination button:hover { opacity: 0.9; }
+            .pagination .page-info {
+                color: #1e293b;
+                font-size: 12px;
+                margin: 0 10px;
+            }
+            .pagination button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
         </style>
     </head>
     <body>
         <div style="text-align:center;padding:4px;background:#f8f9fa;border-bottom:2px solid #facc15;margin-bottom:4px;">
             <span style="font-size:14px;font-weight:bold;color:#0a7c71;">📄 Brochure Preview: ${escapeHtml(name)}</span>
             <br>
-            <span style="font-size:10px;color:#666;">${offers.length} offers | ${totalPages} pages | 12 rows per page</span>
-        </div>`;
-    
-    for (let i = 0; i < totalPages; i++) {
-        fullHtml += `<div class="page">${generateFullBrochureHTML(name, i, totalPages, rowsPerPage)}</div>`;
-    }
-    
-    fullHtml += `
-        <div style="text-align:center;padding:8px;background:#f8f9fa;border-top:2px solid #facc15;margin-top:4px;">
-            <button onclick="window.print()" style="background:#0a7c71;color:white;border:none;padding:6px 16px;border-radius:4px;font-size:11px;cursor:pointer;margin:2px;">
-                🖨️ Print / Save as PDF
-            </button>
-            <button onclick="window.close()" style="background:#dc3545;color:white;border:none;padding:6px 16px;border-radius:4px;font-size:11px;cursor:pointer;margin:2px;">
-                ❌ Close Preview
-            </button>
+            <span style="font-size:10px;color:#666;">${offers.length} offers | ${totalPages} pages | ${rowsPerPage} rows per page</span>
+        </div>
+        <div class="page">${generateFullBrochureHTML(name, page, totalPages, rowsPerPage)}</div>
+        <div class="pagination">
+            <button onclick="window.previewGoToPage(${page - 1})" ${page <= 0 ? 'disabled' : ''}>⬅ Previous</button>
+            <span class="page-info">Page ${page + 1} of ${totalPages}</span>
+            <button onclick="window.previewGoToPage(${page + 1})" ${page >= totalPages - 1 ? 'disabled' : ''}>Next ➡</button>
+            <button onclick="window.print()" style="background:#16a34a;">🖨️ Print</button>
+            <button onclick="window.close()" style="background:#dc3545;">❌ Close</button>
         </div>
     </body></html>`;
     
-    const w = window.open("", "_blank");
-    w.document.write(fullHtml);
-    w.document.close();
+    if (previewWindow && !previewWindow.closed) {
+        previewWindow.close();
+    }
+    
+    previewWindow = window.open("", "_blank");
+    previewWindow.document.write(fullHtml);
+    previewWindow.document.close();
+    
+    previewWindow.previewGoToPage = function(newPage) {
+        if (newPage < 0 || newPage >= previewTotalPages) return;
+        previewCurrentPage = newPage;
+        renderPreviewPage();
+    };
 }
 
-// =========================
-// DOWNLOAD PDF
-// =========================
+// ===================================================
+// DOWNLOAD PDF (LANDSCAPE WITH AUTOTABLE)
+// ===================================================
 async function downloadPDF(name) {
     try {
         const offers = getAllDealerOffers(name);
         if (offers.length === 0) {
-            alert(`No offers found for "${name}"`);
+            showToast(`No offers found for "${name}"`, "error");
             return;
         }
         
-        const rowsPerPage = 12;
+        const rowsPerPage = 14;
         const totalPages = Math.ceil(offers.length / rowsPerPage);
         
         console.log(`📄 Generating PDF: ${offers.length} offers, ${totalPages} pages`);
         
         const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = 210;
-        const pageHeight = 297;
+        const pdf = new jsPDF('l', 'mm', 'a4');
         
-        for (let i = 0; i < totalPages; i++) {
-            if (i > 0) {
-                pdf.addPage();
-            }
-            
-            console.log(`   Page ${i + 1}: Offers ${(i * rowsPerPage) + 1} to ${Math.min((i + 1) * rowsPerPage, offers.length)}`);
-            
-            const div = document.createElement("div");
-            div.innerHTML = generateFullBrochureHTML(name, i, totalPages, rowsPerPage);
-            div.style.position = "fixed";
-            div.style.left = "-9999px";
-            div.style.top = "0";
-            div.style.width = "1000px";
-            div.style.background = "#fff";
-            div.style.padding = "0px";
-            div.style.margin = "0px";
-            document.body.appendChild(div);
-            
-            await new Promise(r => setTimeout(r, 300));
-            
-            const canvas = await html2canvas(div, { 
-                scale: 2.5, 
-                useCORS: true,
-                width: 1000,
-                height: div.scrollHeight,
-                backgroundColor: '#ffffff'
+        // Check if autoTable is available
+        const hasAutoTable = typeof pdf.autoTable === 'function';
+        
+        if (hasAutoTable) {
+            // Build all table data
+            const tableData = offers.map(o => {
+                const prices = calculatePrices(o);
+                const stock = prices.stock;
+                const description = (o.description || '').substring(0, 60);
+                const application = (o.application || '').substring(0, 50);
+                
+                return [
+                    o.part || '',
+                    description || '-',
+                    application || '-',
+                    prices.ourMRP.toFixed(0),
+                    (o.basicPrice || prices.ourMRP).toFixed(0),
+                    prices.discount + '%',
+                    prices.ourOfferPrice.toFixed(0),
+                    stock.ourStock || 0,
+                    stock.hasDistStock ? prices.distMRP.toFixed(0) : '-',
+                    stock.hasDistStock ? prices.distOfferPrice.toFixed(0) : '-',
+                    stock.hasDistStock ? stock.distStock : '-',
+                    o.expiresAt ? formatDate(o.expiresAt) : '-'
+                ];
             });
             
-            document.body.removeChild(div);
-            
-            const imgData = canvas.toDataURL('image/png');
-            
-            const imgWidth = pageWidth;
-            const imgHeight = (canvas.height / canvas.width) * imgWidth;
-            
-            let finalWidth = imgWidth;
-            let finalHeight = imgHeight;
-            if (imgHeight > pageHeight) {
-                const scale = pageHeight / imgHeight;
-                finalWidth *= scale;
-                finalHeight *= scale;
+            // Split into pages
+            for (let i = 0; i < totalPages; i++) {
+                if (i > 0) pdf.addPage();
+                
+                const start = i * rowsPerPage;
+                const end = Math.min(start + rowsPerPage, tableData.length);
+                const pageData = tableData.slice(start, end);
+                
+                // Header
+                pdf.setFontSize(12);
+                pdf.setTextColor(10, 124, 113);
+                pdf.text('AUTO SPARES SOLUTION', 14, 15);
+                
+                pdf.setFontSize(10);
+                pdf.setTextColor(30, 41, 59);
+                pdf.text(`Dealer: ${name}`, 14, 25);
+                
+                pdf.setFontSize(8);
+                pdf.setTextColor(100, 116, 139);
+                pdf.text(`Page ${i + 1} of ${totalPages} | ${offers.length} offers | ${new Date().toLocaleDateString()}`, 14, 32);
+                
+                pdf.autoTable({
+                    startY: 38,
+                    head: [[
+                        'Part No', 'Description', 'Application', 'MRP',
+                        'Basic Price', 'Spl Dis %', 'Net Price',
+                        'Our Stock', 'Dist MRP', 'Dist Price', 'Dist Stock', 'Expiry'
+                    ]],
+                    body: pageData,
+                    theme: 'grid',
+                    styles: {
+                        fontSize: 5.5,
+                        cellPadding: 1.5,
+                        lineColor: [200, 200, 200],
+                        lineWidth: 0.1,
+                        valign: 'middle',
+                        overflow: 'linebreak'
+                    },
+                    headStyles: {
+                        fillColor: [250, 204, 21],
+                        textColor: [0, 0, 0],
+                        fontSize: 5.5,
+                        fontStyle: 'bold',
+                        halign: 'center'
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 22 },
+                        1: { cellWidth: 50 },
+                        2: { cellWidth: 40 },
+                        3: { cellWidth: 15 },
+                        4: { cellWidth: 18 },
+                        5: { cellWidth: 12 },
+                        6: { cellWidth: 20 },
+                        7: { cellWidth: 15 },
+                        8: { cellWidth: 15 },
+                        9: { cellWidth: 18 },
+                        10: { cellWidth: 15 },
+                        11: { cellWidth: 18 }
+                    },
+                    margin: { left: 10, right: 10 },
+                    tableWidth: 'auto',
+                    pageBreak: 'auto'
+                });
             }
             
-            const x = (pageWidth - finalWidth) / 2;
-            const y = 0;
+            pdf.save(`${name.replace(/[^a-z0-9]/gi, '_')}_brochure.pdf`);
+            showToast(`✅ PDF saved: ${totalPages} pages`, "success");
+            console.log(`✅ PDF saved: ${totalPages} pages, ${offers.length} offers`);
             
-            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+        } else {
+            // Fallback: html2canvas
+            console.warn("autoTable not available, using html2canvas fallback");
+            showToast("Using fallback PDF generation...", "info");
+            
+            for (let i = 0; i < totalPages; i++) {
+                if (i > 0) pdf.addPage();
+                
+                const div = document.createElement("div");
+                div.innerHTML = generateFullBrochureHTML(name, i, totalPages, rowsPerPage);
+                div.style.position = "fixed";
+                div.style.left = "-9999px";
+                div.style.top = "0";
+                div.style.width = "1100px";
+                div.style.background = "#fff";
+                div.style.padding = "0px";
+                div.style.margin = "0px";
+                document.body.appendChild(div);
+                
+                await new Promise(r => setTimeout(r, 300));
+                
+                const canvas = await html2canvas(div, { 
+                    scale: 2, 
+                    useCORS: true,
+                    width: 1100,
+                    height: div.scrollHeight,
+                    backgroundColor: '#ffffff'
+                });
+                
+                document.body.removeChild(div);
+                
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = 277;
+                const imgHeight = (canvas.height / canvas.width) * imgWidth;
+                
+                pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, Math.min(imgHeight, 180));
+            }
+            
+            pdf.save(`${name.replace(/[^a-z0-9]/gi, '_')}_brochure.pdf`);
+            showToast(`✅ PDF saved (fallback)`, "success");
         }
-        
-        pdf.save(`${name.replace(/[^a-z0-9]/gi, '_')}_brochure.pdf`);
-        console.log(`✅ PDF saved: ${totalPages} pages, ${offers.length} offers`);
         
     } catch (err) {
         console.error("PDF Error:", err);
-        alert("PDF generation failed: " + err.message);
+        showToast("PDF generation failed: " + err.message, "error");
     }
 }
 
-// =========================
+// ===================================================
 // DOWNLOAD SINGLE PDF
-// =========================
+// ===================================================
 async function downloadSinglePDF(name) {
     await downloadPDF(name);
 }
 
-// =========================
+// ===================================================
 // DOWNLOAD ALL FLYERS PDF
-// =========================
+// ===================================================
 async function downloadAllFlyersPDF() {
     try {
         const dealers = await getDealersWithOffers();
         if (dealers.length === 0) {
-            alert('No flyers found. Run Analysis first.');
+            showToast('No flyers found. Run Analysis first.', 'warning');
             return;
         }
         
@@ -947,139 +1152,173 @@ async function downloadAllFlyersPDF() {
             await new Promise(r => setTimeout(r, 500));
             count++;
         }
-        alert(`✅ Downloaded ${count} PDF files`);
+        showToast(`✅ Downloaded ${count} PDF files`, 'success');
     } catch(err) {
         console.error(err);
-        alert('Error downloading PDFs: ' + err.message);
+        showToast('Error downloading PDFs: ' + err.message, 'error');
     }
 }
 
-// =========================
-// EXCEL EXPORT
-// =========================
+// ===================================================
+// EXPORT EXCEL (FORMATTED)
+// ===================================================
 function exportDealerOffersToExcel(name) {
-    if (!hasXLSX()) {
-        alert("XLSX missing");
+    if (typeof XLSX === 'undefined') {
+        showToast("XLSX library missing", "error");
         return;
     }
+    
     const offers = getAllDealerOffers(name);
+    if (offers.length === 0) {
+        showToast(`No offers found for "${name}"`, "error");
+        return;
+    }
+    
     const data = offers.map(o => {
         const prices = calculatePrices(o);
-        const description = getDescription(o.part);
         return {
             "Part No": o.part,
-            "Description": description || '',
+            "Description": o.description || '',
+            "Application": o.application || '',
             "MRP": prices.ourMRP.toFixed(2),
-            "Discount %": prices.dis,
-            "Offer Price": prices.ourOfferPrice.toFixed(2),
-            "Our Stock": prices.stock.myStock,
-            "Dist. Stock": prices.stock.distributorStock,
-            "Total Stock": prices.stock.totalStock,
+            "Basic Price (Less 31.77%)": (o.basicPrice || prices.ourMRP).toFixed(2),
+            "Spl Dis %": prices.discount,
+            "Net Price Including GST": prices.ourOfferPrice.toFixed(2),
+            "Available Qty": prices.stock.ourStock + prices.stock.distStock,
+            "Our Stock": prices.stock.ourStock,
+            "Dist. Stock": prices.stock.distStock,
             "Offer Type": o.offerType || '',
             "Source": o.source || '',
-            "Expires": o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : ''
+            "Expires": o.expiresAt ? formatDate(o.expiresAt) : ''
         };
     });
+    
     const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Auto column widths
+    ws['!cols'] = [
+        { wch: 12 }, // Part No
+        { wch: 35 }, // Description
+        { wch: 30 }, // Application
+        { wch: 10 }, // MRP
+        { wch: 20 }, // Basic Price
+        { wch: 10 }, // Spl Dis
+        { wch: 22 }, // Net Price
+        { wch: 12 }, // Available Qty
+        { wch: 10 }, // Our Stock
+        { wch: 10 }, // Dist Stock
+        { wch: 15 }, // Offer Type
+        { wch: 15 }, // Source
+        { wch: 12 }  // Expires
+    ];
+    
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Offers");
     XLSX.writeFile(wb, `${name.replace(/[^a-z0-9]/gi, '_')}_offers.xlsx`);
+    showToast(`✅ Excel exported: ${data.length} rows`, "success");
 }
 
-// =========================
+// ===================================================
 // SHARE PDF TO WHATSAPP
-// =========================
+// ===================================================
 async function sharePDFToWhatsApp(name) {
     try {
         let dealer = findDealer(name);
         let phone = dealer?.phone || '';
         
         if (!phone) {
-            const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-            const match = customers.find(c => normalizeText(c.name) === normalizeText(name));
-            if (match) phone = cleanPhone(match.mobileNo || match.phone || '');
+            const customers = getStorageItem('customers') || [];
+            const match = customers.find(c => normalizeDealerName(c.name) === normalizeDealerName(name));
+            if (match) phone = match.mobileNo || match.phone || '';
         }
         
         if (!phone) {
-            alert(`Phone number not found for ${name}`);
+            showToast(`Phone number not found for ${name}`, "error");
             return;
         }
         
         await downloadPDF(name);
         
         const msg = `📄 *Your Special Offer Brochure*\n\nDear ${name},\n\nPlease find your personalized offer brochure attached as PDF.\n\nThank you for your business!\n\nAuto Spares Solution`;
-        let cleanPhoneNum = phone;
-        if (cleanPhoneNum.length === 10) cleanPhoneNum = '91' + cleanPhoneNum;
+        const cleanPhoneNum = formatPhoneForWhatsApp(phone);
         
-        const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
-        window.location.href = url;
+        if (!cleanPhoneNum) {
+            showToast(`Invalid phone number for ${name}`, "error");
+            return;
+        }
+        
+        const url = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
+        window.open(url, '_blank');
+        showToast(`✅ WhatsApp opened for ${name}`, "success");
         
     } catch (err) {
         console.error(err);
-        alert("Failed: " + err.message);
+        showToast("Failed: " + err.message, "error");
     }
 }
 
-// =========================
-// GET DEALERS WITH OFFERS
-// =========================
-async function getDealersWithOffers() {
-    await loadDealerMaster();
+// ===================================================
+// CLEAR FUNCTIONS
+// ===================================================
+function clearOffers() {
+    localStorage.removeItem('dealerOffers');
+    currentOffers = [];
+    dealerOfferMap = {};
+    showToast('All offers cleared', 'warning');
+}
+
+function clearCache() {
+    excelCache.clear();
+    showToast('Cache cleared', 'info');
+}
+
+function refreshOffers() {
     loadOffers();
-    const result = [];
-    const processed = new Set();
-    
-    for (const [key, offers] of Object.entries(dealerOfferMap)) {
-        if (offers.length > 0 && !processed.has(key)) {
-            processed.add(key);
-            const dealer = findDealer(offers[0].dealer);
-            result.push({
-                name: offers[0].dealer,
-                phone: dealer?.phone || '',
-                district: dealer?.district || '',
-                offerCount: offers.length,
-                hasPhone: !!dealer?.phone
-            });
-        }
-    }
-    
-    return result;
+    console.log(`🔄 Offers refreshed: ${currentOffers.length} offers`);
+    return currentOffers.length;
 }
 
-// =========================
-// ESCAPE HTML
-// =========================
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+// ===================================================
+// GET FUNCTIONS
+// ===================================================
+function getDescription(part) {
+    return partDescriptions.get(normalizeText(part)) || '';
 }
 
-// =========================
+function getApplication(part) {
+    return partApplications.get(normalizeText(part)) || '';
+}
+
+// ===================================================
 // INIT
-// =========================
+// ===================================================
 async function init() {
-    await loadDealerMaster();
-    await loadMyStock();
-    await loadDistributorStock();
-    loadOffers();
-    console.log(`🚀 SYSTEM READY`);
-    console.log(`   📊 Offers: ${currentOffers.length}`);
-    console.log(`   📞 Dealers: ${dealerMaster.length}`);
-    console.log(`   🏭 Distributor Stock: ${distributorStock.length} items`);
-    console.log(`   📝 Descriptions loaded: ${partDescriptions.size}`);
+    try {
+        await loadDealerMaster();
+        await loadMyStock();
+        await loadDistributorStock();
+        loadOffers();
+        console.log(`🚀 SYSTEM READY`);
+        console.log(`   📊 Offers: ${currentOffers.length}`);
+        console.log(`   📞 Dealers: ${dealerMaster.length}`);
+        console.log(`   🏭 Distributor Stock: ${distributorStock.length} items`);
+    } catch(err) {
+        console.error("Init error:", err);
+        showToast('System initialization error: ' + err.message, 'error');
+    }
 }
 
-// =========================
+// ===================================================
 // GLOBAL API
-// =========================
+// ===================================================
 window.BrochureGenerator = {
     init,
     loadDealerMaster,
     loadOffers,
     loadDistributorStock,
     loadMyStock,
-    getAllDealerOffers,
     getDealersWithOffers,
+    getAllDealerOffers,
     findDealer,
     generateFullBrochureHTML,
     showBrochurePreview,
@@ -1089,10 +1328,14 @@ window.BrochureGenerator = {
     downloadSinglePDF,
     downloadAllFlyersPDF,
     sharePDFToWhatsApp,
-    getDistributorStock: () => distributorStock,
-    getDistributorInfo: getDistributorInfo,
-    getDescription: getDescription,
-    partDescriptions: partDescriptions
+    getDescription,
+    getApplication,
+    refreshOffers,
+    clearOffers,
+    clearCache,
+    showToast,
+    partDescriptions: partDescriptions,
+    partApplications: partApplications
 };
 
 // Auto-init
