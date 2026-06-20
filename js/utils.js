@@ -15,7 +15,7 @@
             .replace(/\n|\r|\t/g, " ")
             .replace(/\s+/g, " ")
             .trim()
-            .toLowerCase(); // Use lowercase for consistent matching
+            .toLowerCase();
     }
 
     function normalizePartNumber(part) {
@@ -49,11 +49,8 @@
     }
 
     function safePhone(value) {
-        // Remove all non-digit characters
         let cleaned = String(value || '').replace(/\D/g, '');
         if (!cleaned) return '';
-        
-        // Handle Indian numbers
         if (cleaned.length === 10) return cleaned;
         if (cleaned.length === 11 && cleaned.startsWith('0')) return cleaned.substring(1);
         if (cleaned.length === 12 && cleaned.startsWith('91')) return cleaned.substring(2);
@@ -246,7 +243,7 @@
     }
 
     // ===================================================
-    // PART NUMBER DETECTION HELPERS
+    // COLUMN DETECTION HELPERS
     // ===================================================
 
     function detectPartColumn(row) {
