@@ -1,5 +1,5 @@
 // brochure-generator.js - COMPLETE FIXED VERSION
-// All issues resolved: Dealer matching, PDF layout, Excel export, Flyer generation
+// All issues resolved: Dealer matching, PDF layout, Flyer generation
 
 (function () {
 
@@ -25,9 +25,6 @@ const Utils = window.Utils || {
         try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; }
     },
     formatDate: function(d) { return new Date(d).toLocaleDateString(); },
-    getExpiryDate: function() { 
-        const d = new Date(); d.setDate(d.getDate() + 15); return d.toISOString(); 
-    },
     formatPhoneForWhatsApp: function(p) {
         let cleaned = String(p || '').replace(/\D/g, '');
         if (!cleaned) return '';
@@ -35,18 +32,6 @@ const Utils = window.Utils || {
         if (cleaned.length === 11 && cleaned.startsWith('0')) return '91' + cleaned.substring(1);
         if (cleaned.length === 12 && cleaned.startsWith('91')) return cleaned;
         return cleaned;
-    },
-    getColumnWidths: function() {
-        return {
-            part: { cellWidth: 22 },
-            description: { cellWidth: 50 },
-            application: { cellWidth: 40 },
-            mrp: { cellWidth: 15 },
-            basicPrice: { cellWidth: 18 },
-            discount: { cellWidth: 12 },
-            netPrice: { cellWidth: 20 },
-            stock: { cellWidth: 15 }
-        };
     }
 };
 
@@ -58,7 +43,6 @@ const escapeHtml = Utils.escapeHtml;
 const getStorageItem = Utils.getStorageItem;
 const formatDate = Utils.formatDate;
 const formatPhoneForWhatsApp = Utils.formatPhoneForWhatsApp;
-const getColumnWidths = Utils.getColumnWidths;
 
 // ===================================================
 // DATA
@@ -108,13 +92,12 @@ async function loadExcelFile(url, sheetName = null) {
 }
 
 // ===================================================
-// LOAD DEALER MASTER (NORMALIZED)
+// LOAD DEALER MASTER
 // ===================================================
 async function loadDealerMaster() {
     
     const masterMap = new Map();
     
-    // Customer Master
     const customers = getStorageItem('customers') || [];
     console.log(`📋 Customer Master: ${customers.length} customers`);
     
@@ -135,7 +118,6 @@ async function loadDealerMaster() {
         });
     }
     
-    // Excel Master
     try {
         const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
         console.log(`📋 Excel Master: ${rows.length} entries`);
@@ -166,7 +148,6 @@ async function loadDealerMaster() {
         console.warn("Excel master file not found", e);
     }
     
-    // Users & Dealers
     const users = getStorageItem('users') || [];
     const dealers = getStorageItem('dealers') || [];
     const allLocal = [...users, ...dealers];
@@ -194,7 +175,6 @@ async function loadDealerMaster() {
         }
     }
     
-    // Invoices
     const allInvoices = getStorageItem('allInvoices') || [];
     for (const inv of allInvoices) {
         let name = inv.customerName || inv.buyer?.name || '';
@@ -365,34 +345,65 @@ async function loadMyStock() {
 }
 
 // ===================================================
-// LOAD OFFERS
+// LOAD OFFERS (FIXED - Handles all storage formats)
 // ===================================================
 function loadOffers() {
     currentOffers = [];
     dealerOfferMap = {};
     
-    const rawData = getStorageItem('dealerOffers');
-    
-    if (rawData && Array.isArray(rawData.offers)) {
-        currentOffers = rawData.offers;
-        console.log(`✅ Offers loaded: ${currentOffers.length}`);
-    } else if (Array.isArray(rawData)) {
-        currentOffers = rawData;
-        console.log(`✅ Offers loaded as array: ${currentOffers.length}`);
-    } else {
+    try {
+        const rawData = localStorage.getItem('dealerOffers');
+        console.log('📦 Raw data from localStorage:', rawData ? 'Found' : 'Not found');
+        
+        if (!rawData) {
+            console.log('⚠️ No dealerOffers found in localStorage');
+            return;
+        }
+        
+        const parsed = JSON.parse(rawData);
+        console.log('📊 Parsed data structure:', Object.keys(parsed));
+        
+        if (parsed && Array.isArray(parsed.offers)) {
+            currentOffers = parsed.offers;
+            console.log(`✅ Offers loaded from offers property: ${currentOffers.length}`);
+        } else if (Array.isArray(parsed)) {
+            currentOffers = parsed;
+            console.log(`✅ Offers loaded as array: ${currentOffers.length}`);
+        } else if (parsed && typeof parsed === 'object') {
+            for (const key of Object.keys(parsed)) {
+                if (Array.isArray(parsed[key]) && parsed[key].length > 0) {
+                    if (parsed[key][0] && parsed[key][0].dealer) {
+                        currentOffers = parsed[key];
+                        console.log(`✅ Offers found in property "${key}": ${currentOffers.length}`);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (currentOffers.length === 0) {
+            console.log('⚠️ No offers found in any format');
+            return;
+        }
+        
+        currentOffers.forEach(o => {
+            const key = normalizeDealerName(o.dealer || o.dealerRaw || '');
+            if (!key) return;
+            if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
+            dealerOfferMap[key].push(o);
+        });
+        
+        console.log(`📊 Dealers with offers: ${Object.keys(dealerOfferMap).length}`);
+        console.log(`📊 Total offers in memory: ${currentOffers.length}`);
+        
+        const sampleKeys = Object.keys(dealerOfferMap).slice(0, 5);
+        console.log('📋 Sample dealers:', sampleKeys);
+        
+    } catch (err) {
+        console.error('Error loading offers:', err);
         currentOffers = [];
-        console.log(`⚠️ No offers found`);
+        dealerOfferMap = {};
     }
-    
-    // Build dealer map using normalized names
-    currentOffers.forEach(o => {
-        const key = normalizeDealerName(o.dealer || o.dealerRaw || '');
-        if (!key) return;
-        if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
-        dealerOfferMap[key].push(o);
-    });
-    
-    console.log(`📊 Dealers with offers: ${Object.keys(dealerOfferMap).length}`);
 }
 
 // ===================================================
@@ -405,14 +416,17 @@ async function getDealersWithOffers() {
     const result = [];
     const processed = new Set();
     
+    console.log(`🔍 Looking for dealers with offers...`);
+    console.log(`📊 dealerOfferMap keys: ${Object.keys(dealerOfferMap).length}`);
+    
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
         if (offers.length === 0 || processed.has(key)) continue;
         processed.add(key);
         
-        // Find dealer using normalized key
+        console.log(`✅ Found dealer: ${key} with ${offers.length} offers`);
+        
         let dealer = dealerMasterMap.get(key);
         
-        // If not found, try to find by name
         if (!dealer) {
             const firstOffer = offers[0];
             const searchName = firstOffer.dealer || firstOffer.dealerRaw || '';
@@ -435,19 +449,17 @@ async function getDealersWithOffers() {
 }
 
 // ===================================================
-// FIND DEALER (IMPROVED)
+// FIND DEALER
 // ===================================================
 function findDealer(name) {
     if (!name) return null;
     
     const normalized = normalizeDealerName(name);
     
-    // Priority 1: Exact match
     if (dealerMasterMap.has(normalized)) {
         return dealerMasterMap.get(normalized);
     }
     
-    // Priority 2: Contains match with confidence
     let bestMatch = null;
     let bestScore = 0;
     
@@ -466,7 +478,6 @@ function findDealer(name) {
         return bestMatch;
     }
     
-    // Priority 3: Word match
     const words = normalized.split(' ').filter(w => w.length > 2);
     let wordMatch = null;
     let wordScore = 0;
@@ -483,28 +494,28 @@ function findDealer(name) {
         }
     }
     
-    if (wordMatch) {
-        console.log(`✅ Found dealer by word match (${Math.round(wordScore * 100)}%): "${name}"`);
-        return wordMatch;
-    }
-    
-    return null;
+    return wordMatch || null;
 }
 
 // ===================================================
-// GET ALL DEALER OFFERS
+// GET ALL DEALER OFFERS (FIXED)
 // ===================================================
 function getAllDealerOffers(name) {
-    if (!name) return [];
+    if (!name) {
+        console.log('⚠️ getAllDealerOffers called with empty name');
+        return [];
+    }
     
     const normalized = normalizeDealerName(name);
+    console.log(`🔍 Looking for offers for: "${name}" (normalized: "${normalized}")`);
+    console.log(`📊 Available dealer keys: ${Object.keys(dealerOfferMap).length}`);
     
-    // Try exact match
     if (dealerOfferMap[normalized]) {
+        const count = dealerOfferMap[normalized].length;
+        console.log(`✅ Found ${count} offers by exact match for "${normalized}"`);
         return dealerOfferMap[normalized];
     }
     
-    // Try contains match
     let bestMatch = null;
     let bestScore = 0;
     
@@ -519,11 +530,10 @@ function getAllDealerOffers(name) {
     }
     
     if (bestMatch) {
-        console.log(`✅ Found offers by contains match (${Math.round(bestScore * 100)}%)`);
+        console.log(`✅ Found offers by contains match (${Math.round(bestScore * 100)}%) for "${normalized}"`);
         return bestMatch;
     }
     
-    // Try word match
     const words = normalized.split(' ').filter(w => w.length > 2);
     let wordMatch = null;
     let wordScore = 0;
@@ -540,7 +550,13 @@ function getAllDealerOffers(name) {
         }
     }
     
-    return wordMatch || [];
+    if (wordMatch) {
+        console.log(`✅ Found offers by word match (${Math.round(wordScore * 100)}%) for "${normalized}"`);
+        return wordMatch;
+    }
+    
+    console.log(`❌ No offers found for "${name}"`);
+    return [];
 }
 
 // ===================================================
@@ -656,12 +672,11 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
 }
 
 // ===================================================
-// SEND WHATSAPP (FIXED)
+// SEND WHATSAPP
 // ===================================================
 async function sendFlyerToWhatsApp(name) {
     console.log(`🔍 Looking for offers for: "${name}"`);
     
-    // Load fresh data
     await loadDealerMaster();
     loadOffers();
     
@@ -678,7 +693,6 @@ async function sendFlyerToWhatsApp(name) {
     let dealer = findDealer(dealerName);
     
     if (!dealer || !dealer.phone) {
-        // Try customer master directly
         const customers = getStorageItem('customers') || [];
         const customerMatch = customers.find(c => normalizeDealerName(c.name) === normalizeDealerName(dealerName));
         if (customerMatch && (customerMatch.mobileNo || customerMatch.phone)) {
@@ -713,7 +727,7 @@ async function sendFlyerToWhatsApp(name) {
 }
 
 // ===================================================
-// GENERATE BROCHURE HTML (WITH ALL COLUMNS)
+// GENERATE BROCHURE HTML
 // ===================================================
 function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 12) {
     const offers = getAllDealerOffers(name);
@@ -826,7 +840,7 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
 }
 
 // ===================================================
-// SHOW PREVIEW (WITH PAGINATION)
+// SHOW PREVIEW
 // ===================================================
 let previewCurrentPage = 0;
 let previewTotalPages = 1;
@@ -966,7 +980,7 @@ function renderPreviewPage() {
 }
 
 // ===================================================
-// DOWNLOAD PDF (LANDSCAPE WITH AUTOTABLE)
+// DOWNLOAD PDF
 // ===================================================
 async function downloadPDF(name) {
     try {
@@ -984,11 +998,9 @@ async function downloadPDF(name) {
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('l', 'mm', 'a4');
         
-        // Check if autoTable is available
         const hasAutoTable = typeof pdf.autoTable === 'function';
         
         if (hasAutoTable) {
-            // Build all table data
             const tableData = offers.map(o => {
                 const prices = calculatePrices(o);
                 const stock = prices.stock;
@@ -1011,7 +1023,6 @@ async function downloadPDF(name) {
                 ];
             });
             
-            // Split into pages
             for (let i = 0; i < totalPages; i++) {
                 if (i > 0) pdf.addPage();
                 
@@ -1019,7 +1030,6 @@ async function downloadPDF(name) {
                 const end = Math.min(start + rowsPerPage, tableData.length);
                 const pageData = tableData.slice(start, end);
                 
-                // Header
                 pdf.setFontSize(12);
                 pdf.setTextColor(10, 124, 113);
                 pdf.text('AUTO SPARES SOLUTION', 14, 15);
@@ -1081,10 +1091,7 @@ async function downloadPDF(name) {
             console.log(`✅ PDF saved: ${totalPages} pages, ${offers.length} offers`);
             
         } else {
-            // Fallback: html2canvas
-            console.warn("autoTable not available, using html2canvas fallback");
-            showToast("Using fallback PDF generation...", "info");
-            
+            showToast("autoTable not available, using fallback", "warning");
             for (let i = 0; i < totalPages; i++) {
                 if (i > 0) pdf.addPage();
                 
@@ -1160,7 +1167,7 @@ async function downloadAllFlyersPDF() {
 }
 
 // ===================================================
-// EXPORT EXCEL (FORMATTED)
+// EXPORT EXCEL
 // ===================================================
 function exportDealerOffersToExcel(name) {
     if (typeof XLSX === 'undefined') {
@@ -1195,21 +1202,10 @@ function exportDealerOffersToExcel(name) {
     
     const ws = XLSX.utils.json_to_sheet(data);
     
-    // Auto column widths
     ws['!cols'] = [
-        { wch: 12 }, // Part No
-        { wch: 35 }, // Description
-        { wch: 30 }, // Application
-        { wch: 10 }, // MRP
-        { wch: 20 }, // Basic Price
-        { wch: 10 }, // Spl Dis
-        { wch: 22 }, // Net Price
-        { wch: 12 }, // Available Qty
-        { wch: 10 }, // Our Stock
-        { wch: 10 }, // Dist Stock
-        { wch: 15 }, // Offer Type
-        { wch: 15 }, // Source
-        { wch: 12 }  // Expires
+        { wch: 12 }, { wch: 35 }, { wch: 30 }, { wch: 10 },
+        { wch: 20 }, { wch: 10 }, { wch: 22 }, { wch: 12 },
+        { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 12 }
     ];
     
     const wb = XLSX.utils.book_new();
@@ -1219,42 +1215,41 @@ function exportDealerOffersToExcel(name) {
 }
 
 // ===================================================
-// SHARE PDF TO WHATSAPP
+// DEBUG OFFERS
 // ===================================================
-async function sharePDFToWhatsApp(name) {
-    try {
-        let dealer = findDealer(name);
-        let phone = dealer?.phone || '';
-        
-        if (!phone) {
-            const customers = getStorageItem('customers') || [];
-            const match = customers.find(c => normalizeDealerName(c.name) === normalizeDealerName(name));
-            if (match) phone = match.mobileNo || match.phone || '';
+function debugOffers() {
+    console.log('=== OFFER DEBUG ===');
+    
+    const raw = localStorage.getItem('dealerOffers');
+    console.log('Raw localStorage data:', raw ? raw.substring(0, 200) + '...' : 'Not found');
+    
+    if (raw) {
+        try {
+            const parsed = JSON.parse(raw);
+            console.log('Parsed data type:', typeof parsed);
+            console.log('Parsed keys:', Object.keys(parsed));
+            
+            if (Array.isArray(parsed)) {
+                console.log('Data is array, length:', parsed.length);
+                if (parsed.length > 0) {
+                    console.log('Sample offer:', parsed[0]);
+                }
+            } else if (parsed.offers && Array.isArray(parsed.offers)) {
+                console.log('Data has offers array, length:', parsed.offers.length);
+                if (parsed.offers.length > 0) {
+                    console.log('Sample offer:', parsed.offers[0]);
+                }
+            } else {
+                console.log('Unknown data structure');
+            }
+        } catch (err) {
+            console.error('Error parsing storage:', err);
         }
-        
-        if (!phone) {
-            showToast(`Phone number not found for ${name}`, "error");
-            return;
-        }
-        
-        await downloadPDF(name);
-        
-        const msg = `📄 *Your Special Offer Brochure*\n\nDear ${name},\n\nPlease find your personalized offer brochure attached as PDF.\n\nThank you for your business!\n\nAuto Spares Solution`;
-        const cleanPhoneNum = formatPhoneForWhatsApp(phone);
-        
-        if (!cleanPhoneNum) {
-            showToast(`Invalid phone number for ${name}`, "error");
-            return;
-        }
-        
-        const url = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
-        window.open(url, '_blank');
-        showToast(`✅ WhatsApp opened for ${name}`, "success");
-        
-    } catch (err) {
-        console.error(err);
-        showToast("Failed: " + err.message, "error");
     }
+    
+    console.log('dealerOfferMap keys:', Object.keys(dealerOfferMap));
+    console.log('Current offers count:', currentOffers.length);
+    console.log('=== END DEBUG ===');
 }
 
 // ===================================================
@@ -1334,6 +1329,7 @@ window.BrochureGenerator = {
     clearOffers,
     clearCache,
     showToast,
+    debugOffers,
     partDescriptions: partDescriptions,
     partApplications: partApplications
 };
