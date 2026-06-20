@@ -64,6 +64,10 @@
         .btn-small { padding: 5px 10px; font-size: 11px; }
         .btn-excel { background: #217346; }
         .btn-status { background: #0f172a; border: 1px solid #334155; }
+        .btn-active {
+            background: #facc15 !important;
+            color: #1e293b !important;
+        }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -176,6 +180,34 @@
         .status-online { background: #4ade80; }
         .status-offline { background: #f87171; }
         .status-loading { background: #facc15; animation: pulse 1s infinite; }
+        
+        /* Dealer Counter Section Styles */
+        .dealer-counter-section {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid #334155;
+        }
+        .dealer-counter-section h3 {
+            margin-bottom: 5px;
+        }
+        #dealerCounterOffersList::-webkit-scrollbar {
+            width: 6px;
+        }
+        #dealerCounterOffersList::-webkit-scrollbar-track {
+            background: #0f172a;
+            border-radius: 3px;
+        }
+        #dealerCounterOffersList::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        .dealer-counter-highlight {
+            background: #0f172a;
+            border-left: 3px solid #facc15;
+        }
+        
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -257,6 +289,90 @@
             <i class="fas fa-file-excel"></i> Export All Excel
         </button>
     </div>
+
+    <!-- ============================================================ -->
+    <!-- DEALER COUNTER SECTION - ADDED HERE                           -->
+    <!-- ============================================================ -->
+    <div class="dealer-counter-section">
+        <h3><i class="fas fa-list-ol"></i> Dealer Offer Counter 
+            <span id="dealerCounterStatus" style="font-size:12px;color:#94a3b8;font-weight:normal;"></span>
+        </h3>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;background:#0f172a;padding:15px;border-radius:12px;border:1px solid #334155;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-small" onclick="dealerCounterPrev()">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </button>
+                <span id="dealerCounterDisplay" style="font-size:14px;color:#facc15;min-width:120px;text-align:center;">
+                    <span id="dealerCounterCurrent">0</span> / <span id="dealerCounterTotal">0</span>
+                </span>
+                <button class="btn btn-secondary btn-small" onclick="dealerCounterNext()">
+                    Next <i class="fas fa-chevron-right"></i>
+                </button>
+                <button class="btn btn-success btn-small" onclick="dealerCounterGoToFirst()">
+                    <i class="fas fa-fast-backward"></i> First
+                </button>
+                <button class="btn btn-purple btn-small" onclick="dealerCounterGoToLast()">
+                    Last <i class="fas fa-fast-forward"></i>
+                </button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto;">
+                <span style="font-size:11px;color:#94a3b8;">Sort by:</span>
+                <button class="btn btn-small btn-secondary" onclick="dealerCounterSort('alphabetical')" id="sortAlphaBtn">
+                    <i class="fas fa-sort-alpha-down"></i> Alphabetical
+                </button>
+                <button class="btn btn-small btn-secondary" onclick="dealerCounterSort('priority')" id="sortPriorityBtn">
+                    <i class="fas fa-star"></i> Priority (Stock First)
+                </button>
+                <button class="btn btn-small btn-warning" onclick="dealerCounterRefresh()">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
+            </div>
+        </div>
+        
+        <!-- Current Dealer Details -->
+        <div id="dealerCounterDetails" style="margin-top:10px;background:#0f172a;border-radius:12px;padding:15px;border:1px solid #334155;display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                <div>
+                    <span style="font-size:18px;font-weight:bold;color:#facc15;" id="dealerCounterName">-</span>
+                    <span style="font-size:12px;color:#94a3b8;margin-left:10px;" id="dealerCounterOfferCount">0 offers</span>
+                    <span style="font-size:12px;color:#94a3b8;margin-left:10px;" id="dealerCounterPhone">📞 -</span>
+                    <span style="font-size:12px;color:#94a3b8;margin-left:10px;" id="dealerCounterDistrict">📍 -</span>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-whatsapp btn-small" onclick="dealerCounterSendWhatsApp()">
+                        <i class="fab fa-whatsapp"></i> Send
+                    </button>
+                    <button class="btn btn-purple btn-small" onclick="dealerCounterPreviewFlyer()">
+                        <i class="fas fa-file-alt"></i> Preview
+                    </button>
+                    <button class="btn btn-excel btn-small" onclick="dealerCounterExportExcel()">
+                        <i class="fas fa-file-excel"></i> Excel
+                    </button>
+                    <button class="btn btn-small" onclick="dealerCounterDownloadPDF()">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </button>
+                </div>
+            </div>
+            <div id="dealerCounterOffersList" style="margin-top:10px;max-height:200px;overflow-y:auto;font-size:12px;">
+                <table style="width:100%;font-size:11px;">
+                    <thead>
+                        <tr style="background:#1e293b;">
+                            <th style="padding:4px 8px;text-align:left;">Part</th>
+                            <th style="padding:4px 8px;text-align:left;">Description</th>
+                            <th style="padding:4px 8px;text-align:center;">Our Stock</th>
+                            <th style="padding:4px 8px;text-align:center;">Dist Stock</th>
+                            <th style="padding:4px 8px;text-align:center;">Discount</th>
+                            <th style="padding:4px 8px;text-align:center;">Offer Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dealerCounterOffersTbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <!-- ============================================================ -->
+    <!-- END DEALER COUNTER SECTION                                    -->
+    <!-- ============================================================ -->
 
     <!-- WhatsApp Bulk Section -->
     <div class="whatsapp-bulk-section">
@@ -1031,6 +1147,311 @@ function showToast(message, type = 'info') {
 }
 
 // ============================================================
+// ============================================================
+// DEALER COUNTER - Complete Navigation System
+// ============================================================
+
+let dealerCounterList = [];
+let dealerCounterIndex = 0;
+let dealerCounterSortMode = 'priority'; // 'alphabetical' or 'priority'
+
+// ============================================================
+// Load Dealer Counter List
+// ============================================================
+async function dealerCounterLoad() {
+    try {
+        if (typeof BrochureGenerator === 'undefined') {
+            showToast('BrochureGenerator not loaded', 'error');
+            return;
+        }
+        
+        showToast('Loading dealer list...', 'info');
+        
+        // Get all dealers with offers
+        const dealers = await BrochureGenerator.getDealersWithOffers();
+        
+        // Get full offer data for each dealer
+        const fullList = [];
+        for (const d of dealers) {
+            const offers = BrochureGenerator.getAllDealerOffers(d.name);
+            
+            // Count offers by type
+            const myStockOffers = offers.filter(o => o.stockType === 'my-stock');
+            const distStockOffers = offers.filter(o => o.stockType === 'distributor-stock');
+            
+            // Calculate total stock quantity for priority
+            let totalStock = 0;
+            let totalMyStock = 0;
+            offers.forEach(o => {
+                totalStock += (o.myStock || 0) + (o.distributorStock || 0);
+                totalMyStock += (o.myStock || 0);
+            });
+            
+            fullList.push({
+                name: d.name,
+                normalized: d.normalized || d.name,
+                phone: d.phone || '',
+                district: d.district || '',
+                offerCount: offers.length,
+                myStockCount: myStockOffers.length,
+                distStockCount: distStockOffers.length,
+                totalStock: totalStock,
+                totalMyStock: totalMyStock,
+                hasPhone: !!d.phone,
+                offers: offers
+            });
+        }
+        
+        // Apply sorting
+        dealerCounterList = dealerCounterSortList(fullList, dealerCounterSortMode);
+        dealerCounterIndex = 0;
+        
+        // Update UI
+        dealerCounterUpdateUI();
+        
+        // Update stats
+        document.getElementById('dealerCounterTotal').innerText = dealerCounterList.length;
+        document.getElementById('dealerCounterStatus').innerText = `(${dealerCounterList.length} dealers loaded)`;
+        
+        // Show the details
+        document.getElementById('dealerCounterDetails').style.display = 'block';
+        
+        showToast(`✅ Loaded ${dealerCounterList.length} dealers`, 'success');
+        
+    } catch(err) {
+        console.error('Error loading dealer list:', err);
+        showToast('Error loading dealer list: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// Sort Dealer List
+// ============================================================
+function dealerCounterSortList(list, mode) {
+    const sorted = [...list];
+    
+    if (mode === 'alphabetical') {
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else { // priority
+        sorted.sort((a, b) => {
+            // Priority 1: Dealers with My Stock offers first
+            if (a.myStockCount > 0 && b.myStockCount === 0) return -1;
+            if (a.myStockCount === 0 && b.myStockCount > 0) return 1;
+            
+            // Priority 2: More offers first
+            if (a.offerCount !== b.offerCount) return b.offerCount - a.offerCount;
+            
+            // Priority 3: Alphabetical
+            return a.name.localeCompare(b.name);
+        });
+    }
+    
+    return sorted;
+}
+
+// ============================================================
+// Update UI
+// ============================================================
+function dealerCounterUpdateUI() {
+    if (dealerCounterList.length === 0) {
+        document.getElementById('dealerCounterName').innerText = 'No dealers found';
+        document.getElementById('dealerCounterCurrent').innerText = '0';
+        document.getElementById('dealerCounterTotal').innerText = '0';
+        document.getElementById('dealerCounterDetails').style.display = 'none';
+        return;
+    }
+    
+    const dealer = dealerCounterList[dealerCounterIndex];
+    const current = dealerCounterIndex + 1;
+    const total = dealerCounterList.length;
+    
+    // Update counter
+    document.getElementById('dealerCounterCurrent').innerText = current;
+    document.getElementById('dealerCounterTotal').innerText = total;
+    
+    // Update dealer info
+    document.getElementById('dealerCounterName').innerText = dealer.name || 'Unknown';
+    document.getElementById('dealerCounterOfferCount').innerText = `${dealer.offerCount} offers (My: ${dealer.myStockCount}, Dist: ${dealer.distStockCount})`;
+    document.getElementById('dealerCounterPhone').innerHTML = dealer.phone ? `📞 ${dealer.phone}` : '📞 No phone';
+    document.getElementById('dealerCounterDistrict').innerHTML = dealer.district ? `📍 ${dealer.district}` : '📍 No district';
+    
+    // Show offers
+    const tbody = document.getElementById('dealerCounterOffersTbody');
+    tbody.innerHTML = '';
+    
+    const offers = dealer.offers || [];
+    const displayOffers = offers.slice(0, 20); // Show first 20 offers
+    
+    if (displayOffers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:10px;">No offers available</td></tr>';
+    } else {
+        displayOffers.forEach(o => {
+            const row = tbody.insertRow();
+            const isDistributor = o.stockType === 'distributor-stock';
+            
+            row.insertCell(0).innerHTML = `<strong>${escapeHtml(o.part || '')}</strong>`;
+            row.insertCell(1).innerText = (o.description || '-').substring(0, 30);
+            row.insertCell(2).innerHTML = `<span style="color:#4ade80;">${o.myStock || 0}</span>`;
+            row.insertCell(3).innerHTML = `<span style="color:#facc15;">${o.distributorStock || 0}</span>`;
+            row.insertCell(4).innerHTML = isDistributor ? 
+                `<span style="color:#facc15;">0% (MRP)</span>` : 
+                `<span style="color:#4ade80;">${o.discount || 0}%</span>`;
+            row.insertCell(5).innerHTML = `<strong>₹${Number(o.offerPrice || 0).toFixed(2)}</strong>`;
+        });
+        
+        if (offers.length > 20) {
+            const row = tbody.insertRow();
+            row.insertCell(0).colSpan = 6;
+            row.cells[0].style.textAlign = 'center';
+            row.cells[0].style.color = '#94a3b8';
+            row.cells[0].style.padding = '5px';
+            row.cells[0].innerHTML = `... and ${offers.length - 20} more offers`;
+        }
+    }
+    
+    // Show details
+    document.getElementById('dealerCounterDetails').style.display = 'block';
+}
+
+// ============================================================
+// Navigation Functions
+// ============================================================
+function dealerCounterNext() {
+    if (dealerCounterList.length === 0) {
+        showToast('No dealers loaded. Click Refresh.', 'warning');
+        return;
+    }
+    if (dealerCounterIndex < dealerCounterList.length - 1) {
+        dealerCounterIndex++;
+        dealerCounterUpdateUI();
+        // Scroll to top of details
+        document.getElementById('dealerCounterDetails').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        showToast('Already at the last dealer', 'info');
+    }
+}
+
+function dealerCounterPrev() {
+    if (dealerCounterList.length === 0) {
+        showToast('No dealers loaded. Click Refresh.', 'warning');
+        return;
+    }
+    if (dealerCounterIndex > 0) {
+        dealerCounterIndex--;
+        dealerCounterUpdateUI();
+        document.getElementById('dealerCounterDetails').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        showToast('Already at the first dealer', 'info');
+    }
+}
+
+function dealerCounterGoToFirst() {
+    if (dealerCounterList.length === 0) {
+        showToast('No dealers loaded. Click Refresh.', 'warning');
+        return;
+    }
+    dealerCounterIndex = 0;
+    dealerCounterUpdateUI();
+    document.getElementById('dealerCounterDetails').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function dealerCounterGoToLast() {
+    if (dealerCounterList.length === 0) {
+        showToast('No dealers loaded. Click Refresh.', 'warning');
+        return;
+    }
+    dealerCounterIndex = dealerCounterList.length - 1;
+    dealerCounterUpdateUI();
+    document.getElementById('dealerCounterDetails').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============================================================
+// Sort Functions
+// ============================================================
+function dealerCounterSort(mode) {
+    dealerCounterSortMode = mode;
+    dealerCounterList = dealerCounterSortList(dealerCounterList, mode);
+    dealerCounterIndex = 0;
+    dealerCounterUpdateUI();
+    
+    // Update button styles
+    document.getElementById('sortAlphaBtn').className = `btn btn-small ${mode === 'alphabetical' ? 'btn-active' : 'btn-secondary'}`;
+    document.getElementById('sortPriorityBtn').className = `btn btn-small ${mode === 'priority' ? 'btn-active' : 'btn-secondary'}`;
+    
+    showToast(`Sorted: ${mode === 'alphabetical' ? 'Alphabetical' : 'Priority (Stock First)'}`, 'info');
+}
+
+// ============================================================
+// Action Functions
+// ============================================================
+function dealerCounterRefresh() {
+    dealerCounterLoad();
+}
+
+function dealerCounterSendWhatsApp() {
+    if (dealerCounterList.length === 0 || dealerCounterIndex >= dealerCounterList.length) {
+        showToast('No dealer selected', 'warning');
+        return;
+    }
+    const dealer = dealerCounterList[dealerCounterIndex];
+    if (!dealer.phone) {
+        showToast('No phone number for this dealer', 'error');
+        return;
+    }
+    sendSingleWhatsApp(dealer.name);
+}
+
+function dealerCounterPreviewFlyer() {
+    if (dealerCounterList.length === 0 || dealerCounterIndex >= dealerCounterList.length) {
+        showToast('No dealer selected', 'warning');
+        return;
+    }
+    const dealer = dealerCounterList[dealerCounterIndex];
+    previewFlyer(dealer.name);
+}
+
+function dealerCounterExportExcel() {
+    if (dealerCounterList.length === 0 || dealerCounterIndex >= dealerCounterList.length) {
+        showToast('No dealer selected', 'warning');
+        return;
+    }
+    const dealer = dealerCounterList[dealerCounterIndex];
+    exportSingleExcel(dealer.name);
+}
+
+function dealerCounterDownloadPDF() {
+    if (dealerCounterList.length === 0 || dealerCounterIndex >= dealerCounterList.length) {
+        showToast('No dealer selected', 'warning');
+        return;
+    }
+    const dealer = dealerCounterList[dealerCounterIndex];
+    downloadSinglePDF(dealer.name);
+}
+
+// ============================================================
+// Keyboard Navigation
+// ============================================================
+document.addEventListener('keydown', function(e) {
+    // Only if dealer counter is visible
+    const details = document.getElementById('dealerCounterDetails');
+    if (!details || details.style.display === 'none') return;
+    
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        dealerCounterNext();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        dealerCounterPrev();
+    } else if (e.key === 'Home') {
+        e.preventDefault();
+        dealerCounterGoToFirst();
+    } else if (e.key === 'End') {
+        e.preventDefault();
+        dealerCounterGoToLast();
+    }
+});
+
+// ============================================================
 // PAGE LOAD
 // ============================================================
 window.addEventListener('load', function() {
@@ -1071,6 +1492,11 @@ window.addEventListener('load', function() {
             showToast('DealerIntelligence not loaded. Please refresh.', 'error');
         }
     }, 3000);
+    
+    // Load dealer counter after a delay
+    setTimeout(() => {
+        dealerCounterLoad();
+    }, 5000);
 });
 </script>
 </body>
