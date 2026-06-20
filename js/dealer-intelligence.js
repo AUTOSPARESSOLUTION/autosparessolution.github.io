@@ -1,5 +1,5 @@
 // dealer-intelligence.js - COMPLETE FIXED VERSION
-// FIXED: Single MRP from Column D (MRP PRICE) for both Our Stock and Distributor Stock
+// FIXED: Part number matching with leading zeros, Distributor MRP, Uppercase dealer names
 
 (function () {
 
@@ -75,7 +75,7 @@
 
     let dealerPartAverages = new Map();
     let areaDemand = new Map();
-    let currentStock = new Map();  // Stores: part -> {stock, mrp, description, application}
+    let currentStock = new Map();  // Stores: part -> {stock, mrp, distMrp, description, application}
     let activeOffers = [];
     let distributorStock = [];
     let distributorStockMap = new Map();
@@ -123,6 +123,22 @@
             console.warn(`Could not load ${url}`, err);
             return [];
         }
+    }
+
+    // ===================================================
+    // HELPER: Clean Part Number with Leading Zeros
+    // ===================================================
+
+    function cleanPartNumber(part) {
+        if (!part) return '';
+        let cleaned = String(part).trim().toUpperCase();
+        // Remove leading zeros for matching
+        let matchPart = cleaned.replace(/^0+/, '');
+        return {
+            original: cleaned,
+            matchKey: matchPart || cleaned,  // If all zeros, keep as is
+            hasLeadingZeros: cleaned.match(/^0+/) !== null
+        };
     }
 
     // ===================================================
@@ -452,7 +468,7 @@
     }
 
     // ===================================================
-    // LOAD MY STOCK (FIXED: Single MRP from Column D - MRP PRICE)
+    // LOAD MY STOCK (FIXED: Dist MRP from Column D)
     // ===================================================
 
     async function loadMyStock() {
@@ -513,7 +529,7 @@
             console.log('📋 Available columns in prices.csv:', headers);
 
             // ================================================
-            // COLUMN DETECTION - FIXED
+            // COLUMN DETECTION
             // ================================================
             
             // Part column (Column A: Material)
@@ -525,12 +541,12 @@
             
             // Description = Column B (Material2)
             let descCol = headers.find(h => 
-                h.toLowerCase() === 'material2' ||  // Column B
+                h.toLowerCase() === 'material2' ||
                 h.toLowerCase().includes('description') ||
                 h.toLowerCase().includes('desc')
             );
             
-            // Application column (Model, Make, etc.)
+            // Application column
             let appCol = headers.find(h => 
                 h.toLowerCase().includes('model') ||
                 h.toLowerCase().includes('application') ||
@@ -539,16 +555,16 @@
             );
             
             // ================================================
-            // FIX: MRP = Column D (MRP PRICE)
+            // FIX: Dist MRP = Column D (MRP PRICE)
             // ================================================
             let mrpCol = headers.find(h => 
-                h.toLowerCase() === 'mrp price' ||  // Column D exact match
+                h.toLowerCase() === 'mrp price' ||
                 h.toLowerCase().includes('mrp price') ||
                 h.toLowerCase().includes('mrp') ||
                 h.toLowerCase().includes('price')
             );
             
-            // Stock column (STOCK)
+            // Stock column
             let stockCol = headers.find(h => 
                 h.toLowerCase().includes('stock') || 
                 h.toLowerCase().includes('qty')
@@ -556,9 +572,9 @@
 
             console.log('🔍 Detected columns from prices.csv:', {
                 part: partCol || '⚠️ NOT FOUND',
-                description: descCol || '⚠️ NOT FOUND (using Material2)',
+                description: descCol || '⚠️ NOT FOUND',
                 application: appCol || '⚠️ NOT FOUND',
-                mrp: mrpCol || '⚠️ NOT FOUND (using MRP PRICE)',
+                distMrp: mrpCol || '⚠️ NOT FOUND (using MRP PRICE)',
                 stock: stockCol || '⚠️ NOT FOUND'
             });
 
@@ -569,17 +585,12 @@
             }
 
             if (!mrpCol) {
-                console.warn('⚠️ MRP PRICE column not found! Using LIST PRICE as fallback.');
-                mrpCol = headers.find(h => 
-                    h.toLowerCase().includes('list price') ||
-                    h.toLowerCase().includes('price')
-                );
+                console.warn('⚠️ MRP PRICE column not found!');
             }
 
             let loadedCount = 0;
             let descCount = 0;
             let appCount = 0;
-            let stockCount = 0;
 
             for (const row of parsedData) {
                 if (!row || !row[partCol]) continue;
@@ -592,19 +603,19 @@
                 const stock = safeNumber(row[stockCol]);
                 
                 // ================================================
-                // FIX: MRP from Column D (MRP PRICE)
+                // FIX: Dist MRP from Column D (MRP PRICE)
                 // ================================================
-                const mrp = safeNumber(row[mrpCol]);
+                const distMrp = safeNumber(row[mrpCol]);
                 
                 // Description from Column B (Material2)
                 const description = descCol ? String(row[descCol] || '').trim() : '';
                 
                 const application = appCol ? String(row[appCol] || '').trim() : '';
 
-                // Store in currentStock - MRP is the single source of truth
+                // Store in currentStock - distMrp is the MRP value
                 currentStock.set(part, {
                     stock: stock,
-                    mrp: mrp,  // Single MRP from Column D
+                    distMrp: distMrp,  // Dist MRP from Column D
                     description: description,
                     application: application
                 });
@@ -612,7 +623,6 @@
                 loadedCount++;
                 if (description) descCount++;
                 if (application) appCount++;
-                if (stock > 0) stockCount++;
             }
 
             let totalStock = 0;
@@ -623,13 +633,13 @@
                     totalStock += data.stock;
                     partsWithStock++;
                 }
-                if (data.mrp > 0) partsWithMRP++;
+                if (data.distMrp > 0) partsWithMRP++;
             }
 
             console.log(`✅ My stock loaded from prices.csv: ${loadedCount} parts`);
             console.log(`   📦 Parts with stock > 0: ${partsWithStock}`);
             console.log(`   📦 Total stock units: ${totalStock}`);
-            console.log(`   💰 Parts with MRP: ${partsWithMRP} (from MRP PRICE column)`);
+            console.log(`   💰 Parts with Dist MRP: ${partsWithMRP} (from MRP PRICE column)`);
             console.log(`   📝 Parts with description: ${descCount} (from Material2 column)`);
             console.log(`   🔧 Parts with application: ${appCount}`);
             
@@ -638,7 +648,7 @@
             console.log('📋 Sample stock data from prices.csv:');
             sample.forEach(([part, data]) => {
                 console.log(`   ${part}:`);
-                console.log(`      MRP: ₹${data.mrp || 0}`);
+                console.log(`      Dist MRP: ₹${data.distMrp || 0}`);
                 console.log(`      Description: ${data.description || '(empty)'}`);
                 console.log(`      Application: ${data.application || '(empty)'}`);
                 console.log(`      Stock: ${data.stock}`);
@@ -751,7 +761,7 @@
     }
 
     // ===================================================
-    // CENTRALIZED PRICE CALCULATION - FIXED: Single MRP
+    // CENTRALIZED PRICE CALCULATION
     // ===================================================
 
     function calculateNetPrice(mrp, discount = 0) {
@@ -769,7 +779,33 @@
     }
 
     // ===================================================
-    // CALCULATE OFFER - FIXED: Single MRP for both
+    // FIND PART MATCH (With Leading Zero Handling)
+    // ===================================================
+
+    function findPartMatch(partNumber) {
+        const clean = cleanPartNumber(partNumber);
+        
+        // Try exact match first
+        if (currentStock.has(clean.original)) {
+            return currentStock.get(clean.original);
+        }
+        
+        // Try match without leading zeros
+        if (clean.hasLeadingZeros) {
+            for (const [key, value] of currentStock) {
+                const keyClean = cleanPartNumber(key);
+                if (keyClean.matchKey === clean.matchKey) {
+                    console.log(`✅ Matched part "${partNumber}" to "${key}" (ignoring leading zeros)`);
+                    return value;
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    // ===================================================
+    // CALCULATE OFFER - FIXED: Uses Dist MRP
     // ===================================================
 
     function calculateOffer(
@@ -783,49 +819,47 @@
         
         let myStock = 0;
         let distributorStockQty = 0;
-        let finalPrice = 0;
         let offerType = '';
         let basicPrice = 0;
         let discount = 0;
         let description = '';
         let application = '';
         let mrp = 0;
+        let distMrp = 0;
         
-        // Get stock data from currentStock (from prices.csv)
-        const stockData = currentStock.get(part);
+        // Get stock data from currentStock
+        const stockData = findPartMatch(part);
         
         // ================================================
-        // FIX: Single MRP from Column D (MRP PRICE)
+        // FIX: Use Dist MRP from Column D
         // ================================================
-        const singleMRP = stockData?.mrp || 0;
+        if (stockData) {
+            distMrp = stockData.distMrp || 0;
+            description = stockData.description || '';
+            application = stockData.application || '';
+            myStock = stockData.stock || 0;
+        }
+        
+        // ================================================
+        // FIX: Use Dist MRP as the MRP for both stock types
+        // ================================================
+        mrp = distMrp;  // Use Dist MRP as the single MRP
         
         if (stockType === 'my-stock') {
             // ============================================
             // OUR STOCK OFFER (WITH DISCOUNT)
             // ============================================
-            if (!stockData) {
-                console.warn(`⚠️ No stock data for part: ${part}`);
-                return null;
-            }
-            
-            myStock = stockData.stock || 0;
             if (myStock <= 0) {
                 console.warn(`⚠️ No stock for part: ${part}`);
                 return null;
             }
             
-            if (singleMRP <= 0) {
-                console.warn(`⚠️ No MRP for part: ${part}`);
+            if (mrp <= 0) {
+                console.warn(`⚠️ No Dist MRP for part: ${part}`);
                 return null;
             }
             
-            // Description from Material2, Application from Model
-            description = stockData.description || '';
-            application = stockData.application || '';
-            
             distributorStockQty = 0;
-            mrp = singleMRP;  // Use the single MRP from Column D
-            finalPrice = singleMRP;
             
             // Calculate discount
             let volumeTier = CONFIG.volumeTiers[5];
@@ -886,7 +920,7 @@
                 discount: discount,
                 offerType: offerType,
                 minQty: 1,
-                mrp: mrp,  // Single MRP from Column D
+                mrp: mrp,  // Dist MRP from Column D
                 originalPrice: mrp,
                 basicPrice: basicPrice,
                 offerPrice: offerPrice,
@@ -908,20 +942,16 @@
                 return null;
             }
             
-            // Get description and application from prices.csv
-            if (stockData) {
-                description = stockData.description || '';
-                application = stockData.application || '';
-            }
-            
-            myStock = 0;
             distributorStockQty = distItem.stock;
             
             // ================================================
-            // FIX: Use Single MRP from Column D (not distributor price)
+            // FIX: Use Dist MRP from Column D for distributor stock too
             // ================================================
-            mrp = singleMRP > 0 ? singleMRP : distItem.price || 0;
-            finalPrice = mrp;  // MRP only, no discount
+            if (mrp <= 0) {
+                // Fallback to distributor price if no Dist MRP
+                mrp = distItem.price || 0;
+                console.warn(`⚠️ No Dist MRP for part: ${part}, using distributor price: ${mrp}`);
+            }
             
             if (mrp <= 0) {
                 console.warn(`⚠️ No MRP for part: ${part}`);
@@ -930,7 +960,7 @@
             
             basicPrice = mrp;
             discount = 0;
-            const offerPrice = mrp;
+            const offerPrice = mrp;  // MRP only, no discount
             
             offerType = "🏭 Distributor Stock (MRP)";
             
@@ -948,7 +978,7 @@
                 discount: 0,
                 offerType: offerType,
                 minQty: 1,
-                mrp: mrp,  // Single MRP from Column D
+                mrp: mrp,  // Dist MRP from Column D
                 originalPrice: mrp,
                 basicPrice: basicPrice,
                 offerPrice: offerPrice,
@@ -1009,12 +1039,10 @@
                 offers: cleanedOffers,
                 version: "2.0",
                 dataSource: {
-                    mrp: "prices.csv (MRP PRICE column - Column D)",
-                    description: "prices.csv (Material2 column - Column B)",
+                    mrp: "prices.csv (MRP PRICE column - Dist MRP)",
+                    description: "prices.csv (Material2 column)",
                     application: "prices.csv (Model column)",
-                    stock: "prices.csv (STOCK column)",
-                    distributor: "Excel + localStorage",
-                    dealer: "Excel + localStorage"
+                    stock: "prices.csv (STOCK column)"
                 }
             };
             
@@ -1039,35 +1067,7 @@
             
         } catch(err) {
             console.error("Could not save offers:", err.message);
-            
-            if (err.message && err.message.includes('quota')) {
-                try {
-                    console.warn("⚠️ Quota exceeded, trying emergency save with 500 offers");
-                    const emergencyData = {
-                        generatedAt: new Date().toISOString(),
-                        offerCount: 500,
-                        totalGenerated: activeOffers.length,
-                        offers: activeOffers.slice(0, 500).map(o => ({
-                            dealer: o.dealer || '',
-                            part: o.part || '',
-                            description: (o.description || '').substring(0, 100),
-                            application: (o.application || '').substring(0, 80),
-                            mrp: o.mrp || 0,
-                            offerPrice: o.offerPrice || 0,
-                            discount: o.discount || 0,
-                            myStock: o.myStock || 0
-                        })),
-                        version: "2.0-emergency"
-                    };
-                    localStorage.setItem('dealerOffers', JSON.stringify(emergencyData));
-                    showToast('⚠️ Saved only 500 offers (storage limit reached)', 'warning');
-                } catch(e) {
-                    console.error("Emergency save also failed:", e);
-                    showToast('Storage full! Use "Clear Old Offers" button.', 'error');
-                }
-            } else {
-                showToast("Error saving offers: " + err.message, "error");
-            }
+            showToast("Error saving offers: " + err.message, "error");
         }
     }
 
@@ -1108,7 +1108,8 @@
             const district = master.district || '';
             const source = data.source || 'Invoice History';
             
-            const myStock = currentStock.get(part)?.stock || 0;
+            const stockData = findPartMatch(part);
+            const myStock = stockData ? stockData.stock || 0 : 0;
             const distItem = distributorStockMap.get(part);
             const distStock = distItem?.stock || 0;
             const distPrice = distItem?.price || 0;
@@ -1148,7 +1149,8 @@
             
             if (processed.has(myKey) && processed.has(distKey)) continue;
             
-            const myStock = currentStock.get(part)?.stock || 0;
+            const stockData = findPartMatch(part);
+            const myStock = stockData ? stockData.stock || 0 : 0;
             const distItem = distributorStockMap.get(part);
             const distStock = distItem?.stock || 0;
             const distPrice = distItem?.price || 0;
@@ -1174,7 +1176,12 @@
             }
         }
 
-        offers.sort((a, b) => b.discount - a.discount);
+        offers.sort((a, b) => {
+            // Sort by dealer name alphabetically
+            const dealerA = a.dealer || '';
+            const dealerB = b.dealer || '';
+            return dealerA.localeCompare(dealerB);
+        });
         
         activeOffers = offers;
 
@@ -1182,10 +1189,10 @@
         
         if (activeOffers.length > 0) {
             const sample = activeOffers.slice(0, 3);
-            console.log('📋 Sample offers (Single MRP from Column D):');
+            console.log('📋 Sample offers (Dist MRP from Column D):');
             sample.forEach(o => {
                 console.log(`   ${o.part}:`);
-                console.log(`      MRP: ₹${o.mrp || 0}`);
+                console.log(`      MRP: ₹${o.mrp || 0} (from Dist MRP)`);
                 console.log(`      Description: ${o.description || '(empty)'}`);
                 console.log(`      Application: ${o.application || '(empty)'}`);
                 console.log(`      Price: ₹${o.offerPrice}, Stock: ${o.myStock}`);
@@ -1326,7 +1333,7 @@
     function exportOffersCSV() {
         if (activeOffers.length === 0) return null;
 
-        let csv = "Dealer,Part No,Description,Application,MRP,Basic Price,Discount %,Offer Price,GST,Our Stock,Dist Stock,Stock Type,Offer Type,Source,Expires\n";
+        let csv = "Dealer,Part No,Description,Application,MRP (Dist MRP),Basic Price,Discount %,Offer Price,GST,Our Stock,Dist Stock,Stock Type,Offer Type,Source,Expires\n";
 
         for (const o of activeOffers) {
             csv += `"${o.dealer}",${o.part},"${o.description || ''}","${o.application || ''}",${o.mrp.toFixed(2)},${o.basicPrice.toFixed(2)},${o.discount},${o.offerPrice.toFixed(2)},${o.gst ? o.gst.toFixed(2) : 0},${o.myStock},${o.distributorStock},"${o.stockType || 'unknown'}","${o.offerType || 'Standard'}","${o.source || 'Unknown'}",${o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : 'N/A'}\n`;
@@ -1365,6 +1372,8 @@
         refreshStock,
         exportOffersCSV,
         calculateNetPrice,
+        findPartMatch,
+        cleanPartNumber,
         CONFIG,
         isRunning: () => isRunning
     };
