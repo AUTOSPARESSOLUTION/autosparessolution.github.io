@@ -13,6 +13,9 @@
         normalizeText: function(t) { 
             return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); 
         },
+        normalizeDealerName: function(t) { 
+            return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); 
+        },
         showToast: function(msg) { console.log(msg); },
         safeNumber: function(n) { return Number(n) || 0; },
         getStorageItem: function(k) { 
@@ -21,12 +24,11 @@
         setStorageItem: function(k, v) { 
             try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e) { return false; }
         },
-        removeStorageItem: function(k) { localStorage.removeItem(k); },
-        detectPartColumn: function() { return null; },
-        detectStockColumn: function() { return null; }
+        removeStorageItem: function(k) { localStorage.removeItem(k); }
     };
 
     const normalizeText = Utils.normalizeText;
+    const normalizeDealerName = Utils.normalizeDealerName;
     const showToast = Utils.showToast;
     const safeNumber = Utils.safeNumber;
     const getStorageItem = Utils.getStorageItem;
@@ -124,7 +126,7 @@
     }
 
     // ===================================================
-    // LOAD DISTRIBUTOR STOCK (FLEXIBLE COLUMN DETECTION)
+    // LOAD DISTRIBUTOR STOCK
     // ===================================================
 
     async function loadDistributorStockAuto() {
@@ -156,13 +158,11 @@
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
                 
-                // Flexible part detection
                 let part = null;
-                const partPatterns = ['Part No', 'PART NO', 'PartNumber', 'Part Number', 'Item Code', 'Material Code', 'PARTNO'];
+                const partPatterns = ['Part No', 'PART NO', 'PartNumber', 'Part Number', 'Item Code', 'Material Code'];
                 for (const pattern of partPatterns) {
                     if (row[pattern]) { part = row[pattern]; break; }
                 }
-                // Try any column that contains 'part' or 'item'
                 if (!part) {
                     for (const key of Object.keys(row)) {
                         const lower = key.toLowerCase();
@@ -176,13 +176,11 @@
                 
                 let distributor = row['Distributor Name'] || row['Distributor'] || row['distributor'] || 'Auto Links';
                 
-                // Flexible stock detection
                 let stockQty = 0;
-                const stockPatterns = ['Available Stock', 'AVAILABLE STOCK', 'Stock', 'Qty', 'QTY', 'Current Stock', 'Free Stock'];
+                const stockPatterns = ['Available Stock', 'AVAILABLE STOCK', 'Stock', 'Qty', 'QTY', 'Current Stock'];
                 for (const pattern of stockPatterns) {
                     if (row[pattern]) { stockQty = safeNumber(row[pattern]); break; }
                 }
-                // Try any column that contains 'stock' or 'qty'
                 if (stockQty === 0) {
                     for (const key of Object.keys(row)) {
                         const lower = key.toLowerCase();
@@ -237,7 +235,7 @@
     }
 
     // ===================================================
-    // LOAD RETAILER MASTER (NORMALIZED)
+    // LOAD RETAILER MASTER
     // ===================================================
 
     async function loadRetailerMaster() {
@@ -248,7 +246,7 @@
         console.log(`📋 Customer Master: ${customers.length} customers`);
         
         for (const c of customers) {
-            const dealer = normalizeText(c.name);
+            const dealer = normalizeDealerName(c.name);
             if (!dealer) continue;
             
             retailerMaster.set(dealer, {
@@ -272,7 +270,7 @@
                 const dealerRaw = String(row['Retailer Name'] || '').trim();
                 if (!dealerRaw) continue;
                 
-                const dealer = normalizeText(dealerRaw);
+                const dealer = normalizeDealerName(dealerRaw);
                 const district = row['District'] || '';
                 const mobile = row['Mobile No'] || '';
                 
@@ -309,7 +307,7 @@
             const dealerRaw = u.name || u.business || '';
             if (!dealerRaw) continue;
             
-            const dealer = normalizeText(dealerRaw);
+            const dealer = normalizeDealerName(dealerRaw);
             const district = u.district || '';
             const mobile = u.phone || u.mobile || '';
             
@@ -337,7 +335,7 @@
             let dealerRaw = inv.customerName || inv.buyer?.name || '';
             if (!dealerRaw) continue;
             
-            const dealer = normalizeText(dealerRaw);
+            const dealer = normalizeDealerName(dealerRaw);
             let mobile = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
             let district = inv.customerDistrict || inv.buyer?.district || inv.district || '';
             
@@ -392,7 +390,7 @@
             for (const row of rows) {
 
                 const dealerRaw = String(row['Retailer Name'] || '').trim();
-                const dealer = normalizeText(dealerRaw);
+                const dealer = normalizeDealerName(dealerRaw);
                 const part = normalizeText(row['Part No'] || '');
 
                 if (!dealer || !part) continue;
@@ -589,7 +587,7 @@
                 dealerRaw = inv.customerEmail || 'Guest';
             }
 
-            const dealer = normalizeText(dealerRaw);
+            const dealer = normalizeDealerName(dealerRaw);
 
             for (const item of inv.items) {
 
@@ -675,9 +673,6 @@
         let application = '';
         
         if (stockType === 'my-stock') {
-            // ============================================
-            // OUR STOCK OFFER (WITH DISCOUNT)
-            // ============================================
             const stockData = currentStock.get(part);
             if (!stockData) return null;
             
@@ -690,7 +685,6 @@
             distributorStockQty = 0;
             finalPrice = stockData.price || 0;
             
-            // Calculate discount
             let volumeTier = CONFIG.volumeTiers[5];
             for (const tier of CONFIG.volumeTiers) {
                 if (avgQty >= tier.min) {
@@ -762,9 +756,6 @@
             };
             
         } else if (stockType === 'distributor-stock') {
-            // ============================================
-            // DISTRIBUTOR STOCK OFFER - MRP ONLY
-            // ============================================
             const distItem = distributorStockMap.get(part);
             
             if (!distItem || distItem.stock <= 0) {
@@ -820,6 +811,35 @@
     }
 
     // ===================================================
+    // SAVE OFFERS TO STORAGE
+    // ===================================================
+
+    function saveOffersToStorage() {
+        try {
+            const data = {
+                generatedAt: new Date().toISOString(),
+                offerCount: activeOffers.length,
+                offers: activeOffers,
+                version: "2.0"
+            };
+            
+            localStorage.setItem('dealerOffers', JSON.stringify(data));
+            console.log(`💾 Saved ${activeOffers.length} offers to localStorage`);
+            
+            // Verify save
+            const verify = localStorage.getItem('dealerOffers');
+            if (verify) {
+                const parsed = JSON.parse(verify);
+                console.log(`✅ Verification: ${parsed.offers ? parsed.offers.length : 'No offers'} offers found`);
+            }
+            
+        } catch(err) {
+            console.error("Could not save offers:", err.message);
+            showToast("Error saving offers: " + err.message, "error");
+        }
+    }
+
+    // ===================================================
     // GENERATE OFFERS
     // ===================================================
 
@@ -829,10 +849,9 @@
         
         console.log("🔄 Generating new offers...");
         
-        // Clear old offers
         activeOffers = [];
-        removeStorageItem('dealerOffers');
-        console.log("🧹 Cleared old offers");
+        localStorage.removeItem('dealerOffers');
+        console.log("🧹 Cleared old offers from localStorage");
         
         await loadMyStock();
         await loadDistributorStockAuto();
@@ -848,7 +867,6 @@
         const offers = [];
         const processed = new Set();
 
-        // Process from invoices
         for (const [key, data] of dealerPartAverages) {
 
             const master = retailerMaster.get(data.dealer) || {};
@@ -884,7 +902,6 @@
             }
         }
 
-        // Process from retailer sales
         for (const retailer of dealerData) {
 
             const dealer = retailer.dealer;
@@ -927,14 +944,9 @@
         offers.sort((a, b) => b.discount - a.discount);
         activeOffers = offers;
 
-        // Save with proper structure
-        const data = {
-            generatedAt: new Date().toISOString(),
-            offerCount: activeOffers.length,
-            offers: activeOffers,
-            version: "2.0"
-        };
-        setStorageItem('dealerOffers', data);
+        console.log(`📊 Generated ${activeOffers.length} offers before saving`);
+        
+        saveOffersToStorage();
 
         const myStockOffers = activeOffers.filter(o => o.stockType === 'my-stock');
         const distStockOffers = activeOffers.filter(o => o.stockType === 'distributor-stock');
@@ -971,7 +983,7 @@
     }
 
     // ===================================================
-    // RUN FULL ANALYSIS (WITH BUTTON STATE)
+    // RUN FULL ANALYSIS
     // ===================================================
 
     async function runFullAnalysis() {
@@ -983,7 +995,6 @@
 
         isRunning = true;
         
-        // Disable button if exists
         const btn = document.getElementById('runAnalysisBtn');
         if (btn) {
             btn.disabled = true;
@@ -994,9 +1005,8 @@
             console.log("Running full analysis...");
             showToast('Running analysis...', 'info');
             
-            // Clear old offers
             activeOffers = [];
-            removeStorageItem('dealerOffers');
+            localStorage.removeItem('dealerOffers');
 
             const offers = await generateOffers();
 
@@ -1033,7 +1043,7 @@
 
     function clearOffers() {
         activeOffers = [];
-        removeStorageItem('dealerOffers');
+        localStorage.removeItem('dealerOffers');
         console.log("🧹 All offers cleared");
         showToast('All offers cleared', 'warning');
     }
