@@ -187,6 +187,9 @@
             <button class="btn btn-secondary" onclick="clearCache()">
                 <i class="fas fa-broom"></i> Clear Cache
             </button>
+            <button class="btn btn-secondary" onclick="debugOffers()">
+                <i class="fas fa-bug"></i> Debug
+            </button>
         </div>
         <div id="distributorStockBadge" class="distributor-badge badge-inactive">
             <i class="fas fa-spinner fa-spin"></i> Loading...
@@ -274,7 +277,6 @@ function readExcelFile(file) {
                 for (let i = 0; i < rows.length; i++) {
                     const row = rows[i];
                     
-                    // Flexible part detection
                     let part = null;
                     const partPatterns = ['Part No', 'PART NO', 'PartNumber', 'Part Number', 'Item Code', 'Material Code'];
                     for (const pattern of partPatterns) {
@@ -290,7 +292,6 @@ function readExcelFile(file) {
                     }
                     if (!part) continue;
                     
-                    // Flexible stock detection
                     let stockQty = 0;
                     const stockPatterns = ['Available Stock', 'AVAILABLE STOCK', 'Stock', 'Qty', 'QTY', 'Current Stock'];
                     for (const pattern of stockPatterns) {
@@ -401,7 +402,49 @@ function clearCache() {
 }
 
 // ============================================================
-// UPLOAD MULTIPLE DISTRIBUTOR FILES (WITH PROGRESS)
+// DEBUG OFFERS
+// ============================================================
+function debugOffers() {
+    console.log('=== DASHBOARD DEBUG ===');
+    
+    const raw = localStorage.getItem('dealerOffers');
+    console.log('dealerOffers in localStorage:', raw ? 'Found' : 'Not found');
+    
+    if (raw) {
+        try {
+            const parsed = JSON.parse(raw);
+            console.log('Data type:', typeof parsed);
+            console.log('Keys:', Object.keys(parsed));
+            
+            if (parsed.offers) {
+                console.log('Offers count:', parsed.offers.length);
+                if (parsed.offers.length > 0) {
+                    console.log('Sample offer:', parsed.offers[0]);
+                }
+            } else if (Array.isArray(parsed)) {
+                console.log('Offers count (array):', parsed.length);
+                if (parsed.length > 0) {
+                    console.log('Sample offer:', parsed[0]);
+                }
+            }
+        } catch(err) {
+            console.error('Parse error:', err);
+        }
+    }
+    
+    if (window.BrochureGenerator) {
+        console.log('Calling BrochureGenerator.debugOffers()...');
+        BrochureGenerator.debugOffers();
+    } else {
+        console.log('BrochureGenerator not found');
+    }
+    
+    console.log('=== END DEBUG ===');
+    showToast('Debug info logged to console (F12)', 'info');
+}
+
+// ============================================================
+// UPLOAD MULTIPLE DISTRIBUTOR FILES
 // ============================================================
 async function uploadMultipleDistributorFiles() {
     const files = document.getElementById('distributorFiles').files;
@@ -417,7 +460,6 @@ async function uploadMultipleDistributorFiles() {
     const statusSpan = document.getElementById('distributorStatus');
     statusSpan.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing files...';
     
-    // Process files in parallel for speed
     const filePromises = [];
     for (let file of files) {
         filePromises.push(
@@ -445,7 +487,6 @@ async function uploadMultipleDistributorFiles() {
         return;
     }
     
-    // Merge duplicates
     const mergedMap = new Map();
     for (const item of allStock) {
         const key = `${item.part}|${item.distributor}`;
@@ -477,7 +518,7 @@ async function uploadMultipleDistributorFiles() {
 }
 
 // ============================================================
-// RUN ANALYSIS (WITH BUTTON STATE)
+// RUN ANALYSIS
 // ============================================================
 async function runAnalysis() {
     const btn = document.getElementById('runAnalysisBtn');
@@ -582,7 +623,6 @@ async function generateAllFlyers() {
         showToast('Generating flyers...', 'info');
         
         await BrochureGenerator.loadDealerMaster();
-        BrochureGenerator.clearOffers();
         BrochureGenerator.loadOffers();
         
         const dealers = await BrochureGenerator.getDealersWithOffers();
@@ -714,7 +754,7 @@ async function exportAllExcel() {
 }
 
 // ============================================================
-// BULK WHATSAPP (WITH PROPER PROGRESS)
+// BULK WHATSAPP
 // ============================================================
 let whatsAppQueue = [];
 let isWhatsAppRunning = false;
@@ -819,7 +859,6 @@ function processWhatsAppQueue() {
     msg += `_Reply with part numbers and quantity_\n`;
     msg += `*Thank you for your business!*`;
     
-    // Limit message length
     if (msg.length > 3000) {
         msg = msg.substring(0, 2900) + "\n\n... (truncated)\nReply YES to confirm order.";
     }
@@ -848,14 +887,13 @@ function escapeHtml(str) {
 }
 
 // ============================================================
-// TOAST (fallback if Utils not loaded)
+// TOAST
 // ============================================================
 function showToast(message, type = 'info') {
     if (window.Utils && Utils.showToast) {
         Utils.showToast(message, type);
         return;
     }
-    // Fallback
     console.log(`[${type}] ${message}`);
     alert(message);
 }
@@ -875,4 +913,4 @@ window.addEventListener('load', () => {
 });
 </script>
 </body>
-    </html>
+            </html>
