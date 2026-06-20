@@ -5,14 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dealer Intelligence Dashboard – Auto Spares Solution</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- ============================================
+    LOAD LIBRARIES FIRST (CDN)
+    ============================================ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- ============================================
+    LOAD APPLICATION SCRIPTS IN ORDER
+    ============================================ -->
     <script src="js/utils.js"></script>
     <script src="js/dealer-intelligence.js"></script>
     <script src="js/brochure-generator.js"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -54,6 +63,7 @@
         .btn-warning { background: #f59e0b; color: #1e293b; }
         .btn-small { padding: 5px 10px; font-size: 11px; }
         .btn-excel { background: #217346; }
+        .btn-status { background: #0f172a; border: 1px solid #334155; }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -105,6 +115,7 @@
         }
         .badge-active { background: #16a34a; color: white; }
         .badge-inactive { background: #475569; color: #94a3b8; }
+        .badge-loading { background: #f59e0b; color: #1e293b; }
         .flyer-card {
             background: #0f172a;
             border-radius: 12px;
@@ -153,7 +164,22 @@
         .text-muted { color: #94a3b8; }
         .text-success { color: #4ade80; }
         .text-warning { color: #facc15; }
+        .text-danger { color: #f87171; }
         .progress-text { font-size: 12px; color: #94a3b8; margin-left: 10px; }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online { background: #4ade80; }
+        .status-offline { background: #f87171; }
+        .status-loading { background: #facc15; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
         @media (max-width: 768px) {
             .btn { padding: 6px 10px; font-size: 12px; }
             th, td { font-size: 11px; padding: 5px; }
@@ -164,7 +190,13 @@
 <body>
 <div class="container">
     <h1><i class="fas fa-chart-line"></i> Dealer Intelligence Dashboard</h1>
-    <p class="text-muted" style="margin-bottom:15px;">Auto Spares Solution - Dealer Offer Management System</p>
+    <p class="text-muted" style="margin-bottom:15px;">
+        Auto Spares Solution - Dealer Offer Management System
+        <span id="systemStatus" style="margin-left: 15px;">
+            <span class="status-indicator status-loading"></span>
+            <span class="text-muted" style="font-size:12px;">Initializing...</span>
+        </span>
+    </p>
 
     <!-- Distributor Stock Upload Section -->
     <div class="upload-section">
@@ -190,6 +222,9 @@
             <button class="btn btn-secondary" onclick="debugOffers()">
                 <i class="fas fa-bug"></i> Debug
             </button>
+            <button class="btn btn-status" onclick="checkSystemStatus()">
+                <i class="fas fa-heartbeat"></i> Status
+            </button>
         </div>
         <div id="distributorStockBadge" class="distributor-badge badge-inactive">
             <i class="fas fa-spinner fa-spin"></i> Loading...
@@ -204,6 +239,7 @@
         <div class="stat-card"><div class="stat-number" id="lowStockCount">0</div><div>Low Stock Alerts</div></div>
         <div class="stat-card"><div class="stat-number" id="areasCount">0</div><div>Areas</div></div>
         <div class="stat-card"><div class="stat-number" id="distributorPartsCount">0</div><div>Distributor Parts</div><small id="distributorUnitsCount" style="font-size:12px;">0 units</small></div>
+        <div class="stat-card"><div class="stat-number" id="dealerCount">0</div><div>Dealers with Offers</div></div>
     </div>
 
     <!-- Action Buttons -->
@@ -211,7 +247,7 @@
         <button class="btn btn-success" id="runAnalysisBtn" onclick="runAnalysis()">
             <i class="fas fa-sync"></i> Run Analysis
         </button>
-        <button class="btn" onclick="generateAllFlyers()">
+        <button class="btn" id="generateFlyersBtn" onclick="generateAllFlyers()">
             <i class="fas fa-file-alt"></i> Generate Flyers
         </button>
         <button class="btn btn-purple" onclick="downloadAllFlyersPDF()">
@@ -260,6 +296,80 @@
 </div>
 
 <script>
+// ============================================================
+// SYSTEM STATUS CHECK
+// ============================================================
+function checkSystemStatus() {
+    const statusEl = document.getElementById('systemStatus');
+    const statusDot = statusEl.querySelector('.status-indicator');
+    const statusText = statusEl.querySelector('.text-muted');
+    
+    let allLoaded = true;
+    let messages = [];
+    
+    // Check XLSX
+    if (typeof XLSX === 'undefined') {
+        allLoaded = false;
+        messages.push('❌ XLSX library missing');
+    } else {
+        messages.push('✅ XLSX loaded');
+    }
+    
+    // Check jsPDF
+    if (typeof window.jspdf === 'undefined') {
+        allLoaded = false;
+        messages.push('❌ jsPDF library missing');
+    } else {
+        messages.push('✅ jsPDF loaded');
+    }
+    
+    // Check DealerIntelligence
+    if (typeof DealerIntelligence === 'undefined') {
+        allLoaded = false;
+        messages.push('❌ DealerIntelligence not loaded');
+    } else {
+        messages.push('✅ DealerIntelligence loaded');
+    }
+    
+    // Check BrochureGenerator
+    if (typeof BrochureGenerator === 'undefined') {
+        allLoaded = false;
+        messages.push('❌ BrochureGenerator not loaded');
+    } else {
+        const initStatus = BrochureGenerator.isInitialized ? BrochureGenerator.isInitialized() : false;
+        messages.push(`✅ BrochureGenerator loaded (${initStatus ? 'initialized' : 'not initialized'})`);
+    }
+    
+    // Check localStorage
+    const offers = localStorage.getItem('dealerOffers');
+    if (offers) {
+        try {
+            const parsed = JSON.parse(offers);
+            const count = parsed.offers ? parsed.offers.length : (Array.isArray(parsed) ? parsed.length : 0);
+            messages.push(`✅ Offers in storage: ${count}`);
+        } catch(e) {
+            messages.push('⚠️ Offers in storage (corrupted)');
+        }
+    } else {
+        messages.push('⚠️ No offers in storage');
+    }
+    
+    // Update status display
+    if (allLoaded) {
+        statusDot.className = 'status-indicator status-online';
+        statusText.textContent = 'All systems online';
+    } else {
+        statusDot.className = 'status-indicator status-offline';
+        statusText.textContent = 'Some systems offline';
+    }
+    
+    // Show detailed status
+    showToast('System Status:\n' + messages.join('\n'), allLoaded ? 'success' : 'error');
+    console.log('=== SYSTEM STATUS ===');
+    messages.forEach(m => console.log(m));
+    console.log('====================');
+}
+
 // ============================================================
 // HELPER: Read Excel File
 // ============================================================
@@ -386,6 +496,7 @@ function clearAllOffers() {
         document.getElementById('totalOffers').innerText = '0';
         document.getElementById('highDiscount').innerText = '0';
         document.getElementById('lowStockCount').innerText = '0';
+        document.getElementById('dealerCount').innerText = '0';
         document.getElementById('flyerList').innerHTML = '';
         
         setTimeout(() => runAnalysis(), 500);
@@ -548,6 +659,12 @@ async function runAnalysis() {
         document.getElementById('areasCount').innerText = result.areasAnalysed || 0;
         displayOffers(result.offers || []);
         
+        // Update dealer count
+        if (window.BrochureGenerator) {
+            const dealers = await BrochureGenerator.getDealersWithOffers();
+            document.getElementById('dealerCount').innerText = dealers.length || 0;
+        }
+        
         showToast(`✅ Analysis complete: ${result.offersGenerated} offers generated`, 'success');
         console.log('✅ Analysis complete.');
     } catch(err) {
@@ -573,8 +690,12 @@ function displayOffers(offers) {
         const row = tbody.insertRow();
         row.insertCell(0).innerText = o.dealer || '';
         row.insertCell(1).innerText = o.part || '';
-        row.insertCell(2).innerText = (o.description || '-').substring(0, 30);
-        row.insertCell(3).innerText = (o.application || '-').substring(0, 25);
+        
+        const description = o.description || '-';
+        const application = o.application || '-';
+        row.insertCell(2).innerText = description.length > 40 ? description.substring(0, 40) + '...' : description;
+        row.insertCell(3).innerText = application.length > 35 ? application.substring(0, 35) + '...' : application;
+        
         row.insertCell(4).innerText = o.district || o.pincode || '-';
         
         const ourStock = o.myStock || o.stock || 0;
@@ -614,11 +735,16 @@ async function sendSingleWhatsApp(dealerName) {
 }
 
 async function generateAllFlyers() {
+    const btn = document.getElementById('generateFlyersBtn');
+    
     try {
         if (typeof BrochureGenerator === 'undefined') { 
             showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
         
         showToast('Generating flyers...', 'info');
         
@@ -650,10 +776,15 @@ async function generateAllFlyers() {
                 </div>
             `;
         });
+        
+        document.getElementById('dealerCount').innerText = dealers.length;
         showToast(`✅ Generated ${dealers.length} flyers`, 'success');
     } catch(err) { 
         console.error(err); 
         showToast(err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-file-alt"></i> Generate Flyers';
     }
 }
 
@@ -894,6 +1025,7 @@ function showToast(message, type = 'info') {
         Utils.showToast(message, type);
         return;
     }
+    // Fallback
     console.log(`[${type}] ${message}`);
     alert(message);
 }
@@ -901,16 +1033,45 @@ function showToast(message, type = 'info') {
 // ============================================================
 // PAGE LOAD
 // ============================================================
-window.addEventListener('load', () => {
+window.addEventListener('load', function() {
+    console.log('📋 Dashboard loading...');
+    
     updateDistributorIndicators();
+    
+    // Update status
+    const statusEl = document.getElementById('systemStatus');
+    const statusDot = statusEl.querySelector('.status-indicator');
+    const statusText = statusEl.querySelector('.text-muted');
+    
+    // Check if BrochureGenerator loaded
+    setTimeout(() => {
+        if (typeof BrochureGenerator !== 'undefined' && BrochureGenerator.isInitialized && BrochureGenerator.isInitialized()) {
+            statusDot.className = 'status-indicator status-online';
+            statusText.textContent = 'System Ready';
+        } else if (typeof BrochureGenerator !== 'undefined') {
+            statusDot.className = 'status-indicator status-loading';
+            statusText.textContent = 'Initializing...';
+            // Try to init
+            BrochureGenerator.init().then(() => {
+                statusDot.className = 'status-indicator status-online';
+                statusText.textContent = 'System Ready';
+            });
+        } else {
+            statusDot.className = 'status-indicator status-offline';
+            statusText.textContent = 'Brochure Generator not loaded';
+        }
+    }, 2000);
+    
+    // Run analysis
     setTimeout(() => {
         if (typeof DealerIntelligence !== 'undefined') {
             runAnalysis();
         } else {
-            document.getElementById('offersTbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:#f87171;">⚠️ DealerIntelligence not loaded. Please ensure js/dealer-intelligence.js exists.</td></tr>';
+            document.getElementById('offersTbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:#f87171;">⚠️ DealerIntelligence not loaded. Please ensure js/dealer-intelligence.js exists and refresh.</td></tr>';
+            showToast('DealerIntelligence not loaded. Please refresh.', 'error');
         }
-    }, 1500);
+    }, 3000);
 });
 </script>
 </body>
-            </html>
+</html>
