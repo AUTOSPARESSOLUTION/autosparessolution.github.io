@@ -1,5 +1,5 @@
 // dealer-intelligence.js - COMPLETE FIXED VERSION
-// All issues resolved: Dealer matching, Stock display, Offer generation
+// FIXED: Description and Application ONLY from prices.csv
 
 (function () {
 
@@ -75,7 +75,7 @@
 
     let dealerPartAverages = new Map();
     let areaDemand = new Map();
-    let currentStock = new Map();
+    let currentStock = new Map();  // Stores: part -> {stock, price, description, application} ONLY from prices.csv
     let activeOffers = [];
     let distributorStock = [];
     let distributorStockMap = new Map();
@@ -126,7 +126,7 @@
     }
 
     // ===================================================
-    // LOAD DISTRIBUTOR STOCK
+    // LOAD DISTRIBUTOR STOCK (FROM Excel ONLY)
     // ===================================================
 
     async function loadDistributorStockAuto() {
@@ -235,7 +235,7 @@
     }
 
     // ===================================================
-    // LOAD RETAILER MASTER
+    // LOAD RETAILER MASTER (FROM Excel + localStorage)
     // ===================================================
 
     async function loadRetailerMaster() {
@@ -370,7 +370,7 @@
     }
 
     // ===================================================
-    // LOAD RETAILER SALES
+    // LOAD RETAILER SALES (FROM Excel ONLY)
     // ===================================================
 
     async function loadRetailerOfftakeAuto() {
@@ -452,17 +452,23 @@
     }
 
     // ===================================================
-    // LOAD MY STOCK
+    // LOAD MY STOCK (ONLY FROM prices.csv)
+    // FIXED: Description and Application ONLY from prices.csv
     // ===================================================
 
     async function loadMyStock() {
 
         try {
 
-            console.log("🔄 Fetching latest stock...");
+            console.log("🔄 Fetching stock data ONLY from prices.csv...");
 
             const response = await fetch('prices.csv');
+            if (!response.ok) {
+                throw new Error(`Failed to fetch prices.csv: ${response.status}`);
+            }
+            
             const csvText = await response.text();
+            console.log(`📄 prices.csv loaded: ${csvText.length} characters`);
             
             let parsedData;
             if (typeof Papa !== 'undefined') {
@@ -472,27 +478,109 @@
                     trimHeaders: true
                 });
                 parsedData = result.data;
+                console.log(`📊 PapaParse loaded ${parsedData.length} rows`);
             } else {
+                // Fallback: Use XLSX
+                console.warn("PapaParse not found, using XLSX fallback");
                 const workbook = XLSX.read(csvText, { type: 'string' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                parsedData = rows.slice(1).map(row => ({
-                    'Material No': row[0],
-                    'Description': row[1],
-                    'Price': row[3],
-                    'Stock': row[7],
-                    'Application': row[4] || ''
-                }));
+                
+                let headerRow = rows.find(row => 
+                    row.some(cell => 
+                        String(cell || '').toLowerCase().includes('material') ||
+                        String(cell || '').toLowerCase().includes('part') ||
+                        String(cell || '').toLowerCase().includes('description')
+                    )
+                );
+                
+                if (!headerRow) {
+                    headerRow = rows[0];
+                }
+                
+                const headers = headerRow.map(h => String(h || '').trim());
+                const dataStart = rows.indexOf(headerRow) + 1;
+                
+                parsedData = rows.slice(dataStart).map(row => {
+                    const obj = {};
+                    headers.forEach((h, i) => {
+                        obj[h] = row[i] || '';
+                    });
+                    return obj;
+                });
             }
 
+            // Clear existing stock data
             currentStock.clear();
+            console.log(`📊 Processing ${parsedData.length} rows from prices.csv`);
 
+            // Find column names (case insensitive)
             const headers = Object.keys(parsedData[0] || {});
-            const partCol = headers.find(h => h.toLowerCase().includes('material') || h.toLowerCase().includes('part'));
-            const descCol = headers.find(h => h.toLowerCase().includes('description'));
-            const appCol = headers.find(h => h.toLowerCase().includes('application'));
-            const priceCol = headers.find(h => h.toLowerCase().includes('price'));
-            const stockCol = headers.find(h => h.toLowerCase().includes('stock') || h.toLowerCase().includes('qty'));
+            console.log('📋 Available columns in prices.csv:', headers);
+
+            // ================================================
+            // CRITICAL: Find columns ONLY from prices.csv
+            // ================================================
+            
+            // Part column
+            let partCol = headers.find(h => 
+                h.toLowerCase().includes('material') || 
+                h.toLowerCase().includes('part') ||
+                h.toLowerCase().includes('item') ||
+                h.toLowerCase() === 'partno'
+            );
+            
+            // Description column - ONLY from prices.csv
+            let descCol = headers.find(h => 
+                h.toLowerCase().includes('description') ||
+                h.toLowerCase().includes('desc') ||
+                h.toLowerCase().includes('product') ||
+                h.toLowerCase().includes('item name')
+            );
+            
+            // Application column - ONLY from prices.csv
+            let appCol = headers.find(h => 
+                h.toLowerCase().includes('application') ||
+                h.toLowerCase().includes('appl') ||
+                h.toLowerCase().includes('use') ||
+                h.toLowerCase().includes('model') ||
+                h.toLowerCase().includes('fitment')
+            );
+            
+            // Price column
+            let priceCol = headers.find(h => 
+                h.toLowerCase().includes('price') ||
+                h.toLowerCase().includes('mrp') ||
+                h.toLowerCase().includes('rate') ||
+                h.toLowerCase().includes('cost')
+            );
+            
+            // Stock column
+            let stockCol = headers.find(h => 
+                h.toLowerCase().includes('stock') || 
+                h.toLowerCase().includes('qty') ||
+                h.toLowerCase().includes('quantity') ||
+                h.toLowerCase().includes('avl')
+            );
+
+            console.log('🔍 Detected columns from prices.csv:', {
+                part: partCol || '⚠️ NOT FOUND',
+                description: descCol || '⚠️ NOT FOUND',
+                application: appCol || '⚠️ NOT FOUND',
+                price: priceCol || '⚠️ NOT FOUND',
+                stock: stockCol || '⚠️ NOT FOUND'
+            });
+
+            if (!partCol) {
+                console.error('❌ Part column not found in prices.csv!');
+                showToast('Part column not found in prices.csv', 'error');
+                return;
+            }
+
+            let loadedCount = 0;
+            let descCount = 0;
+            let appCount = 0;
+            let stockCount = 0;
 
             for (const row of parsedData) {
                 if (!row || !row[partCol]) continue;
@@ -500,17 +588,28 @@
                 const part = normalizeText(row[partCol]);
                 if (!part) continue;
 
+                // Get data ONLY from prices.csv
                 const stock = safeNumber(row[stockCol]);
                 const price = safeNumber(row[priceCol]);
-                const description = row[descCol] ? String(row[descCol]).trim() : '';
-                const application = row[appCol] ? String(row[appCol]).trim() : '';
+                
+                // Description - ONLY from prices.csv
+                const description = descCol ? String(row[descCol] || '').trim() : '';
+                
+                // Application - ONLY from prices.csv
+                const application = appCol ? String(row[appCol] || '').trim() : '';
 
+                // Store in currentStock - ONLY from prices.csv
                 currentStock.set(part, {
-                    stock,
-                    price,
-                    description,
-                    application
+                    stock: stock,
+                    price: price,
+                    description: description,
+                    application: application
                 });
+                
+                loadedCount++;
+                if (description) descCount++;
+                if (application) appCount++;
+                if (stock > 0) stockCount++;
             }
 
             let totalStock = 0;
@@ -522,14 +621,32 @@
                 }
             }
 
-            console.log(`✅ My stock: ${currentStock.size} parts`);
+            console.log(`✅ My stock loaded from prices.csv: ${loadedCount} parts`);
             console.log(`   📦 Parts with stock > 0: ${partsWithStock}`);
             console.log(`   📦 Total stock units: ${totalStock}`);
+            console.log(`   📝 Parts with description: ${descCount}`);
+            console.log(`   🔧 Parts with application: ${appCount}`);
+            
+            // Show sample data with description and application
+            const sample = Array.from(currentStock.entries()).slice(0, 5);
+            console.log('📋 Sample stock data from prices.csv:');
+            sample.forEach(([part, data]) => {
+                console.log(`   ${part}:`);
+                console.log(`      Description: ${data.description || '(empty)'}`);
+                console.log(`      Application: ${data.application || '(empty)'}`);
+                console.log(`      Stock: ${data.stock}, Price: ${data.price}`);
+            });
+
+            if (descCount === 0 && appCount === 0) {
+                console.warn('⚠️ No description or application found in prices.csv!');
+                console.warn('   Available columns:', headers);
+                showToast('No description/application found in prices.csv', 'warning');
+            }
 
         } catch (err) {
 
-            console.error("Error loading stock:", err);
-            showToast("Error loading stock data", "error");
+            console.error("Error loading prices.csv:", err);
+            showToast("Error loading stock data: " + err.message, "error");
         }
     }
 
@@ -568,7 +685,7 @@
     }
 
     // ===================================================
-    // ANALYSE INVOICES
+    // ANALYSE INVOICES (FROM localStorage ONLY)
     // ===================================================
 
     function analyseInvoices() {
@@ -651,7 +768,8 @@
     }
 
     // ===================================================
-    // CALCULATE OFFER
+    // CALCULATE OFFER (FIXED)
+    // Description and Application come ONLY from currentStock (prices.csv)
     // ===================================================
 
     function calculateOffer(
@@ -672,19 +790,37 @@
         let description = '';
         let application = '';
         
+        // Get stock data from currentStock (ONLY from prices.csv)
+        const stockData = currentStock.get(part);
+        
         if (stockType === 'my-stock') {
-            const stockData = currentStock.get(part);
-            if (!stockData) return null;
+            // ============================================
+            // OUR STOCK OFFER (WITH DISCOUNT)
+            // ============================================
+            if (!stockData) {
+                console.warn(`⚠️ No stock data for part: ${part} (from prices.csv)`);
+                return null;
+            }
             
             myStock = stockData.stock || 0;
-            if (myStock <= 0) return null;
+            if (myStock <= 0) {
+                console.warn(`⚠️ No stock for part: ${part}`);
+                return null;
+            }
             
+            // Description and Application - ONLY from prices.csv (stockData)
             description = stockData.description || '';
             application = stockData.application || '';
             
             distributorStockQty = 0;
             finalPrice = stockData.price || 0;
             
+            if (finalPrice <= 0) {
+                console.warn(`⚠️ No price for part: ${part}`);
+                return null;
+            }
+            
+            // Calculate discount
             let volumeTier = CONFIG.volumeTiers[5];
             for (const tier of CONFIG.volumeTiers) {
                 if (avgQty >= tier.min) {
@@ -733,8 +869,8 @@
                 dealer: dealer,
                 dealerRaw: dealer,
                 part: part,
-                description: description,
-                application: application,
+                description: description,      // ONLY from prices.csv
+                application: application,      // ONLY from prices.csv
                 avgQty: avgQty,
                 pincode: district,
                 district: district,
@@ -756,15 +892,20 @@
             };
             
         } else if (stockType === 'distributor-stock') {
+            // ============================================
+            // DISTRIBUTOR STOCK OFFER - MRP ONLY
+            // ============================================
             const distItem = distributorStockMap.get(part);
             
             if (!distItem || distItem.stock <= 0) {
                 return null;
             }
             
-            const stockData = currentStock.get(part);
-            description = stockData?.description || '';
-            application = stockData?.application || '';
+            // Description and Application - ONLY from prices.csv (stockData)
+            if (stockData) {
+                description = stockData.description || '';
+                application = stockData.application || '';
+            }
             
             myStock = 0;
             distributorStockQty = distItem.stock;
@@ -784,8 +925,8 @@
                 dealer: dealer,
                 dealerRaw: dealer,
                 part: part,
-                description: description,
-                application: application,
+                description: description,      // ONLY from prices.csv
+                application: application,      // ONLY from prices.csv
                 avgQty: avgQty,
                 pincode: district,
                 district: district,
@@ -816,26 +957,101 @@
 
     function saveOffersToStorage() {
         try {
+            localStorage.removeItem('dealerOffers');
+            console.log("🧹 Cleared old offers from localStorage before saving");
+            
+            const MAX_OFFERS = 5000;
+            let offersToSave = activeOffers;
+            
+            if (activeOffers.length > MAX_OFFERS) {
+                console.warn(`⚠️ Too many offers (${activeOffers.length}), limiting to ${MAX_OFFERS}`);
+                offersToSave = activeOffers.slice(0, MAX_OFFERS);
+                showToast(`Limited to ${MAX_OFFERS} offers (${activeOffers.length} generated)`, 'warning');
+            }
+            
+            const cleanedOffers = offersToSave.map(o => ({
+                dealer: o.dealer || '',
+                dealerRaw: o.dealerRaw || '',
+                part: o.part || '',
+                description: (o.description || '').substring(0, 200),  // From prices.csv
+                application: (o.application || '').substring(0, 150),  // From prices.csv
+                district: o.district || '',
+                myStock: o.myStock || 0,
+                distributorStock: o.distributorStock || 0,
+                discount: o.discount || 0,
+                offerType: o.offerType || '',
+                mrp: o.mrp || 0,
+                basicPrice: o.basicPrice || 0,
+                offerPrice: o.offerPrice || 0,
+                gst: o.gst || 0,
+                stockType: o.stockType || 'my-stock',
+                source: o.source || '',
+                expiresAt: o.expiresAt || ''
+            }));
+            
             const data = {
                 generatedAt: new Date().toISOString(),
-                offerCount: activeOffers.length,
-                offers: activeOffers,
-                version: "2.0"
+                offerCount: cleanedOffers.length,
+                totalGenerated: activeOffers.length,
+                offers: cleanedOffers,
+                version: "2.0",
+                dataSource: {
+                    description: "prices.csv",
+                    application: "prices.csv",
+                    stock: "prices.csv",
+                    distributor: "Excel + localStorage",
+                    dealer: "Excel + localStorage"
+                }
             };
             
             localStorage.setItem('dealerOffers', JSON.stringify(data));
-            console.log(`💾 Saved ${activeOffers.length} offers to localStorage`);
+            console.log(`💾 Saved ${cleanedOffers.length} offers to localStorage`);
             
-            // Verify save
             const verify = localStorage.getItem('dealerOffers');
             if (verify) {
                 const parsed = JSON.parse(verify);
                 console.log(`✅ Verification: ${parsed.offers ? parsed.offers.length : 'No offers'} offers found`);
+                
+                if (parsed.offers && parsed.offers.length > 0) {
+                    const sample = parsed.offers[0];
+                    console.log('📋 Sample saved offer (description/application from prices.csv):', {
+                        part: sample.part,
+                        description: sample.description || '(empty)',
+                        application: sample.application || '(empty)'
+                    });
+                }
             }
             
         } catch(err) {
             console.error("Could not save offers:", err.message);
-            showToast("Error saving offers: " + err.message, "error");
+            
+            if (err.message && err.message.includes('quota')) {
+                try {
+                    console.warn("⚠️ Quota exceeded, trying emergency save with 500 offers");
+                    const emergencyData = {
+                        generatedAt: new Date().toISOString(),
+                        offerCount: 500,
+                        totalGenerated: activeOffers.length,
+                        offers: activeOffers.slice(0, 500).map(o => ({
+                            dealer: o.dealer || '',
+                            part: o.part || '',
+                            description: (o.description || '').substring(0, 100),
+                            application: (o.application || '').substring(0, 80),
+                            offerPrice: o.offerPrice || 0,
+                            discount: o.discount || 0,
+                            myStock: o.myStock || 0
+                        })),
+                        version: "2.0-emergency"
+                    };
+                    localStorage.setItem('dealerOffers', JSON.stringify(emergencyData));
+                    showToast('⚠️ Saved only 500 offers (storage limit reached)', 'warning');
+                } catch(e) {
+                    console.error("Emergency save also failed:", e);
+                    showToast('Storage full! Use "Clear Old Offers" button.', 'error');
+                }
+            } else {
+                showToast("Error saving offers: " + err.message, "error");
+            }
         }
     }
 
@@ -850,23 +1066,24 @@
         console.log("🔄 Generating new offers...");
         
         activeOffers = [];
+        dealerPartAverages.clear();
         localStorage.removeItem('dealerOffers');
-        console.log("🧹 Cleared old offers from localStorage");
+        console.log("🧹 Cleared ALL old offers from memory and localStorage");
         
-        await loadMyStock();
-        await loadDistributorStockAuto();
-        
-        console.log(`📦 My Stock: ${currentStock.size} parts`);
-        console.log(`🏭 Distributor Stock: ${distributorStock.length} parts`);
-
-        await loadRetailerMaster();
-        await loadRetailerOfftakeAuto();
-        analyseInvoices();
+        // Load data from different sources
+        await loadMyStock();  // ONLY prices.csv - gets description, application, stock, price
+        await loadDistributorStockAuto();  // Excel + localStorage - gets distributor stock
+        await loadRetailerMaster();  // Excel + localStorage - gets dealer info
+        await loadRetailerOfftakeAuto();  // Excel - gets sales data
+        analyseInvoices();  // localStorage - gets invoice data
         updateAreaFromOfftake();
 
         const offers = [];
         const processed = new Set();
 
+        console.log(`📊 Processing ${dealerPartAverages.size} dealer-part combinations...`);
+
+        // Process from invoices
         for (const [key, data] of dealerPartAverages) {
 
             const master = retailerMaster.get(data.dealer) || {};
@@ -902,6 +1119,7 @@
             }
         }
 
+        // Process from retailer sales
         for (const retailer of dealerData) {
 
             const dealer = retailer.dealer;
@@ -942,9 +1160,22 @@
         }
 
         offers.sort((a, b) => b.discount - a.discount);
+        
         activeOffers = offers;
 
-        console.log(`📊 Generated ${activeOffers.length} offers before saving`);
+        console.log(`📊 Generated ${activeOffers.length} offers`);
+        
+        // Log sample with description and application
+        if (activeOffers.length > 0) {
+            const sample = activeOffers.slice(0, 3);
+            console.log('📋 Sample offers (description/application from prices.csv):');
+            sample.forEach(o => {
+                console.log(`   ${o.part}:`);
+                console.log(`      Description: ${o.description || '(empty)'}`);
+                console.log(`      Application: ${o.application || '(empty)'}`);
+                console.log(`      Price: ₹${o.offerPrice}, Stock: ${o.myStock}`);
+            });
+        }
         
         saveOffersToStorage();
 
@@ -1006,10 +1237,13 @@
             showToast('Running analysis...', 'info');
             
             activeOffers = [];
+            dealerPartAverages.clear();
             localStorage.removeItem('dealerOffers');
+            console.log("🧹 Cleared all old offers before analysis");
 
             const offers = await generateOffers();
 
+            const displayLimit = 100;
             const result = {
                 timestamp: new Date().toISOString(),
                 offersGenerated: offers.length,
@@ -1018,10 +1252,10 @@
                 highDiscountOffers: offers.filter(o => o.discount >= 5).length,
                 lowStockAlerts: offers.filter(o => (o.myStock + o.distributorStock) < CONFIG.lowStockThreshold).length,
                 areasAnalysed: areaDemand.size,
-                offers: offers.slice(0, 50)
+                offers: offers.slice(0, displayLimit)
             };
 
-            showToast(`✅ Analysis complete: ${offers.length} offers generated`, 'success');
+            showToast(`✅ Analysis complete: ${offers.length} offers generated (showing ${displayLimit})`, 'success');
             return result;
 
         } catch (err) {
@@ -1043,8 +1277,10 @@
 
     function clearOffers() {
         activeOffers = [];
+        dealerPartAverages.clear();
         localStorage.removeItem('dealerOffers');
-        console.log("🧹 All offers cleared");
+        localStorage.removeItem('offers');
+        console.log("🧹 All offers cleared completely");
         showToast('All offers cleared', 'warning');
     }
 
