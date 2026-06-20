@@ -1,12 +1,24 @@
 // brochure-generator.js - COMPLETE FIXED VERSION
-// All issues resolved: Dealer matching, PDF layout, Flyer generation
+// FIXED: Proper loading, initialization, and error handling
 
 (function () {
 
-console.log("🚀 Brochure System Loaded");
+console.log("🚀 Brochure Generator loading...");
 
 // ===================================================
-// DEPENDENCIES
+// DEPENDENCIES CHECK
+// ===================================================
+
+if (typeof XLSX === 'undefined') {
+    console.warn("⚠️ XLSX library not loaded. Excel export will not work.");
+}
+
+if (typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') {
+    console.warn("⚠️ jsPDF library not loaded. PDF export will not work.");
+}
+
+// ===================================================
+// UTILITIES (Fallback if Utils not loaded)
 // ===================================================
 
 const Utils = window.Utils || {
@@ -16,7 +28,32 @@ const Utils = window.Utils || {
     normalizeDealerName: function(t) { 
         return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); 
     },
-    showToast: function(msg) { console.log(msg); },
+    showToast: function(msg, type) { 
+        console.log(`[${type || 'info'}] ${msg}`);
+        // Try to show alert if no toast system
+        if (document.getElementById('toast-container')) {
+            // Toast exists, try to use it
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                background: ${type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#2563eb'};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-family: Arial, sans-serif;
+                font-size: 14px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                animation: slideIn 0.3s ease;
+                word-wrap: break-word;
+            `;
+            toast.textContent = msg;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+    },
     safeNumber: function(n) { return Number(n) || 0; },
     escapeHtml: function(s) { return String(s).replace(/[&<>"]/g, function(m) {
         return m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '>' ? '&gt;' : '&quot;';
@@ -24,7 +61,9 @@ const Utils = window.Utils || {
     getStorageItem: function(k) { 
         try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; }
     },
-    formatDate: function(d) { return new Date(d).toLocaleDateString(); },
+    formatDate: function(d) { 
+        try { return new Date(d).toLocaleDateString(); } catch(e) { return ''; }
+    },
     formatPhoneForWhatsApp: function(p) {
         let cleaned = String(p || '').replace(/\D/g, '');
         if (!cleaned) return '';
@@ -57,6 +96,7 @@ let currentStock = new Map();
 let partDescriptions = new Map();
 let partApplications = new Map();
 let excelCache = new Map();
+let isInitialized = false;
 
 // ===================================================
 // LOAD EXCEL (CACHED)
@@ -95,30 +135,37 @@ async function loadExcelFile(url, sheetName = null) {
 // LOAD DEALER MASTER
 // ===================================================
 async function loadDealerMaster() {
+    console.log("🔄 Loading Dealer Master...");
     
     const masterMap = new Map();
     
-    const customers = getStorageItem('customers') || [];
-    console.log(`📋 Customer Master: ${customers.length} customers`);
-    
-    for (const c of customers) {
-        const name = c.name || '';
-        if (!name) continue;
+    try {
+        // Customer Master
+        const customers = getStorageItem('customers') || [];
+        console.log(`📋 Customer Master: ${customers.length} customers`);
         
-        const normName = normalizeDealerName(name);
-        const phone = c.mobileNo || c.phone || '';
-        const district = c.district || '';
-        
-        masterMap.set(normName, {
-            name: name,
-            normalized: normName,
-            phone: phone.replace(/\D/g, ''),
-            district: district,
-            source: 'customer-master'
-        });
+        for (const c of customers) {
+            const name = c.name || '';
+            if (!name) continue;
+            
+            const normName = normalizeDealerName(name);
+            const phone = c.mobileNo || c.phone || '';
+            const district = c.district || '';
+            
+            masterMap.set(normName, {
+                name: name,
+                normalized: normName,
+                phone: phone.replace(/\D/g, ''),
+                district: district,
+                source: 'customer-master'
+            });
+        }
+    } catch(e) {
+        console.warn("Error loading customers:", e);
     }
     
     try {
+        // Excel Master
         const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
         console.log(`📋 Excel Master: ${rows.length} entries`);
         
@@ -148,55 +195,65 @@ async function loadDealerMaster() {
         console.warn("Excel master file not found", e);
     }
     
-    const users = getStorageItem('users') || [];
-    const dealers = getStorageItem('dealers') || [];
-    const allLocal = [...users, ...dealers];
-    
-    for (const u of allLocal) {
-        const name = u.name || u.business || '';
-        if (!name) continue;
+    try {
+        // Users & Dealers
+        const users = getStorageItem('users') || [];
+        const dealers = getStorageItem('dealers') || [];
+        const allLocal = [...users, ...dealers];
         
-        const normName = normalizeDealerName(name);
-        const phone = u.phone || u.mobile || u.mobileNo || '';
-        const district = u.district || '';
-        
-        if (!masterMap.has(normName)) {
-            masterMap.set(normName, {
-                name: name,
-                normalized: normName,
-                phone: phone.replace(/\D/g, ''),
-                district: district,
-                source: 'user-dealer'
-            });
-        } else {
-            const existing = masterMap.get(normName);
-            if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
-            if (!existing.district && district) existing.district = district;
+        for (const u of allLocal) {
+            const name = u.name || u.business || '';
+            if (!name) continue;
+            
+            const normName = normalizeDealerName(name);
+            const phone = u.phone || u.mobile || u.mobileNo || '';
+            const district = u.district || '';
+            
+            if (!masterMap.has(normName)) {
+                masterMap.set(normName, {
+                    name: name,
+                    normalized: normName,
+                    phone: phone.replace(/\D/g, ''),
+                    district: district,
+                    source: 'user-dealer'
+                });
+            } else {
+                const existing = masterMap.get(normName);
+                if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
+                if (!existing.district && district) existing.district = district;
+            }
         }
+    } catch(e) {
+        console.warn("Error loading users/dealers:", e);
     }
     
-    const allInvoices = getStorageItem('allInvoices') || [];
-    for (const inv of allInvoices) {
-        let name = inv.customerName || inv.buyer?.name || '';
-        if (!name) continue;
-        
-        const normName = normalizeDealerName(name);
-        let phone = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
-        let district = inv.customerDistrict || inv.buyer?.district || inv.district || '';
-        
-        if (!masterMap.has(normName)) {
-            masterMap.set(normName, {
-                name: name,
-                normalized: normName,
-                phone: phone.replace(/\D/g, ''),
-                district: district,
-                source: 'invoice'
-            });
-        } else {
-            const existing = masterMap.get(normName);
-            if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
-            if (!existing.district && district) existing.district = district;
+    try {
+        // Invoices
+        const allInvoices = getStorageItem('allInvoices') || [];
+        for (const inv of allInvoices) {
+            let name = inv.customerName || inv.buyer?.name || '';
+            if (!name) continue;
+            
+            const normName = normalizeDealerName(name);
+            let phone = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
+            let district = inv.customerDistrict || inv.buyer?.district || inv.district || '';
+            
+            if (!masterMap.has(normName)) {
+                masterMap.set(normName, {
+                    name: name,
+                    normalized: normName,
+                    phone: phone.replace(/\D/g, ''),
+                    district: district,
+                    source: 'invoice'
+                });
+            } else {
+                const existing = masterMap.get(normName);
+                if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
+                if (!existing.district && district) existing.district = district;
+            }
         }
+    } catch(e) {
+        console.warn("Error loading invoices:", e);
     }
     
     dealerMaster = Array.from(masterMap.values());
@@ -215,6 +272,8 @@ async function loadDealerMaster() {
 // LOAD DISTRIBUTOR STOCK
 // ===================================================
 async function loadDistributorStock() {
+    console.log("🔄 Loading Distributor Stock...");
+    
     try {
         const localStock = getStorageItem('distributorStock');
         if (localStock && localStock.length > 0) {
@@ -271,15 +330,21 @@ async function loadDistributorStock() {
 }
 
 // ===================================================
-// LOAD MY STOCK
+// LOAD MY STOCK (FROM prices.csv)
 // ===================================================
 async function loadMyStock() {
+    console.log("🔄 Loading stock from prices.csv...");
 
     try {
 
         const response = await fetch('prices.csv');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch prices.csv: ${response.status}`);
+        }
+        
         const csvText = await response.text();
-
+        console.log(`📄 prices.csv loaded: ${csvText.length} characters`);
+        
         let rows;
         if (typeof Papa !== 'undefined') {
             const result = Papa.parse(csvText, {
@@ -288,7 +353,9 @@ async function loadMyStock() {
                 trimHeaders: true
             });
             rows = result.data;
+            console.log(`📊 PapaParse loaded ${rows.length} rows`);
         } else {
+            console.warn("PapaParse not found, using XLSX fallback");
             const workbook = XLSX.read(csvText, { type: 'string' });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
@@ -307,12 +374,15 @@ async function loadMyStock() {
         partApplications.clear();
 
         const headers = Object.keys(rows[0] || {});
+        console.log('📋 Available columns in prices.csv:', headers);
+        
         const partCol = headers.find(h => h.toLowerCase().includes('material') || h.toLowerCase().includes('part'));
-        const descCol = headers.find(h => h.toLowerCase().includes('description'));
-        const appCol = headers.find(h => h.toLowerCase().includes('application'));
-        const priceCol = headers.find(h => h.toLowerCase().includes('price'));
+        const descCol = headers.find(h => h.toLowerCase().includes('description') || h.toLowerCase().includes('desc'));
+        const appCol = headers.find(h => h.toLowerCase().includes('application') || h.toLowerCase().includes('appl'));
+        const priceCol = headers.find(h => h.toLowerCase().includes('price') || h.toLowerCase().includes('mrp'));
         const stockCol = headers.find(h => h.toLowerCase().includes('stock') || h.toLowerCase().includes('qty'));
 
+        let loadedCount = 0;
         for (const row of rows) {
             if (!row || !row[partCol]) continue;
 
@@ -333,14 +403,16 @@ async function loadMyStock() {
             
             if (description) partDescriptions.set(part, description);
             if (application) partApplications.set(part, application);
+            loadedCount++;
         }
 
-        console.log(`✅ My stock: ${currentStock.size} parts`);
+        console.log(`✅ My stock: ${loadedCount} parts loaded from prices.csv`);
+        console.log(`   📝 Descriptions: ${partDescriptions.size}, Applications: ${partApplications.size}`);
 
     } catch (err) {
 
-        console.error("Error loading stock:", err);
-        showToast("Error loading stock data", "error");
+        console.error("Error loading prices.csv:", err);
+        showToast("Error loading stock data: " + err.message, "error");
     }
 }
 
@@ -348,6 +420,8 @@ async function loadMyStock() {
 // LOAD OFFERS (FIXED - Handles all storage formats)
 // ===================================================
 function loadOffers() {
+    console.log("🔄 Loading offers...");
+    
     currentOffers = [];
     dealerOfferMap = {};
     
@@ -386,6 +460,7 @@ function loadOffers() {
             return;
         }
         
+        // Build dealer map using normalized names
         currentOffers.forEach(o => {
             const key = normalizeDealerName(o.dealer || o.dealerRaw || '');
             if (!key) return;
@@ -396,6 +471,7 @@ function loadOffers() {
         console.log(`📊 Dealers with offers: ${Object.keys(dealerOfferMap).length}`);
         console.log(`📊 Total offers in memory: ${currentOffers.length}`);
         
+        // Log sample dealers
         const sampleKeys = Object.keys(dealerOfferMap).slice(0, 5);
         console.log('📋 Sample dealers:', sampleKeys);
         
@@ -410,13 +486,15 @@ function loadOffers() {
 // GET DEALERS WITH OFFERS (FIXED)
 // ===================================================
 async function getDealersWithOffers() {
+    console.log("🔍 Getting dealers with offers...");
+    
+    // Load fresh data
     await loadDealerMaster();
     loadOffers();
     
     const result = [];
     const processed = new Set();
     
-    console.log(`🔍 Looking for dealers with offers...`);
     console.log(`📊 dealerOfferMap keys: ${Object.keys(dealerOfferMap).length}`);
     
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
@@ -995,6 +1073,12 @@ async function downloadPDF(name) {
         
         console.log(`📄 Generating PDF: ${offers.length} offers, ${totalPages} pages`);
         
+        // Check if jsPDF is available
+        if (typeof window.jspdf === 'undefined') {
+            showToast("jsPDF library not loaded. Please refresh the page.", "error");
+            return;
+        }
+        
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('l', 'mm', 'a4');
         
@@ -1091,42 +1175,7 @@ async function downloadPDF(name) {
             console.log(`✅ PDF saved: ${totalPages} pages, ${offers.length} offers`);
             
         } else {
-            showToast("autoTable not available, using fallback", "warning");
-            for (let i = 0; i < totalPages; i++) {
-                if (i > 0) pdf.addPage();
-                
-                const div = document.createElement("div");
-                div.innerHTML = generateFullBrochureHTML(name, i, totalPages, rowsPerPage);
-                div.style.position = "fixed";
-                div.style.left = "-9999px";
-                div.style.top = "0";
-                div.style.width = "1100px";
-                div.style.background = "#fff";
-                div.style.padding = "0px";
-                div.style.margin = "0px";
-                document.body.appendChild(div);
-                
-                await new Promise(r => setTimeout(r, 300));
-                
-                const canvas = await html2canvas(div, { 
-                    scale: 2, 
-                    useCORS: true,
-                    width: 1100,
-                    height: div.scrollHeight,
-                    backgroundColor: '#ffffff'
-                });
-                
-                document.body.removeChild(div);
-                
-                const imgData = canvas.toDataURL('image/png');
-                const imgWidth = 277;
-                const imgHeight = (canvas.height / canvas.width) * imgWidth;
-                
-                pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, Math.min(imgHeight, 180));
-            }
-            
-            pdf.save(`${name.replace(/[^a-z0-9]/gi, '_')}_brochure.pdf`);
-            showToast(`✅ PDF saved (fallback)`, "success");
+            showToast("PDF autoTable not available. Please refresh the page.", "error");
         }
         
     } catch (err) {
@@ -1285,21 +1334,33 @@ function getApplication(part) {
 }
 
 // ===================================================
-// INIT
+// INIT (FIXED - With proper error handling)
 // ===================================================
 async function init() {
+    console.log("🚀 Initializing Brochure Generator...");
+    
     try {
         await loadDealerMaster();
         await loadMyStock();
         await loadDistributorStock();
         loadOffers();
+        
+        isInitialized = true;
+        
         console.log(`🚀 SYSTEM READY`);
         console.log(`   📊 Offers: ${currentOffers.length}`);
         console.log(`   📞 Dealers: ${dealerMaster.length}`);
         console.log(`   🏭 Distributor Stock: ${distributorStock.length} items`);
+        console.log(`   📝 Descriptions: ${partDescriptions.size}, Applications: ${partApplications.size}`);
+        
+        showToast('System Ready', 'success');
+        return true;
+        
     } catch(err) {
         console.error("Init error:", err);
         showToast('System initialization error: ' + err.message, 'error');
+        isInitialized = false;
+        return false;
     }
 }
 
@@ -1322,7 +1383,6 @@ window.BrochureGenerator = {
     downloadPDF,
     downloadSinglePDF,
     downloadAllFlyersPDF,
-    sharePDFToWhatsApp,
     getDescription,
     getApplication,
     refreshOffers,
@@ -1331,10 +1391,37 @@ window.BrochureGenerator = {
     showToast,
     debugOffers,
     partDescriptions: partDescriptions,
-    partApplications: partApplications
+    partApplications: partApplications,
+    isInitialized: function() { return isInitialized; }
 };
 
-// Auto-init
-init();
+// ===================================================
+// AUTO-INIT (with delay to ensure DOM is ready)
+// ===================================================
+console.log("📋 Brochure Generator registered. Starting auto-init...");
+
+// Wait for DOM to be ready
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(async () => {
+        await init();
+    }, 500);
+} else {
+    document.addEventListener('DOMContentLoaded', async function() {
+        setTimeout(async () => {
+            await init();
+        }, 500);
+    });
+}
+
+// Also try after window load
+window.addEventListener('load', async function() {
+    if (!isInitialized) {
+        setTimeout(async () => {
+            await init();
+        }, 1000);
+    }
+});
+
+console.log("✅ Brochure Generator loaded");
 
 })();
