@@ -412,9 +412,7 @@
         </button>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- DEALER OFFER COUNTER SECTION                                  -->
-    <!-- ============================================================ -->
+    <!-- DEALER OFFER COUNTER SECTION -->
     <div class="dealer-counter-section">
         <h3>
             <i class="fas fa-list-ol"></i> Dealer Offer Counter 
@@ -521,9 +519,7 @@
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- FLYER OFFER COUNTER SECTION                                   -->
-    <!-- ============================================================ -->
+    <!-- FLYER OFFER COUNTER SECTION -->
     <div class="flyer-counter-section">
         <h3>
             <i class="fas fa-file-pdf"></i> Flyer Offer Counter 
@@ -1000,7 +996,7 @@ async function uploadMultipleDistributorFiles() {
 }
 
 // ============================================================
-// RUN ANALYSIS
+// RUN ANALYSIS - FIXED: Correct property names
 // ============================================================
 async function runAnalysis() {
     const btn = document.getElementById('runAnalysisBtn');
@@ -1025,6 +1021,8 @@ async function runAnalysis() {
         }
         
         const result = await DealerIntelligence.runFullAnalysis();
+        
+        // FIXED: Use correct property name "offersGenerated"
         document.getElementById('totalOffers').innerText = result.offersGenerated || 0;
         document.getElementById('highDiscount').innerText = result.highDiscountOffers || 0;
         document.getElementById('lowStockCount').innerText = result.lowStockAlerts || 0;
@@ -1042,10 +1040,10 @@ async function runAnalysis() {
             loadAllFlyerDealersFromPagination();
         }, 1000);
         
-        showToast(`✅ Analysis complete: ${result.offersGenerated} offers generated`, 'success');
+        showToast(`✅ Analysis complete: ${result.offersGenerated || 0} offers generated`, 'success');
         console.log('✅ Analysis complete.');
     } catch(err) {
-        console.error(err);
+        console.error('Analysis error:', err);
         showToast('Analysis failed: ' + err.message, 'error');
     } finally {
         btn.disabled = false;
@@ -1407,8 +1405,7 @@ function showToast(message, type = 'info') {
 }
 
 // ============================================================
-// ============================================================
-// DEALER COUNTER - COMPLETE PAGINATION SYSTEM
+// DEALER COUNTER - PAGINATION SYSTEM
 // ============================================================
 
 let dealerCounterList = [];
@@ -1421,7 +1418,7 @@ let dealerGridAllDealers = [];
 function loadAllDealersFromPagination() {
     try {
         if (typeof BrochureGeneratorPagination === 'undefined') {
-            showToast('Pagination not ready. Click "Load All Dealers" again.', 'warning');
+            showToast('Pagination not ready. Click again.', 'warning');
             return;
         }
         
@@ -1691,8 +1688,7 @@ function dealerCounterDownloadPDF() {
 }
 
 // ============================================================
-// ============================================================
-// FLYER COUNTER - COMPLETE PAGINATION SYSTEM
+// FLYER COUNTER - PAGINATION SYSTEM
 // ============================================================
 
 let flyerCounterList = [];
@@ -1705,7 +1701,7 @@ let flyerGridAllDealers = [];
 function loadAllFlyerDealersFromPagination() {
     try {
         if (typeof BrochureGeneratorPagination === 'undefined') {
-            showToast('Pagination not ready. Click "Load Flyer Dealers" again.', 'warning');
+            showToast('Pagination not ready. Click again.', 'warning');
             return;
         }
         
