@@ -61,6 +61,10 @@
         .btn-active { background: #facc15 !important; color: #1e293b !important; }
         .btn-flyer { background: #8b5cf6; }
         .btn-flyer:hover { background: #7c3aed; }
+        .btn-priority { background: #dc2626; }
+        .btn-priority:hover { background: #b91c1c; }
+        .btn-category { background: #059669; }
+        .btn-category:hover { background: #047857; }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -316,6 +320,63 @@
             font-size: 11px;
         }
         
+        .flyer-actions {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #334155;
+        }
+        .flyer-actions .action-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .flyer-actions .action-label {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-right: 5px;
+        }
+        
+        .category-select {
+            background: #0f172a;
+            color: #fff;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            min-width: 150px;
+        }
+        .category-select:focus {
+            outline: none;
+            border-color: #facc15;
+        }
+        
+        .priority-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: bold;
+        }
+        .priority-high { background: #dc2626; color: white; }
+        .priority-medium { background: #f59e0b; color: #1e293b; }
+        .priority-low { background: #16a34a; color: white; }
+        
+        .category-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        .cat-stock { background: #2563eb; color: white; }
+        .cat-discount { background: #dc2626; color: white; }
+        .cat-value { background: #059669; color: white; }
+        .cat-dist { background: #f59e0b; color: #1e293b; }
+        .cat-our { background: #8b5cf6; color: white; }
+        
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -330,6 +391,10 @@
             .pagination-controls .page-btn {
                 min-width: 30px;
                 height: 30px;
+                font-size: 10px;
+            }
+            .category-select {
+                min-width: 100px;
                 font-size: 10px;
             }
         }
@@ -478,6 +543,56 @@
             </div>
         </div>
         
+        <!-- FLYER ACTIONS with Category Select -->
+        <div class="flyer-actions" id="dealerFlyerActions" style="display:none;">
+            <div class="action-group">
+                <span class="action-label"><i class="fas fa-file-pdf"></i> Flyer Actions:</span>
+                <button class="btn btn-flyer btn-small" onclick="dealerCounterGenerateFlyer()">
+                    <i class="fas fa-file-pdf"></i> Generate Flyer
+                </button>
+                <button class="btn btn-flyer btn-small" onclick="dealerCounterGenerateAndNext()">
+                    <i class="fas fa-forward"></i> Flyer & Next
+                </button>
+                <button class="btn btn-priority btn-small" onclick="dealerCounterGeneratePriority()">
+                    <i class="fas fa-star"></i> Priority Flyers
+                </button>
+                <button class="btn btn-category btn-small" onclick="dealerCounterGenerateByCategory()">
+                    <i class="fas fa-layer-group"></i> Generate by Category
+                </button>
+                <span style="font-size:10px;color:#94a3b8;margin-left:5px;" id="dealerPriorityInfo">
+                    Priority: <span id="dealerPriorityStatus">Normal</span>
+                </span>
+            </div>
+            <div class="action-group" style="margin-top:5px;flex-wrap:wrap;">
+                <span class="action-label">Priority Options:</span>
+                <button class="btn btn-small btn-secondary" onclick="setFlyerPriority('stock')" id="priorityStockBtn">
+                    📦 Stock First
+                </button>
+                <button class="btn btn-small btn-secondary" onclick="setFlyerPriority('discount')" id="priorityDiscountBtn">
+                    💰 Discount First
+                </button>
+                <button class="btn btn-small btn-secondary" onclick="setFlyerPriority('normal')" id="priorityNormalBtn">
+                    📋 Normal
+                </button>
+                
+                <span class="action-label" style="margin-left:10px;">Category:</span>
+                <select id="flyerCategorySelect" class="category-select">
+                    <option value="all">📋 All Dealers</option>
+                    <option value="stock">📦 Stock First</option>
+                    <option value="discount">💰 Discount First</option>
+                    <option value="high-value">💎 High Value</option>
+                    <option value="distributor">🏭 Distributor Stock</option>
+                    <option value="our-stock">📦 Our Stock Only</option>
+                    <option value="mixed">🔄 Mixed Stock</option>
+                    <option value="low-stock">⚠️ Low Stock</option>
+                </select>
+                <button class="btn btn-small btn-category" onclick="dealerCounterGenerateByCategory()">
+                    <i class="fas fa-play"></i> Generate Selected
+                </button>
+                <span id="categoryCountInfo" style="font-size:10px;color:#94a3b8;"></span>
+            </div>
+        </div>
+        
         <div id="dealerCounterDetails" style="margin-top:10px;background:#0f172a;border-radius:12px;padding:15px;border:1px solid #334155;display:none;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
                 <div>
@@ -485,6 +600,8 @@
                     <span style="font-size:12px;color:#94a3b8;margin-left:10px;" id="dealerCounterOfferCount">0 offers</span>
                     <span style="font-size:12px;color:#94a3b8;margin-left:10px;" id="dealerCounterPhone">📞 -</span>
                     <span style="font-size:12px;color:#94a3b8;margin-left:10px;" id="dealerCounterDistrict">📍 -</span>
+                    <span style="font-size:10px;margin-left:10px;" id="dealerCounterPriorityBadge"></span>
+                    <span style="font-size:10px;margin-left:5px;" id="dealerCounterCategoryBadge"></span>
                 </div>
                 <div style="display:flex;gap:8px;">
                     <button class="btn btn-whatsapp btn-small" onclick="dealerCounterSendWhatsApp()">
@@ -499,6 +616,9 @@
                     <button class="btn btn-small" onclick="dealerCounterDownloadPDF()">
                         <i class="fas fa-file-pdf"></i> PDF
                     </button>
+                    <button class="btn btn-flyer btn-small" onclick="dealerCounterGenerateFlyer()">
+                        <i class="fas fa-file-pdf"></i> Flyer
+                    </button>
                 </div>
             </div>
             <div id="dealerCounterOffersList" style="margin-top:10px;max-height:250px;overflow-y:auto;font-size:12px;">
@@ -511,6 +631,8 @@
                             <th style="padding:4px 8px;text-align:center;">Dist Stock</th>
                             <th style="padding:4px 8px;text-align:center;">Discount</th>
                             <th style="padding:4px 8px;text-align:center;">Offer Price</th>
+                            <th style="padding:4px 8px;text-align:center;">Priority</th>
+                            <th style="padding:4px 8px;text-align:center;">Category</th>
                         </tr>
                     </thead>
                     <tbody id="dealerCounterOffersTbody"></tbody>
@@ -865,6 +987,7 @@ function clearAllOffers() {
         document.getElementById('flyerList').innerHTML = '';
         document.getElementById('dealerGridContainer').style.display = 'none';
         document.getElementById('flyerGridContainer').style.display = 'none';
+        document.getElementById('dealerFlyerActions').style.display = 'none';
         
         setTimeout(() => runAnalysis(), 500);
     }
@@ -996,7 +1119,7 @@ async function uploadMultipleDistributorFiles() {
 }
 
 // ============================================================
-// RUN ANALYSIS - FIXED: Correct property names
+// RUN ANALYSIS
 // ============================================================
 async function runAnalysis() {
     const btn = document.getElementById('runAnalysisBtn');
@@ -1022,7 +1145,6 @@ async function runAnalysis() {
         
         const result = await DealerIntelligence.runFullAnalysis();
         
-        // FIXED: Use correct property name "offersGenerated"
         document.getElementById('totalOffers').innerText = result.offersGenerated || 0;
         document.getElementById('highDiscount').innerText = result.highDiscountOffers || 0;
         document.getElementById('lowStockCount').innerText = result.lowStockAlerts || 0;
@@ -1034,7 +1156,6 @@ async function runAnalysis() {
             document.getElementById('dealerCount').innerText = dealers.length || 0;
         }
         
-        // Load dealers
         setTimeout(() => {
             loadAllDealersFromPagination();
             loadAllFlyerDealersFromPagination();
@@ -1405,7 +1526,8 @@ function showToast(message, type = 'info') {
 }
 
 // ============================================================
-// DEALER COUNTER - PAGINATION SYSTEM
+// ============================================================
+// DEALER COUNTER - COMPLETE PAGINATION SYSTEM
 // ============================================================
 
 let dealerCounterList = [];
@@ -1415,6 +1537,118 @@ let dealerGridCurrentPage = 1;
 let dealerGridPerPage = 20;
 let dealerGridAllDealers = [];
 
+// Flyer Priority Mode
+let flyerPriorityMode = 'normal'; // 'normal', 'stock', 'discount'
+
+function setFlyerPriority(mode) {
+    flyerPriorityMode = mode;
+    const statusEl = document.getElementById('dealerPriorityStatus');
+    const labels = {
+        'normal': '📋 Normal',
+        'stock': '📦 Stock First',
+        'discount': '💰 Discount First'
+    };
+    statusEl.textContent = labels[mode] || 'Normal';
+    
+    document.getElementById('priorityStockBtn').className = `btn btn-small ${mode === 'stock' ? 'btn-active' : 'btn-secondary'}`;
+    document.getElementById('priorityDiscountBtn').className = `btn btn-small ${mode === 'discount' ? 'btn-active' : 'btn-secondary'}`;
+    document.getElementById('priorityNormalBtn').className = `btn btn-small ${mode === 'normal' ? 'btn-active' : 'btn-secondary'}`;
+    
+    showToast(`Priority: ${labels[mode]}`, 'info');
+    
+    if (dealerCounterList.length > 0) {
+        dealerCounterUpdateUI();
+    }
+}
+
+// ============================================================
+// Category Functions
+// ============================================================
+
+function getDealersByCategory(category) {
+    if (!dealerGridAllDealers || dealerGridAllDealers.length === 0) {
+        return [];
+    }
+    
+    let dealers = [...dealerGridAllDealers];
+    let categoryName = '';
+    
+    switch(category) {
+        case 'stock':
+            dealers.sort((a, b) => {
+                const aStock = (a.myStockCount || 0) + (a.distStockCount || 0);
+                const bStock = (b.myStockCount || 0) + (b.distStockCount || 0);
+                return bStock - aStock;
+            });
+            categoryName = '📦 Stock First';
+            break;
+            
+        case 'discount':
+            dealers.sort((a, b) => {
+                const aMax = Math.max(...(a.offers || []).map(o => o.discount || 0), 0);
+                const bMax = Math.max(...(b.offers || []).map(o => o.discount || 0), 0);
+                return bMax - aMax;
+            });
+            categoryName = '💰 Discount First';
+            break;
+            
+        case 'high-value':
+            dealers.sort((a, b) => {
+                const aValue = (a.offers || []).reduce((sum, o) => sum + (o.offerPrice || 0), 0);
+                const bValue = (b.offers || []).reduce((sum, o) => sum + (o.offerPrice || 0), 0);
+                return bValue - aValue;
+            });
+            categoryName = '💎 High Value';
+            break;
+            
+        case 'distributor':
+            dealers = dealers.filter(d => (d.distStockCount || 0) > 0);
+            dealers.sort((a, b) => (b.distStockCount || 0) - (a.distStockCount || 0));
+            categoryName = '🏭 Distributor Stock';
+            break;
+            
+        case 'our-stock':
+            dealers = dealers.filter(d => (d.myStockCount || 0) > 0 && (d.distStockCount || 0) === 0);
+            dealers.sort((a, b) => (b.myStockCount || 0) - (a.myStockCount || 0));
+            categoryName = '📦 Our Stock Only';
+            break;
+            
+        case 'mixed':
+            dealers = dealers.filter(d => (d.myStockCount || 0) > 0 && (d.distStockCount || 0) > 0);
+            dealers.sort((a, b) => ((b.myStockCount || 0) + (b.distStockCount || 0)) - ((a.myStockCount || 0) + (a.distStockCount || 0)));
+            categoryName = '🔄 Mixed Stock';
+            break;
+            
+        case 'low-stock':
+            dealers = dealers.filter(d => {
+                const total = (d.myStockCount || 0) + (d.distStockCount || 0);
+                return total > 0 && total < 10;
+            });
+            dealers.sort((a, b) => {
+                const aTotal = (a.myStockCount || 0) + (a.distStockCount || 0);
+                const bTotal = (b.myStockCount || 0) + (b.distStockCount || 0);
+                return aTotal - bTotal;
+            });
+            categoryName = '⚠️ Low Stock';
+            break;
+            
+        default:
+            categoryName = '📋 All Dealers';
+            break;
+    }
+    
+    return { dealers, categoryName, count: dealers.length };
+}
+
+function updateCategoryCount() {
+    const category = document.getElementById('flyerCategorySelect').value;
+    const result = getDealersByCategory(category);
+    document.getElementById('categoryCountInfo').innerHTML = `(${result.count} dealers in "${result.categoryName}")`;
+}
+
+// ============================================================
+// Load ALL Dealers
+// ============================================================
 function loadAllDealersFromPagination() {
     try {
         if (typeof BrochureGeneratorPagination === 'undefined') {
@@ -1434,12 +1668,15 @@ function loadAllDealersFromPagination() {
         document.getElementById('dealerTotalCount').innerText = `(${dealers.length} total dealers)`;
         document.getElementById('dealerCounterStatus').innerText = `✅ Loaded ${dealers.length} dealers`;
         document.getElementById('dealerGridContainer').style.display = 'block';
+        document.getElementById('dealerFlyerActions').style.display = 'block';
         
         dealerGridCurrentPage = 1;
         dealerCounterIndex = 0;
         dealerCounterList = dealerGridAllDealers.slice(0, dealerGridPerPage);
         dealerCounterUpdateUI();
         dealerGridRenderPage();
+        
+        updateCategoryCount();
         
         showToast(`✅ Loaded ${dealers.length} dealers`, 'success');
     } catch(err) {
@@ -1448,6 +1685,9 @@ function loadAllDealersFromPagination() {
     }
 }
 
+// ============================================================
+// Grid Pagination - Dealer Counter
+// ============================================================
 function dealerGridRenderPage() {
     const perPage = dealerGridPerPage;
     const totalDealers = dealerGridAllDealers.length;
@@ -1525,6 +1765,9 @@ function dealerCounterChangePerPage() {
     dealerGridRenderPage();
 }
 
+// ============================================================
+// Update UI for selected dealer with priority and category
+// ============================================================
 function dealerCounterUpdateUI() {
     if (dealerCounterList.length === 0) {
         document.getElementById('dealerCounterName').innerText = 'No dealers found';
@@ -1546,30 +1789,98 @@ function dealerCounterUpdateUI() {
     document.getElementById('dealerCounterPhone').innerHTML = dealer.phone ? `📞 ${dealer.phone}` : '📞 No phone';
     document.getElementById('dealerCounterDistrict').innerHTML = dealer.district ? `📍 ${dealer.district}` : '📍 No district';
     
+    // Priority badge
+    const badgeEl = document.getElementById('dealerCounterPriorityBadge');
+    const priorityLabels = {
+        'normal': '<span class="priority-badge priority-low">Normal</span>',
+        'stock': '<span class="priority-badge priority-high">📦 Stock First</span>',
+        'discount': '<span class="priority-badge priority-medium">💰 Discount First</span>'
+    };
+    badgeEl.innerHTML = priorityLabels[flyerPriorityMode] || '';
+    
+    // Category badge
+    const catBadgeEl = document.getElementById('dealerCounterCategoryBadge');
+    const totalStock = (dealer.myStockCount || 0) + (dealer.distStockCount || 0);
+    let catText = '';
+    if (dealer.distStockCount > 0 && dealer.myStockCount > 0) {
+        catText = '<span class="category-badge cat-mixed">🔄 Mixed</span>';
+    } else if (dealer.distStockCount > 0) {
+        catText = '<span class="category-badge cat-dist">🏭 Dist</span>';
+    } else if (dealer.myStockCount > 0) {
+        catText = '<span class="category-badge cat-our">📦 Our</span>';
+    }
+    catBadgeEl.innerHTML = catText;
+    
     const tbody = document.getElementById('dealerCounterOffersTbody');
     tbody.innerHTML = '';
     
-    const offers = dealer.offers || [];
+    let offers = dealer.offers || [];
+    
+    // Apply priority sorting
+    if (flyerPriorityMode === 'stock') {
+        offers = [...offers].sort((a, b) => {
+            const aStock = (a.myStock || 0) + (a.distributorStock || 0);
+            const bStock = (b.myStock || 0) + (b.distributorStock || 0);
+            return bStock - aStock;
+        });
+    } else if (flyerPriorityMode === 'discount') {
+        offers = [...offers].sort((a, b) => {
+            return (b.discount || 0) - (a.discount || 0);
+        });
+    }
+    
     const displayOffers = offers.slice(0, 20);
     
     if (displayOffers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:10px;">No offers available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:10px;">No offers available</td></tr>';
     } else {
         displayOffers.forEach(o => {
             const row = tbody.insertRow();
             const isDistributor = o.stockType === 'distributor-stock';
+            const totalStock = (o.myStock || 0) + (o.distributorStock || 0);
             
-            row.insertCell(0).innerHTML = `<strong>${escapeHtml(o.part || '')}</strong>`;
+            let priorityIcon = '';
+            let categoryIcon = '';
+            
+            if (flyerPriorityMode === 'stock' && totalStock > 0) {
+                priorityIcon = '📦 ';
+            } else if (flyerPriorityMode === 'discount' && (o.discount || 0) > 0) {
+                priorityIcon = `💰 ${o.discount}% `;
+            }
+            
+            if (isDistributor) {
+                categoryIcon = '🏭';
+            } else if (o.myStock > 0) {
+                categoryIcon = '📦';
+            }
+            
+            row.insertCell(0).innerHTML = `<strong>${priorityIcon}${escapeHtml(o.part || '')}</strong>`;
             row.insertCell(1).innerText = (o.description || '-').substring(0, 30);
             row.insertCell(2).innerHTML = `<span style="color:#4ade80;">${o.myStock || 0}</span>`;
             row.insertCell(3).innerHTML = `<span style="color:#facc15;">${o.distributorStock || 0}</span>`;
             row.insertCell(4).innerHTML = isDistributor ? `<span style="color:#facc15;">0% (MRP)</span>` : `<span style="color:#4ade80;">${o.discount || 0}%</span>`;
             row.insertCell(5).innerHTML = `<strong>₹${Number(o.offerPrice || 0).toFixed(2)}</strong>`;
+            
+            // Priority column
+            let priorityText = '-';
+            if (flyerPriorityMode === 'stock') {
+                priorityText = totalStock > 0 ? `📦 ${totalStock}` : '-';
+            } else if (flyerPriorityMode === 'discount') {
+                priorityText = (o.discount || 0) > 0 ? `${o.discount}%` : '-';
+            }
+            row.insertCell(6).innerHTML = priorityText;
+            
+            // Category column
+            let catText = '-';
+            if (isDistributor && o.myStock > 0) catText = '🔄 Mixed';
+            else if (isDistributor) catText = '🏭 Dist';
+            else if (o.myStock > 0) catText = '📦 Our';
+            row.insertCell(7).innerHTML = catText;
         });
         
         if (offers.length > 20) {
             const row = tbody.insertRow();
-            row.insertCell(0).colSpan = 6;
+            row.insertCell(0).colSpan = 8;
             row.cells[0].style.textAlign = 'center';
             row.cells[0].style.color = '#94a3b8';
             row.cells[0].style.padding = '5px';
@@ -1580,6 +1891,9 @@ function dealerCounterUpdateUI() {
     document.getElementById('dealerCounterDetails').style.display = 'block';
 }
 
+// ============================================================
+// Navigation Functions - Dealer Counter
+// ============================================================
 function dealerCounterNext() {
     if (typeof BrochureGeneratorPagination === 'undefined') {
         showToast('Pagination not loaded. Click "Load All Dealers" first.', 'warning');
@@ -1662,6 +1976,148 @@ function dealerCounterSort(mode) {
     showToast(`Sorted: ${mode === 'alphabetical' ? 'Alphabetical' : 'Priority (Stock First)'}`, 'info');
 }
 
+// ============================================================
+// FLYER GENERATION FUNCTIONS IN DEALER COUNTER
+// ============================================================
+
+function dealerCounterGenerateFlyer() {
+    if (dealerCounterList.length === 0 || dealerCounterIndex >= dealerCounterList.length) {
+        showToast('No dealer selected', 'warning');
+        return;
+    }
+    const dealer = dealerCounterList[dealerCounterIndex];
+    showToast(`Generating flyer for ${dealer.name}...`, 'info');
+    previewFlyer(dealer.name);
+}
+
+function dealerCounterGenerateAndNext() {
+    if (dealerCounterList.length === 0 || dealerCounterIndex >= dealerCounterList.length) {
+        showToast('No dealer selected', 'warning');
+        return;
+    }
+    const dealer = dealerCounterList[dealerCounterIndex];
+    showToast(`Generating flyer for ${dealer.name} and moving to next...`, 'info');
+    
+    previewFlyer(dealer.name);
+    
+    setTimeout(() => {
+        dealerCounterNext();
+    }, 2000);
+}
+
+function dealerCounterGeneratePriority() {
+    if (dealerCounterList.length === 0) {
+        showToast('No dealers loaded', 'warning');
+        return;
+    }
+    
+    let allDealers = [...dealerGridAllDealers];
+    
+    if (flyerPriorityMode === 'stock') {
+        allDealers.sort((a, b) => {
+            const aStock = (a.myStockCount || 0) + (a.distStockCount || 0);
+            const bStock = (b.myStockCount || 0) + (b.distStockCount || 0);
+            return bStock - aStock;
+        });
+    } else if (flyerPriorityMode === 'discount') {
+        allDealers.sort((a, b) => {
+            const aMaxDiscount = Math.max(...(a.offers || []).map(o => o.discount || 0), 0);
+            const bMaxDiscount = Math.max(...(b.offers || []).map(o => o.discount || 0), 0);
+            return bMaxDiscount - aMaxDiscount;
+        });
+    }
+    
+    const topDealers = allDealers.slice(0, 5);
+    let msg = '📋 Priority Flyer Queue:\n\n';
+    topDealers.forEach((d, i) => {
+        const stock = (d.myStockCount || 0) + (d.distStockCount || 0);
+        const maxDiscount = Math.max(...(d.offers || []).map(o => o.discount || 0), 0);
+        msg += `${i+1}. ${d.name}\n`;
+        msg += `   Offers: ${d.offerCount} | Stock: ${stock} | Max Discount: ${maxDiscount}%\n`;
+    });
+    
+    showToast('Priority queue generated. Check console.', 'info');
+    console.log(msg);
+    
+    if (topDealers.length > 0) {
+        const priorityDealer = topDealers[0];
+        const idx = dealerCounterList.findIndex(d => d.name === priorityDealer.name);
+        if (idx !== -1) {
+            dealerCounterIndex = idx;
+            dealerCounterUpdateUI();
+            dealerGridRenderPage();
+            setTimeout(() => {
+                previewFlyer(priorityDealer.name);
+            }, 500);
+        } else {
+            const globalIdx = dealerGridAllDealers.findIndex(d => d.name === priorityDealer.name);
+            if (globalIdx !== -1) {
+                const page = Math.floor(globalIdx / dealerGridPerPage) + 1;
+                dealerGridCurrentPage = page;
+                dealerGridRenderPage();
+                dealerCounterIndex = dealerCounterList.findIndex(d => d.name === priorityDealer.name);
+                if (dealerCounterIndex === -1) dealerCounterIndex = 0;
+                dealerCounterUpdateUI();
+                setTimeout(() => {
+                    previewFlyer(priorityDealer.name);
+                }, 500);
+            }
+        }
+        showToast(`🎯 Priority: ${priorityDealer.name}`, 'success');
+    }
+}
+
+// ============================================================
+// CATEGORY-BASED FLYER GENERATION
+// ============================================================
+
+function dealerCounterGenerateByCategory() {
+    const category = document.getElementById('flyerCategorySelect').value;
+    const result = getDealersByCategory(category);
+    
+    if (result.count === 0) {
+        showToast(`No dealers found in category: ${result.categoryName}`, 'warning');
+        return;
+    }
+    
+    showToast(`📋 Generating flyers for ${result.count} dealers in "${result.categoryName}"...`, 'info');
+    
+    // Show the list in console
+    console.log(`=== ${result.categoryName} (${result.count} dealers) ===`);
+    result.dealers.forEach((d, i) => {
+        const stock = (d.myStockCount || 0) + (d.distStockCount || 0);
+        const maxDiscount = Math.max(...(d.offers || []).map(o => o.discount || 0), 0);
+        console.log(`${i+1}. ${d.name}: ${d.offerCount} offers, Stock: ${stock}, Max Disc: ${maxDiscount}%`);
+    });
+    
+    // Generate flyer for first dealer in category
+    if (result.dealers.length > 0) {
+        const targetDealer = result.dealers[0];
+        // Find and navigate to this dealer
+        const globalIdx = dealerGridAllDealers.findIndex(d => d.name === targetDealer.name);
+        if (globalIdx !== -1) {
+            const page = Math.floor(globalIdx / dealerGridPerPage) + 1;
+            dealerGridCurrentPage = page;
+            dealerGridRenderPage();
+            dealerCounterIndex = dealerCounterList.findIndex(d => d.name === targetDealer.name);
+            if (dealerCounterIndex === -1) dealerCounterIndex = 0;
+            dealerCounterUpdateUI();
+            
+            // Update category info
+            document.getElementById('categoryCountInfo').innerHTML = `(${result.count} dealers in "${result.categoryName}")`;
+            
+            // Generate flyer
+            setTimeout(() => {
+                previewFlyer(targetDealer.name);
+                showToast(`🎯 Category: ${result.categoryName} - ${targetDealer.name}`, 'success');
+            }, 500);
+        }
+    }
+}
+
+// ============================================================
+// Action Functions - Dealer Counter
+// ============================================================
 function dealerCounterSendWhatsApp() {
     if (dealerCounterList.length === 0 || dealerCounterIndex >= dealerCounterList.length) { showToast('No dealer selected', 'warning'); return; }
     const dealer = dealerCounterList[dealerCounterIndex];
@@ -1989,7 +2445,6 @@ function flyerCounterDownloadPDF() {
 // Keyboard Navigation
 // ============================================================
 document.addEventListener('keydown', function(e) {
-    // Dealer Counter: Arrow keys without Ctrl
     const dealerDetails = document.getElementById('dealerCounterDetails');
     if (dealerDetails && dealerDetails.style.display !== 'none') {
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
@@ -2004,10 +2459,15 @@ document.addEventListener('keydown', function(e) {
         } else if (e.key === 'End') {
             e.preventDefault();
             dealerCounterGoToLast();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            dealerCounterGenerateFlyer();
+        } else if (e.key === 'g') {
+            e.preventDefault();
+            dealerCounterGenerateByCategory();
         }
     }
     
-    // Flyer Counter: Ctrl+Arrow keys
     if (e.ctrlKey) {
         const flyerDetails = document.getElementById('flyerCounterDetails');
         if (flyerDetails && flyerDetails.style.display !== 'none') {
@@ -2023,6 +2483,9 @@ document.addEventListener('keydown', function(e) {
             } else if (e.key === 'End') {
                 e.preventDefault();
                 flyerCounterGoToLast();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                flyerCounterGenerateFlyer();
             }
         }
     }
@@ -2086,7 +2549,12 @@ window.addEventListener('load', function() {
             setTimeout(attemptPaginationLoad, 2000);
         }
     }, 6000);
+    
+    // Update category count on select change
+    document.getElementById('flyerCategorySelect').addEventListener('change', function() {
+        updateCategoryCount();
+    });
 });
 </script>
 </body>
-    </html>
+            </html>
