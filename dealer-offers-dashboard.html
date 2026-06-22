@@ -1245,10 +1245,31 @@ async function generateAllFlyers() {
         
         showToast('Generating flyers...', 'info');
         
+        // FIX: Force load fresh data
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         
-        const dealers = await BrochureGenerator.getDealersWithOffers();
+        let dealers = [];
+        
+        // Try to get from pagination first
+        if (typeof BrochureGeneratorPagination !== 'undefined') {
+            const allDealers = BrochureGeneratorPagination.getAllDealers();
+            if (allDealers && allDealers.length > 0) {
+                dealers = allDealers.map(d => ({
+                    name: d.name,
+                    offerCount: d.offerCount || d.offers?.length || 0,
+                    hasPhone: !!d.phone,
+                    phone: d.phone || '',
+                    district: d.district || ''
+                }));
+            }
+        }
+        
+        // If no dealers from pagination, try the regular method
+        if (dealers.length === 0) {
+            dealers = await BrochureGenerator.getDealersWithOffers();
+        }
+        
         const div = document.getElementById('flyerList');
         div.innerHTML = '';
         
