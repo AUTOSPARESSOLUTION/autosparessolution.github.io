@@ -58,6 +58,33 @@
         .btn-small { padding: 5px 10px; font-size: 11px; }
         .btn-excel { background: #217346; }
         .btn-status { background: #0f172a; border: 1px solid #334155; }
+        .btn-flyer { background: #8b5cf6; }
+        .btn-flyer:hover { background: #7c3aed; }
+        .btn-best { background: #dc2626; }
+        .btn-best:hover { background: #b91c1c; }
+        .action-bar {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid #334155;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+        .action-bar .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+        }
+        .action-bar .divider {
+            width: 1px;
+            height: 30px;
+            background: #334155;
+            margin: 0 5px;
+        }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -413,20 +440,36 @@
         <div class="stat-card"><div class="stat-number" id="dealerCount">0</div><div>Dealers with Offers</div></div>
     </div>
 
-    <!-- Action Buttons -->
-    <div class="flex">
-        <button class="btn btn-success" id="runAnalysisBtn" onclick="runAnalysis()">
-            <i class="fas fa-sync"></i> Run Analysis
-        </button>
-        <button class="btn" id="generateFlyersBtn" onclick="generateAllFlyers()">
-            <i class="fas fa-file-alt"></i> Generate Flyers
-        </button>
-        <button class="btn btn-purple" onclick="downloadAllFlyersPDF()">
-            <i class="fas fa-file-pdf"></i> Download All PDF
-        </button>
-        <button class="btn btn-excel" onclick="exportAllExcel()">
-            <i class="fas fa-file-excel"></i> Export All Excel
-        </button>
+    <!-- ============================================================ -->
+    <!-- ACTION BAR - Flyer button beside Analysis button              -->
+    <!-- ============================================================ -->
+    <div class="action-bar">
+        <div class="btn-group">
+            <button class="btn btn-success" id="runAnalysisBtn" onclick="runAnalysis()">
+                <i class="fas fa-sync"></i> Run Analysis
+            </button>
+            <button class="btn btn-flyer" onclick="generateBestFlyer()" title="Generate Flyer for Best Dealer">
+                <i class="fas fa-star"></i> Best Flyer
+            </button>
+            <button class="btn btn-secondary" onclick="generateAllFlyers()">
+                <i class="fas fa-file-alt"></i> Generate Flyers
+            </button>
+        </div>
+        <div class="divider"></div>
+        <div class="btn-group">
+            <button class="btn btn-purple" onclick="downloadAllFlyersPDF()">
+                <i class="fas fa-file-pdf"></i> Download All PDF
+            </button>
+            <button class="btn btn-excel" onclick="exportAllExcel()">
+                <i class="fas fa-file-excel"></i> Export All Excel
+            </button>
+        </div>
+        <div class="divider"></div>
+        <div class="btn-group">
+            <button class="btn btn-whatsapp btn-small" onclick="sendBulkWhatsAppFlyers()">
+                <i class="fab fa-whatsapp"></i> Bulk WhatsApp
+            </button>
+        </div>
     </div>
 
     <!-- DEALER OFFER COUNTER SECTION -->
@@ -1013,7 +1056,7 @@ async function uploadMultipleDistributorFiles() {
 }
 
 // ============================================================
-// RUN ANALYSIS - FIXED: Correct property names
+// RUN ANALYSIS
 // ============================================================
 async function runAnalysis() {
     const btn = document.getElementById('runAnalysisBtn');
@@ -1039,7 +1082,6 @@ async function runAnalysis() {
         
         const result = await DealerIntelligence.runFullAnalysis();
         
-        // FIXED: Use correct property name "offersGenerated" (not "offersGenerator")
         document.getElementById('totalOffers').innerText = result?.offersGenerated || 0;
         document.getElementById('highDiscount').innerText = result?.highDiscountOffers || 0;
         document.getElementById('lowStockCount').innerText = result?.lowStockAlerts || 0;
@@ -1051,7 +1093,6 @@ async function runAnalysis() {
             document.getElementById('dealerCount').innerText = dealers?.length || 0;
         }
         
-        // Load dealers
         setTimeout(() => {
             if (typeof loadAllDealersFromPagination === 'function') {
                 loadAllDealersFromPagination();
@@ -1069,6 +1110,66 @@ async function runAnalysis() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-sync"></i> Run Analysis';
+    }
+}
+
+// ============================================================
+// GENERATE BEST FLYER - NEW FUNCTION
+// ============================================================
+function generateBestFlyer() {
+    try {
+        if (typeof BrochureGeneratorPagination === 'undefined') {
+            showToast('Pagination not loaded. Please load dealers first.', 'warning');
+            return;
+        }
+        
+        // Get all dealers and find the best one
+        const allDealers = BrochureGeneratorPagination.getAllDealers();
+        
+        if (!allDealers || allDealers.length === 0) {
+            showToast('No dealers found. Run analysis first.', 'warning');
+            return;
+        }
+        
+        // Find the dealer with the best offer (highest discount or highest stock)
+        let bestDealer = null;
+        let bestScore = 0;
+        
+        allDealers.forEach(dealer => {
+            const offers = dealer.offers || [];
+            let score = 0;
+            
+            offers.forEach(o => {
+                // Score based on discount and stock
+                const discountScore = (o.discount || 0) * 2;
+                const stockScore = (o.myStock || 0) + (o.distributorStock || 0);
+                const totalScore = discountScore + stockScore;
+                if (totalScore > score) score = totalScore;
+            });
+            
+            // Also consider number of offers
+            score += offers.length * 5;
+            
+            if (score > bestScore) {
+                bestScore = score;
+                bestDealer = dealer;
+            }
+        });
+        
+        if (!bestDealer) {
+            showToast('No suitable dealer found.', 'warning');
+            return;
+        }
+        
+        showToast(`🎯 Best Dealer: ${bestDealer.name} (Score: ${bestScore})`, 'success');
+        console.log(`Best Dealer: ${bestDealer.name}, Score: ${bestScore}, Offers: ${bestDealer.offers.length}`);
+        
+        // Preview the best dealer's flyer
+        previewFlyer(bestDealer.name);
+        
+    } catch(err) {
+        console.error('Error generating best flyer:', err);
+        showToast('Error: ' + err.message, 'error');
     }
 }
 
@@ -2008,6 +2109,41 @@ function flyerCounterDownloadPDF() {
 }
 
 // ============================================================
+// BULK WHATSAPP FLYERS
+// ============================================================
+async function sendBulkWhatsAppFlyers() {
+    try {
+        if (typeof BrochureGenerator === 'undefined') { 
+            showToast('BrochureGenerator not loaded', 'error');
+            return; 
+        }
+        
+        const dealers = await BrochureGenerator.getDealersWithOffers();
+        
+        if (!dealers || dealers.length === 0) {
+            showToast('No dealers found. Run analysis first.', 'warning');
+            return;
+        }
+        
+        let count = 0;
+        for (const d of dealers) {
+            if (d.phone) {
+                await BrochureGenerator.sendFlyerToWhatsApp(d.name);
+                count++;
+                // Wait between messages
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+        
+        showToast(`✅ Sent flyers to ${count} dealers via WhatsApp`, 'success');
+        
+    } catch(err) {
+        console.error('Bulk WhatsApp error:', err);
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
 // Keyboard Navigation
 // ============================================================
 document.addEventListener('keydown', function(e) {
@@ -2115,4 +2251,4 @@ window.addEventListener('load', function() {
 });
 </script>
 </body>
-                        </html>
+                    </html>
