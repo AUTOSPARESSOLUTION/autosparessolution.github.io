@@ -3,6 +3,7 @@
 // FIXED: All part numbers UPPERCASE
 // FIXED: Application column uses M column (Model) correctly
 // FIXED: Discount determination system improved
+// FIXED: File name "RETAILER data Deatils.xlsx"
 
 (function () {
 
@@ -273,7 +274,7 @@
     }
 
     // ===================================================
-    // LOAD RETAILER MASTER - FIXED: All names UPPERCASE
+    // LOAD RETAILER MASTER - FIXED: Correct file name
     // ===================================================
 
     async function loadRetailerMaster() {
@@ -301,6 +302,7 @@
         }
         
         try {
+            // FIXED: Correct file name - "Deatils" not "details"
             const rows = await loadExcelFile('data/RETAILER data Deatils.xlsx', 'SAPUI5 Export');
             console.log(`📋 Excel Master: ${rows.length} entries`);
             
@@ -490,7 +492,7 @@
     }
 
     // ===================================================
-    // LOAD MY STOCK - FIXED: Application from M column (Model)
+    // LOAD MY STOCK
     // ===================================================
 
     async function loadMyStock() {
@@ -550,10 +552,7 @@
             const headers = Object.keys(parsedData[0] || {});
             console.log('📋 Available columns in prices.csv:', headers);
 
-            // ================================================
-            // COLUMN DETECTION - FIXED: M column for Model
-            // ================================================
-            
+            // Column detection
             let partCol = headers.find(h => 
                 h.toLowerCase() === 'material' || 
                 h.toLowerCase().includes('material') || 
@@ -566,16 +565,12 @@
                 h.toLowerCase().includes('desc')
             );
             
-            // ================================================
-            // FIX: Application should be from M column (Model)
-            // Column M = "Model" in prices.csv
-            // ================================================
+            // FIX: Application from Model column (M column)
             let appCol = headers.find(h => 
-                h.toLowerCase() === 'model' ||  // M column
+                h.toLowerCase() === 'model' ||
                 h.toLowerCase().includes('model')
             );
             
-            // If "Model" not found, fallback to other columns
             if (!appCol) {
                 appCol = headers.find(h => 
                     h.toLowerCase().includes('application') ||
@@ -610,11 +605,6 @@
                 return;
             }
 
-            if (!appCol) {
-                console.warn('⚠️ "Model" column not found in prices.csv! Check column M.');
-                showToast('Model column not found in prices.csv. Check column M.', 'warning');
-            }
-
             let loadedCount = 0;
             let descCount = 0;
             let appCount = 0;
@@ -628,7 +618,6 @@
                 const stock = safeNumber(row[stockCol]);
                 const distMrp = safeNumber(row[mrpCol]);
                 const description = descCol ? String(row[descCol] || '').trim() : '';
-                // FIX: Application from Model column (M column)
                 const application = appCol ? String(row[appCol] || '').trim() : '';
 
                 currentStock.set(part, {
@@ -796,7 +785,7 @@
     }
 
     // ===================================================
-    // DISCOUNT DETERMINATION SYSTEM - FIXED
+    // DISCOUNT DETERMINATION SYSTEM
     // ===================================================
 
     function calculateDiscount(avgQty, myStock, district, dealer, part) {
@@ -847,7 +836,7 @@
     }
 
     // ===================================================
-    // CALCULATE OFFER - FIXED: Uses improved discount system
+    // CALCULATE OFFER
     // ===================================================
 
     function calculateOffer(
@@ -885,7 +874,6 @@
             
             distributorStockQty = 0;
             
-            // FIX: Use improved discount calculation
             discount = calculateDiscount(avgQty, myStock, district, dealer, part);
             
             const pricing = calculateNetPrice(mrp, discount);
