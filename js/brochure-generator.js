@@ -4,6 +4,7 @@
 // FIXED: Net Price shows MRP when Our Stock=0 but Distributor Stock available
 // FIXED: Dealer matching improved to avoid wrong dealer
 // FIXED: Application column uses Model from prices.csv
+// FIXED: File name "RETAILER data Deatils.xlsx"
 // ADDED: Pagination/Navigation for ALL dealers
 
 (function () {
@@ -172,7 +173,7 @@ async function loadExcelFile(url, sheetName = null) {
 }
 
 // ===================================================
-// LOAD DEALER MASTER - FIXED: All names UPPERCASE
+// LOAD DEALER MASTER
 // ===================================================
 async function loadDealerMaster() {
     console.log("🔄 Loading Dealer Master...");
@@ -204,6 +205,7 @@ async function loadDealerMaster() {
     }
     
     try {
+        // FIXED: Correct file name
         const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
         console.log(`📋 Excel Master: ${rows.length} entries`);
         
@@ -366,7 +368,7 @@ async function loadDistributorStock() {
 }
 
 // ===================================================
-// LOAD MY STOCK (FROM prices.csv) - FIXED: Application from Model column
+// LOAD MY STOCK (FROM prices.csv)
 // ===================================================
 async function loadMyStock() {
     console.log("🔄 Loading stock from prices.csv...");
@@ -415,7 +417,7 @@ async function loadMyStock() {
         // Column detection
         const partCol = headers.find(h => h.toLowerCase() === 'material' || h.toLowerCase().includes('material') || h.toLowerCase().includes('part'));
         const descCol = headers.find(h => h.toLowerCase() === 'material2' || h.toLowerCase().includes('description') || h.toLowerCase().includes('desc'));
-        // FIX: Application should be from Model column (M column)
+        // FIX: Application from Model column
         const appCol = headers.find(h => h.toLowerCase() === 'model' || h.toLowerCase().includes('model'));
         const mrpCol = headers.find(h => h.toLowerCase() === 'mrp price' || h.toLowerCase().includes('mrp price') || h.toLowerCase().includes('mrp'));
         const stockCol = headers.find(h => h.toLowerCase().includes('stock') || h.toLowerCase().includes('qty'));
@@ -434,7 +436,7 @@ async function loadMyStock() {
 
             currentStock.set(part, {
                 stock,
-                mrp,  // Dist MRP from Column D
+                mrp,
                 description,
                 application
             });
@@ -518,7 +520,7 @@ function loadOffers() {
 }
 
 // ===================================================
-// GET DEALERS WITH OFFERS (FIXED: Uppercase + Alphabetical)
+// GET DEALERS WITH OFFERS
 // ===================================================
 async function getDealersWithOffers() {
     console.log("🔍 Getting dealers with offers...");
@@ -566,7 +568,7 @@ async function getDealersWithOffers() {
 }
 
 // ===================================================
-// FIND DEALER - FIXED: Improved matching to avoid wrong dealer
+// FIND DEALER - FIXED: Improved matching
 // ===================================================
 function findDealer(name) {
     if (!name) return null;
@@ -582,7 +584,7 @@ function findDealer(name) {
         };
     }
     
-    // Priority 2: Contains match with high confidence (0.7+)
+    // Priority 2: Contains match with high confidence
     let bestMatch = null;
     let bestScore = 0;
     
@@ -604,7 +606,7 @@ function findDealer(name) {
         return bestMatch;
     }
     
-    // Priority 3: Word match with high confidence
+    // Priority 3: Word match
     const words = normalized.split(' ').filter(w => w.length > 2);
     let wordMatch = null;
     let wordScore = 0;
@@ -629,7 +631,7 @@ function findDealer(name) {
         return wordMatch;
     }
     
-    // Priority 4: Phone number match (if provided)
+    // Priority 4: Phone number match
     if (name && name.length >= 10 && !isNaN(name)) {
         for (const [key, dealer] of dealerMasterMap) {
             if (dealer.phone && dealer.phone === name) {
@@ -647,7 +649,7 @@ function findDealer(name) {
 }
 
 // ===================================================
-// GET ALL DEALER OFFERS (FIXED: Uppercase)
+// GET ALL DEALER OFFERS
 // ===================================================
 function getAllDealerOffers(name) {
     if (!name) {
@@ -716,7 +718,7 @@ function getDistributorInfo(part) {
 }
 
 // ===================================================
-// PRICE CALCULATIONS - FIXED: Net Price uses MRP when Our Stock=0
+// PRICE CALCULATIONS
 // ===================================================
 function calculateOurPrice(mrp, discount) {
     const basic = mrp - (mrp * 31.77 / 100);
@@ -725,14 +727,14 @@ function calculateOurPrice(mrp, discount) {
 }
 
 function calculateDistributorPrice(mrp) {
-    return mrp; // MRP only, no discount
+    return mrp;
 }
 
 function getStockInfo(offer) {
     const myStock = offer.myStock || offer.stock || 0;
     const distInfo = getDistributorInfo(offer.part);
     const distributorStockQty = distInfo?.stock || offer.distributorStock || 0;
-    const distMRP = offer.mrp || 0; // Use the offer's MRP (which is Dist MRP)
+    const distMRP = offer.mrp || 0;
     
     return {
         ourStock: myStock,
@@ -746,16 +748,13 @@ function calculatePrices(offer) {
     const discount = Number(offer.discount || 0);
     const stock = getStockInfo(offer);
     
-    // Use MRP from offer (which is Dist MRP from Column D)
     const mrp = offer.mrp || offer.originalPrice || 0;
     
     // FIX: If Our Stock is 0 but Distributor Stock is available, use MRP as Net Price
     let ourOfferPrice;
     if (stock.ourStock === 0 && stock.hasDistStock) {
-        // Only Distributor Stock available - use MRP (no discount)
         ourOfferPrice = mrp;
     } else {
-        // Our Stock available - calculate with discount
         ourOfferPrice = calculateOurPrice(mrp, discount);
     }
     
@@ -773,7 +772,7 @@ function calculatePrices(offer) {
 }
 
 // ===================================================
-// GENERATE WHATSAPP MESSAGE - FIXED: Shows correct prices
+// GENERATE WHATSAPP MESSAGE
 // ===================================================
 function generateWhatsAppMessage(dealerName, dealer, offers) {
     let msg = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
@@ -796,7 +795,6 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
         if (desc) item += `   📝 ${desc.substring(0, 30)}\n`;
         if (app) item += `   🔧 ${app.substring(0, 30)}\n`;
         
-        // Show MRP (Dist MRP)
         item += `   💰 MRP: ₹${mrp.toFixed(2)}\n`;
         
         if (stock.ourStock > 0) {
@@ -804,7 +802,6 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
             if (prices.discount > 0) item += ` (${prices.discount}% OFF)`;
             item += `\n`;
         } else if (stock.hasDistStock) {
-            // FIX: Show Distributor Stock with MRP when no Our Stock
             hasDistributorStock = true;
             item += `   🏭 Dist Stock: ${stock.distStock} @ ₹${prices.distOfferPrice.toFixed(2)} (MRP)\n`;
             item += `   ⚠️ Only Distributor Stock available\n`;
@@ -840,7 +837,7 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
 }
 
 // ===================================================
-// SEND WHATSAPP - FIXED: Uses whatsapp:// protocol for personal WhatsApp
+// SEND WHATSAPP - FIXED: Uses whatsapp:// protocol
 // ===================================================
 async function sendFlyerToWhatsApp(name) {
     console.log(`🔍 Looking for offers for: "${name}"`);
@@ -896,7 +893,7 @@ async function sendFlyerToWhatsApp(name) {
 }
 
 // ===================================================
-// GENERATE BROCHURE HTML - FIXED: Uppercase dealer name
+// GENERATE BROCHURE HTML
 // ===================================================
 function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 12) {
     const dealerName = name.toUpperCase();
@@ -978,7 +975,6 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
         const expiryDate = o.expiresAt ? formatDate(o.expiresAt) : '-';
         const mrp = prices.mrp || 0;
         
-        // FIX: Show '-' for Net Price if only Distributor Stock
         const showNetPrice = stock.ourStock > 0 ? prices.ourOfferPrice.toFixed(0) : '-';
         const netPriceColor = stock.ourStock === 0 && stock.hasDistStock ? '#facc15' : '#dc2626';
         
@@ -1156,7 +1152,7 @@ function renderPreviewPage() {
 }
 
 // ===================================================
-// DOWNLOAD PDF - FIXED: Shows correct Net Price
+// DOWNLOAD PDF
 // ===================================================
 async function downloadPDF(name) {
     try {
@@ -1190,7 +1186,6 @@ async function downloadPDF(name) {
                 const application = (o.application || '').substring(0, 50);
                 const mrp = prices.mrp || 0;
                 
-                // FIX: Show '-' for Net Price if only Distributor Stock
                 const netPrice = stock.ourStock > 0 ? prices.ourOfferPrice.toFixed(0) : '-';
                 
                 return [
@@ -1318,7 +1313,7 @@ async function downloadAllFlyersPDF() {
 }
 
 // ===================================================
-// EXPORT EXCEL - FIXED: Shows correct columns
+// EXPORT EXCEL
 // ===================================================
 function exportDealerOffersToExcel(name) {
     if (typeof XLSX === 'undefined') {
@@ -1398,7 +1393,7 @@ async function sharePDFToWhatsApp(name) {
             return;
         }
         
-        // FIX: Use whatsapp:// protocol for personal WhatsApp
+        // FIX: Use whatsapp:// protocol
         const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
         window.location.href = url;
         showToast(`✅ WhatsApp opened for ${dealerName}`, "success");
@@ -1575,14 +1570,9 @@ window.addEventListener('load', async function() {
 console.log("✅ Brochure Generator loaded");
 
 // ===================================================
-// ===================================================
-// PAGINATION & NAVIGATION ADD-ONS (APPENDED)
-// ===================================================
+// PAGINATION & NAVIGATION ADD-ONS
 // ===================================================
 
-// ===================================================
-// DATA FOR PAGINATION
-// ===================================================
 let paginationDealerList = [];
 let paginationCurrentIndex = 0;
 let paginationSortMode = 'priority';
@@ -1590,9 +1580,6 @@ let paginationCurrentPage = 1;
 let paginationPerPage = 20;
 let paginationAllDealers = [];
 
-// ===================================================
-// GET ALL DEALERS FROM FULL ANALYSIS
-// ===================================================
 function getDealersFromFullAnalysis() {
     try {
         if (typeof DealerIntelligence === 'undefined' || typeof DealerIntelligence.getActiveOffers === 'undefined') {
@@ -1617,9 +1604,6 @@ function getDealersFromFullAnalysis() {
     }
 }
 
-// ===================================================
-// BUILD DEALER LIST FROM OFFERS
-// ===================================================
 function buildDealerListFromOffers(offers) {
     const dealerMap = new Map();
     
@@ -1658,9 +1642,6 @@ function buildDealerListFromOffers(offers) {
     return result;
 }
 
-// ===================================================
-// LOAD ALL DEALERS WITH PAGINATION
-// ===================================================
 function loadAllDealersWithPagination() {
     console.log('📊 Loading all dealers with pagination...');
     
@@ -1684,9 +1665,6 @@ function loadAllDealersWithPagination() {
     return paginationAllDealers;
 }
 
-// ===================================================
-// SORT DEALER LIST
-// ===================================================
 function sortDealerList(list, mode) {
     const sorted = [...list];
     
@@ -1706,9 +1684,6 @@ function sortDealerList(list, mode) {
     return sorted;
 }
 
-// ===================================================
-// UPDATE PAGINATION PAGE
-// ===================================================
 function updatePaginationPage() {
     const perPage = paginationPerPage;
     const totalDealers = paginationAllDealers.length;
@@ -1737,9 +1712,6 @@ function updatePaginationPage() {
     };
 }
 
-// ===================================================
-// PAGINATION NAVIGATION FUNCTIONS
-// ===================================================
 function paginationNext() {
     if (paginationDealerList.length === 0) {
         showToast('No dealers loaded. Run analysis first.', 'warning');
@@ -1880,9 +1852,6 @@ function generateFlyerForCurrentDealer() {
     return dealer;
 }
 
-// ===================================================
-// EXPORT PAGINATION FUNCTIONS TO WINDOW
-// ===================================================
 window.BrochureGeneratorPagination = {
     loadAllDealers: loadAllDealersWithPagination,
     getCurrentDealer: getCurrentDealer,
@@ -1904,7 +1873,5 @@ window.BrochureGeneratorPagination = {
 };
 
 console.log('✅ Brochure Generator Pagination Add-ons loaded');
-console.log('📊 Use BrochureGeneratorPagination.loadAllDealers() to load all dealers');
-console.log('📊 Use BrochureGeneratorPagination.next() and prev() to navigate');
 
 })();
