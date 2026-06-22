@@ -301,7 +301,7 @@
         }
         
         try {
-            const rows = await loadExcelFile('data/RETAILER data details.xlsx', 'SAPUI5 Export');
+            const rows = await loadExcelFile('data/RETAILER data Deatils.xlsx', 'SAPUI5 Export');
             console.log(`📋 Excel Master: ${rows.length} entries`);
             
             for (const row of rows) {
