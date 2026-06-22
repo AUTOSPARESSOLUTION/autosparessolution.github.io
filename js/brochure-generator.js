@@ -1,5 +1,9 @@
 // brochure-generator.js - COMPLETE FIXED VERSION
 // FIXED: Part matching with leading zeros, Dist MRP, Uppercase dealer names, Alphabetical order
+// FIXED: WhatsApp opens with personal WhatsApp using whatsapp:// protocol
+// FIXED: Net Price shows MRP when Our Stock=0 but Distributor Stock available
+// FIXED: Dealer matching improved to avoid wrong dealer
+// FIXED: Application column uses Model from prices.csv
 // ADDED: Pagination/Navigation for ALL dealers
 
 (function () {
@@ -168,7 +172,7 @@ async function loadExcelFile(url, sheetName = null) {
 }
 
 // ===================================================
-// LOAD DEALER MASTER
+// LOAD DEALER MASTER - FIXED: All names UPPERCASE
 // ===================================================
 async function loadDealerMaster() {
     console.log("🔄 Loading Dealer Master...");
@@ -362,7 +366,7 @@ async function loadDistributorStock() {
 }
 
 // ===================================================
-// LOAD MY STOCK (FROM prices.csv)
+// LOAD MY STOCK (FROM prices.csv) - FIXED: Application from Model column
 // ===================================================
 async function loadMyStock() {
     console.log("🔄 Loading stock from prices.csv...");
@@ -411,7 +415,8 @@ async function loadMyStock() {
         // Column detection
         const partCol = headers.find(h => h.toLowerCase() === 'material' || h.toLowerCase().includes('material') || h.toLowerCase().includes('part'));
         const descCol = headers.find(h => h.toLowerCase() === 'material2' || h.toLowerCase().includes('description') || h.toLowerCase().includes('desc'));
-        const appCol = headers.find(h => h.toLowerCase().includes('model') || h.toLowerCase().includes('application') || h.toLowerCase().includes('make'));
+        // FIX: Application should be from Model column (M column)
+        const appCol = headers.find(h => h.toLowerCase() === 'model' || h.toLowerCase().includes('model'));
         const mrpCol = headers.find(h => h.toLowerCase() === 'mrp price' || h.toLowerCase().includes('mrp price') || h.toLowerCase().includes('mrp'));
         const stockCol = headers.find(h => h.toLowerCase().includes('stock') || h.toLowerCase().includes('qty'));
 
@@ -561,13 +566,14 @@ async function getDealersWithOffers() {
 }
 
 // ===================================================
-// FIND DEALER (FIXED: Uppercase)
+// FIND DEALER - FIXED: Improved matching to avoid wrong dealer
 // ===================================================
 function findDealer(name) {
     if (!name) return null;
     
     const normalized = normalizeDealerName(name);
     
+    // Priority 1: Exact match
     if (dealerMasterMap.has(normalized)) {
         const dealer = dealerMasterMap.get(normalized);
         return {
@@ -576,13 +582,14 @@ function findDealer(name) {
         };
     }
     
+    // Priority 2: Contains match with high confidence (0.7+)
     let bestMatch = null;
     let bestScore = 0;
     
     for (const [key, dealer] of dealerMasterMap) {
         if (key.includes(normalized) || normalized.includes(key)) {
             const score = Math.min(key.length, normalized.length) / Math.max(key.length, normalized.length);
-            if (score > bestScore && score > 0.6) {
+            if (score > bestScore && score > 0.7) {
                 bestScore = score;
                 bestMatch = {
                     ...dealer,
@@ -597,6 +604,7 @@ function findDealer(name) {
         return bestMatch;
     }
     
+    // Priority 3: Word match with high confidence
     const words = normalized.split(' ').filter(w => w.length > 2);
     let wordMatch = null;
     let wordScore = 0;
@@ -607,7 +615,7 @@ function findDealer(name) {
             if (key.includes(word)) matches++;
         }
         const score = words.length > 0 ? matches / words.length : 0;
-        if (score > wordScore && score > 0.5) {
+        if (score > wordScore && score > 0.6) {
             wordScore = score;
             wordMatch = {
                 ...dealer,
@@ -616,7 +624,26 @@ function findDealer(name) {
         }
     }
     
-    return wordMatch || null;
+    if (wordMatch) {
+        console.log(`✅ Found dealer by word match (${Math.round(wordScore * 100)}%): "${name}"`);
+        return wordMatch;
+    }
+    
+    // Priority 4: Phone number match (if provided)
+    if (name && name.length >= 10 && !isNaN(name)) {
+        for (const [key, dealer] of dealerMasterMap) {
+            if (dealer.phone && dealer.phone === name) {
+                console.log(`✅ Found dealer by phone number: "${dealer.name}"`);
+                return {
+                    ...dealer,
+                    name: dealer.name.toUpperCase()
+                };
+            }
+        }
+    }
+    
+    console.log(`⚠️ No exact dealer match found for "${name}"`);
+    return null;
 }
 
 // ===================================================
@@ -689,7 +716,7 @@ function getDistributorInfo(part) {
 }
 
 // ===================================================
-// PRICE CALCULATIONS - FIXED: Uses Dist MRP
+// PRICE CALCULATIONS - FIXED: Net Price uses MRP when Our Stock=0
 // ===================================================
 function calculateOurPrice(mrp, discount) {
     const basic = mrp - (mrp * 31.77 / 100);
@@ -721,7 +748,16 @@ function calculatePrices(offer) {
     
     // Use MRP from offer (which is Dist MRP from Column D)
     const mrp = offer.mrp || offer.originalPrice || 0;
-    const ourOfferPrice = calculateOurPrice(mrp, discount);
+    
+    // FIX: If Our Stock is 0 but Distributor Stock is available, use MRP as Net Price
+    let ourOfferPrice;
+    if (stock.ourStock === 0 && stock.hasDistStock) {
+        // Only Distributor Stock available - use MRP (no discount)
+        ourOfferPrice = mrp;
+    } else {
+        // Our Stock available - calculate with discount
+        ourOfferPrice = calculateOurPrice(mrp, discount);
+    }
     
     const distMRP = stock.distMRP || mrp || 0;
     const distOfferPrice = calculateDistributorPrice(distMRP);
@@ -737,7 +773,7 @@ function calculatePrices(offer) {
 }
 
 // ===================================================
-// GENERATE WHATSAPP MESSAGE
+// GENERATE WHATSAPP MESSAGE - FIXED: Shows correct prices
 // ===================================================
 function generateWhatsAppMessage(dealerName, dealer, offers) {
     let msg = `*⚡ AUTO SPARES SOLUTION ⚡*\n\n`;
@@ -767,11 +803,16 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
             item += `   📦 Our Stock: ${stock.ourStock} @ ₹${prices.ourOfferPrice.toFixed(2)}`;
             if (prices.discount > 0) item += ` (${prices.discount}% OFF)`;
             item += `\n`;
-        }
-        
-        if (stock.hasDistStock) {
+        } else if (stock.hasDistStock) {
+            // FIX: Show Distributor Stock with MRP when no Our Stock
             hasDistributorStock = true;
             item += `   🏭 Dist Stock: ${stock.distStock} @ ₹${prices.distOfferPrice.toFixed(2)} (MRP)\n`;
+            item += `   ⚠️ Only Distributor Stock available\n`;
+        }
+        
+        if (stock.hasDistStock && stock.ourStock > 0) {
+            hasDistributorStock = true;
+            item += `   🏭 Also Dist Stock: ${stock.distStock} @ ₹${prices.distOfferPrice.toFixed(2)} (MRP)\n`;
         }
         item += `\n`;
         
@@ -799,7 +840,7 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
 }
 
 // ===================================================
-// SEND WHATSAPP
+// SEND WHATSAPP - FIXED: Uses whatsapp:// protocol for personal WhatsApp
 // ===================================================
 async function sendFlyerToWhatsApp(name) {
     console.log(`🔍 Looking for offers for: "${name}"`);
@@ -846,8 +887,9 @@ async function sendFlyerToWhatsApp(name) {
         return;
     }
     
-    const url = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+    // FIX: Use whatsapp:// protocol for personal WhatsApp
+    const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
+    window.location.href = url;
     
     showToast(`✅ WhatsApp opened for "${dealerName}"`, "success");
     console.log(`✅ WhatsApp opened for "${dealerName}" (${cleanPhoneNum}) | Offers: ${offers.length}`);
@@ -914,7 +956,7 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
     <tr style="background:#facc15;">
         <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;">Part No</th>
         <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;">Description</th>
-        <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;">Application</th>
+        <th style="padding:2px 2px;border:1px solid #ccc;text-align:left;font-size:7px;">Application<br><span style="font-size:5px;">(Model)</span></th>
         <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">MRP<br><span style="font-size:5px;">(Dist MRP)</span></th>
         <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Basic Price<br><span style="font-size:5px;">(Less 31.77%)</span></th>
         <th style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">Spl Dis %</th>
@@ -936,6 +978,10 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
         const expiryDate = o.expiresAt ? formatDate(o.expiresAt) : '-';
         const mrp = prices.mrp || 0;
         
+        // FIX: Show '-' for Net Price if only Distributor Stock
+        const showNetPrice = stock.ourStock > 0 ? prices.ourOfferPrice.toFixed(0) : '-';
+        const netPriceColor = stock.ourStock === 0 && stock.hasDistStock ? '#facc15' : '#dc2626';
+        
         html += `<tr>
             <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:7px;"><strong>${escapeHtml(o.part || '')}</strong></td>
             <td style="padding:2px 2px;border:1px solid #ccc;word-wrap:break-word;font-size:7px;color:#333;">${escapeHtml(description || '-')}</td>
@@ -943,7 +989,7 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;font-weight:bold;color:#2563eb;">${mrp.toFixed(0)}</td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">${(o.basicPrice || mrp).toFixed(0)}</td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#16a34a;">${prices.discount}%</td>
-            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#dc2626;font-weight:bold;">${stock.ourStock > 0 ? prices.ourOfferPrice.toFixed(0) : '-'}</td>
+            <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:${netPriceColor};font-weight:bold;">${showNetPrice}</td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;">${stock.ourStock || 0}</td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;${stock.hasDistStock ? 'color:#facc15;' : 'color:#999;'}">${stock.hasDistStock ? prices.distMRP.toFixed(0) : '-'}</td>
             <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7px;color:#9333ea;font-weight:bold;">${stock.hasDistStock ? prices.distOfferPrice.toFixed(0) : '-'}</td>
@@ -1110,7 +1156,7 @@ function renderPreviewPage() {
 }
 
 // ===================================================
-// DOWNLOAD PDF
+// DOWNLOAD PDF - FIXED: Shows correct Net Price
 // ===================================================
 async function downloadPDF(name) {
     try {
@@ -1144,6 +1190,9 @@ async function downloadPDF(name) {
                 const application = (o.application || '').substring(0, 50);
                 const mrp = prices.mrp || 0;
                 
+                // FIX: Show '-' for Net Price if only Distributor Stock
+                const netPrice = stock.ourStock > 0 ? prices.ourOfferPrice.toFixed(0) : '-';
+                
                 return [
                     o.part || '',
                     description || '-',
@@ -1151,7 +1200,7 @@ async function downloadPDF(name) {
                     mrp.toFixed(0),
                     (o.basicPrice || mrp).toFixed(0),
                     prices.discount + '%',
-                    prices.ourOfferPrice.toFixed(0),
+                    netPrice,
                     stock.ourStock || 0,
                     stock.hasDistStock ? prices.distMRP.toFixed(0) : '-',
                     stock.hasDistStock ? prices.distOfferPrice.toFixed(0) : '-',
@@ -1269,7 +1318,7 @@ async function downloadAllFlyersPDF() {
 }
 
 // ===================================================
-// EXPORT EXCEL
+// EXPORT EXCEL - FIXED: Shows correct columns
 // ===================================================
 function exportDealerOffersToExcel(name) {
     if (typeof XLSX === 'undefined') {
@@ -1287,14 +1336,15 @@ function exportDealerOffersToExcel(name) {
     const data = offers.map(o => {
         const prices = calculatePrices(o);
         const mrp = prices.mrp || 0;
+        const netPrice = prices.stock.ourStock > 0 ? prices.ourOfferPrice.toFixed(2) : '-';
         return {
             "Part No": o.part,
             "Description": o.description || '',
-            "Application": o.application || '',
+            "Application (Model)": o.application || '',
             "MRP (Dist MRP)": mrp.toFixed(2),
             "Basic Price (Less 31.77%)": (o.basicPrice || mrp).toFixed(2),
             "Spl Dis %": prices.discount,
-            "Net Price Including GST": prices.ourOfferPrice.toFixed(2),
+            "Net Price Including GST": netPrice,
             "Available Qty": prices.stock.ourStock + prices.stock.distStock,
             "Our Stock": prices.stock.ourStock,
             "Dist. Stock": prices.stock.distStock,
@@ -1348,8 +1398,9 @@ async function sharePDFToWhatsApp(name) {
             return;
         }
         
-        const url = `https://wa.me/${cleanPhoneNum}?text=${encodeURIComponent(msg)}`;
-        window.open(url, '_blank');
+        // FIX: Use whatsapp:// protocol for personal WhatsApp
+        const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
+        window.location.href = url;
         showToast(`✅ WhatsApp opened for ${dealerName}`, "success");
         
     } catch (err) {
@@ -1544,15 +1595,12 @@ let paginationAllDealers = [];
 // ===================================================
 function getDealersFromFullAnalysis() {
     try {
-        // Check if DealerIntelligence is available
         if (typeof DealerIntelligence === 'undefined' || typeof DealerIntelligence.getActiveOffers === 'undefined') {
             console.warn('⚠️ DealerIntelligence not available, using localStorage data');
-            // Fallback: Use current offers
             const offers = currentOffers || [];
             return buildDealerListFromOffers(offers);
         }
         
-        // Get ALL offers from full analysis
         const allOffers = DealerIntelligence.getActiveOffers();
         if (!allOffers || allOffers.length === 0) {
             console.warn('⚠️ No offers found in analysis, using localStorage');
@@ -1564,7 +1612,6 @@ function getDealersFromFullAnalysis() {
         
     } catch(err) {
         console.error('Error getting dealers from full analysis:', err);
-        // Fallback: Use current offers
         const offers = currentOffers || [];
         return buildDealerListFromOffers(offers);
     }
@@ -1594,10 +1641,8 @@ function buildDealerListFromOffers(offers) {
         else dealer.distStockCount++;
     });
     
-    // Convert to array
     const result = Array.from(dealerMap.values());
     
-    // Try to get phone and district from dealer master
     try {
         result.forEach(d => {
             const dealer = findDealer(d.name);
@@ -1619,7 +1664,6 @@ function buildDealerListFromOffers(offers) {
 function loadAllDealersWithPagination() {
     console.log('📊 Loading all dealers with pagination...');
     
-    // Get all dealers from full analysis
     paginationAllDealers = getDealersFromFullAnalysis();
     
     if (paginationAllDealers.length === 0) {
@@ -1627,14 +1671,11 @@ function loadAllDealersWithPagination() {
         return [];
     }
     
-    // Apply sorting
     paginationAllDealers = sortDealerList(paginationAllDealers, paginationSortMode);
     
-    // Reset pagination
     paginationCurrentPage = 1;
     paginationCurrentIndex = 0;
     
-    // Update current page dealers
     updatePaginationPage();
     
     console.log(`✅ Loaded ${paginationAllDealers.length} dealers with pagination`);
@@ -1651,18 +1692,13 @@ function sortDealerList(list, mode) {
     
     if (mode === 'alphabetical') {
         sorted.sort((a, b) => a.name.localeCompare(b.name));
-    } else { // priority
+    } else {
         sorted.sort((a, b) => {
-            // Priority 1: Dealers with My Stock offers first
             const aHasStock = (a.myStockCount || 0) > 0;
             const bHasStock = (b.myStockCount || 0) > 0;
             if (aHasStock && !bHasStock) return -1;
             if (!aHasStock && bHasStock) return 1;
-            
-            // Priority 2: More offers first
             if (a.offerCount !== b.offerCount) return b.offerCount - a.offerCount;
-            
-            // Priority 3: Alphabetical
             return a.name.localeCompare(b.name);
         });
     }
@@ -1714,7 +1750,6 @@ function paginationNext() {
         paginationCurrentIndex++;
         return getCurrentDealer();
     } else {
-        // Go to next page
         const totalPages = Math.ceil(paginationAllDealers.length / paginationPerPage);
         if (paginationCurrentPage < totalPages) {
             paginationCurrentPage++;
@@ -1738,7 +1773,6 @@ function paginationPrev() {
         paginationCurrentIndex--;
         return getCurrentDealer();
     } else {
-        // Go to previous page
         if (paginationCurrentPage > 1) {
             paginationCurrentPage--;
             updatePaginationPage();
@@ -1793,9 +1827,6 @@ function paginationSetPerPage(perPage) {
     return getCurrentDealer();
 }
 
-// ===================================================
-// GET CURRENT DEALER
-// ===================================================
 function getCurrentDealer() {
     if (paginationDealerList.length === 0 || paginationCurrentIndex >= paginationDealerList.length) {
         return null;
@@ -1803,9 +1834,6 @@ function getCurrentDealer() {
     return paginationDealerList[paginationCurrentIndex];
 }
 
-// ===================================================
-// GET DEALER BY INDEX (Global)
-// ===================================================
 function getDealerByIndex(index) {
     if (paginationAllDealers.length === 0 || index >= paginationAllDealers.length) {
         return null;
@@ -1813,16 +1841,10 @@ function getDealerByIndex(index) {
     return paginationAllDealers[index];
 }
 
-// ===================================================
-// GET DEALER COUNT
-// ===================================================
 function getTotalDealerCount() {
     return paginationAllDealers.length;
 }
 
-// ===================================================
-// GET PAGINATION INFO
-// ===================================================
 function getPaginationInfo() {
     const totalPages = Math.ceil(paginationAllDealers.length / paginationPerPage);
     return {
@@ -1836,9 +1858,6 @@ function getPaginationInfo() {
     };
 }
 
-// ===================================================
-// SET SORT MODE
-// ===================================================
 function paginationSetSort(mode) {
     paginationSortMode = mode;
     paginationAllDealers = sortDealerList(paginationAllDealers, mode);
@@ -1848,16 +1867,10 @@ function paginationSetSort(mode) {
     return getCurrentDealer();
 }
 
-// ===================================================
-// REFRESH DEALER LIST
-// ===================================================
 function paginationRefresh() {
     return loadAllDealersWithPagination();
 }
 
-// ===================================================
-// GENERATE FLYER FOR CURRENT DEALER
-// ===================================================
 function generateFlyerForCurrentDealer() {
     const dealer = getCurrentDealer();
     if (!dealer) {
