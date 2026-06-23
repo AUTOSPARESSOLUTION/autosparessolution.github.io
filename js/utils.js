@@ -15,7 +15,7 @@
             .replace(/\n|\r|\t/g, " ")
             .replace(/\s+/g, " ")
             .trim()
-            .toLowerCase();
+            .toUpperCase();
     }
 
     function normalizePartNumber(part) {
@@ -32,7 +32,7 @@
             .replace(/\n|\r|\t/g, " ")
             .replace(/\s+/g, " ")
             .trim()
-            .toLowerCase();
+            .toUpperCase();
     }
 
     // ===================================================
@@ -200,49 +200,6 @@
     }
 
     // ===================================================
-    // DEALER MATCHING HELPERS
-    // ===================================================
-
-    function calculateMatchScore(str1, str2) {
-        const s1 = normalizeText(str1);
-        const s2 = normalizeText(str2);
-        
-        if (s1 === s2) return 1.0;
-        if (s1.includes(s2) || s2.includes(s1)) {
-            return 0.8;
-        }
-        
-        const words1 = s1.split(' ').filter(w => w.length > 2);
-        const words2 = s2.split(' ').filter(w => w.length > 2);
-        
-        let matches = 0;
-        for (const w1 of words1) {
-            for (const w2 of words2) {
-                if (w1 === w2) matches++;
-            }
-        }
-        
-        const maxWords = Math.max(words1.length, words2.length);
-        return maxWords > 0 ? matches / maxWords : 0;
-    }
-
-    function findBestMatch(searchText, candidates, threshold = 0.5) {
-        const normalized = normalizeText(searchText);
-        let bestMatch = null;
-        let bestScore = 0;
-
-        for (const candidate of candidates) {
-            const score = calculateMatchScore(normalized, candidate);
-            if (score > bestScore && score >= threshold) {
-                bestScore = score;
-                bestMatch = candidate;
-            }
-        }
-
-        return bestMatch;
-    }
-
-    // ===================================================
     // COLUMN DETECTION HELPERS
     // ===================================================
 
@@ -329,10 +286,6 @@
         getStorageItem,
         setStorageItem,
         removeStorageItem,
-        
-        // Matching
-        calculateMatchScore,
-        findBestMatch,
         
         // Column detection
         detectPartColumn,
