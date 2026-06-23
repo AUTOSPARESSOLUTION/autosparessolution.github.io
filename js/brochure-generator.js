@@ -1,10 +1,10 @@
 // brochure-generator.js - COMPLETE FIXED VERSION
-// FIXED: Part matching with leading zeros, Dist MRP, Uppercase dealer names, Alphabetical order
+// FIXED: Part matching with leading zeros, Dist MRP, Uppercase dealer names
 // FIXED: WhatsApp opens with personal WhatsApp using whatsapp:// protocol
 // FIXED: Net Price shows MRP when Our Stock=0 but Distributor Stock available
 // FIXED: Dealer matching improved to avoid wrong dealer
 // FIXED: Application column uses Model from prices.csv
-// FIXED: File name "RETAILER data Deatils.xlsx"
+// FIXED: dealerOfferMap properly initialized and populated
 // ADDED: Pagination/Navigation for ALL dealers
 
 (function () {
@@ -93,7 +93,7 @@ const formatPhoneForWhatsApp = Utils.formatPhoneForWhatsApp;
 let dealerMaster = [];
 let dealerMasterMap = new Map();
 let currentOffers = [];
-let dealerOfferMap = {};
+let dealerOfferMap = {};  // FIXED: Always initialize as empty object
 let distributorStock = [];
 let distributorStockMap = new Map();
 let currentStock = new Map();
@@ -173,7 +173,7 @@ async function loadExcelFile(url, sheetName = null) {
 }
 
 // ===================================================
-// LOAD DEALER MASTER
+// LOAD DEALER MASTER - FIXED: All names UPPERCASE
 // ===================================================
 async function loadDealerMaster() {
     console.log("🔄 Loading Dealer Master...");
@@ -458,11 +458,12 @@ async function loadMyStock() {
 }
 
 // ===================================================
-// LOAD OFFERS
+// LOAD OFFERS - FIXED: Properly initializes dealerOfferMap
 // ===================================================
 function loadOffers() {
     console.log("🔄 Loading offers...");
     
+    // FIX: Always initialize as empty object
     currentOffers = [];
     dealerOfferMap = {};
     
@@ -501,16 +502,33 @@ function loadOffers() {
             return;
         }
         
-        // Build dealer map using normalized names
+        // FIX: Build dealer map using normalized names
+        let builtCount = 0;
         currentOffers.forEach(o => {
-            const key = normalizeDealerName(o.dealer || o.dealerRaw || '');
+            const dealerName = o.dealer || o.dealerRaw || '';
+            if (!dealerName) return;
+            
+            const key = normalizeDealerName(dealerName);
             if (!key) return;
-            if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
+            
+            if (!dealerOfferMap[key]) {
+                dealerOfferMap[key] = [];
+            }
             dealerOfferMap[key].push(o);
+            builtCount++;
         });
         
-        console.log(`📊 Dealers with offers: ${Object.keys(dealerOfferMap).length}`);
+        console.log(`📊 Dealer keys in map: ${Object.keys(dealerOfferMap).length}`);
         console.log(`📊 Total offers in memory: ${currentOffers.length}`);
+        console.log(`📊 Offers assigned to dealers: ${builtCount}`);
+        
+        // Log sample dealers
+        const sampleKeys = Object.keys(dealerOfferMap).slice(0, 5);
+        if (sampleKeys.length > 0) {
+            console.log('📋 Sample dealers:', sampleKeys);
+        } else {
+            console.warn('⚠️ No dealers in map! Checking first offer:', currentOffers[0]);
+        }
         
     } catch (err) {
         console.error('Error loading offers:', err);
@@ -520,7 +538,7 @@ function loadOffers() {
 }
 
 // ===================================================
-// GET DEALERS WITH OFFERS
+// GET DEALERS WITH OFFERS - FIXED
 // ===================================================
 async function getDealersWithOffers() {
     console.log("🔍 Getting dealers with offers...");
@@ -532,6 +550,26 @@ async function getDealersWithOffers() {
     const processed = new Set();
     
     console.log(`📊 dealerOfferMap keys: ${Object.keys(dealerOfferMap).length}`);
+    
+    // If dealerOfferMap is empty but currentOffers has data, rebuild
+    if (Object.keys(dealerOfferMap).length === 0 && currentOffers.length > 0) {
+        console.log('⚠️ dealerOfferMap is empty but currentOffers has data. Rebuilding...');
+        
+        currentOffers.forEach(o => {
+            const dealerName = o.dealer || o.dealerRaw || '';
+            if (!dealerName) return;
+            
+            const key = normalizeDealerName(dealerName);
+            if (!key) return;
+            
+            if (!dealerOfferMap[key]) {
+                dealerOfferMap[key] = [];
+            }
+            dealerOfferMap[key].push(o);
+        });
+        
+        console.log(`📊 Rebuilt dealerOfferMap with ${Object.keys(dealerOfferMap).length} keys`);
+    }
     
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
         if (offers.length === 0 || processed.has(key)) continue;
@@ -558,10 +596,7 @@ async function getDealersWithOffers() {
         });
     }
     
-    // Sort alphabetically
-    result.sort((a, b) => {
-        return a.name.localeCompare(b.name);
-    });
+    result.sort((a, b) => a.name.localeCompare(b.name));
     
     console.log(`✅ Found ${result.length} dealers with offers (sorted alphabetically)`);
     return result;
@@ -1467,7 +1502,6 @@ function refreshOffers() {
 // GET FUNCTIONS
 // ===================================================
 function getDescription(part) {
-    const clean = cleanPartNumber(part);
     const stockData = findPartMatch(part);
     return stockData?.description || '';
 }
