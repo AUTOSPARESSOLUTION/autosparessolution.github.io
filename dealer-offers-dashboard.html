@@ -451,9 +451,10 @@
             <button class="btn btn-flyer" onclick="generateBestFlyer()" title="Generate Flyer for Best Dealer">
                 <i class="fas fa-star"></i> Best Flyer
             </button>
-            <button class="btn btn-warning" onclick="generateAllFlyers()">
-    <i class="fas fa-file-alt"></i> Generate Flyers
-</button>
+            <!-- FIXED: Added id="generateFlyersBtn" -->
+            <button class="btn btn-warning" id="generateFlyersBtn" onclick="generateAllFlyers()">
+                <i class="fas fa-file-alt"></i> Generate Flyers
+            </button>
         </div>
         <div class="divider"></div>
         <div class="btn-group">
@@ -1067,8 +1068,10 @@ async function runAnalysis() {
             return;
         }
         
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+        }
         
         showToast('Running analysis...', 'info');
         
@@ -1108,13 +1111,15 @@ async function runAnalysis() {
         console.error('Analysis error:', err);
         showToast('Analysis failed: ' + err.message, 'error');
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-sync"></i> Run Analysis';
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync"></i> Run Analysis';
+        }
     }
 }
 
 // ============================================================
-// GENERATE BEST FLYER - NEW FUNCTION
+// GENERATE BEST FLYER
 // ============================================================
 function generateBestFlyer() {
     try {
@@ -1123,7 +1128,6 @@ function generateBestFlyer() {
             return;
         }
         
-        // Get all dealers and find the best one
         const allDealers = BrochureGeneratorPagination.getAllDealers();
         
         if (!allDealers || allDealers.length === 0) {
@@ -1131,7 +1135,6 @@ function generateBestFlyer() {
             return;
         }
         
-        // Find the dealer with the best offer (highest discount or highest stock)
         let bestDealer = null;
         let bestScore = 0;
         
@@ -1140,14 +1143,12 @@ function generateBestFlyer() {
             let score = 0;
             
             offers.forEach(o => {
-                // Score based on discount and stock
                 const discountScore = (o.discount || 0) * 2;
                 const stockScore = (o.myStock || 0) + (o.distributorStock || 0);
                 const totalScore = discountScore + stockScore;
                 if (totalScore > score) score = totalScore;
             });
             
-            // Also consider number of offers
             score += offers.length * 5;
             
             if (score > bestScore) {
@@ -1164,7 +1165,6 @@ function generateBestFlyer() {
         showToast(`🎯 Best Dealer: ${bestDealer.name} (Score: ${bestScore})`, 'success');
         console.log(`Best Dealer: ${bestDealer.name}, Score: ${bestScore}, Offers: ${bestDealer.offers.length}`);
         
-        // Preview the best dealer's flyer
         previewFlyer(bestDealer.name);
         
     } catch(err) {
@@ -1231,6 +1231,9 @@ async function sendSingleWhatsApp(dealerName) {
     }
 }
 
+// ============================================================
+// GENERATE ALL FLYERS - FIXED with null checks
+// ============================================================
 async function generateAllFlyers() {
     const btn = document.getElementById('generateFlyersBtn');
     
@@ -1240,18 +1243,19 @@ async function generateAllFlyers() {
             return; 
         }
         
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+        // FIX: Check if button exists before setting properties
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+        }
         
         showToast('Generating flyers...', 'info');
         
-        // FIX: Force load fresh data
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         
         let dealers = [];
         
-        // Try to get from pagination first
         if (typeof BrochureGeneratorPagination !== 'undefined') {
             const allDealers = BrochureGeneratorPagination.getAllDealers();
             if (allDealers && allDealers.length > 0) {
@@ -1265,44 +1269,54 @@ async function generateAllFlyers() {
             }
         }
         
-        // If no dealers from pagination, try the regular method
         if (dealers.length === 0) {
             dealers = await BrochureGenerator.getDealersWithOffers();
         }
         
         const div = document.getElementById('flyerList');
-        div.innerHTML = '';
+        if (div) {
+            div.innerHTML = '';
+        }
         
         if (!dealers || dealers.length === 0) {
-            div.innerHTML = '<div style="color:#facc15;padding:20px;">No flyers found. Run Analysis first.</div>';
+            if (div) {
+                div.innerHTML = '<div style="color:#facc15;padding:20px;">No flyers found. Run Analysis first.</div>';
+            }
             showToast('No flyers found', 'warning');
             return;
         }
         
-        dealers.forEach(d => {
-            div.innerHTML += `
-                <div class="flyer-card">
-                    <div class="flyer-title">${escapeHtml(d.name)}</div>
-                    <div>Total Offers: ${d.offerCount || 0}</div>
-                    <div style="font-size:11px;color:#94a3b8;">${d.hasPhone ? '📞 Has Phone' : '⚠️ No Phone'}</div>
-                    <div class="flyer-buttons">
-                        <button class="btn btn-small" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
-                        <button class="btn btn-purple btn-small" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
-                        <button class="btn btn-excel btn-small" onclick="exportSingleExcel('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📊 Excel</button>
-                        <button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i></button>
+        if (div) {
+            dealers.forEach(d => {
+                div.innerHTML += `
+                    <div class="flyer-card">
+                        <div class="flyer-title">${escapeHtml(d.name)}</div>
+                        <div>Total Offers: ${d.offerCount || 0}</div>
+                        <div style="font-size:11px;color:#94a3b8;">${d.hasPhone ? '📞 Has Phone' : '⚠️ No Phone'}</div>
+                        <div class="flyer-buttons">
+                            <button class="btn btn-small" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
+                            <button class="btn btn-purple btn-small" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
+                            <button class="btn btn-excel btn-small" onclick="exportSingleExcel('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📊 Excel</button>
+                            <button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i></button>
+                        </div>
                     </div>
-                </div>
-            `;
-        });
+                `;
+            });
+        }
         
-        document.getElementById('dealerCount').innerText = dealers.length;
+        const dealerCountEl = document.getElementById('dealerCount');
+        if (dealerCountEl) {
+            dealerCountEl.innerText = dealers.length;
+        }
         showToast(`✅ Generated ${dealers.length} flyers`, 'success');
     } catch(err) { 
         console.error(err); 
         showToast(err.message, 'error');
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-file-alt"></i> Generate Flyers';
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-file-alt"></i> Generate Flyers';
+        }
     }
 }
 
@@ -1547,7 +1561,6 @@ function showToast(message, type = 'info') {
     alert(message);
 }
 
-// ============================================================
 // ============================================================
 // DEALER COUNTER - PAGINATION SYSTEM
 // ============================================================
@@ -2151,7 +2164,6 @@ async function sendBulkWhatsAppFlyers() {
             if (d.phone) {
                 await BrochureGenerator.sendFlyerToWhatsApp(d.name);
                 count++;
-                // Wait between messages
                 await new Promise(r => setTimeout(r, 2000));
             }
         }
@@ -2272,4 +2284,4 @@ window.addEventListener('load', function() {
 });
 </script>
 </body>
-                    </html>
+                        </html>
