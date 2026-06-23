@@ -1,8 +1,8 @@
-// dealer-intelligence.js - COMPLETE FIXED VERSION
+// dealer-intelligence.js - COMPLETE FIXED VERSION WITH INDEXEDDB
 // FIXED: All dealer names UPPERCASE, All part numbers UPPERCASE
 // FIXED: Application column uses M column (Model) correctly
-// FIXED: Discount determination system improved
 // FIXED: File name "RETAILER data Deatils.xlsx"
+// ADDED: IndexedDB support for unlimited offers
 
 (function () {
 
@@ -273,7 +273,7 @@
     }
 
     // ===================================================
-    // LOAD RETAILER MASTER - FIXED: Correct file name
+    // LOAD RETAILER MASTER
     // ===================================================
 
     async function loadRetailerMaster() {
@@ -301,7 +301,6 @@
         }
         
         try {
-            // FIXED: Correct file name - "Deatils" not "details"
             const rows = await loadExcelFile('data/RETAILER data Deatils.xlsx', 'SAPUI5 Export');
             console.log(`📋 Excel Master: ${rows.length} entries`);
             
@@ -790,7 +789,6 @@
     function calculateDiscount(avgQty, myStock, district, dealer, part) {
         let discount = 0;
         
-        // 1. Volume-based discount
         let volumeTier = CONFIG.volumeTiers[5];
         for (const tier of CONFIG.volumeTiers) {
             if (avgQty >= tier.min) {
@@ -800,34 +798,28 @@
         }
         discount = volumeTier.discount;
         
-        // 2. Area multiplier
         const multiplier = getAreaDemandMultiplier(district);
         discount = Math.min(discount * multiplier, CONFIG.dynamicOffers.maxDiscount);
         
-        // 3. Loyalty bonus
         const dealerHistory = dealerPurchaseHistory.get(dealer);
         if (dealerHistory && dealerHistory.totalQty > 50) {
             discount += CONFIG.dynamicOffers.loyaltyBonus;
         }
         
-        // 4. New customer bonus
         if (dealerHistory && dealerHistory.partCount <= 3 && avgQty > 0) {
             discount += CONFIG.dynamicOffers.newCustomerBonus;
         }
         
-        // 5. Urgent stock bonus (low stock)
         if (myStock < CONFIG.lowStockThreshold && myStock > 0) {
             discount += CONFIG.dynamicOffers.urgentStockBonus;
         }
         
-        // 6. Seasonal boost
         const currentMonth = new Date().getMonth();
         const festiveMonths = [10, 11, 12];
         if (festiveMonths.includes(currentMonth)) {
             discount += CONFIG.dynamicOffers.seasonalBoost;
         }
         
-        // 7. Cap and floor
         discount = Math.min(Math.round(discount), CONFIG.dynamicOffers.maxDiscount);
         discount = Math.max(discount, CONFIG.dynamicOffers.minDiscount);
         
@@ -968,13 +960,44 @@
     }
 
     // ===================================================
-    // SAVE OFFERS TO STORAGE
+    // SAVE TO INDEXEDDB - NEW
+    // ===================================================
+
+    async function saveToIndexedDB() {
+        try {
+            if (typeof DealerDB === 'undefined') {
+                console.warn('⚠️ DealerDB not loaded, falling back to localStorage');
+                saveOffersToStorage();
+                return;
+            }
+            
+            console.log('💾 Saving offers to IndexedDB...');
+            const result = await DealerDB.saveOffersToDB(activeOffers);
+            
+            if (result.success) {
+                console.log(`✅ Saved ${result.offersSaved} offers, ${result.dealersSaved} dealers to IndexedDB`);
+                showToast(`✅ Saved ${result.offersSaved} offers to database`, 'success');
+            } else {
+                console.error('❌ Failed to save to IndexedDB:', result.error);
+                saveOffersToStorage();
+            }
+            
+            return result;
+            
+        } catch (error) {
+            console.error('❌ Error saving to IndexedDB:', error);
+            saveOffersToStorage();
+            return { success: false, error: error.message };
+        }
+    }
+
+    // ===================================================
+    // SAVE OFFERS TO STORAGE (localStorage - backup)
     // ===================================================
 
     function saveOffersToStorage() {
         try {
             localStorage.removeItem('dealerOffers');
-            console.log("🧹 Cleared old offers from localStorage before saving");
             
             const MAX_OFFERS = 5000;
             let offersToSave = activeOffers;
@@ -982,49 +1005,21 @@
             if (activeOffers.length > MAX_OFFERS) {
                 console.warn(`⚠️ Too many offers (${activeOffers.length}), limiting to ${MAX_OFFERS}`);
                 offersToSave = activeOffers.slice(0, MAX_OFFERS);
-                showToast(`Limited to ${MAX_OFFERS} offers (${activeOffers.length} generated)`, 'warning');
             }
-            
-            const cleanedOffers = offersToSave.map(o => ({
-                dealer: o.dealer || '',
-                dealerRaw: o.dealerRaw || '',
-                part: o.part || '',
-                description: (o.description || '').substring(0, 200),
-                application: (o.application || '').substring(0, 150),
-                district: o.district || '',
-                myStock: o.myStock || 0,
-                distributorStock: o.distributorStock || 0,
-                discount: o.discount || 0,
-                offerType: o.offerType || '',
-                mrp: o.mrp || 0,
-                basicPrice: o.basicPrice || 0,
-                offerPrice: o.offerPrice || 0,
-                gst: o.gst || 0,
-                stockType: o.stockType || 'my-stock',
-                source: o.source || '',
-                expiresAt: o.expiresAt || ''
-            }));
             
             const data = {
                 generatedAt: new Date().toISOString(),
-                offerCount: cleanedOffers.length,
+                offerCount: offersToSave.length,
                 totalGenerated: activeOffers.length,
-                offers: cleanedOffers,
-                version: "2.0",
-                dataSource: {
-                    mrp: "prices.csv (MRP PRICE column)",
-                    description: "prices.csv (Material2 column)",
-                    application: "prices.csv (Model column - M column)",
-                    stock: "prices.csv (STOCK column)"
-                }
+                offers: offersToSave,
+                version: "2.0"
             };
             
             localStorage.setItem('dealerOffers', JSON.stringify(data));
-            console.log(`💾 Saved ${cleanedOffers.length} offers to localStorage`);
+            console.log(`💾 Saved ${offersToSave.length} offers to localStorage (backup)`);
             
         } catch(err) {
             console.error("Could not save offers:", err.message);
-            showToast("Error saving offers: " + err.message, "error");
         }
     }
 
@@ -1141,18 +1136,10 @@
 
         console.log(`📊 Generated ${activeOffers.length} offers`);
         
-        if (activeOffers.length > 0) {
-            const sample = activeOffers.slice(0, 3);
-            console.log('📋 Sample offers:');
-            sample.forEach(o => {
-                console.log(`   ${o.part}:`);
-                console.log(`      MRP: ₹${o.mrp || 0}`);
-                console.log(`      Description: ${o.description || '(empty)'}`);
-                console.log(`      Application: ${o.application || '(empty)'}`);
-                console.log(`      Price: ₹${o.offerPrice}, Stock: ${o.myStock}`);
-            });
-        }
-        
+        // ================================================
+        // FIX: Save to IndexedDB AND localStorage
+        // ================================================
+        await saveToIndexedDB();
         saveOffersToStorage();
 
         const myStockOffers = activeOffers.filter(o => o.stockType === 'my-stock');
@@ -1339,6 +1326,7 @@
         calculateDiscount,
         findPartMatch,
         cleanPartNumber,
+        saveToIndexedDB,
         CONFIG,
         isRunning: () => isRunning
     };
