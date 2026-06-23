@@ -2288,6 +2288,101 @@ window.addEventListener('load', function() {
         }
     }, 6000);
 });
+    // ============================================================
+// CHECK DATABASE STATUS
+// ============================================================
+async function checkDatabaseStatus() {
+    console.log('=== DATABASE STATUS ===');
+    
+    try {
+        if (typeof DealerDB === 'undefined') {
+            showToast('❌ DealerDB not loaded', 'error');
+            return;
+        }
+        
+        const status = await DealerDB.getStorageStatus();
+        console.log('Status:', status);
+        
+        let msg = `📊 Database Status:\n`;
+        msg += `   Offers: ${status.offerCount}\n`;
+        msg += `   Dealers: ${status.dealerCount}\n`;
+        msg += `   DB Name: ${status.dbName}\n`;
+        msg += `   Version: ${status.version}\n`;
+        msg += `   Has Data: ${status.hasData ? '✅ Yes' : '❌ No'}`;
+        
+        showToast(msg, status.hasData ? 'success' : 'warning');
+        
+    } catch(err) {
+        console.error(err);
+        showToast('Error checking database: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// CLEAR DATABASE
+// ============================================================
+async function clearDatabase() {
+    if (!confirm('⚠️ This will DELETE ALL data from IndexedDB. Are you sure?')) {
+        return;
+    }
+    
+    try {
+        if (typeof DealerDB === 'undefined') {
+            showToast('❌ DealerDB not loaded', 'error');
+            return;
+        }
+        
+        const result = await DealerDB.clearDatabase();
+        if (result.success) {
+            showToast('✅ Database cleared successfully', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast('❌ Failed to clear database: ' + result.error, 'error');
+        }
+    } catch(err) {
+        console.error(err);
+        showToast('Error clearing database: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// LOAD DEALERS FROM INDEXEDDB (Alternative to pagination)
+// ============================================================
+async function loadAllDealersFromDB() {
+    try {
+        if (typeof BrochureGenerator === 'undefined') {
+            showToast('BrochureGenerator not loaded', 'error');
+            return;
+        }
+        
+        showToast('Loading dealers from database...', 'info');
+        
+        const dealers = await BrochureGenerator.loadDealersFromDB();
+        
+        if (!dealers || dealers.length === 0) {
+            showToast('No dealers found in database', 'warning');
+            return;
+        }
+        
+        // Update the grid
+        dealerGridAllDealers = dealers;
+        document.getElementById('dealerTotalCount').innerText = `(${dealers.length} total dealers)`;
+        document.getElementById('dealerCounterStatus').innerText = `✅ Loaded ${dealers.length} dealers from DB`;
+        document.getElementById('dealerGridContainer').style.display = 'block';
+        
+        dealerGridCurrentPage = 1;
+        dealerCounterIndex = 0;
+        dealerCounterList = dealers.slice(0, dealerGridPerPage);
+        dealerCounterUpdateUI();
+        dealerGridRenderPage();
+        
+        showToast(`✅ Loaded ${dealers.length} dealers from database`, 'success');
+        
+    } catch(err) {
+        console.error('Error loading dealers from DB:', err);
+        showToast('Error: ' + err.message, 'error');
+    }
+            }
 </script>
 </body>
                         </html>
