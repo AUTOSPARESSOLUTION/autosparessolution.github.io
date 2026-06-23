@@ -6,15 +6,22 @@
     <title>Dealer Intelligence Dashboard – Auto Spares Solution</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
-    <script src="js/utils.js"></script>
-    <script src="js/dealer-intelligence.js"></script>
-    <script src="js/brochure-generator.js"></script>
+    <!-- ============================================
+LOAD LIBRARIES FIRST (CDN)
+============================================ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<!-- ============================================
+LOAD APPLICATION SCRIPTS IN ORDER
+============================================ -->
+<script src="js/utils.js"></script>
+<script src="js/db-manager.js"></script>        <!-- ← MUST BE BEFORE dealer-intelligence.js -->
+<script src="js/dealer-intelligence.js"></script>
+<script src="js/brochure-generator.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
