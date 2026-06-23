@@ -1,6 +1,5 @@
 // dealer-intelligence.js - COMPLETE FIXED VERSION
-// FIXED: All dealer names UPPERCASE
-// FIXED: All part numbers UPPERCASE
+// FIXED: All dealer names UPPERCASE, All part numbers UPPERCASE
 // FIXED: Application column uses M column (Model) correctly
 // FIXED: Discount determination system improved
 // FIXED: File name "RETAILER data Deatils.xlsx"
