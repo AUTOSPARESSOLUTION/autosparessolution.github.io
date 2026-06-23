@@ -1907,5 +1907,86 @@ window.BrochureGeneratorPagination = {
 };
 
 console.log('✅ Brochure Generator Pagination Add-ons loaded');
+// ===================================================
+// LOAD DEALERS FROM INDEXEDDB - NEW
+// ===================================================
 
+async function loadDealersFromDB() {
+    console.log('📊 Loading dealers from IndexedDB...');
+    
+    try {
+        if (typeof DealerDB === 'undefined') {
+            console.warn('⚠️ DealerDB not loaded, using localStorage fallback');
+            return await getDealersWithOffers();
+        }
+        
+        const dealers = await DealerDB.getAllDealersFromDB();
+        console.log(`✅ Loaded ${dealers.length} dealers from IndexedDB`);
+        
+        return dealers.map(d => ({
+            name: d.name,
+            normalized: d.normalized,
+            phone: d.phone || '',
+            district: d.district || '',
+            offerCount: d.offerCount || 0,
+            hasPhone: !!d.phone,
+            myStockCount: d.myStockCount || 0,
+            distStockCount: d.distStockCount || 0,
+            offers: []
+        }));
+        
+    } catch (error) {
+        console.error('❌ Error loading dealers from IndexedDB:', error);
+        return await getDealersWithOffers();
+    }
+}
+
+// ===================================================
+// LOAD OFFERS FOR DEALER FROM INDEXEDDB - NEW
+// ===================================================
+
+async function loadOffersForDealerFromDB(dealerName, page = 1, pageSize = 20) {
+    console.log(`🔍 Loading offers for ${dealerName} from IndexedDB...`);
+    
+    try {
+        if (typeof DealerDB === 'undefined') {
+            console.warn('⚠️ DealerDB not loaded, using localStorage fallback');
+            const offers = getAllDealerOffers(dealerName);
+            return {
+                offers: offers.slice(0, pageSize),
+                total: offers.length,
+                page: page,
+                pageSize: pageSize,
+                totalPages: Math.ceil(offers.length / pageSize)
+            };
+        }
+        
+        return await DealerDB.loadOffersByDealer(dealerName, page, pageSize);
+        
+    } catch (error) {
+        console.error(`❌ Error loading offers for ${dealerName}:`, error);
+        return {
+            offers: [],
+            total: 0,
+            page: 1,
+            pageSize: pageSize,
+            totalPages: 0
+        };
+    }
+}
+
+// ===================================================
+// GET STORAGE STATUS - NEW
+// ===================================================
+
+async function getStorageStatusFromDB() {
+    try {
+        if (typeof DealerDB === 'undefined') {
+            return { hasData: false, offerCount: 0, dealerCount: 0 };
+        }
+        return await DealerDB.getStorageStatus();
+    } catch (error) {
+        return { hasData: false, offerCount: 0, dealerCount: 0, error: error.message };
+    }
+}
 })();
