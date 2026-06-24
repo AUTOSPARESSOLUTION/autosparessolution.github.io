@@ -1,11 +1,5 @@
-// brochure-generator.js - COMPLETE FIXED VERSION
-// FIXED: Part matching with leading zeros, Dist MRP, Uppercase dealer names
-// FIXED: WhatsApp opens with personal WhatsApp using whatsapp:// protocol
-// FIXED: Net Price shows MRP when Our Stock=0 but Distributor Stock available
-// FIXED: Dealer matching improved to avoid wrong dealer
-// FIXED: Application column uses Model from prices.csv
-// FIXED: dealerOfferMap properly initialized and populated
-// ADDED: Pagination/Navigation for ALL dealers
+// brochure-generator.js - COMPLETE FIXED VERSION WITH INDEXEDDB
+// All features: Pagination, IndexedDB, WhatsApp, PDF, Excel
 
 (function () {
 
@@ -49,6 +43,7 @@ const Utils = window.Utils || {
                 box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                 animation: slideIn 0.3s ease;
                 word-wrap: break-word;
+                max-width: 90vw;
             `;
             toast.textContent = msg;
             container.appendChild(toast);
@@ -93,7 +88,7 @@ const formatPhoneForWhatsApp = Utils.formatPhoneForWhatsApp;
 let dealerMaster = [];
 let dealerMasterMap = new Map();
 let currentOffers = [];
-let dealerOfferMap = {};  // FIXED: Always initialize as empty object
+let dealerOfferMap = {};
 let distributorStock = [];
 let distributorStockMap = new Map();
 let currentStock = new Map();
@@ -120,12 +115,10 @@ function cleanPartNumber(part) {
 function findPartMatch(partNumber) {
     const clean = cleanPartNumber(partNumber);
     
-    // Try exact match first
     if (currentStock.has(clean.original)) {
         return currentStock.get(clean.original);
     }
     
-    // Try match without leading zeros
     if (clean.hasLeadingZeros) {
         for (const [key, value] of currentStock) {
             const keyClean = cleanPartNumber(key);
@@ -143,14 +136,12 @@ function findPartMatch(partNumber) {
 // LOAD EXCEL (CACHED)
 // ===================================================
 async function loadExcelFile(url, sheetName = null) {
-
     const cacheKey = url + (sheetName || '');
     if (excelCache.has(cacheKey)) {
         return excelCache.get(cacheKey);
     }
 
     try {
-
         const res = await fetch(url);
         if (!res.ok) throw new Error("File not found: " + url);
 
@@ -166,14 +157,13 @@ async function loadExcelFile(url, sheetName = null) {
         return data;
 
     } catch (err) {
-
         console.error("Excel Load Error:", err.message);
         return [];
     }
 }
 
 // ===================================================
-// LOAD DEALER MASTER - FIXED: All names UPPERCASE
+// LOAD DEALER MASTER
 // ===================================================
 async function loadDealerMaster() {
     console.log("🔄 Loading Dealer Master...");
@@ -205,7 +195,6 @@ async function loadDealerMaster() {
     }
     
     try {
-        // FIXED: Correct file name
         const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
         console.log(`📋 Excel Master: ${rows.length} entries`);
         
@@ -374,7 +363,6 @@ async function loadMyStock() {
     console.log("🔄 Loading stock from prices.csv...");
 
     try {
-
         const response = await fetch('prices.csv');
         if (!response.ok) {
             throw new Error(`Failed to fetch prices.csv: ${response.status}`);
@@ -414,10 +402,8 @@ async function loadMyStock() {
         const headers = Object.keys(rows[0] || {});
         console.log('📋 Available columns in prices.csv:', headers);
         
-        // Column detection
         const partCol = headers.find(h => h.toLowerCase() === 'material' || h.toLowerCase().includes('material') || h.toLowerCase().includes('part'));
         const descCol = headers.find(h => h.toLowerCase() === 'material2' || h.toLowerCase().includes('description') || h.toLowerCase().includes('desc'));
-        // FIX: Application from Model column
         const appCol = headers.find(h => h.toLowerCase() === 'model' || h.toLowerCase().includes('model'));
         const mrpCol = headers.find(h => h.toLowerCase() === 'mrp price' || h.toLowerCase().includes('mrp price') || h.toLowerCase().includes('mrp'));
         const stockCol = headers.find(h => h.toLowerCase().includes('stock') || h.toLowerCase().includes('qty'));
@@ -448,26 +434,29 @@ async function loadMyStock() {
 
         console.log(`✅ My stock: ${loadedCount} parts loaded from prices.csv`);
         console.log(`   📝 Descriptions: ${partDescriptions.size}, Applications: ${partApplications.size}`);
-        console.log(`   💰 MRP from Column D (MRP PRICE)`);
 
     } catch (err) {
-
         console.error("Error loading prices.csv:", err);
         showToast("Error loading stock data: " + err.message, "error");
     }
 }
 
 // ===================================================
-// LOAD OFFERS - FIXED: Properly initializes dealerOfferMap
+// LOAD OFFERS - WITH INDEXEDDB SUPPORT
 // ===================================================
 function loadOffers() {
     console.log("🔄 Loading offers...");
     
-    // FIX: Always initialize as empty object
     currentOffers = [];
     dealerOfferMap = {};
     
     try {
+        // Try IndexedDB first
+        if (typeof DealerDB !== 'undefined' && DealerDB.isIndexedDBAvailable()) {
+            // Async call - we'll handle this in init
+            console.log('📊 IndexedDB available for offers');
+        }
+        
         const rawData = localStorage.getItem('dealerOffers');
         console.log('📦 Raw data from localStorage:', rawData ? 'Found' : 'Not found');
         
@@ -502,7 +491,6 @@ function loadOffers() {
             return;
         }
         
-        // FIX: Build dealer map using normalized names
         let builtCount = 0;
         currentOffers.forEach(o => {
             const dealerName = o.dealer || o.dealerRaw || '';
@@ -522,14 +510,6 @@ function loadOffers() {
         console.log(`📊 Total offers in memory: ${currentOffers.length}`);
         console.log(`📊 Offers assigned to dealers: ${builtCount}`);
         
-        // Log sample dealers
-        const sampleKeys = Object.keys(dealerOfferMap).slice(0, 5);
-        if (sampleKeys.length > 0) {
-            console.log('📋 Sample dealers:', sampleKeys);
-        } else {
-            console.warn('⚠️ No dealers in map! Checking first offer:', currentOffers[0]);
-        }
-        
     } catch (err) {
         console.error('Error loading offers:', err);
         currentOffers = [];
@@ -538,7 +518,51 @@ function loadOffers() {
 }
 
 // ===================================================
-// GET DEALERS WITH OFFERS - FIXED
+// LOAD FROM INDEXEDDB
+// ===================================================
+async function loadFromIndexedDB() {
+    console.log('📊 Loading from IndexedDB...');
+    
+    try {
+        if (typeof DealerDB === 'undefined') {
+            console.warn('⚠️ DealerDB not available');
+            return false;
+        }
+        
+        const status = await DealerDB.getStorageStatus();
+        if (!status.hasData) {
+            console.log('ℹ️ No data in IndexedDB');
+            return false;
+        }
+        
+        const offers = await DealerDB.loadAllOffersFromDB();
+        if (offers && offers.length > 0) {
+            currentOffers = offers;
+            
+            // Rebuild dealer map
+            dealerOfferMap = {};
+            offers.forEach(o => {
+                const dealerName = o.dealer || o.dealerRaw || '';
+                if (!dealerName) return;
+                const key = normalizeDealerName(dealerName);
+                if (!key) return;
+                if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
+                dealerOfferMap[key].push(o);
+            });
+            
+            console.log(`✅ Loaded ${currentOffers.length} offers from IndexedDB`);
+            return true;
+        }
+        return false;
+        
+    } catch (error) {
+        console.error('❌ Error loading from IndexedDB:', error);
+        return false;
+    }
+}
+
+// ===================================================
+// GET DEALERS WITH OFFERS - WITH INDEXEDDB
 // ===================================================
 async function getDealersWithOffers() {
     console.log("🔍 Getting dealers with offers...");
@@ -546,36 +570,70 @@ async function getDealersWithOffers() {
     await loadDealerMaster();
     loadOffers();
     
+    // Try IndexedDB if available
+    let indexedDBDealers = [];
+    if (typeof DealerDB !== 'undefined') {
+        try {
+            const dbDealers = await DealerDB.getAllDealersFromDB();
+            if (dbDealers && dbDealers.length > 0) {
+                indexedDBDealers = dbDealers;
+                console.log(`✅ Found ${dbDealers.length} dealers in IndexedDB`);
+            }
+        } catch(e) {
+            console.warn('Could not load dealers from IndexedDB:', e);
+        }
+    }
+    
     const result = [];
     const processed = new Set();
     
     console.log(`📊 dealerOfferMap keys: ${Object.keys(dealerOfferMap).length}`);
     
-    // If dealerOfferMap is empty but currentOffers has data, rebuild
     if (Object.keys(dealerOfferMap).length === 0 && currentOffers.length > 0) {
         console.log('⚠️ dealerOfferMap is empty but currentOffers has data. Rebuilding...');
         
         currentOffers.forEach(o => {
             const dealerName = o.dealer || o.dealerRaw || '';
             if (!dealerName) return;
-            
             const key = normalizeDealerName(dealerName);
             if (!key) return;
-            
-            if (!dealerOfferMap[key]) {
-                dealerOfferMap[key] = [];
-            }
+            if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
             dealerOfferMap[key].push(o);
         });
         
         console.log(`📊 Rebuilt dealerOfferMap with ${Object.keys(dealerOfferMap).length} keys`);
     }
     
+    // Use IndexedDB dealers first
+    if (indexedDBDealers.length > 0) {
+        for (const dealer of indexedDBDealers) {
+            const key = dealer.normalized || normalizeDealerName(dealer.name);
+            if (processed.has(key)) continue;
+            processed.add(key);
+            
+            const offers = dealerOfferMap[key] || [];
+            result.push({
+                name: dealer.name || key,
+                normalized: key,
+                phone: dealer.phone || '',
+                district: dealer.district || '',
+                offerCount: dealer.offerCount || offers.length,
+                hasPhone: !!dealer.phone,
+                myStockCount: dealer.myStockCount || 0,
+                distStockCount: dealer.distStockCount || 0,
+                offers: offers
+            });
+        }
+        
+        console.log(`✅ Found ${result.length} dealers from IndexedDB`);
+        result.sort((a, b) => a.name.localeCompare(b.name));
+        return result;
+    }
+    
+    // Fallback: Build from dealerOfferMap
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
         if (offers.length === 0 || processed.has(key)) continue;
         processed.add(key);
-        
-        console.log(`✅ Found dealer: ${key} with ${offers.length} offers`);
         
         let dealer = dealerMasterMap.get(key);
         
@@ -592,7 +650,10 @@ async function getDealersWithOffers() {
             phone: dealer?.phone || '',
             district: dealer?.district || '',
             offerCount: offers.length,
-            hasPhone: !!dealer?.phone
+            hasPhone: !!dealer?.phone,
+            myStockCount: offers.filter(o => o.stockType === 'my-stock').length,
+            distStockCount: offers.filter(o => o.stockType === 'distributor-stock').length,
+            offers: offers
         });
     }
     
@@ -603,14 +664,13 @@ async function getDealersWithOffers() {
 }
 
 // ===================================================
-// FIND DEALER - FIXED: Improved matching
+// FIND DEALER
 // ===================================================
 function findDealer(name) {
     if (!name) return null;
     
     const normalized = normalizeDealerName(name);
     
-    // Priority 1: Exact match
     if (dealerMasterMap.has(normalized)) {
         const dealer = dealerMasterMap.get(normalized);
         return {
@@ -619,7 +679,6 @@ function findDealer(name) {
         };
     }
     
-    // Priority 2: Contains match with high confidence
     let bestMatch = null;
     let bestScore = 0;
     
@@ -641,7 +700,6 @@ function findDealer(name) {
         return bestMatch;
     }
     
-    // Priority 3: Word match
     const words = normalized.split(' ').filter(w => w.length > 2);
     let wordMatch = null;
     let wordScore = 0;
@@ -666,7 +724,6 @@ function findDealer(name) {
         return wordMatch;
     }
     
-    // Priority 4: Phone number match
     if (name && name.length >= 10 && !isNaN(name)) {
         for (const [key, dealer] of dealerMasterMap) {
             if (dealer.phone && dealer.phone === name) {
@@ -785,7 +842,6 @@ function calculatePrices(offer) {
     
     const mrp = offer.mrp || offer.originalPrice || 0;
     
-    // FIX: If Our Stock is 0 but Distributor Stock is available, use MRP as Net Price
     let ourOfferPrice;
     if (stock.ourStock === 0 && stock.hasDistStock) {
         ourOfferPrice = mrp;
@@ -872,7 +928,7 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
 }
 
 // ===================================================
-// SEND WHATSAPP - FIXED: Uses whatsapp:// protocol
+// SEND WHATSAPP
 // ===================================================
 async function sendFlyerToWhatsApp(name) {
     console.log(`🔍 Looking for offers for: "${name}"`);
@@ -919,7 +975,6 @@ async function sendFlyerToWhatsApp(name) {
         return;
     }
     
-    // FIX: Use whatsapp:// protocol for personal WhatsApp
     const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
     window.location.href = url;
     
@@ -1316,16 +1371,10 @@ async function downloadPDF(name) {
     }
 }
 
-// ===================================================
-// DOWNLOAD SINGLE PDF
-// ===================================================
 async function downloadSinglePDF(name) {
     await downloadPDF(name);
 }
 
-// ===================================================
-// DOWNLOAD ALL FLYERS PDF
-// ===================================================
 async function downloadAllFlyersPDF() {
     try {
         const dealers = await getDealersWithOffers();
@@ -1428,7 +1477,6 @@ async function sharePDFToWhatsApp(name) {
             return;
         }
         
-        // FIX: Use whatsapp:// protocol
         const url = `whatsapp://send?phone=${cleanPhoneNum}&text=${encodeURIComponent(msg)}`;
         window.location.href = url;
         showToast(`✅ WhatsApp opened for ${dealerName}`, "success");
@@ -1437,44 +1485,6 @@ async function sharePDFToWhatsApp(name) {
         console.error(err);
         showToast("Failed: " + err.message, "error");
     }
-}
-
-// ===================================================
-// DEBUG OFFERS
-// ===================================================
-function debugOffers() {
-    console.log('=== OFFER DEBUG ===');
-    
-    const raw = localStorage.getItem('dealerOffers');
-    console.log('Raw localStorage data:', raw ? 'Found' : 'Not found');
-    
-    if (raw) {
-        try {
-            const parsed = JSON.parse(raw);
-            console.log('Parsed data type:', typeof parsed);
-            console.log('Parsed keys:', Object.keys(parsed));
-            
-            if (Array.isArray(parsed)) {
-                console.log('Data is array, length:', parsed.length);
-                if (parsed.length > 0) {
-                    console.log('Sample offer:', parsed[0]);
-                }
-            } else if (parsed.offers && Array.isArray(parsed.offers)) {
-                console.log('Data has offers array, length:', parsed.offers.length);
-                if (parsed.offers.length > 0) {
-                    console.log('Sample offer:', parsed.offers[0]);
-                }
-            } else {
-                console.log('Unknown data structure');
-            }
-        } catch (err) {
-            console.error('Error parsing storage:', err);
-        }
-    }
-    
-    console.log('dealerOfferMap keys:', Object.keys(dealerOfferMap));
-    console.log('Current offers count:', currentOffers.length);
-    console.log('=== END DEBUG ===');
 }
 
 // ===================================================
@@ -1512,6 +1522,93 @@ function getApplication(part) {
 }
 
 // ===================================================
+// INDEXEDDB FUNCTIONS
+// ===================================================
+async function loadDealersFromDB() {
+    console.log('📊 Loading dealers from IndexedDB...');
+    
+    try {
+        if (typeof DealerDB === 'undefined') {
+            console.warn('⚠️ DealerDB not loaded, using localStorage fallback');
+            return await getDealersWithOffers();
+        }
+        
+        const dealers = await DealerDB.getAllDealersFromDB();
+        console.log(`✅ Loaded ${dealers.length} dealers from IndexedDB`);
+        
+        return dealers.map(d => ({
+            name: d.name || d.normalized || 'Unknown',
+            normalized: d.normalized || d.name?.toUpperCase() || '',
+            phone: d.phone || '',
+            district: d.district || '',
+            offerCount: d.offerCount || 0,
+            hasPhone: !!d.phone,
+            myStockCount: d.myStockCount || 0,
+            distStockCount: d.distStockCount || 0,
+            offers: []
+        }));
+        
+    } catch (error) {
+        console.error('❌ Error loading dealers from IndexedDB:', error);
+        return await getDealersWithOffers();
+    }
+}
+
+async function loadOffersForDealerFromDB(dealerName, page = 1, pageSize = 20) {
+    console.log(`🔍 Loading offers for ${dealerName} from IndexedDB...`);
+    
+    try {
+        if (typeof DealerDB === 'undefined') {
+            console.warn('⚠️ DealerDB not loaded, using localStorage fallback');
+            const offers = getAllDealerOffers(dealerName);
+            return {
+                offers: offers.slice(0, pageSize),
+                total: offers.length,
+                page: page,
+                pageSize: pageSize,
+                totalPages: Math.ceil(offers.length / pageSize)
+            };
+        }
+        
+        return await DealerDB.loadOffersByDealer(dealerName, page, pageSize);
+        
+    } catch (error) {
+        console.error(`❌ Error loading offers for ${dealerName}:`, error);
+        return {
+            offers: [],
+            total: 0,
+            page: 1,
+            pageSize: pageSize,
+            totalPages: 0
+        };
+    }
+}
+
+async function getStorageStatusFromDB() {
+    try {
+        if (typeof DealerDB === 'undefined') {
+            return { hasData: false, offerCount: 0, dealerCount: 0 };
+        }
+        return await DealerDB.getStorageStatus();
+    } catch (error) {
+        return { hasData: false, offerCount: 0, dealerCount: 0, error: error.message };
+    }
+}
+
+async function saveOffersToDB(offers) {
+    try {
+        if (typeof DealerDB === 'undefined') {
+            console.warn('⚠️ DealerDB not available');
+            return { success: false, error: 'DealerDB not available' };
+        }
+        return await DealerDB.saveOffersToDB(offers);
+    } catch (error) {
+        console.error('❌ Error saving to IndexedDB:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ===================================================
 // INIT
 // ===================================================
 async function init() {
@@ -1522,6 +1619,12 @@ async function init() {
         await loadMyStock();
         await loadDistributorStock();
         loadOffers();
+        
+        // Try loading from IndexedDB
+        const dbLoaded = await loadFromIndexedDB();
+        if (dbLoaded) {
+            console.log('✅ Data loaded from IndexedDB');
+        }
         
         isInitialized = true;
         
@@ -1551,6 +1654,7 @@ window.BrochureGenerator = {
     loadOffers,
     loadDistributorStock,
     loadMyStock,
+    loadFromIndexedDB,
     getDealersWithOffers,
     getAllDealerOffers,
     findDealer,
@@ -1568,43 +1672,26 @@ window.BrochureGenerator = {
     clearOffers,
     clearCache,
     showToast,
-    debugOffers,
+    debugOffers: function() {
+        console.log('=== OFFER DEBUG ===');
+        console.log('dealerOfferMap keys:', Object.keys(dealerOfferMap));
+        console.log('Current offers count:', currentOffers.length);
+        console.log('=== END DEBUG ===');
+    },
     findPartMatch,
     cleanPartNumber,
     partDescriptions: partDescriptions,
     partApplications: partApplications,
-    isInitialized: function() { return isInitialized; }
+    isInitialized: function() { return isInitialized; },
+    // IndexedDB functions
+    loadDealersFromDB,
+    loadOffersForDealerFromDB,
+    getStorageStatusFromDB,
+    saveOffersToDB
 };
 
 // ===================================================
-// AUTO-INIT
-// ===================================================
-console.log("📋 Brochure Generator registered. Starting auto-init...");
-
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(async () => {
-        await init();
-    }, 500);
-} else {
-    document.addEventListener('DOMContentLoaded', async function() {
-        setTimeout(async () => {
-            await init();
-        }, 500);
-    });
-}
-
-window.addEventListener('load', async function() {
-    if (!isInitialized) {
-        setTimeout(async () => {
-            await init();
-        }, 1000);
-    }
-});
-
-console.log("✅ Brochure Generator loaded");
-
-// ===================================================
-// PAGINATION & NAVIGATION ADD-ONS
+// PAGINATION & NAVIGATION
 // ===================================================
 
 let paginationDealerList = [];
@@ -1616,21 +1703,8 @@ let paginationAllDealers = [];
 
 function getDealersFromFullAnalysis() {
     try {
-        if (typeof DealerIntelligence === 'undefined' || typeof DealerIntelligence.getActiveOffers === 'undefined') {
-            console.warn('⚠️ DealerIntelligence not available, using localStorage data');
-            const offers = currentOffers || [];
-            return buildDealerListFromOffers(offers);
-        }
-        
-        const allOffers = DealerIntelligence.getActiveOffers();
-        if (!allOffers || allOffers.length === 0) {
-            console.warn('⚠️ No offers found in analysis, using localStorage');
-            const offers = currentOffers || [];
-            return buildDealerListFromOffers(offers);
-        }
-        
-        return buildDealerListFromOffers(allOffers);
-        
+        const offers = currentOffers || [];
+        return buildDealerListFromOffers(offers);
     } catch(err) {
         console.error('Error getting dealers from full analysis:', err);
         const offers = currentOffers || [];
@@ -1742,8 +1816,7 @@ function updatePaginationPage() {
         total: totalDealers,
         currentPage: paginationCurrentPage,
         totalPages: totalPages,
-        currentIndex: paginationCurrentIndex
-    };
+        currentIndex: paginationCurrentIndex    };
 }
 
 function paginationNext() {
@@ -1907,86 +1980,32 @@ window.BrochureGeneratorPagination = {
 };
 
 console.log('✅ Brochure Generator Pagination Add-ons loaded');
-// ===================================================
-// LOAD DEALERS FROM INDEXEDDB - NEW
-// ===================================================
 
-async function loadDealersFromDB() {
-    console.log('📊 Loading dealers from IndexedDB...');
-    
-    try {
-        if (typeof DealerDB === 'undefined') {
-            console.warn('⚠️ DealerDB not loaded, using localStorage fallback');
-            return await getDealersWithOffers();
-        }
-        
-        const dealers = await DealerDB.getAllDealersFromDB();
-        console.log(`✅ Loaded ${dealers.length} dealers from IndexedDB`);
-        
-        return dealers.map(d => ({
-            name: d.name,
-            normalized: d.normalized,
-            phone: d.phone || '',
-            district: d.district || '',
-            offerCount: d.offerCount || 0,
-            hasPhone: !!d.phone,
-            myStockCount: d.myStockCount || 0,
-            distStockCount: d.distStockCount || 0,
-            offers: []
-        }));
-        
-    } catch (error) {
-        console.error('❌ Error loading dealers from IndexedDB:', error);
-        return await getDealersWithOffers();
-    }
+// ===================================================
+// AUTO-INIT
+// ===================================================
+console.log("📋 Brochure Generator registered. Starting auto-init...");
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(async () => {
+        await init();
+    }, 500);
+} else {
+    document.addEventListener('DOMContentLoaded', async function() {
+        setTimeout(async () => {
+            await init();
+        }, 500);
+    });
 }
 
-// ===================================================
-// LOAD OFFERS FOR DEALER FROM INDEXEDDB - NEW
-// ===================================================
-
-async function loadOffersForDealerFromDB(dealerName, page = 1, pageSize = 20) {
-    console.log(`🔍 Loading offers for ${dealerName} from IndexedDB...`);
-    
-    try {
-        if (typeof DealerDB === 'undefined') {
-            console.warn('⚠️ DealerDB not loaded, using localStorage fallback');
-            const offers = getAllDealerOffers(dealerName);
-            return {
-                offers: offers.slice(0, pageSize),
-                total: offers.length,
-                page: page,
-                pageSize: pageSize,
-                totalPages: Math.ceil(offers.length / pageSize)
-            };
-        }
-        
-        return await DealerDB.loadOffersByDealer(dealerName, page, pageSize);
-        
-    } catch (error) {
-        console.error(`❌ Error loading offers for ${dealerName}:`, error);
-        return {
-            offers: [],
-            total: 0,
-            page: 1,
-            pageSize: pageSize,
-            totalPages: 0
-        };
+window.addEventListener('load', async function() {
+    if (!isInitialized) {
+        setTimeout(async () => {
+            await init();
+        }, 1000);
     }
-}
+});
 
-// ===================================================
-// GET STORAGE STATUS - NEW
-// ===================================================
+console.log("✅ Brochure Generator loaded");
 
-async function getStorageStatusFromDB() {
-    try {
-        if (typeof DealerDB === 'undefined') {
-            return { hasData: false, offerCount: 0, dealerCount: 0 };
-        }
-        return await DealerDB.getStorageStatus();
-    } catch (error) {
-        return { hasData: false, offerCount: 0, dealerCount: 0, error: error.message };
-    }
-}
 })();
