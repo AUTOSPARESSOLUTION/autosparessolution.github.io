@@ -1263,58 +1263,245 @@ async function sendSingleWhatsApp(dealerName) {
 // ============================================================
 // GENERATE ALL FLYERS - FIXED: Loads from IndexedDB
 // ============================================================
+// ============================================================
+// GENERATE ALL FLYERS - COMPLETE FIX with phone lookup
+// ============================================================
 async function generateAllFlyers() {
     const btn = document.getElementById('generateFlyersBtn');
     
     try {
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading from database...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading dealers...';
         }
         
-        showToast('Loading all dealers from IndexedDB...', 'info');
+        showToast('Loading dealers with phone numbers...', 'info');
         
+        // ============================================================
+        // STEP 1: Load dealer master from all sources
+        // ============================================================
+        let dealerMasterMap = new Map();
+        let dealerMasterList = [];
+        
+        // Source 1: Load from Excel (RETAILER data Deatils.xlsx)
+        try {
+            if (typeof BrochureGenerator !== 'undefined') {
+                await BrochureGenerator.loadDealerMaster();
+                // Try to get the master map from BrochureGenerator
+                if (window.BrochureGenerator._dealerMasterMap) {
+                    dealerMasterMap = window.BrochureGenerator._dealerMasterMap;
+                    dealerMasterList = Array.from(dealerMasterMap.values());
+                    console.log(`📋 Loaded ${dealerMasterList.length} dealers from Excel master`);
+                }
+            }
+        } catch(e) {
+            console.warn('Could not load from BrochureGenerator:', e);
+        }
+        
+        // Source 2: Load from localStorage Customer Master
+        try {
+            const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+            if (customers.length > 0) {
+                console.log(`📋 Loading ${customers.length} customers from localStorage`);
+                customers.forEach(c => {
+                    const name = (c.name || c.businessName || '').toUpperCase().trim();
+                    if (name) {
+                        const phone = (c.mobileNo || c.phone || c.mobile || '').replace(/\D/g, '');
+                        const district = c.district || c.city || '';
+                        const key = name;
+                        if (!dealerMasterMap.has(key)) {
+                            dealerMasterMap.set(key, {
+                                name: name,
+                                normalized: key,
+                                phone: phone,
+                                district: district,
+                                source: 'customer-master'
+                            });
+                        } else {
+                            const existing = dealerMasterMap.get(key);
+                            if (!existing.phone && phone) existing.phone = phone;
+                            if (!existing.district && district) existing.district = district;
+                        }
+                    }
+                });
+                console.log(`✅ Added ${customers.length} customers to master map`);
+            }
+        } catch(e) {
+            console.warn('Could not load customers:', e);
+        }
+        
+        // Source 3: Load from localStorage users/dealers
+        try {
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
+            const allUsers = [...users, ...dealers];
+            
+            allUsers.forEach(u => {
+                const name = (u.name || u.business || u.businessName || '').toUpperCase().trim();
+                if (name) {
+                    const phone = (u.phone || u.mobile || u.mobileNo || '').replace(/\D/g, '');
+                    const district = u.district || u.city || '';
+                    const key = name;
+                    if (!dealerMasterMap.has(key)) {
+                        dealerMasterMap.set(key, {
+                            name: name,
+                            normalized: key,
+                            phone: phone,
+                            district: district,
+                            source: 'user-dealer'
+                        });
+                    } else {
+                        const existing = dealerMasterMap.get(key);
+                        if (!existing.phone && phone) existing.phone = phone;
+                        if (!existing.district && district) existing.district = district;
+                    }
+                }
+            });
+            console.log(`✅ Added ${allUsers.length} users/dealers to master map`);
+        } catch(e) {
+            console.warn('Could not load users/dealers:', e);
+        }
+        
+        // Source 4: Load from BrochureGenerator's dealer master (already loaded)
+        if (typeof BrochureGenerator !== 'undefined' && BrochureGenerator.dealerMaster) {
+            const bgDealers = BrochureGenerator.dealerMaster || [];
+            bgDealers.forEach(d => {
+                const key = (d.normalized || d.name || '').toUpperCase().trim();
+                if (key && !dealerMasterMap.has(key)) {
+                    dealerMasterMap.set(key, {
+                        name: d.name || key,
+                        normalized: key,
+                        phone: d.phone || '',
+                        district: d.district || '',
+                        source: 'brochure-generator'
+                    });
+                }
+            });
+            console.log(`✅ Added ${bgDealers.length} dealers from BrochureGenerator`);
+        }
+        
+        console.log(`📋 Total dealer master entries: ${dealerMasterMap.size}`);
+        const withPhone = Array.from(dealerMasterMap.values()).filter(d => d.phone).length;
+        console.log(`📞 Dealers with phone: ${withPhone}`);
+        
+        // ============================================================
+        // STEP 2: Load offers from IndexedDB
+        // ============================================================
         let dealers = [];
         
-        // === FIX: Load from IndexedDB directly ===
         if (typeof DealerDB !== 'undefined') {
             const dbDealers = await DealerDB.getAllDealersFromDB();
             
             if (dbDealers && dbDealers.length > 0) {
                 console.log(`📊 Loaded ${dbDealers.length} dealers from IndexedDB`);
                 
-                dealers = dbDealers.map(d => ({
-                    name: d.name || d.normalized || 'Unknown',
-                    normalized: d.normalized || d.name?.toUpperCase() || '',
-                    phone: d.phone || '',
-                    district: d.district || '',
-                    offerCount: d.offerCount || 0,
-                    hasPhone: !!d.phone,
-                    myStockCount: d.myStockCount || 0,
-                    distStockCount: d.distStockCount || 0
-                }));
+                dealers = dbDealers.map(d => {
+                    const name = d.name || d.normalized || 'Unknown';
+                    const normalized = (d.normalized || name).toUpperCase().trim();
+                    
+                    // ============================================================
+                    // STEP 3: Find phone number from master (with fuzzy matching)
+                    // ============================================================
+                    let phone = d.phone || '';
+                    let district = d.district || '';
+                    
+                    // Try exact match first
+                    if (dealerMasterMap.has(normalized)) {
+                        const master = dealerMasterMap.get(normalized);
+                        phone = master.phone || phone;
+                        district = master.district || district;
+                        if (phone) {
+                            console.log(`📞 Exact match: "${name}" -> ${phone}`);
+                        }
+                    } else {
+                        // Try normalized name match (remove special chars)
+                        const cleanNormalized = normalized.replace(/[^A-Z0-9]/g, '');
+                        for (const [key, master] of dealerMasterMap) {
+                            const cleanKey = key.replace(/[^A-Z0-9]/g, '');
+                            if (cleanKey === cleanNormalized) {
+                                phone = master.phone || phone;
+                                district = master.district || district;
+                                if (phone) {
+                                    console.log(`📞 Clean match: "${name}" -> ${phone}`);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Try contains match if still no phone
+                        if (!phone) {
+                            const words = normalized.split(' ').filter(w => w.length > 2);
+                            for (const [key, master] of dealerMasterMap) {
+                                let matches = 0;
+                                for (const word of words) {
+                                    if (key.includes(word)) matches++;
+                                }
+                                const score = words.length > 0 ? matches / words.length : 0;
+                                if (score > 0.6) {
+                                    phone = master.phone || phone;
+                                    district = master.district || district;
+                                    if (phone) {
+                                        console.log(`📞 Word match (${Math.round(score * 100)}%): "${name}" -> ${phone}`);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    return {
+                        name: name,
+                        normalized: normalized,
+                        phone: phone || '',
+                        district: district || '',
+                        offerCount: d.offerCount || 0,
+                        hasPhone: !!phone,
+                        myStockCount: d.myStockCount || 0,
+                        distStockCount: d.distStockCount || 0
+                    };
+                });
                 
                 // Sort by offer count (highest first)
                 dealers.sort((a, b) => b.offerCount - a.offerCount);
                 
-                console.log(`✅ Found ${dealers.length} dealers with offers in IndexedDB`);
+                const withPhoneCount = dealers.filter(d => d.hasPhone).length;
+                console.log(`✅ Found ${dealers.length} dealers with offers`);
+                console.log(`📞 ${withPhoneCount} have phone numbers`);
             }
         }
         
-        // Fallback: if no IndexedDB dealers, try BrochureGenerator
+        // ============================================================
+        // STEP 4: Fallback to BrochureGenerator if no IndexedDB data
+        // ============================================================
         if (dealers.length === 0 && typeof BrochureGenerator !== 'undefined') {
             console.log('⚠️ No dealers in IndexedDB, trying BrochureGenerator...');
             const localDealers = await BrochureGenerator.getDealersWithOffers();
             if (localDealers && localDealers.length > 0) {
-                dealers = localDealers.map(d => ({
-                    name: d.name || 'Unknown',
-                    phone: d.phone || '',
-                    district: d.district || '',
-                    offerCount: d.offerCount || 0,
-                    hasPhone: !!d.phone,
-                    myStockCount: d.myStockCount || 0,
-                    distStockCount: d.distStockCount || 0
-                }));
+                dealers = localDealers.map(d => {
+                    const name = d.name || 'Unknown';
+                    const normalized = (d.normalized || name).toUpperCase().trim();
+                    
+                    let phone = d.phone || '';
+                    let district = d.district || '';
+                    
+                    // Look up phone from master
+                    if (dealerMasterMap.has(normalized)) {
+                        const master = dealerMasterMap.get(normalized);
+                        phone = master.phone || phone;
+                        district = master.district || district;
+                    }
+                    
+                    return {
+                        name: name,
+                        normalized: normalized,
+                        phone: phone || '',
+                        district: district || '',
+                        offerCount: d.offerCount || 0,
+                        hasPhone: !!phone,
+                        myStockCount: d.myStockCount || 0,
+                        distStockCount: d.distStockCount || 0
+                    };
+                });
                 console.log(`✅ Found ${dealers.length} dealers from BrochureGenerator`);
             }
         }
@@ -1328,22 +1515,30 @@ async function generateAllFlyers() {
             return;
         }
         
-        // Update the dealer count display
+        // ============================================================
+        // STEP 5: Update UI and generate flyer cards
+        // ============================================================
         const dealerCountEl = document.getElementById('dealerCount');
         if (dealerCountEl) {
             dealerCountEl.innerText = dealers.length;
         }
         
-        // === Generate flyer cards ===
         const div = document.getElementById('flyerList');
         if (div) {
             div.innerHTML = '';
             
-            // Show count
             const totalOffers = dealers.reduce((sum, d) => sum + d.offerCount, 0);
+            const dealersWithPhone = dealers.filter(d => d.hasPhone).length;
+            
+            // Summary header
             const countInfo = document.createElement('div');
             countInfo.style.cssText = 'width:100%;padding:10px;background:#0f172a;border-radius:8px;margin-bottom:10px;color:#94a3b8;font-size:14px;';
-            countInfo.innerHTML = `📊 Showing <strong style="color:#facc15;">${dealers.length}</strong> dealers with offers (total offers: <strong style="color:#4ade80;">${totalOffers.toLocaleString()}</strong>)`;
+            countInfo.innerHTML = `
+                📊 Showing <strong style="color:#facc15;">${dealers.length}</strong> dealers with offers 
+                (total offers: <strong style="color:#4ade80;">${totalOffers.toLocaleString()}</strong>) 
+                | 📞 <strong style="color:#25D366;">${dealersWithPhone}</strong> have phone numbers
+                | ⚠️ <strong style="color:#f87171;">${dealers.length - dealersWithPhone}</strong> need phone numbers
+            `;
             div.appendChild(countInfo);
             
             // Create flyer cards
@@ -1359,25 +1554,24 @@ async function generateAllFlyers() {
                     <div>Total Offers: <strong style="color:#4ade80;">${d.offerCount}</strong></div>
                     <div style="font-size:11px;color:#94a3b8;">
                         My Stock: ${d.myStockCount || 0} | Dist Stock: ${d.distStockCount || 0}
-                        ${d.hasPhone ? ' 📞 Has Phone' : ' ⚠️ No Phone'}
+                        ${d.hasPhone ? ` 📞 <span style="color:#25D366;font-weight:bold;">${d.phone}</span>` : ' ⚠️ <span style="color:#f87171;">No Phone</span>'}
                         ${d.district ? ` 📍 ${escapeHtml(d.district)}` : ''}
                     </div>
                     <div class="flyer-buttons">
                         <button class="btn btn-small" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
                         <button class="btn btn-purple btn-small" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
                         <button class="btn btn-excel btn-small" onclick="exportSingleExcel('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📊 Excel</button>
-                        ${d.hasPhone ? `<button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i></button>` : ''}
+                        ${d.hasPhone ? `<button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i> Send</button>` : `<button class="btn btn-secondary btn-small" disabled title="No phone number available"><i class="fas fa-phone-slash"></i> No Phone</button>`}
                     </div>
                 `;
                 div.appendChild(card);
                 
-                // Add small delay to prevent UI freeze
                 if (count % 20 === 0) {
                     await new Promise(r => setTimeout(r, 10));
                 }
             }
             
-            showToast(`✅ Generated ${count} flyers from ${dealers.length} dealers`, 'success');
+            showToast(`✅ Generated ${count} flyers (${dealersWithPhone} with phone numbers)`, 'success');
         }
         
     } catch(err) {
@@ -1390,7 +1584,6 @@ async function generateAllFlyers() {
         }
     }
 }
-
 async function previewFlyer(dealerName) {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
