@@ -19,7 +19,7 @@ LOAD LIBRARIES FIRST (CDN)
 LOAD APPLICATION SCRIPTS IN ORDER
 ============================================ -->
 <script src="js/utils.js"></script>
-<script src="js/db-manager.js"></script>        <!-- ← MUST BE BEFORE dealer-intelligence.js -->
+<script src="js/db-manager.js"></script>
 <script src="js/dealer-intelligence.js"></script>
 <script src="js/brochure-generator.js"></script>
     
@@ -149,6 +149,9 @@ LOAD APPLICATION SCRIPTS IN ORDER
             padding: 15px;
             min-width: 280px;
             border: 1px solid #334155;
+            flex: 1;
+            min-width: 250px;
+            max-width: 350px;
         }
         .flyer-title { color: #facc15; font-size: 18px; margin-bottom: 8px; }
         .flyer-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
@@ -367,6 +370,13 @@ LOAD APPLICATION SCRIPTS IN ORDER
             font-size: 11px;
         }
         
+        .flyers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -382,6 +392,13 @@ LOAD APPLICATION SCRIPTS IN ORDER
                 min-width: 30px;
                 height: 30px;
                 font-size: 10px;
+            }
+            .flyers-grid {
+                grid-template-columns: 1fr;
+            }
+            .flyer-card {
+                min-width: unset;
+                max-width: unset;
             }
         }
     </style>
@@ -447,9 +464,7 @@ LOAD APPLICATION SCRIPTS IN ORDER
         <div class="stat-card"><div class="stat-number" id="dealerCount">0</div><div>Dealers with Offers</div></div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- ACTION BAR - Flyer button beside Analysis button              -->
-    <!-- ============================================================ -->
+    <!-- ACTION BAR -->
     <div class="action-bar">
         <div class="btn-group">
             <button class="btn btn-success" id="runAnalysisBtn" onclick="runAnalysis()">
@@ -458,16 +473,15 @@ LOAD APPLICATION SCRIPTS IN ORDER
             <button class="btn btn-flyer" onclick="generateBestFlyer()" title="Generate Flyer for Best Dealer">
                 <i class="fas fa-star"></i> Best Flyer
             </button>
-            <!-- FIXED: Added id="generateFlyersBtn" -->
             <button class="btn btn-warning" id="generateFlyersBtn" onclick="generateAllFlyers()">
                 <i class="fas fa-file-alt"></i> Generate Flyers
             </button>
             <button class="btn btn-status" onclick="checkDatabaseStatus()">
-    <i class="fas fa-database"></i> DB Status
-</button>
-<button class="btn btn-danger" onclick="clearDatabase()">
-    <i class="fas fa-trash"></i> Clear DB
-</button>
+                <i class="fas fa-database"></i> DB Status
+            </button>
+            <button class="btn btn-danger" onclick="clearDatabase()">
+                <i class="fas fa-trash"></i> Clear DB
+            </button>
         </div>
         <div class="divider"></div>
         <div class="btn-group">
@@ -737,7 +751,7 @@ LOAD APPLICATION SCRIPTS IN ORDER
 
     <!-- Flyers List -->
     <h2 style="margin-top:20px;">Dealer Flyers</h2>
-    <div id="flyerList" class="flex" style="margin-top:15px;"></div>
+    <div id="flyerList" class="flyers-grid" style="margin-top:15px;"></div>
 </div>
 
 <script>
@@ -1104,18 +1118,20 @@ async function runAnalysis() {
         document.getElementById('areasCount').innerText = result?.areasAnalysed || 0;
         displayOffers(result?.offers || []);
         
-        if (window.BrochureGenerator) {
-            const dealers = await BrochureGenerator.getDealersWithOffers();
-            document.getElementById('dealerCount').innerText = dealers?.length || 0;
+        // Update dealer count from IndexedDB
+        if (typeof DealerDB !== 'undefined') {
+            try {
+                const status = await DealerDB.getStorageStatus();
+                document.getElementById('dealerCount').innerText = status.dealerCount || 0;
+            } catch(e) {
+                console.warn('Could not get dealer count from IndexedDB:', e);
+            }
         }
         
-        setTimeout(() => {
-            if (typeof loadAllDealersFromPagination === 'function') {
-                loadAllDealersFromPagination();
-            }
-            if (typeof loadAllFlyerDealersFromPagination === 'function') {
-                loadAllFlyerDealersFromPagination();
-            }
+        // Load all dealers from IndexedDB
+        setTimeout(async () => {
+            await loadAllDealersFromPagination();
+            await loadAllFlyerDealersFromPagination();
         }, 1000);
         
         showToast(`✅ Analysis complete: ${result?.offersGenerated || 0} offers generated`, 'success');
@@ -1245,86 +1261,128 @@ async function sendSingleWhatsApp(dealerName) {
 }
 
 // ============================================================
-// GENERATE ALL FLYERS - FIXED with null checks
+// GENERATE ALL FLYERS - FIXED: Loads from IndexedDB
 // ============================================================
 async function generateAllFlyers() {
     const btn = document.getElementById('generateFlyersBtn');
     
     try {
-        if (typeof BrochureGenerator === 'undefined') { 
-            showToast('BrochureGenerator not loaded', 'error');
-            return; 
-        }
-        
-        // FIX: Check if button exists before setting properties
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading from database...';
         }
         
-        showToast('Generating flyers...', 'info');
-        
-        await BrochureGenerator.loadDealerMaster();
-        BrochureGenerator.loadOffers();
+        showToast('Loading all dealers from IndexedDB...', 'info');
         
         let dealers = [];
         
-        if (typeof BrochureGeneratorPagination !== 'undefined') {
-            const allDealers = BrochureGeneratorPagination.getAllDealers();
-            if (allDealers && allDealers.length > 0) {
-                dealers = allDealers.map(d => ({
-                    name: d.name,
-                    offerCount: d.offerCount || d.offers?.length || 0,
-                    hasPhone: !!d.phone,
+        // === FIX: Load from IndexedDB directly ===
+        if (typeof DealerDB !== 'undefined') {
+            const dbDealers = await DealerDB.getAllDealersFromDB();
+            
+            if (dbDealers && dbDealers.length > 0) {
+                console.log(`📊 Loaded ${dbDealers.length} dealers from IndexedDB`);
+                
+                dealers = dbDealers.map(d => ({
+                    name: d.name || d.normalized || 'Unknown',
+                    normalized: d.normalized || d.name?.toUpperCase() || '',
                     phone: d.phone || '',
-                    district: d.district || ''
+                    district: d.district || '',
+                    offerCount: d.offerCount || 0,
+                    hasPhone: !!d.phone,
+                    myStockCount: d.myStockCount || 0,
+                    distStockCount: d.distStockCount || 0
                 }));
+                
+                // Sort by offer count (highest first)
+                dealers.sort((a, b) => b.offerCount - a.offerCount);
+                
+                console.log(`✅ Found ${dealers.length} dealers with offers in IndexedDB`);
+            }
+        }
+        
+        // Fallback: if no IndexedDB dealers, try BrochureGenerator
+        if (dealers.length === 0 && typeof BrochureGenerator !== 'undefined') {
+            console.log('⚠️ No dealers in IndexedDB, trying BrochureGenerator...');
+            const localDealers = await BrochureGenerator.getDealersWithOffers();
+            if (localDealers && localDealers.length > 0) {
+                dealers = localDealers.map(d => ({
+                    name: d.name || 'Unknown',
+                    phone: d.phone || '',
+                    district: d.district || '',
+                    offerCount: d.offerCount || 0,
+                    hasPhone: !!d.phone,
+                    myStockCount: d.myStockCount || 0,
+                    distStockCount: d.distStockCount || 0
+                }));
+                console.log(`✅ Found ${dealers.length} dealers from BrochureGenerator`);
             }
         }
         
         if (dealers.length === 0) {
-            dealers = await BrochureGenerator.getDealersWithOffers();
-        }
-        
-        const div = document.getElementById('flyerList');
-        if (div) {
-            div.innerHTML = '';
-        }
-        
-        if (!dealers || dealers.length === 0) {
-            if (div) {
-                div.innerHTML = '<div style="color:#facc15;padding:20px;">No flyers found. Run Analysis first.</div>';
+            showToast('No dealers found. Run Analysis first.', 'warning');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-file-alt"></i> Generate Flyers';
             }
-            showToast('No flyers found', 'warning');
             return;
         }
         
-        if (div) {
-            dealers.forEach(d => {
-                div.innerHTML += `
-                    <div class="flyer-card">
-                        <div class="flyer-title">${escapeHtml(d.name)}</div>
-                        <div>Total Offers: ${d.offerCount || 0}</div>
-                        <div style="font-size:11px;color:#94a3b8;">${d.hasPhone ? '📞 Has Phone' : '⚠️ No Phone'}</div>
-                        <div class="flyer-buttons">
-                            <button class="btn btn-small" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
-                            <button class="btn btn-purple btn-small" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
-                            <button class="btn btn-excel btn-small" onclick="exportSingleExcel('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📊 Excel</button>
-                            <button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i></button>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-        
+        // Update the dealer count display
         const dealerCountEl = document.getElementById('dealerCount');
         if (dealerCountEl) {
             dealerCountEl.innerText = dealers.length;
         }
-        showToast(`✅ Generated ${dealers.length} flyers`, 'success');
-    } catch(err) { 
-        console.error(err); 
-        showToast(err.message, 'error');
+        
+        // === Generate flyer cards ===
+        const div = document.getElementById('flyerList');
+        if (div) {
+            div.innerHTML = '';
+            
+            // Show count
+            const totalOffers = dealers.reduce((sum, d) => sum + d.offerCount, 0);
+            const countInfo = document.createElement('div');
+            countInfo.style.cssText = 'width:100%;padding:10px;background:#0f172a;border-radius:8px;margin-bottom:10px;color:#94a3b8;font-size:14px;';
+            countInfo.innerHTML = `📊 Showing <strong style="color:#facc15;">${dealers.length}</strong> dealers with offers (total offers: <strong style="color:#4ade80;">${totalOffers.toLocaleString()}</strong>)`;
+            div.appendChild(countInfo);
+            
+            // Create flyer cards
+            let count = 0;
+            for (const d of dealers) {
+                if (d.offerCount === 0) continue;
+                
+                count++;
+                const card = document.createElement('div');
+                card.className = 'flyer-card';
+                card.innerHTML = `
+                    <div class="flyer-title">${escapeHtml(d.name)}</div>
+                    <div>Total Offers: <strong style="color:#4ade80;">${d.offerCount}</strong></div>
+                    <div style="font-size:11px;color:#94a3b8;">
+                        My Stock: ${d.myStockCount || 0} | Dist Stock: ${d.distStockCount || 0}
+                        ${d.hasPhone ? ' 📞 Has Phone' : ' ⚠️ No Phone'}
+                        ${d.district ? ` 📍 ${escapeHtml(d.district)}` : ''}
+                    </div>
+                    <div class="flyer-buttons">
+                        <button class="btn btn-small" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
+                        <button class="btn btn-purple btn-small" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
+                        <button class="btn btn-excel btn-small" onclick="exportSingleExcel('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📊 Excel</button>
+                        ${d.hasPhone ? `<button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i></button>` : ''}
+                    </div>
+                `;
+                div.appendChild(card);
+                
+                // Add small delay to prevent UI freeze
+                if (count % 20 === 0) {
+                    await new Promise(r => setTimeout(r, 10));
+                }
+            }
+            
+            showToast(`✅ Generated ${count} flyers from ${dealers.length} dealers`, 'success');
+        }
+        
+    } catch(err) {
+        console.error('Error generating flyers:', err);
+        showToast('Error: ' + err.message, 'error');
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -1575,7 +1633,7 @@ function showToast(message, type = 'info') {
 }
 
 // ============================================================
-// DEALER COUNTER - PAGINATION SYSTEM
+// DEALER COUNTER - PAGINATION SYSTEM (FIXED: Loads from IndexedDB)
 // ============================================================
 
 let dealerCounterList = [];
@@ -1585,33 +1643,66 @@ let dealerGridCurrentPage = 1;
 let dealerGridPerPage = 20;
 let dealerGridAllDealers = [];
 
-function loadAllDealersFromPagination() {
+async function loadAllDealersFromPagination() {
     try {
-        if (typeof BrochureGeneratorPagination === 'undefined') {
-            showToast('Pagination not ready. Click again.', 'warning');
-            return;
+        showToast('Loading all dealers from database...', 'info');
+        
+        let dealers = [];
+        
+        // Load from IndexedDB
+        if (typeof DealerDB !== 'undefined') {
+            const dbDealers = await DealerDB.getAllDealersFromDB();
+            
+            if (dbDealers && dbDealers.length > 0) {
+                console.log(`📊 Loaded ${dbDealers.length} dealers from IndexedDB`);
+                
+                dealers = dbDealers.map(d => ({
+                    name: d.name || d.normalized || 'Unknown',
+                    normalized: d.normalized || d.name?.toUpperCase() || '',
+                    phone: d.phone || '',
+                    district: d.district || '',
+                    offerCount: d.offerCount || 0,
+                    hasPhone: !!d.phone,
+                    myStockCount: d.myStockCount || 0,
+                    distStockCount: d.distStockCount || 0,
+                    offers: []
+                }));
+                
+                // Sort by offer count
+                dealers.sort((a, b) => b.offerCount - a.offerCount);
+            }
         }
         
-        showToast('Loading all dealers...', 'info');
-        const dealers = BrochureGeneratorPagination.loadAllDealers();
+        // Fallback to localStorage
+        if (dealers.length === 0 && typeof BrochureGenerator !== 'undefined') {
+            console.log('⚠️ No dealers in IndexedDB, using localStorage...');
+            const localDealers = await BrochureGenerator.getDealersWithOffers();
+            if (localDealers && localDealers.length > 0) {
+                dealers = localDealers;
+            }
+        }
         
-        if (!dealers || dealers.length === 0) {
+        if (dealers.length === 0) {
             showToast('No dealers found. Run analysis first.', 'warning');
             return;
         }
         
+        // Update the dealer counter
         dealerGridAllDealers = dealers;
         document.getElementById('dealerTotalCount').innerText = `(${dealers.length} total dealers)`;
-        document.getElementById('dealerCounterStatus').innerText = `✅ Loaded ${dealers.length} dealers`;
+        document.getElementById('dealerCounterStatus').innerText = `✅ Loaded ${dealers.length} dealers from database`;
         document.getElementById('dealerGridContainer').style.display = 'block';
         
         dealerGridCurrentPage = 1;
         dealerCounterIndex = 0;
-        dealerCounterList = dealerGridAllDealers.slice(0, dealerGridPerPage);
-        dealerCounterUpdateUI();
-        dealerGridRenderPage();
+        dealerGridPerPage = parseInt(document.getElementById('dealerPerPage').value) || 20;
         
-        showToast(`✅ Loaded ${dealers.length} dealers`, 'success');
+        dealerGridRenderPage();
+        dealerCounterUpdateUI();
+        
+        showToast(`✅ Loaded ${dealers.length} dealers from database`, 'success');
+        console.log(`✅ Loaded ${dealers.length} dealers with pagination`);
+        
     } catch(err) {
         console.error('Error loading dealers:', err);
         showToast('Error loading dealers: ' + err.message, 'error');
@@ -1670,14 +1761,6 @@ function dealerGridRenderPage() {
     document.getElementById('dealerGridStart2').innerText = start + 1;
     document.getElementById('dealerGridEnd2').innerText = end;
     document.getElementById('dealerGridTotal2').innerText = totalDealers;
-    
-    document.querySelectorAll('#dealerPaginationTop .page-btn, #dealerPaginationBottom .page-btn').forEach(btn => {
-        if (btn.textContent === '◄') {
-            btn.disabled = dealerGridCurrentPage <= 1;
-        } else if (btn.textContent === '►') {
-            btn.disabled = dealerGridCurrentPage >= totalPages;
-        }
-    });
 }
 
 function dealerGridPrevPage() {
@@ -1751,82 +1834,67 @@ function dealerCounterUpdateUI() {
 }
 
 function dealerCounterNext() {
-    if (typeof BrochureGeneratorPagination === 'undefined') {
-        showToast('Pagination not loaded. Click "Load All Dealers" first.', 'warning');
-        return;
-    }
-    const dealer = BrochureGeneratorPagination.next();
-    if (dealer) {
-        const info = BrochureGeneratorPagination.getPaginationInfo();
-        dealerGridCurrentPage = info.currentPage;
-        dealerGridAllDealers = BrochureGeneratorPagination.getAllDealers();
-        dealerCounterList = BrochureGeneratorPagination.getDealersList();
-        dealerCounterIndex = BrochureGeneratorPagination.getCurrentIndex();
+    if (dealerCounterList.length === 0) { showToast('No dealers loaded.', 'warning'); return; }
+    if (dealerCounterIndex < dealerCounterList.length - 1) {
+        dealerCounterIndex++;
         dealerCounterUpdateUI();
-        dealerGridRenderPage();
+    } else {
+        dealerGridNextPage();
+        dealerCounterIndex = 0;
+        dealerCounterUpdateUI();
     }
 }
 
 function dealerCounterPrev() {
-    if (typeof BrochureGeneratorPagination === 'undefined') {
-        showToast('Pagination not loaded. Click "Load All Dealers" first.', 'warning');
-        return;
-    }
-    const dealer = BrochureGeneratorPagination.prev();
-    if (dealer) {
-        const info = BrochureGeneratorPagination.getPaginationInfo();
-        dealerGridCurrentPage = info.currentPage;
-        dealerGridAllDealers = BrochureGeneratorPagination.getAllDealers();
-        dealerCounterList = BrochureGeneratorPagination.getDealersList();
-        dealerCounterIndex = BrochureGeneratorPagination.getCurrentIndex();
+    if (dealerCounterList.length === 0) { showToast('No dealers loaded.', 'warning'); return; }
+    if (dealerCounterIndex > 0) {
+        dealerCounterIndex--;
         dealerCounterUpdateUI();
-        dealerGridRenderPage();
+    } else if (dealerGridCurrentPage > 1) {
+        dealerGridPrevPage();
+        dealerCounterIndex = dealerCounterList.length - 1;
+        dealerCounterUpdateUI();
     }
 }
 
 function dealerCounterGoToFirst() {
-    if (typeof BrochureGeneratorPagination === 'undefined') { showToast('Pagination not loaded.', 'warning'); return; }
-    const dealer = BrochureGeneratorPagination.goToFirst();
-    if (dealer) {
-        const info = BrochureGeneratorPagination.getPaginationInfo();
-        dealerGridCurrentPage = info.currentPage;
-        dealerGridAllDealers = BrochureGeneratorPagination.getAllDealers();
-        dealerCounterList = BrochureGeneratorPagination.getDealersList();
-        dealerCounterIndex = BrochureGeneratorPagination.getCurrentIndex();
-        dealerCounterUpdateUI();
-        dealerGridRenderPage();
-    }
+    if (dealerGridAllDealers.length === 0) return;
+    dealerGridCurrentPage = 1;
+    dealerGridRenderPage();
+    dealerCounterIndex = 0;
+    dealerCounterUpdateUI();
 }
 
 function dealerCounterGoToLast() {
-    if (typeof BrochureGeneratorPagination === 'undefined') { showToast('Pagination not loaded.', 'warning'); return; }
-    const dealer = BrochureGeneratorPagination.goToLast();
-    if (dealer) {
-        const info = BrochureGeneratorPagination.getPaginationInfo();
-        dealerGridCurrentPage = info.currentPage;
-        dealerGridAllDealers = BrochureGeneratorPagination.getAllDealers();
-        dealerCounterList = BrochureGeneratorPagination.getDealersList();
-        dealerCounterIndex = BrochureGeneratorPagination.getCurrentIndex();
-        dealerCounterUpdateUI();
-        dealerGridRenderPage();
-    }
+    if (dealerGridAllDealers.length === 0) return;
+    const totalPages = Math.ceil(dealerGridAllDealers.length / dealerGridPerPage);
+    dealerGridCurrentPage = totalPages;
+    dealerGridRenderPage();
+    dealerCounterIndex = dealerCounterList.length - 1;
+    dealerCounterUpdateUI();
 }
 
 function dealerCounterRefresh() { loadAllDealersFromPagination(); }
 
 function dealerCounterSort(mode) {
-    if (typeof BrochureGeneratorPagination === 'undefined') { showToast('Pagination not loaded.', 'warning'); return; }
     dealerCounterSortMode = mode;
-    const dealer = BrochureGeneratorPagination.setSort(mode);
-    if (dealer) {
-        const info = BrochureGeneratorPagination.getPaginationInfo();
-        dealerGridCurrentPage = info.currentPage;
-        dealerGridAllDealers = BrochureGeneratorPagination.getAllDealers();
-        dealerCounterList = BrochureGeneratorPagination.getDealersList();
-        dealerCounterIndex = BrochureGeneratorPagination.getCurrentIndex();
-        dealerCounterUpdateUI();
-        dealerGridRenderPage();
+    if (mode === 'alphabetical') {
+        dealerGridAllDealers.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+        dealerGridAllDealers.sort((a, b) => {
+            const aHasStock = (a.myStockCount || 0) > 0;
+            const bHasStock = (b.myStockCount || 0) > 0;
+            if (aHasStock && !bHasStock) return -1;
+            if (!aHasStock && bHasStock) return 1;
+            if (a.offerCount !== b.offerCount) return b.offerCount - a.offerCount;
+            return a.name.localeCompare(b.name);
+        });
     }
+    dealerGridCurrentPage = 1;
+    dealerGridRenderPage();
+    dealerCounterIndex = 0;
+    dealerCounterUpdateUI();
+    
     document.getElementById('sortAlphaBtn').className = `btn btn-small ${mode === 'alphabetical' ? 'btn-active' : 'btn-secondary'}`;
     document.getElementById('sortPriorityBtn').className = `btn btn-small ${mode === 'priority' ? 'btn-active' : 'btn-secondary'}`;
     showToast(`Sorted: ${mode === 'alphabetical' ? 'Alphabetical' : 'Priority (Stock First)'}`, 'info');
@@ -1858,7 +1926,7 @@ function dealerCounterDownloadPDF() {
 }
 
 // ============================================================
-// FLYER COUNTER
+// FLYER COUNTER (FIXED: Loads from IndexedDB)
 // ============================================================
 
 let flyerCounterList = [];
@@ -1868,33 +1936,69 @@ let flyerGridCurrentPage = 1;
 let flyerGridPerPage = 20;
 let flyerGridAllDealers = [];
 
-function loadAllFlyerDealersFromPagination() {
+async function loadAllFlyerDealersFromPagination() {
     try {
-        if (typeof BrochureGeneratorPagination === 'undefined') {
-            showToast('Pagination not ready. Click again.', 'warning');
+        showToast('Loading flyer dealers from database...', 'info');
+        
+        let dealers = [];
+        
+        // Load from IndexedDB
+        if (typeof DealerDB !== 'undefined') {
+            const dbDealers = await DealerDB.getAllDealersFromDB();
+            
+            if (dbDealers && dbDealers.length > 0) {
+                console.log(`📊 Loaded ${dbDealers.length} flyer dealers from IndexedDB`);
+                
+                dealers = dbDealers.map(d => ({
+                    name: d.name || d.normalized || 'Unknown',
+                    normalized: d.normalized || d.name?.toUpperCase() || '',
+                    phone: d.phone || '',
+                    district: d.district || '',
+                    offerCount: d.offerCount || 0,
+                    hasPhone: !!d.phone,
+                    myStockCount: d.myStockCount || 0,
+                    distStockCount: d.distStockCount || 0,
+                    offers: []
+                }));
+                
+                // Filter dealers with offers
+                dealers = dealers.filter(d => d.offerCount > 0);
+                
+                // Sort by offer count
+                dealers.sort((a, b) => b.offerCount - a.offerCount);
+            }
+        }
+        
+        // Fallback to localStorage
+        if (dealers.length === 0 && typeof BrochureGenerator !== 'undefined') {
+            console.log('⚠️ No dealers in IndexedDB, using localStorage...');
+            const localDealers = await BrochureGenerator.getDealersWithOffers();
+            if (localDealers && localDealers.length > 0) {
+                dealers = localDealers;
+            }
+        }
+        
+        if (dealers.length === 0) {
+            showToast('No flyer dealers found. Run analysis first.', 'warning');
             return;
         }
         
-        showToast('Loading flyer dealers...', 'info');
-        const dealers = BrochureGeneratorPagination.loadAllDealers();
-        
-        if (!dealers || dealers.length === 0) {
-            showToast('No dealers found. Run analysis first.', 'warning');
-            return;
-        }
-        
+        // Update the flyer counter
         flyerGridAllDealers = dealers;
         document.getElementById('flyerTotalCount').innerText = `(${dealers.length} total dealers)`;
-        document.getElementById('flyerCounterStatus').innerText = `✅ Loaded ${dealers.length} flyer dealers`;
+        document.getElementById('flyerCounterStatus').innerText = `✅ Loaded ${dealers.length} flyer dealers from database`;
         document.getElementById('flyerGridContainer').style.display = 'block';
         
         flyerGridCurrentPage = 1;
         flyerCounterIndex = 0;
-        flyerCounterList = flyerGridAllDealers.slice(0, flyerGridPerPage);
-        flyerCounterUpdateUI();
-        flyerGridRenderPage();
+        flyerGridPerPage = parseInt(document.getElementById('flyerPerPage').value) || 20;
         
-        showToast(`✅ Loaded ${dealers.length} flyer dealers`, 'success');
+        flyerGridRenderPage();
+        flyerCounterUpdateUI();
+        
+        showToast(`✅ Loaded ${dealers.length} flyer dealers from database`, 'success');
+        console.log(`✅ Loaded ${dealers.length} flyer dealers with pagination`);
+        
     } catch(err) {
         console.error('Error loading flyer dealers:', err);
         showToast('Error loading flyer dealers: ' + err.message, 'error');
@@ -1953,14 +2057,6 @@ function flyerGridRenderPage() {
     document.getElementById('flyerGridStart2').innerText = start + 1;
     document.getElementById('flyerGridEnd2').innerText = end;
     document.getElementById('flyerGridTotal2').innerText = totalDealers;
-    
-    document.querySelectorAll('#flyerPaginationTop .page-btn, #flyerPaginationBottom .page-btn').forEach(btn => {
-        if (btn.textContent === '◄') {
-            btn.disabled = flyerGridCurrentPage <= 1;
-        } else if (btn.textContent === '►') {
-            btn.disabled = flyerGridCurrentPage >= totalPages;
-        }
-    });
 }
 
 function flyerGridPrevPage() {
@@ -2080,23 +2176,10 @@ function flyerCounterRefresh() { loadAllFlyerDealersFromPagination(); }
 
 function flyerCounterSort(mode) {
     flyerCounterSortMode = mode;
-    flyerGridAllDealers = sortFlyerDealerList(flyerGridAllDealers, mode);
-    flyerGridCurrentPage = 1;
-    flyerCounterIndex = 0;
-    flyerGridRenderPage();
-    flyerCounterUpdateUI();
-    
-    document.getElementById('flyerSortAlphaBtn').className = `btn btn-small ${mode === 'alphabetical' ? 'btn-active' : 'btn-secondary'}`;
-    document.getElementById('flyerSortPriorityBtn').className = `btn btn-small ${mode === 'priority' ? 'btn-active' : 'btn-secondary'}`;
-    showToast(`Sorted: ${mode === 'alphabetical' ? 'Alphabetical' : 'Priority (Stock First)'}`, 'info');
-}
-
-function sortFlyerDealerList(list, mode) {
-    const sorted = [...list];
     if (mode === 'alphabetical') {
-        sorted.sort((a, b) => a.name.localeCompare(b.name));
+        flyerGridAllDealers.sort((a, b) => a.name.localeCompare(b.name));
     } else {
-        sorted.sort((a, b) => {
+        flyerGridAllDealers.sort((a, b) => {
             const aHasStock = (a.myStockCount || 0) > 0;
             const bHasStock = (b.myStockCount || 0) > 0;
             if (aHasStock && !bHasStock) return -1;
@@ -2105,7 +2188,14 @@ function sortFlyerDealerList(list, mode) {
             return a.name.localeCompare(b.name);
         });
     }
-    return sorted;
+    flyerGridCurrentPage = 1;
+    flyerGridRenderPage();
+    flyerCounterIndex = 0;
+    flyerCounterUpdateUI();
+    
+    document.getElementById('flyerSortAlphaBtn').className = `btn btn-small ${mode === 'alphabetical' ? 'btn-active' : 'btn-secondary'}`;
+    document.getElementById('flyerSortPriorityBtn').className = `btn btn-small ${mode === 'priority' ? 'btn-active' : 'btn-secondary'}`;
+    showToast(`Sorted: ${mode === 'alphabetical' ? 'Alphabetical' : 'Priority (Stock First)'}`, 'info');
 }
 
 function flyerCounterGenerateFlyer() {
@@ -2237,65 +2327,6 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ============================================================
-// PAGE LOAD
-// ============================================================
-window.addEventListener('load', function() {
-    console.log('📋 Dashboard loading...');
-    
-    updateDistributorIndicators();
-    
-    const statusEl = document.getElementById('systemStatus');
-    const statusDot = statusEl.querySelector('.status-indicator');
-    const statusText = statusEl.querySelector('.text-muted');
-    
-    setTimeout(() => {
-        if (typeof BrochureGenerator !== 'undefined' && BrochureGenerator.isInitialized && BrochureGenerator.isInitialized()) {
-            statusDot.className = 'status-indicator status-online';
-            statusText.textContent = 'System Ready';
-        } else if (typeof BrochureGenerator !== 'undefined') {
-            statusDot.className = 'status-indicator status-loading';
-            statusText.textContent = 'Initializing...';
-            BrochureGenerator.init().then(() => {
-                statusDot.className = 'status-indicator status-online';
-                statusText.textContent = 'System Ready';
-            });
-        } else {
-            statusDot.className = 'status-indicator status-offline';
-            statusText.textContent = 'Brochure Generator not loaded';
-        }
-    }, 2000);
-    
-    setTimeout(() => {
-        if (typeof DealerIntelligence !== 'undefined') {
-            runAnalysis();
-        } else {
-            document.getElementById('offersTbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:#f87171;">⚠️ DealerIntelligence not loaded. Please refresh.</td></tr>';
-            showToast('DealerIntelligence not loaded. Please refresh.', 'error');
-        }
-    }, 3000);
-    
-    setTimeout(function attemptPaginationLoad() {
-        if (typeof BrochureGeneratorPagination !== 'undefined') {
-            console.log('BrochureGeneratorPagination is ready, loading dealers...');
-            loadAllDealersFromPagination();
-            loadAllFlyerDealersFromPagination();
-        } else if (typeof BrochureGenerator !== 'undefined' && BrochureGenerator.isInitialized()) {
-            console.log('BrochureGenerator is initialized, waiting for pagination...');
-            setTimeout(function() {
-                if (typeof BrochureGeneratorPagination !== 'undefined') {
-                    loadAllDealersFromPagination();
-                    loadAllFlyerDealersFromPagination();
-                } else {
-                    console.log('Click "Load All Dealers" or "Load Flyer Dealers" button.');
-                    showToast('Click "Load All Dealers" button to load pagination.', 'info');
-                }
-            }, 2000);
-        } else {
-            setTimeout(attemptPaginationLoad, 2000);
-        }
-    }, 6000);
-});
-    // ============================================================
 // CHECK DATABASE STATUS
 // ============================================================
 async function checkDatabaseStatus() {
@@ -2317,7 +2348,7 @@ async function checkDatabaseStatus() {
         msg += `   Version: ${status.version}\n`;
         msg += `   Has Data: ${status.hasData ? '✅ Yes' : '❌ No'}`;
         
-        showToast(msg, status.hasData ? 'success' : 'warning');
+        showToast(msg, status.hasData ? 'success' : 'warning', 5000);
         
     } catch(err) {
         console.error(err);
@@ -2371,7 +2402,6 @@ async function loadAllDealersFromDB() {
             return;
         }
         
-        // Update the grid
         dealerGridAllDealers = dealers;
         document.getElementById('dealerTotalCount').innerText = `(${dealers.length} total dealers)`;
         document.getElementById('dealerCounterStatus').innerText = `✅ Loaded ${dealers.length} dealers from DB`;
@@ -2389,7 +2419,67 @@ async function loadAllDealersFromDB() {
         console.error('Error loading dealers from DB:', err);
         showToast('Error: ' + err.message, 'error');
     }
-            }
+}
+
+// ============================================================
+// PAGE LOAD
+// ============================================================
+window.addEventListener('load', function() {
+    console.log('📋 Dashboard loading...');
+    
+    updateDistributorIndicators();
+    
+    const statusEl = document.getElementById('systemStatus');
+    const statusDot = statusEl.querySelector('.status-indicator');
+    const statusText = statusEl.querySelector('.text-muted');
+    
+    setTimeout(() => {
+        if (typeof BrochureGenerator !== 'undefined' && BrochureGenerator.isInitialized && BrochureGenerator.isInitialized()) {
+            statusDot.className = 'status-indicator status-online';
+            statusText.textContent = 'System Ready';
+        } else if (typeof BrochureGenerator !== 'undefined') {
+            statusDot.className = 'status-indicator status-loading';
+            statusText.textContent = 'Initializing...';
+            BrochureGenerator.init().then(() => {
+                statusDot.className = 'status-indicator status-online';
+                statusText.textContent = 'System Ready';
+            });
+        } else {
+            statusDot.className = 'status-indicator status-offline';
+            statusText.textContent = 'Brochure Generator not loaded';
+        }
+    }, 2000);
+    
+    setTimeout(() => {
+        if (typeof DealerIntelligence !== 'undefined') {
+            runAnalysis();
+        } else {
+            document.getElementById('offersTbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:#f87171;">⚠️ DealerIntelligence not loaded. Please refresh.</td></tr>';
+            showToast('DealerIntelligence not loaded. Please refresh.', 'error');
+        }
+    }, 3000);
+    
+    setTimeout(async function attemptPaginationLoad() {
+        if (typeof DealerDB !== 'undefined') {
+            console.log('DealerDB is ready, loading dealers...');
+            await loadAllDealersFromPagination();
+            await loadAllFlyerDealersFromPagination();
+        } else if (typeof BrochureGenerator !== 'undefined' && BrochureGenerator.isInitialized()) {
+            console.log('BrochureGenerator is initialized, waiting for DealerDB...');
+            setTimeout(async function() {
+                if (typeof DealerDB !== 'undefined') {
+                    await loadAllDealersFromPagination();
+                    await loadAllFlyerDealersFromPagination();
+                } else {
+                    console.log('Click "Load All Dealers" or "Load Flyer Dealers" button.');
+                    showToast('Click "Load All Dealers" button to load pagination.', 'info');
+                }
+            }, 2000);
+        } else {
+            setTimeout(attemptPaginationLoad, 2000);
+        }
+    }, 6000);
+});
 </script>
 </body>
-                        </html>
+</html>
