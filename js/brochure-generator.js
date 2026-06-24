@@ -1,5 +1,5 @@
-// brochure-generator.js - COMPLETE FIXED VERSION WITH INDEXEDDB
-// All features: Pagination, IndexedDB, WhatsApp, PDF, Excel
+// brochure-generator.js - COMPLETE FIXED VERSION
+// All fixes applied: phone.replace error, dealer matching, IndexedDB integration
 
 (function () {
 
@@ -83,12 +83,27 @@ const formatDate = Utils.formatDate;
 const formatPhoneForWhatsApp = Utils.formatPhoneForWhatsApp;
 
 // ===================================================
+// SAFE STRING HELPERS (FIX for phone.replace error)
+// ===================================================
+
+function safeString(value) {
+    if (value === null || value === undefined) return '';
+    return String(value);
+}
+
+function safePhone(value) {
+    const str = safeString(value);
+    return str.replace(/\D/g, '');
+}
+
+// ===================================================
 // DATA
 // ===================================================
 let dealerMaster = [];
 let dealerMasterMap = new Map();
 let currentOffers = [];
 let dealerOfferMap = {};
+let dealerOfferMapLower = {}; // Case-insensitive lookup
 let distributorStock = [];
 let distributorStockMap = new Map();
 let currentStock = new Map();
@@ -163,7 +178,7 @@ async function loadExcelFile(url, sheetName = null) {
 }
 
 // ===================================================
-// LOAD DEALER MASTER
+// LOAD DEALER MASTER - FIXED: safeString for all values
 // ===================================================
 async function loadDealerMaster() {
     console.log("🔄 Loading Dealer Master...");
@@ -175,17 +190,17 @@ async function loadDealerMaster() {
         console.log(`📋 Customer Master: ${customers.length} customers`);
         
         for (const c of customers) {
-            const name = c.name || '';
+            const name = safeString(c.name || c.businessName || '');
             if (!name) continue;
             
             const normName = normalizeDealerName(name);
-            const phone = c.mobileNo || c.phone || '';
-            const district = c.district || '';
+            const phone = safePhone(c.mobileNo || c.phone || c.mobile || '');
+            const district = safeString(c.district || c.city || c.place || '');
             
             masterMap.set(normName, {
                 name: name.toUpperCase(),
                 normalized: normName,
-                phone: phone.replace(/\D/g, ''),
+                phone: phone,
                 district: district,
                 source: 'customer-master'
             });
@@ -199,29 +214,29 @@ async function loadDealerMaster() {
         console.log(`📋 Excel Master: ${rows.length} entries`);
         
         for (const row of rows) {
-            const name = row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || row["Name"] || "";
+            const name = safeString(row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || row["Name"] || "");
             if (!name) continue;
             
             const normName = normalizeDealerName(name);
-            const phone = row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "";
-            const district = row["District"] || row["District Name"] || row["PLACE"] || row["Location"] || "";
+            const phone = safePhone(row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "");
+            const district = safeString(row["District"] || row["District Name"] || row["PLACE"] || row["Location"] || "");
             
             if (!masterMap.has(normName)) {
                 masterMap.set(normName, {
                     name: name.toUpperCase(),
                     normalized: normName,
-                    phone: phone.replace(/\D/g, ''),
+                    phone: phone,
                     district: district,
                     source: 'excel'
                 });
             } else {
                 const existing = masterMap.get(normName);
-                if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
+                if (!existing.phone && phone) existing.phone = phone;
                 if (!existing.district && district) existing.district = district;
             }
         }
     } catch(e) {
-        console.warn("Excel master file not found", e);
+        console.warn("Excel master file not found or error:", e);
     }
     
     try {
@@ -230,24 +245,24 @@ async function loadDealerMaster() {
         const allLocal = [...users, ...dealers];
         
         for (const u of allLocal) {
-            const name = u.name || u.business || '';
+            const name = safeString(u.name || u.business || u.businessName || '');
             if (!name) continue;
             
             const normName = normalizeDealerName(name);
-            const phone = u.phone || u.mobile || u.mobileNo || '';
-            const district = u.district || '';
+            const phone = safePhone(u.phone || u.mobile || u.mobileNo || '');
+            const district = safeString(u.district || u.city || '');
             
             if (!masterMap.has(normName)) {
                 masterMap.set(normName, {
                     name: name.toUpperCase(),
                     normalized: normName,
-                    phone: phone.replace(/\D/g, ''),
+                    phone: phone,
                     district: district,
                     source: 'user-dealer'
                 });
             } else {
                 const existing = masterMap.get(normName);
-                if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
+                if (!existing.phone && phone) existing.phone = phone;
                 if (!existing.district && district) existing.district = district;
             }
         }
@@ -258,24 +273,24 @@ async function loadDealerMaster() {
     try {
         const allInvoices = getStorageItem('allInvoices') || [];
         for (const inv of allInvoices) {
-            let name = inv.customerName || inv.buyer?.name || '';
+            let name = safeString(inv.customerName || inv.buyer?.name || '');
             if (!name) continue;
             
             const normName = normalizeDealerName(name);
-            let phone = inv.customerPhone || inv.buyer?.phone || inv.phone || '';
-            let district = inv.customerDistrict || inv.buyer?.district || inv.district || '';
+            let phone = safePhone(inv.customerPhone || inv.buyer?.phone || inv.phone || '');
+            let district = safeString(inv.customerDistrict || inv.buyer?.district || inv.district || '');
             
             if (!masterMap.has(normName)) {
                 masterMap.set(normName, {
                     name: name.toUpperCase(),
                     normalized: normName,
-                    phone: phone.replace(/\D/g, ''),
+                    phone: phone,
                     district: district,
                     source: 'invoice'
                 });
             } else {
                 const existing = masterMap.get(normName);
-                if (!existing.phone && phone) existing.phone = phone.replace(/\D/g, '');
+                if (!existing.phone && phone) existing.phone = phone;
                 if (!existing.district && district) existing.district = district;
             }
         }
@@ -442,21 +457,16 @@ async function loadMyStock() {
 }
 
 // ===================================================
-// LOAD OFFERS - WITH INDEXEDDB SUPPORT
+// LOAD OFFERS - FIXED: Better dealer matching with case-insensitive map
 // ===================================================
 function loadOffers() {
     console.log("🔄 Loading offers...");
     
     currentOffers = [];
     dealerOfferMap = {};
+    dealerOfferMapLower = {};
     
     try {
-        // Try IndexedDB first
-        if (typeof DealerDB !== 'undefined' && DealerDB.isIndexedDBAvailable()) {
-            // Async call - we'll handle this in init
-            console.log('📊 IndexedDB available for offers');
-        }
-        
         const rawData = localStorage.getItem('dealerOffers');
         console.log('📦 Raw data from localStorage:', rawData ? 'Found' : 'Not found');
         
@@ -491,6 +501,7 @@ function loadOffers() {
             return;
         }
         
+        // Build dealer map with multiple variations for better matching
         let builtCount = 0;
         currentOffers.forEach(o => {
             const dealerName = o.dealer || o.dealerRaw || '';
@@ -499,10 +510,28 @@ function loadOffers() {
             const key = normalizeDealerName(dealerName);
             if (!key) return;
             
+            // Store in main map
             if (!dealerOfferMap[key]) {
                 dealerOfferMap[key] = [];
             }
             dealerOfferMap[key].push(o);
+            
+            // Store in lowercase map for case-insensitive matching
+            const lowerKey = key.toLowerCase();
+            if (!dealerOfferMapLower[lowerKey]) {
+                dealerOfferMapLower[lowerKey] = [];
+            }
+            dealerOfferMapLower[lowerKey].push(o);
+            
+            // Store by original name
+            const originalKey = dealerName.trim().toUpperCase();
+            if (originalKey !== key && !dealerOfferMap[originalKey]) {
+                dealerOfferMap[originalKey] = [];
+            }
+            if (originalKey !== key) {
+                dealerOfferMap[originalKey].push(o);
+            }
+            
             builtCount++;
         });
         
@@ -510,10 +539,15 @@ function loadOffers() {
         console.log(`📊 Total offers in memory: ${currentOffers.length}`);
         console.log(`📊 Offers assigned to dealers: ${builtCount}`);
         
+        // Log sample dealer keys for debugging
+        const sampleKeys = Object.keys(dealerOfferMap).slice(0, 10);
+        console.log('📋 Sample dealer keys:', sampleKeys);
+        
     } catch (err) {
         console.error('Error loading offers:', err);
         currentOffers = [];
         dealerOfferMap = {};
+        dealerOfferMapLower = {};
     }
 }
 
@@ -541,6 +575,7 @@ async function loadFromIndexedDB() {
             
             // Rebuild dealer map
             dealerOfferMap = {};
+            dealerOfferMapLower = {};
             offers.forEach(o => {
                 const dealerName = o.dealer || o.dealerRaw || '';
                 if (!dealerName) return;
@@ -548,6 +583,10 @@ async function loadFromIndexedDB() {
                 if (!key) return;
                 if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
                 dealerOfferMap[key].push(o);
+                
+                const lowerKey = key.toLowerCase();
+                if (!dealerOfferMapLower[lowerKey]) dealerOfferMapLower[lowerKey] = [];
+                dealerOfferMapLower[lowerKey].push(o);
             });
             
             console.log(`✅ Loaded ${currentOffers.length} offers from IndexedDB`);
@@ -562,27 +601,13 @@ async function loadFromIndexedDB() {
 }
 
 // ===================================================
-// GET DEALERS WITH OFFERS - WITH INDEXEDDB
+// GET DEALERS WITH OFFERS - FIXED
 // ===================================================
 async function getDealersWithOffers() {
     console.log("🔍 Getting dealers with offers...");
     
     await loadDealerMaster();
     loadOffers();
-    
-    // Try IndexedDB if available
-    let indexedDBDealers = [];
-    if (typeof DealerDB !== 'undefined') {
-        try {
-            const dbDealers = await DealerDB.getAllDealersFromDB();
-            if (dbDealers && dbDealers.length > 0) {
-                indexedDBDealers = dbDealers;
-                console.log(`✅ Found ${dbDealers.length} dealers in IndexedDB`);
-            }
-        } catch(e) {
-            console.warn('Could not load dealers from IndexedDB:', e);
-        }
-    }
     
     const result = [];
     const processed = new Set();
@@ -604,33 +629,7 @@ async function getDealersWithOffers() {
         console.log(`📊 Rebuilt dealerOfferMap with ${Object.keys(dealerOfferMap).length} keys`);
     }
     
-    // Use IndexedDB dealers first
-    if (indexedDBDealers.length > 0) {
-        for (const dealer of indexedDBDealers) {
-            const key = dealer.normalized || normalizeDealerName(dealer.name);
-            if (processed.has(key)) continue;
-            processed.add(key);
-            
-            const offers = dealerOfferMap[key] || [];
-            result.push({
-                name: dealer.name || key,
-                normalized: key,
-                phone: dealer.phone || '',
-                district: dealer.district || '',
-                offerCount: dealer.offerCount || offers.length,
-                hasPhone: !!dealer.phone,
-                myStockCount: dealer.myStockCount || 0,
-                distStockCount: dealer.distStockCount || 0,
-                offers: offers
-            });
-        }
-        
-        console.log(`✅ Found ${result.length} dealers from IndexedDB`);
-        result.sort((a, b) => a.name.localeCompare(b.name));
-        return result;
-    }
-    
-    // Fallback: Build from dealerOfferMap
+    // Build from dealerOfferMap
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
         if (offers.length === 0 || processed.has(key)) continue;
         processed.add(key);
@@ -644,6 +643,9 @@ async function getDealersWithOffers() {
         }
         
         const firstOffer = offers[0];
+        const myStockCount = offers.filter(o => o.stockType === 'my-stock' || o.stockType === 'our-stock').length;
+        const distStockCount = offers.filter(o => o.stockType === 'distributor-stock').length;
+        
         result.push({
             name: (firstOffer.dealer || firstOffer.dealerRaw || key).toUpperCase(),
             normalized: key,
@@ -651,10 +653,43 @@ async function getDealersWithOffers() {
             district: dealer?.district || '',
             offerCount: offers.length,
             hasPhone: !!dealer?.phone,
-            myStockCount: offers.filter(o => o.stockType === 'my-stock').length,
-            distStockCount: offers.filter(o => o.stockType === 'distributor-stock').length,
+            myStockCount: myStockCount,
+            distStockCount: distStockCount,
             offers: offers
         });
+    }
+    
+    // If no results but we have offers, try a different approach
+    if (result.length === 0 && currentOffers.length > 0) {
+        console.log('⚠️ No dealers found in map, building from offers directly...');
+        
+        const tempMap = {};
+        currentOffers.forEach(o => {
+            const name = o.dealer || 'Unknown';
+            if (!tempMap[name]) tempMap[name] = [];
+            tempMap[name].push(o);
+        });
+        
+        for (const [name, offers] of Object.entries(tempMap)) {
+            if (offers.length === 0) continue;
+            const key = normalizeDealerName(name);
+            const dealer = dealerMasterMap.get(key);
+            
+            const myStockCount = offers.filter(o => o.stockType === 'my-stock' || o.stockType === 'our-stock').length;
+            const distStockCount = offers.filter(o => o.stockType === 'distributor-stock').length;
+            
+            result.push({
+                name: name.toUpperCase(),
+                normalized: key,
+                phone: dealer?.phone || '',
+                district: dealer?.district || '',
+                offerCount: offers.length,
+                hasPhone: !!dealer?.phone,
+                myStockCount: myStockCount,
+                distStockCount: distStockCount,
+                offers: offers
+            });
+        }
     }
     
     result.sort((a, b) => a.name.localeCompare(b.name));
@@ -664,21 +699,50 @@ async function getDealersWithOffers() {
 }
 
 // ===================================================
-// FIND DEALER
+// FIND DEALER - FIXED: Better matching with case-insensitive
 // ===================================================
 function findDealer(name) {
     if (!name) return null;
     
     const normalized = normalizeDealerName(name);
+    console.log(`🔍 Finding dealer: "${name}" -> normalized: "${normalized}"`);
     
+    // Priority 1: Exact match in master
     if (dealerMasterMap.has(normalized)) {
         const dealer = dealerMasterMap.get(normalized);
+        console.log(`✅ Exact match found: "${dealer.name}"`);
         return {
             ...dealer,
             name: dealer.name.toUpperCase()
         };
     }
     
+    // Priority 2: Check if dealer is in offer map (even if not in master)
+    if (dealerOfferMap[normalized]) {
+        console.log(`✅ Dealer found in offer map: "${normalized}"`);
+        return {
+            name: normalized,
+            normalized: normalized,
+            phone: '',
+            district: '',
+            source: 'offer-map'
+        };
+    }
+    
+    // Priority 3: Check lowercase map
+    const lowerKey = normalized.toLowerCase();
+    if (dealerOfferMapLower[lowerKey]) {
+        console.log(`✅ Dealer found in lower-case offer map: "${normalized}"`);
+        return {
+            name: normalized,
+            normalized: normalized,
+            phone: '',
+            district: '',
+            source: 'offer-map-lower'
+        };
+    }
+    
+    // Priority 4: Contains match with master
     let bestMatch = null;
     let bestScore = 0;
     
@@ -696,10 +760,11 @@ function findDealer(name) {
     }
     
     if (bestMatch) {
-        console.log(`✅ Found dealer by contains match (${Math.round(bestScore * 100)}%): "${name}"`);
+        console.log(`✅ Found dealer by contains match (${Math.round(bestScore * 100)}%): "${bestMatch.name}"`);
         return bestMatch;
     }
     
+    // Priority 5: Word match
     const words = normalized.split(' ').filter(w => w.length > 2);
     let wordMatch = null;
     let wordScore = 0;
@@ -720,13 +785,15 @@ function findDealer(name) {
     }
     
     if (wordMatch) {
-        console.log(`✅ Found dealer by word match (${Math.round(wordScore * 100)}%): "${name}"`);
+        console.log(`✅ Found dealer by word match (${Math.round(wordScore * 100)}%): "${wordMatch.name}"`);
         return wordMatch;
     }
     
-    if (name && name.length >= 10 && !isNaN(name)) {
+    // Priority 6: Phone number match
+    const phoneNum = safePhone(name);
+    if (phoneNum && phoneNum.length >= 10) {
         for (const [key, dealer] of dealerMasterMap) {
-            if (dealer.phone && dealer.phone === name) {
+            if (dealer.phone && dealer.phone === phoneNum) {
                 console.log(`✅ Found dealer by phone number: "${dealer.name}"`);
                 return {
                     ...dealer,
@@ -736,12 +803,12 @@ function findDealer(name) {
         }
     }
     
-    console.log(`⚠️ No exact dealer match found for "${name}"`);
+    console.log(`⚠️ No match found for "${name}"`);
     return null;
 }
 
 // ===================================================
-// GET ALL DEALER OFFERS
+// GET ALL DEALER OFFERS - FIXED: Better matching
 // ===================================================
 function getAllDealerOffers(name) {
     if (!name) {
@@ -753,12 +820,30 @@ function getAllDealerOffers(name) {
     console.log(`🔍 Looking for offers for: "${name}" (normalized: "${normalized}")`);
     console.log(`📊 Available dealer keys: ${Object.keys(dealerOfferMap).length}`);
     
+    // Try exact match
     if (dealerOfferMap[normalized]) {
         const count = dealerOfferMap[normalized].length;
         console.log(`✅ Found ${count} offers by exact match for "${normalized}"`);
         return dealerOfferMap[normalized];
     }
     
+    // Try original name (without normalization)
+    const originalKey = name.trim().toUpperCase();
+    if (dealerOfferMap[originalKey]) {
+        const count = dealerOfferMap[originalKey].length;
+        console.log(`✅ Found ${count} offers by original name match for "${originalKey}"`);
+        return dealerOfferMap[originalKey];
+    }
+    
+    // Try lower-case map
+    const lowerKey = normalized.toLowerCase();
+    if (dealerOfferMapLower[lowerKey]) {
+        const count = dealerOfferMapLower[lowerKey].length;
+        console.log(`✅ Found ${count} offers by lower-case match for "${lowerKey}"`);
+        return dealerOfferMapLower[lowerKey];
+    }
+    
+    // Try contains match
     let bestMatch = null;
     let bestScore = 0;
     
@@ -777,6 +862,7 @@ function getAllDealerOffers(name) {
         return bestMatch;
     }
     
+    // Try word match
     const words = normalized.split(' ').filter(w => w.length > 2);
     let wordMatch = null;
     let wordScore = 0;
@@ -875,7 +961,9 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
     let charCount = msg.length;
     const MAX_CHARS = 3000;
     
-    for (let o of offers) {
+    const displayOffers = offers.slice(0, 20);
+    
+    for (let o of displayOffers) {
         const prices = calculatePrices(o);
         const stock = prices.stock;
         const desc = o.description || '';
@@ -911,6 +999,10 @@ function generateWhatsAppMessage(dealerName, dealer, offers) {
         
         msg += item;
         charCount += item.length;
+    }
+
+    if (offers.length > displayOffers.length) {
+        msg += `\n*And ${offers.length - displayOffers.length} more offers...*\n`;
     }
 
     msg += `━━━━━━━━━━━━━━━━━━━━\n`;
@@ -955,8 +1047,8 @@ async function sendFlyerToWhatsApp(name) {
             dealer = {
                 name: customerMatch.name.toUpperCase(),
                 normalized: normalizeDealerName(customerMatch.name),
-                phone: customerMatch.mobileNo || customerMatch.phone || '',
-                district: customerMatch.district || '',
+                phone: safePhone(customerMatch.mobileNo || customerMatch.phone || ''),
+                district: safeString(customerMatch.district || ''),
                 source: 'customer-master'
             };
         }
@@ -997,8 +1089,8 @@ function generateFullBrochureHTML(name, page = 0, totalPages = 1, rowsPerPage = 
         const customers = getStorageItem('customers') || [];
         const match = customers.find(c => normalizeDealerName(c.name) === normalizeDealerName(dealerName));
         if (match) {
-            phone = match.mobileNo || match.phone || '';
-            district = match.district || '';
+            phone = safePhone(match.mobileNo || match.phone || '');
+            district = safeString(match.district || '');
         }
     }
 
@@ -1459,7 +1551,7 @@ async function sharePDFToWhatsApp(name) {
         if (!phone) {
             const customers = getStorageItem('customers') || [];
             const match = customers.find(c => normalizeDealerName(c.name) === normalizeDealerName(dealerName));
-            if (match) phone = match.mobileNo || match.phone || '';
+            if (match) phone = safePhone(match.mobileNo || match.phone || '');
         }
         
         if (!phone) {
@@ -1494,6 +1586,7 @@ function clearOffers() {
     localStorage.removeItem('dealerOffers');
     currentOffers = [];
     dealerOfferMap = {};
+    dealerOfferMapLower = {};
     showToast('All offers cleared', 'warning');
 }
 
@@ -1539,8 +1632,8 @@ async function loadDealersFromDB() {
         return dealers.map(d => ({
             name: d.name || d.normalized || 'Unknown',
             normalized: d.normalized || d.name?.toUpperCase() || '',
-            phone: d.phone || '',
-            district: d.district || '',
+            phone: safePhone(d.phone || ''),
+            district: safeString(d.district || ''),
             offerCount: d.offerCount || 0,
             hasPhone: !!d.phone,
             myStockCount: d.myStockCount || 0,
@@ -1609,6 +1702,22 @@ async function saveOffersToDB(offers) {
 }
 
 // ===================================================
+// DEBUG - Show all dealer keys
+// ===================================================
+function debugDealerKeys() {
+    console.log('=== DEALER KEYS DEBUG ===');
+    console.log('dealerOfferMap keys:', Object.keys(dealerOfferMap));
+    console.log('dealerOfferMapLower keys:', Object.keys(dealerOfferMapLower));
+    console.log('Total offers:', currentOffers.length);
+    console.log('=== END DEBUG ===');
+    return {
+        offerKeys: Object.keys(dealerOfferMap),
+        lowerKeys: Object.keys(dealerOfferMapLower),
+        totalOffers: currentOffers.length
+    };
+}
+
+// ===================================================
 // INIT
 // ===================================================
 async function init() {
@@ -1633,6 +1742,7 @@ async function init() {
         console.log(`   📞 Dealers: ${dealerMaster.length}`);
         console.log(`   🏭 Distributor Stock: ${distributorStock.length} items`);
         console.log(`   📝 Descriptions: ${partDescriptions.size}, Applications: ${partApplications.size}`);
+        console.log(`   🗂️  Dealer keys in offer map: ${Object.keys(dealerOfferMap).length}`);
         
         showToast('System Ready', 'success');
         return true;
@@ -1678,6 +1788,7 @@ window.BrochureGenerator = {
         console.log('Current offers count:', currentOffers.length);
         console.log('=== END DEBUG ===');
     },
+    debugDealerKeys: debugDealerKeys,
     findPartMatch,
     cleanPartNumber,
     partDescriptions: partDescriptions,
@@ -1729,7 +1840,7 @@ function buildDealerListFromOffers(offers) {
         }
         const dealer = dealerMap.get(name);
         dealer.offers.push(o);
-        if (o.stockType === 'my-stock') dealer.myStockCount++;
+        if (o.stockType === 'my-stock' || o.stockType === 'our-stock') dealer.myStockCount++;
         else dealer.distStockCount++;
     });
     
@@ -1816,7 +1927,8 @@ function updatePaginationPage() {
         total: totalDealers,
         currentPage: paginationCurrentPage,
         totalPages: totalPages,
-        currentIndex: paginationCurrentIndex    };
+        currentIndex: paginationCurrentIndex
+    };
 }
 
 function paginationNext() {
