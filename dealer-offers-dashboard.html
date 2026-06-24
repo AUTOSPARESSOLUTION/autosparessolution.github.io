@@ -1841,34 +1841,109 @@ async function loadAllDealersFromPagination() {
         showToast('Loading all dealers from database...', 'info');
         
         let dealers = [];
+        let dealerMasterMap = new Map();
+        
+        // Load dealer master from all sources
+        try {
+            // Load from BrochureGenerator
+            if (typeof BrochureGenerator !== 'undefined') {
+                await BrochureGenerator.loadDealerMaster();
+                if (window.BrochureGenerator._dealerMasterMap) {
+                    dealerMasterMap = window.BrochureGenerator._dealerMasterMap;
+                }
+            }
+            
+            // Load from Customer Master
+            const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+            customers.forEach(c => {
+                const name = (c.name || '').toUpperCase().trim();
+                if (name) {
+                    const phone = (c.mobileNo || c.phone || '').replace(/\D/g, '');
+                    if (!dealerMasterMap.has(name) && phone) {
+                        dealerMasterMap.set(name, {
+                            name: name,
+                            phone: phone,
+                            district: c.district || ''
+                        });
+                    }
+                }
+            });
+            
+            // Load from users/dealers
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const dealersData = JSON.parse(localStorage.getItem('dealers') || '[]');
+            [...users, ...dealersData].forEach(u => {
+                const name = (u.name || u.business || '').toUpperCase().trim();
+                if (name) {
+                    const phone = (u.phone || u.mobile || '').replace(/\D/g, '');
+                    if (!dealerMasterMap.has(name) && phone) {
+                        dealerMasterMap.set(name, {
+                            name: name,
+                            phone: phone,
+                            district: u.district || ''
+                        });
+                    }
+                }
+            });
+        } catch(e) {
+            console.warn('Could not load dealer master:', e);
+        }
         
         // Load from IndexedDB
         if (typeof DealerDB !== 'undefined') {
             const dbDealers = await DealerDB.getAllDealersFromDB();
             
             if (dbDealers && dbDealers.length > 0) {
-                console.log(`📊 Loaded ${dbDealers.length} dealers from IndexedDB`);
+                dealers = dbDealers.map(d => {
+                    const name = d.name || d.normalized || 'Unknown';
+                    const normalized = (d.normalized || name).toUpperCase().trim();
+                    
+                    let phone = d.phone || '';
+                    let district = d.district || '';
+                    
+                    // Look up phone from master
+                    if (!phone && dealerMasterMap.has(normalized)) {
+                        const master = dealerMasterMap.get(normalized);
+                        phone = master.phone || '';
+                        district = master.district || district;
+                    }
+                    
+                    // Try contains match if still no phone
+                    if (!phone) {
+                        const words = normalized.split(' ').filter(w => w.length > 2);
+                        for (const [key, master] of dealerMasterMap) {
+                            let matches = 0;
+                            for (const word of words) {
+                                if (key.includes(word)) matches++;
+                            }
+                            if (words.length > 0 && matches / words.length > 0.6) {
+                                phone = master.phone || '';
+                                district = master.district || district;
+                                if (phone) break;
+                            }
+                        }
+                    }
+                    
+                    return {
+                        name: name,
+                        normalized: normalized,
+                        phone: phone || '',
+                        district: district || '',
+                        offerCount: d.offerCount || 0,
+                        hasPhone: !!phone,
+                        myStockCount: d.myStockCount || 0,
+                        distStockCount: d.distStockCount || 0,
+                        offers: []
+                    };
+                });
                 
-                dealers = dbDealers.map(d => ({
-                    name: d.name || d.normalized || 'Unknown',
-                    normalized: d.normalized || d.name?.toUpperCase() || '',
-                    phone: d.phone || '',
-                    district: d.district || '',
-                    offerCount: d.offerCount || 0,
-                    hasPhone: !!d.phone,
-                    myStockCount: d.myStockCount || 0,
-                    distStockCount: d.distStockCount || 0,
-                    offers: []
-                }));
-                
-                // Sort by offer count
                 dealers.sort((a, b) => b.offerCount - a.offerCount);
+                console.log(`✅ Loaded ${dealers.length} dealers, ${dealers.filter(d => d.hasPhone).length} with phone`);
             }
         }
         
         // Fallback to localStorage
         if (dealers.length === 0 && typeof BrochureGenerator !== 'undefined') {
-            console.log('⚠️ No dealers in IndexedDB, using localStorage...');
             const localDealers = await BrochureGenerator.getDealersWithOffers();
             if (localDealers && localDealers.length > 0) {
                 dealers = localDealers;
@@ -1880,10 +1955,10 @@ async function loadAllDealersFromPagination() {
             return;
         }
         
-        // Update the dealer counter
+        const withPhone = dealers.filter(d => d.hasPhone).length;
         dealerGridAllDealers = dealers;
-        document.getElementById('dealerTotalCount').innerText = `(${dealers.length} total dealers)`;
-        document.getElementById('dealerCounterStatus').innerText = `✅ Loaded ${dealers.length} dealers from database`;
+        document.getElementById('dealerTotalCount').innerText = `(${dealers.length} total, ${withPhone} with phone)`;
+        document.getElementById('dealerCounterStatus').innerText = `✅ Loaded ${dealers.length} dealers (${withPhone} with phone)`;
         document.getElementById('dealerGridContainer').style.display = 'block';
         
         dealerGridCurrentPage = 1;
@@ -1893,15 +1968,13 @@ async function loadAllDealersFromPagination() {
         dealerGridRenderPage();
         dealerCounterUpdateUI();
         
-        showToast(`✅ Loaded ${dealers.length} dealers from database`, 'success');
-        console.log(`✅ Loaded ${dealers.length} dealers with pagination`);
+        showToast(`✅ Loaded ${dealers.length} dealers (${withPhone} with phone numbers)`, 'success');
         
     } catch(err) {
         console.error('Error loading dealers:', err);
         showToast('Error loading dealers: ' + err.message, 'error');
     }
 }
-
 function dealerGridRenderPage() {
     const perPage = dealerGridPerPage;
     const totalDealers = dealerGridAllDealers.length;
