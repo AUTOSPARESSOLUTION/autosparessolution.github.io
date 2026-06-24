@@ -180,22 +180,36 @@ async function loadExcelFile(url, sheetName = null) {
 // ===================================================
 // LOAD DEALER MASTER - FIXED: safeString for all values
 // ===================================================
+// ===================================================
+// LOAD DEALER MASTER - FIXED: safeString for all values
+// ===================================================
 async function loadDealerMaster() {
     console.log("🔄 Loading Dealer Master...");
     
     const masterMap = new Map();
+    
+    // Helper function to safely get string values
+    function safeStr(value) {
+        if (value === null || value === undefined) return '';
+        return String(value);
+    }
+    
+    function safePhoneNum(value) {
+        const str = safeStr(value);
+        return str.replace(/\D/g, '');
+    }
     
     try {
         const customers = getStorageItem('customers') || [];
         console.log(`📋 Customer Master: ${customers.length} customers`);
         
         for (const c of customers) {
-            const name = safeString(c.name || c.businessName || '');
+            const name = safeStr(c.name || c.businessName || '');
             if (!name) continue;
             
             const normName = normalizeDealerName(name);
-            const phone = safePhone(c.mobileNo || c.phone || c.mobile || '');
-            const district = safeString(c.district || c.city || c.place || '');
+            const phone = safePhoneNum(c.mobileNo || c.phone || c.mobile || '');
+            const district = safeStr(c.district || c.city || c.place || '');
             
             masterMap.set(normName, {
                 name: name.toUpperCase(),
@@ -214,12 +228,22 @@ async function loadDealerMaster() {
         console.log(`📋 Excel Master: ${rows.length} entries`);
         
         for (const row of rows) {
-            const name = safeString(row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || row["Name"] || "");
+            // SAFELY get values - ensure they are strings before calling .replace
+            let rawName = row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || row["Name"] || "";
+            let rawPhone = row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "";
+            let rawDistrict = row["District"] || row["District Name"] || row["PLACE"] || row["Location"] || "";
+            
+            // Convert to string safely
+            const name = safeStr(rawName);
             if (!name) continue;
             
             const normName = normalizeDealerName(name);
-            const phone = safePhone(row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "");
-            const district = safeString(row["District"] || row["District Name"] || row["PLACE"] || row["Location"] || "");
+            
+            // SAFE: convert phone to string before replace
+            const phoneStr = safeStr(rawPhone);
+            const phone = phoneStr.replace(/\D/g, '');
+            
+            const district = safeStr(rawDistrict);
             
             if (!masterMap.has(normName)) {
                 masterMap.set(normName, {
@@ -245,12 +269,12 @@ async function loadDealerMaster() {
         const allLocal = [...users, ...dealers];
         
         for (const u of allLocal) {
-            const name = safeString(u.name || u.business || u.businessName || '');
+            const name = safeStr(u.name || u.business || u.businessName || '');
             if (!name) continue;
             
             const normName = normalizeDealerName(name);
-            const phone = safePhone(u.phone || u.mobile || u.mobileNo || '');
-            const district = safeString(u.district || u.city || '');
+            const phone = safePhoneNum(u.phone || u.mobile || u.mobileNo || '');
+            const district = safeStr(u.district || u.city || '');
             
             if (!masterMap.has(normName)) {
                 masterMap.set(normName, {
@@ -273,12 +297,12 @@ async function loadDealerMaster() {
     try {
         const allInvoices = getStorageItem('allInvoices') || [];
         for (const inv of allInvoices) {
-            let name = safeString(inv.customerName || inv.buyer?.name || '');
+            let name = safeStr(inv.customerName || inv.buyer?.name || '');
             if (!name) continue;
             
             const normName = normalizeDealerName(name);
-            let phone = safePhone(inv.customerPhone || inv.buyer?.phone || inv.phone || '');
-            let district = safeString(inv.customerDistrict || inv.buyer?.district || inv.district || '');
+            let phone = safePhoneNum(inv.customerPhone || inv.buyer?.phone || inv.phone || '');
+            let district = safeStr(inv.customerDistrict || inv.buyer?.district || inv.district || '');
             
             if (!masterMap.has(normName)) {
                 masterMap.set(normName, {
@@ -309,7 +333,6 @@ async function loadDealerMaster() {
     
     return dealerMaster;
 }
-
 // ===================================================
 // LOAD DISTRIBUTOR STOCK
 // ===================================================
