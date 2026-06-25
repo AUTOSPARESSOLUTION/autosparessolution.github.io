@@ -1,5 +1,8 @@
 // brochure-generator.js - COMPLETE FIXED VERSION
-// All fixes applied: phone.replace error, dealer matching, IndexedDB integration
+// FIXED: RLP CODE as primary key for exact matching
+// FIXED: Exact phone number matching (NO fuzzy matching)
+// FIXED: Preview and flyer list use SAME matching logic
+// FIXED: Verified badge for matched dealers
 
 (function () {
 
@@ -83,7 +86,7 @@ const formatDate = Utils.formatDate;
 const formatPhoneForWhatsApp = Utils.formatPhoneForWhatsApp;
 
 // ===================================================
-// SAFE STRING HELPERS (FIX for phone.replace error)
+// SAFE STRING HELPERS
 // ===================================================
 
 function safeString(value) {
@@ -101,9 +104,9 @@ function safePhone(value) {
 // ===================================================
 let dealerMaster = [];
 let dealerMasterMap = new Map();
+let rlpCodeMap = new Map();  // Primary key: RLP CODE
 let currentOffers = [];
 let dealerOfferMap = {};
-let dealerOfferMapLower = {}; // Case-insensitive lookup
 let distributorStock = [];
 let distributorStockMap = new Map();
 let currentStock = new Map();
@@ -178,17 +181,14 @@ async function loadExcelFile(url, sheetName = null) {
 }
 
 // ===================================================
-// LOAD DEALER MASTER - FIXED: safeString for all values
-// ===================================================
-// ===================================================
-// LOAD DEALER MASTER - FIXED: safeString for all values
+// LOAD DEALER MASTER - FIXED: RLP CODE as PRIMARY KEY
 // ===================================================
 async function loadDealerMaster() {
-    console.log("🔄 Loading Dealer Master...");
+    console.log("🔄 Loading Dealer Master with RLP CODE...");
     
     const masterMap = new Map();
+    const rlpMap = new Map();  // Primary key: RLP CODE
     
-    // Helper function to safely get string values
     function safeStr(value) {
         if (value === null || value === undefined) return '';
         return String(value);
@@ -199,6 +199,71 @@ async function loadDealerMaster() {
         return str.replace(/\D/g, '');
     }
     
+    // ============================================================
+    // SOURCE 1: RETAILER data Deatils.xlsx (PRIMARY SOURCE)
+    // ============================================================
+    try {
+        const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
+        console.log(`📋 Excel Master: ${rows.length} entries`);
+        
+        for (const row of rows) {
+            // Get RLP CODE (Primary Key)
+            const rlpCode = safeStr(row["RLP Code"] || row["RLP CODE"] || row["rlpCode"] || "").trim();
+            
+            // Get Retailer Name
+            const rawName = safeStr(row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || row["Name"] || "");
+            const name = rawName.toUpperCase().trim();
+            if (!name) continue;
+            
+            const normName = normalizeDealerName(name);
+            const phone = safePhoneNum(row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "");
+            const district = safeStr(row["District"] || row["District Name"] || row["PLACE"] || row["Location"] || "");
+            const customerType = safeStr(row["Customer Type"] || "");
+            const ownerName = safeStr(row["Owner Name"] || "");
+            
+            // Store by RLP CODE (Primary)
+            if (rlpCode) {
+                rlpMap.set(rlpCode, {
+                    rlpCode: rlpCode,
+                    name: name,
+                    normalized: normName,
+                    phone: phone,
+                    district: district,
+                    customerType: customerType,
+                    ownerName: ownerName,
+                    source: 'excel'
+                });
+                console.log(`✅ RLP CODE: ${rlpCode} → ${name} (${phone || 'No Phone'})`);
+            }
+            
+            // Also store by name for fallback
+            if (!masterMap.has(normName)) {
+                masterMap.set(normName, {
+                    name: name,
+                    normalized: normName,
+                    phone: phone,
+                    district: district,
+                    rlpCode: rlpCode,
+                    customerType: customerType,
+                    ownerName: ownerName,
+                    source: 'excel'
+                });
+            } else {
+                const existing = masterMap.get(normName);
+                if (!existing.rlpCode && rlpCode) existing.rlpCode = rlpCode;
+                if (!existing.phone && phone) existing.phone = phone;
+                if (!existing.district && district) existing.district = district;
+            }
+        }
+        
+        console.log(`✅ Loaded ${rlpMap.size} dealers with RLP CODE from Excel`);
+    } catch(e) {
+        console.warn("Excel master file not found or error:", e);
+    }
+    
+    // ============================================================
+    // SOURCE 2: Customer Master (localStorage)
+    // ============================================================
     try {
         const customers = getStorageItem('customers') || [];
         console.log(`📋 Customer Master: ${customers.length} customers`);
@@ -210,40 +275,15 @@ async function loadDealerMaster() {
             const normName = normalizeDealerName(name);
             const phone = safePhoneNum(c.mobileNo || c.phone || c.mobile || '');
             const district = safeStr(c.district || c.city || c.place || '');
+            const rlpCode = safeStr(c.rlpCode || c.customerCode || c.code || '');
             
-            masterMap.set(normName, {
-                name: name.toUpperCase(),
-                normalized: normName,
-                phone: phone,
-                district: district,
-                source: 'customer-master'
-            });
-        }
-    } catch(e) {
-        console.warn("Error loading customers:", e);
-    }
-    
-    try {
-        const rows = await loadExcelFile("./data/RETAILER data Deatils.xlsx");
-        console.log(`📋 Excel Master: ${rows.length} entries`);
-        
-        for (const row of rows) {
-            // SAFELY get values - ensure they are strings before calling .replace
-            let rawName = row["Retailer Name"] || row["Customer Name"] || row["Dealer Name"] || row["Name"] || "";
-            let rawPhone = row["Mobile No"] || row["Mobile Number"] || row["Phone"] || "";
-            let rawDistrict = row["District"] || row["District Name"] || row["PLACE"] || row["Location"] || "";
-            
-            // Convert to string safely
-            const name = safeStr(rawName);
-            if (!name) continue;
-            
-            const normName = normalizeDealerName(name);
-            
-            // SAFE: convert phone to string before replace
-            const phoneStr = safeStr(rawPhone);
-            const phone = phoneStr.replace(/\D/g, '');
-            
-            const district = safeStr(rawDistrict);
+            // Check if RLP CODE exists in master
+            if (rlpCode && rlpMap.has(rlpCode)) {
+                const existing = rlpMap.get(rlpCode);
+                if (!existing.phone && phone) existing.phone = phone;
+                if (!existing.district && district) existing.district = district;
+                console.log(`📞 Updated RLP CODE ${rlpCode} with phone: ${phone}`);
+            }
             
             if (!masterMap.has(normName)) {
                 masterMap.set(normName, {
@@ -251,18 +291,23 @@ async function loadDealerMaster() {
                     normalized: normName,
                     phone: phone,
                     district: district,
-                    source: 'excel'
+                    rlpCode: rlpCode,
+                    source: 'customer-master'
                 });
             } else {
                 const existing = masterMap.get(normName);
+                if (!existing.rlpCode && rlpCode) existing.rlpCode = rlpCode;
                 if (!existing.phone && phone) existing.phone = phone;
                 if (!existing.district && district) existing.district = district;
             }
         }
     } catch(e) {
-        console.warn("Excel master file not found or error:", e);
+        console.warn("Error loading customers:", e);
     }
     
+    // ============================================================
+    // SOURCE 3: Users/Dealers (localStorage)
+    // ============================================================
     try {
         const users = getStorageItem('users') || [];
         const dealers = getStorageItem('dealers') || [];
@@ -275,6 +320,13 @@ async function loadDealerMaster() {
             const normName = normalizeDealerName(name);
             const phone = safePhoneNum(u.phone || u.mobile || u.mobileNo || '');
             const district = safeStr(u.district || u.city || '');
+            const rlpCode = safeStr(u.rlpCode || u.customerCode || u.code || '');
+            
+            if (rlpCode && rlpMap.has(rlpCode)) {
+                const existing = rlpMap.get(rlpCode);
+                if (!existing.phone && phone) existing.phone = phone;
+                if (!existing.district && district) existing.district = district;
+            }
             
             if (!masterMap.has(normName)) {
                 masterMap.set(normName, {
@@ -282,10 +334,12 @@ async function loadDealerMaster() {
                     normalized: normName,
                     phone: phone,
                     district: district,
+                    rlpCode: rlpCode,
                     source: 'user-dealer'
                 });
             } else {
                 const existing = masterMap.get(normName);
+                if (!existing.rlpCode && rlpCode) existing.rlpCode = rlpCode;
                 if (!existing.phone && phone) existing.phone = phone;
                 if (!existing.district && district) existing.district = district;
             }
@@ -294,6 +348,9 @@ async function loadDealerMaster() {
         console.warn("Error loading users/dealers:", e);
     }
     
+    // ============================================================
+    // SOURCE 4: Invoices (localStorage)
+    // ============================================================
     try {
         const allInvoices = getStorageItem('allInvoices') || [];
         for (const inv of allInvoices) {
@@ -303,6 +360,13 @@ async function loadDealerMaster() {
             const normName = normalizeDealerName(name);
             let phone = safePhoneNum(inv.customerPhone || inv.buyer?.phone || inv.phone || '');
             let district = safeStr(inv.customerDistrict || inv.buyer?.district || inv.district || '');
+            let rlpCode = safeStr(inv.rlpCode || inv.customerCode || '');
+            
+            if (rlpCode && rlpMap.has(rlpCode)) {
+                const existing = rlpMap.get(rlpCode);
+                if (!existing.phone && phone) existing.phone = phone;
+                if (!existing.district && district) existing.district = district;
+            }
             
             if (!masterMap.has(normName)) {
                 masterMap.set(normName, {
@@ -310,10 +374,12 @@ async function loadDealerMaster() {
                     normalized: normName,
                     phone: phone,
                     district: district,
+                    rlpCode: rlpCode,
                     source: 'invoice'
                 });
             } else {
                 const existing = masterMap.get(normName);
+                if (!existing.rlpCode && rlpCode) existing.rlpCode = rlpCode;
                 if (!existing.phone && phone) existing.phone = phone;
                 if (!existing.district && district) existing.district = district;
             }
@@ -322,17 +388,59 @@ async function loadDealerMaster() {
         console.warn("Error loading invoices:", e);
     }
     
-    dealerMaster = Array.from(masterMap.values());
-    dealerMasterMap = masterMap;
+    // ============================================================
+    // BUILD FINAL MASTER MAP - PRIORITIZE RLP CODE MATCHES
+    // ============================================================
+    
+    // First, add all RLP CODE entries
+    const finalMap = new Map();
+    for (const [rlpCode, data] of rlpMap) {
+        finalMap.set(data.normalized, {
+            ...data,
+            matchedBy: 'rlp-code'
+        });
+    }
+    
+    // Then add name-based entries that don't have RLP CODE
+    for (const [key, data] of masterMap) {
+        if (!finalMap.has(key)) {
+            finalMap.set(key, {
+                ...data,
+                matchedBy: 'name-only'
+            });
+        } else {
+            const existing = finalMap.get(key);
+            if (!existing.phone && data.phone) existing.phone = data.phone;
+            if (!existing.district && data.district) existing.district = data.district;
+            if (!existing.rlpCode && data.rlpCode) existing.rlpCode = data.rlpCode;
+        }
+    }
+    
+    dealerMaster = Array.from(finalMap.values());
+    dealerMasterMap = finalMap;
+    
+    // Store RLP CODE map for quick lookup
+    rlpCodeMap = rlpMap;
+    window._rlpCodeMap = rlpMap;
     
     const withPhone = dealerMaster.filter(d => d.phone).length;
+    const withRlpCode = dealerMaster.filter(d => d.rlpCode).length;
     const withDistrict = dealerMaster.filter(d => d.district).length;
     
     console.log(`✅ Dealer Master: ${dealerMaster.length} dealers`);
-    console.log(`   📞 Has Phone: ${withPhone} | 📍 Has District: ${withDistrict}`);
+    console.log(`   📞 Has Phone: ${withPhone}`);
+    console.log(`   🆔 Has RLP CODE: ${withRlpCode}`);
+    console.log(`   📍 Has District: ${withDistrict}`);
+    
+    // Log sample of RLP CODE matches
+    const sampleRlp = Array.from(rlpMap.entries()).slice(0, 5);
+    sampleRlp.forEach(([code, data]) => {
+        console.log(`   🆔 ${code} → ${data.name} (${data.phone || 'No Phone'})`);
+    });
     
     return dealerMaster;
 }
+
 // ===================================================
 // LOAD DISTRIBUTOR STOCK
 // ===================================================
@@ -480,14 +588,13 @@ async function loadMyStock() {
 }
 
 // ===================================================
-// LOAD OFFERS - FIXED: Better dealer matching with case-insensitive map
+// LOAD OFFERS - EXACT MATCH with RLP CODE
 // ===================================================
 function loadOffers() {
     console.log("🔄 Loading offers...");
     
     currentOffers = [];
     dealerOfferMap = {};
-    dealerOfferMapLower = {};
     
     try {
         const rawData = localStorage.getItem('dealerOffers');
@@ -524,7 +631,7 @@ function loadOffers() {
             return;
         }
         
-        // Build dealer map with multiple variations for better matching
+        // Build dealer map with EXACT matching
         let builtCount = 0;
         currentOffers.forEach(o => {
             const dealerName = o.dealer || o.dealerRaw || '';
@@ -533,26 +640,22 @@ function loadOffers() {
             const key = normalizeDealerName(dealerName);
             if (!key) return;
             
-            // Store in main map
             if (!dealerOfferMap[key]) {
                 dealerOfferMap[key] = [];
             }
             dealerOfferMap[key].push(o);
             
-            // Store in lowercase map for case-insensitive matching
-            const lowerKey = key.toLowerCase();
-            if (!dealerOfferMapLower[lowerKey]) {
-                dealerOfferMapLower[lowerKey] = [];
-            }
-            dealerOfferMapLower[lowerKey].push(o);
-            
-            // Store by original name
-            const originalKey = dealerName.trim().toUpperCase();
-            if (originalKey !== key && !dealerOfferMap[originalKey]) {
-                dealerOfferMap[originalKey] = [];
-            }
-            if (originalKey !== key) {
-                dealerOfferMap[originalKey].push(o);
+            // Also store by RLP CODE if available
+            const rlpMap = window._rlpCodeMap || new Map();
+            for (const [code, data] of rlpMap) {
+                if (normalizeDealerName(data.name) === key) {
+                    if (!dealerOfferMap[code]) {
+                        dealerOfferMap[code] = [];
+                    }
+                    dealerOfferMap[code].push(o);
+                    console.log(`🆔 Mapped RLP CODE "${code}" to "${key}"`);
+                    break;
+                }
             }
             
             builtCount++;
@@ -562,7 +665,6 @@ function loadOffers() {
         console.log(`📊 Total offers in memory: ${currentOffers.length}`);
         console.log(`📊 Offers assigned to dealers: ${builtCount}`);
         
-        // Log sample dealer keys for debugging
         const sampleKeys = Object.keys(dealerOfferMap).slice(0, 10);
         console.log('📋 Sample dealer keys:', sampleKeys);
         
@@ -570,7 +672,6 @@ function loadOffers() {
         console.error('Error loading offers:', err);
         currentOffers = [];
         dealerOfferMap = {};
-        dealerOfferMapLower = {};
     }
 }
 
@@ -596,9 +697,8 @@ async function loadFromIndexedDB() {
         if (offers && offers.length > 0) {
             currentOffers = offers;
             
-            // Rebuild dealer map
+            // Rebuild dealer map with EXACT matching
             dealerOfferMap = {};
-            dealerOfferMapLower = {};
             offers.forEach(o => {
                 const dealerName = o.dealer || o.dealerRaw || '';
                 if (!dealerName) return;
@@ -606,10 +706,6 @@ async function loadFromIndexedDB() {
                 if (!key) return;
                 if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
                 dealerOfferMap[key].push(o);
-                
-                const lowerKey = key.toLowerCase();
-                if (!dealerOfferMapLower[lowerKey]) dealerOfferMapLower[lowerKey] = [];
-                dealerOfferMapLower[lowerKey].push(o);
             });
             
             console.log(`✅ Loaded ${currentOffers.length} offers from IndexedDB`);
@@ -624,105 +720,7 @@ async function loadFromIndexedDB() {
 }
 
 // ===================================================
-// GET DEALERS WITH OFFERS - FIXED
-// ===================================================
-async function getDealersWithOffers() {
-    console.log("🔍 Getting dealers with offers...");
-    
-    await loadDealerMaster();
-    loadOffers();
-    
-    const result = [];
-    const processed = new Set();
-    
-    console.log(`📊 dealerOfferMap keys: ${Object.keys(dealerOfferMap).length}`);
-    
-    if (Object.keys(dealerOfferMap).length === 0 && currentOffers.length > 0) {
-        console.log('⚠️ dealerOfferMap is empty but currentOffers has data. Rebuilding...');
-        
-        currentOffers.forEach(o => {
-            const dealerName = o.dealer || o.dealerRaw || '';
-            if (!dealerName) return;
-            const key = normalizeDealerName(dealerName);
-            if (!key) return;
-            if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
-            dealerOfferMap[key].push(o);
-        });
-        
-        console.log(`📊 Rebuilt dealerOfferMap with ${Object.keys(dealerOfferMap).length} keys`);
-    }
-    
-    // Build from dealerOfferMap
-    for (const [key, offers] of Object.entries(dealerOfferMap)) {
-        if (offers.length === 0 || processed.has(key)) continue;
-        processed.add(key);
-        
-        let dealer = dealerMasterMap.get(key);
-        
-        if (!dealer) {
-            const firstOffer = offers[0];
-            const searchName = firstOffer.dealer || firstOffer.dealerRaw || '';
-            dealer = findDealer(searchName);
-        }
-        
-        const firstOffer = offers[0];
-        const myStockCount = offers.filter(o => o.stockType === 'my-stock' || o.stockType === 'our-stock').length;
-        const distStockCount = offers.filter(o => o.stockType === 'distributor-stock').length;
-        
-        result.push({
-            name: (firstOffer.dealer || firstOffer.dealerRaw || key).toUpperCase(),
-            normalized: key,
-            phone: dealer?.phone || '',
-            district: dealer?.district || '',
-            offerCount: offers.length,
-            hasPhone: !!dealer?.phone,
-            myStockCount: myStockCount,
-            distStockCount: distStockCount,
-            offers: offers
-        });
-    }
-    
-    // If no results but we have offers, try a different approach
-    if (result.length === 0 && currentOffers.length > 0) {
-        console.log('⚠️ No dealers found in map, building from offers directly...');
-        
-        const tempMap = {};
-        currentOffers.forEach(o => {
-            const name = o.dealer || 'Unknown';
-            if (!tempMap[name]) tempMap[name] = [];
-            tempMap[name].push(o);
-        });
-        
-        for (const [name, offers] of Object.entries(tempMap)) {
-            if (offers.length === 0) continue;
-            const key = normalizeDealerName(name);
-            const dealer = dealerMasterMap.get(key);
-            
-            const myStockCount = offers.filter(o => o.stockType === 'my-stock' || o.stockType === 'our-stock').length;
-            const distStockCount = offers.filter(o => o.stockType === 'distributor-stock').length;
-            
-            result.push({
-                name: name.toUpperCase(),
-                normalized: key,
-                phone: dealer?.phone || '',
-                district: dealer?.district || '',
-                offerCount: offers.length,
-                hasPhone: !!dealer?.phone,
-                myStockCount: myStockCount,
-                distStockCount: distStockCount,
-                offers: offers
-            });
-        }
-    }
-    
-    result.sort((a, b) => a.name.localeCompare(b.name));
-    
-    console.log(`✅ Found ${result.length} dealers with offers (sorted alphabetically)`);
-    return result;
-}
-
-// ===================================================
-// FIND DEALER - FIXED: Better matching with case-insensitive
+// FIND DEALER - EXACT MATCH ONLY
 // ===================================================
 function findDealer(name) {
     if (!name) return null;
@@ -730,108 +728,71 @@ function findDealer(name) {
     const normalized = normalizeDealerName(name);
     console.log(`🔍 Finding dealer: "${name}" -> normalized: "${normalized}"`);
     
-    // Priority 1: Exact match in master
-    if (dealerMasterMap.has(normalized)) {
-        const dealer = dealerMasterMap.get(normalized);
-        console.log(`✅ Exact match found: "${dealer.name}"`);
+    // ============================================================
+    // LEVEL 1: EXACT RLP CODE MATCH (Highest Priority)
+    // ============================================================
+    const rlpMap = window._rlpCodeMap || new Map();
+    if (rlpMap.has(normalized) || rlpMap.has(name)) {
+        const code = rlpMap.has(normalized) ? normalized : name;
+        const dealer = rlpMap.get(code);
+        console.log(`✅ EXACT RLP CODE match: "${code}" → "${dealer.name}"`);
         return {
             ...dealer,
-            name: dealer.name.toUpperCase()
+            name: dealer.name,
+            matchedBy: 'rlp-code'
         };
     }
     
-    // Priority 2: Check if dealer is in offer map (even if not in master)
-    if (dealerOfferMap[normalized]) {
-        console.log(`✅ Dealer found in offer map: "${normalized}"`);
+    // ============================================================
+    // LEVEL 2: EXACT NAME MATCH (Normalized)
+    // ============================================================
+    if (dealerMasterMap.has(normalized)) {
+        const dealer = dealerMasterMap.get(normalized);
+        console.log(`✅ EXACT name match: "${dealer.name}"`);
         return {
-            name: normalized,
-            normalized: normalized,
-            phone: '',
-            district: '',
-            source: 'offer-map'
+            ...dealer,
+            name: dealer.name,
+            matchedBy: 'exact-name'
         };
     }
     
-    // Priority 3: Check lowercase map
-    const lowerKey = normalized.toLowerCase();
-    if (dealerOfferMapLower[lowerKey]) {
-        console.log(`✅ Dealer found in lower-case offer map: "${normalized}"`);
-        return {
-            name: normalized,
-            normalized: normalized,
-            phone: '',
-            district: '',
-            source: 'offer-map-lower'
-        };
-    }
-    
-    // Priority 4: Contains match with master
-    let bestMatch = null;
-    let bestScore = 0;
-    
+    // ============================================================
+    // LEVEL 3: Check by RLP CODE from dealer master
+    // ============================================================
     for (const [key, dealer] of dealerMasterMap) {
-        if (key.includes(normalized) || normalized.includes(key)) {
-            const score = Math.min(key.length, normalized.length) / Math.max(key.length, normalized.length);
-            if (score > bestScore && score > 0.7) {
-                bestScore = score;
-                bestMatch = {
-                    ...dealer,
-                    name: dealer.name.toUpperCase()
-                };
-            }
-        }
-    }
-    
-    if (bestMatch) {
-        console.log(`✅ Found dealer by contains match (${Math.round(bestScore * 100)}%): "${bestMatch.name}"`);
-        return bestMatch;
-    }
-    
-    // Priority 5: Word match
-    const words = normalized.split(' ').filter(w => w.length > 2);
-    let wordMatch = null;
-    let wordScore = 0;
-    
-    for (const [key, dealer] of dealerMasterMap) {
-        let matches = 0;
-        for (const word of words) {
-            if (key.includes(word)) matches++;
-        }
-        const score = words.length > 0 ? matches / words.length : 0;
-        if (score > wordScore && score > 0.6) {
-            wordScore = score;
-            wordMatch = {
+        if (dealer.rlpCode && dealer.rlpCode === normalized) {
+            console.log(`✅ EXACT RLP CODE match from master: "${dealer.rlpCode}" → "${dealer.name}"`);
+            return {
                 ...dealer,
-                name: dealer.name.toUpperCase()
+                name: dealer.name,
+                matchedBy: 'rlp-code-master'
             };
         }
     }
     
-    if (wordMatch) {
-        console.log(`✅ Found dealer by word match (${Math.round(wordScore * 100)}%): "${wordMatch.name}"`);
-        return wordMatch;
-    }
-    
-    // Priority 6: Phone number match
+    // ============================================================
+    // LEVEL 4: Check by phone number (EXACT)
+    // ============================================================
     const phoneNum = safePhone(name);
     if (phoneNum && phoneNum.length >= 10) {
         for (const [key, dealer] of dealerMasterMap) {
             if (dealer.phone && dealer.phone === phoneNum) {
-                console.log(`✅ Found dealer by phone number: "${dealer.name}"`);
+                console.log(`✅ EXACT phone match: "${dealer.phone}" → "${dealer.name}"`);
                 return {
                     ...dealer,
-                    name: dealer.name.toUpperCase()
+                    name: dealer.name,
+                    matchedBy: 'phone'
                 };
             }
         }
     }
     
-    console.log(`⚠️ No match found for "${name}"`);
+    console.log(`❌ NO EXACT match found for "${name}"`);
     return null;
 }
 
 // ===================================================
-// GET ALL DEALER OFFERS - FIXED: Better matching
+// GET ALL DEALER OFFERS - EXACT MATCH ONLY
 // ===================================================
 function getAllDealerOffers(name) {
     if (!name) {
@@ -841,73 +802,60 @@ function getAllDealerOffers(name) {
     
     const normalized = normalizeDealerName(name);
     console.log(`🔍 Looking for offers for: "${name}" (normalized: "${normalized}")`);
-    console.log(`📊 Available dealer keys: ${Object.keys(dealerOfferMap).length}`);
     
-    // Try exact match
+    // ============================================================
+    // LEVEL 1: EXACT MATCH by normalized name
+    // ============================================================
     if (dealerOfferMap[normalized]) {
         const count = dealerOfferMap[normalized].length;
-        console.log(`✅ Found ${count} offers by exact match for "${normalized}"`);
+        console.log(`✅ EXACT match found: "${normalized}" → ${count} offers`);
         return dealerOfferMap[normalized];
     }
     
-    // Try original name (without normalization)
+    // ============================================================
+    // LEVEL 2: EXACT MATCH by original name
+    // ============================================================
     const originalKey = name.trim().toUpperCase();
     if (dealerOfferMap[originalKey]) {
         const count = dealerOfferMap[originalKey].length;
-        console.log(`✅ Found ${count} offers by original name match for "${originalKey}"`);
+        console.log(`✅ EXACT original name match: "${originalKey}" → ${count} offers`);
         return dealerOfferMap[originalKey];
     }
     
-    // Try lower-case map
-    const lowerKey = normalized.toLowerCase();
-    if (dealerOfferMapLower[lowerKey]) {
-        const count = dealerOfferMapLower[lowerKey].length;
-        console.log(`✅ Found ${count} offers by lower-case match for "${lowerKey}"`);
-        return dealerOfferMapLower[lowerKey];
+    // ============================================================
+    // LEVEL 3: EXACT MATCH by RLP CODE
+    // ============================================================
+    const rlpMap = window._rlpCodeMap || new Map();
+    if (rlpMap.has(normalized)) {
+        const dealerData = rlpMap.get(normalized);
+        const dealerName = normalizeDealerName(dealerData.name);
+        if (dealerOfferMap[dealerName]) {
+            const count = dealerOfferMap[dealerName].length;
+            console.log(`✅ RLP CODE match: "${normalized}" → "${dealerName}" → ${count} offers`);
+            return dealerOfferMap[dealerName];
+        }
+        // Also check if RLP CODE is a key in dealerOfferMap
+        if (dealerOfferMap[normalized]) {
+            const count = dealerOfferMap[normalized].length;
+            console.log(`✅ RLP CODE as key match: "${normalized}" → ${count} offers`);
+            return dealerOfferMap[normalized];
+        }
     }
     
-    // Try contains match
-    let bestMatch = null;
-    let bestScore = 0;
-    
+    // ============================================================
+    // LEVEL 4: Check by RLP CODE in dealer master
+    // ============================================================
     for (const [key, offers] of Object.entries(dealerOfferMap)) {
-        if (key.includes(normalized) || normalized.includes(key)) {
-            const score = Math.min(key.length, normalized.length) / Math.max(key.length, normalized.length);
-            if (score > bestScore && score > 0.6) {
-                bestScore = score;
-                bestMatch = offers;
-            }
+        const dealerInfo = dealerMasterMap.get(key);
+        if (dealerInfo && dealerInfo.rlpCode && dealerInfo.rlpCode === normalized) {
+            const count = offers.length;
+            console.log(`✅ RLP CODE match from master: "${normalized}" → "${key}" → ${count} offers`);
+            return offers;
         }
     }
     
-    if (bestMatch) {
-        console.log(`✅ Found offers by contains match (${Math.round(bestScore * 100)}%) for "${normalized}"`);
-        return bestMatch;
-    }
-    
-    // Try word match
-    const words = normalized.split(' ').filter(w => w.length > 2);
-    let wordMatch = null;
-    let wordScore = 0;
-    
-    for (const [key, offers] of Object.entries(dealerOfferMap)) {
-        let matches = 0;
-        for (const word of words) {
-            if (key.includes(word)) matches++;
-        }
-        const score = words.length > 0 ? matches / words.length : 0;
-        if (score > wordScore && score > 0.5) {
-            wordScore = score;
-            wordMatch = offers;
-        }
-    }
-    
-    if (wordMatch) {
-        console.log(`✅ Found offers by word match (${Math.round(wordScore * 100)}%) for "${normalized}"`);
-        return wordMatch;
-    }
-    
-    console.log(`❌ No offers found for "${name}"`);
+    console.log(`❌ NO EXACT match found for "${name}"`);
+    console.log(`   Available exact keys:`, Object.keys(dealerOfferMap).slice(0, 10));
     return [];
 }
 
@@ -1609,7 +1557,6 @@ function clearOffers() {
     localStorage.removeItem('dealerOffers');
     currentOffers = [];
     dealerOfferMap = {};
-    dealerOfferMapLower = {};
     showToast('All offers cleared', 'warning');
 }
 
@@ -1638,6 +1585,79 @@ function getApplication(part) {
 }
 
 // ===================================================
+// GET DEALERS WITH OFFERS - EXACT MATCH
+// ===================================================
+async function getDealersWithOffers() {
+    console.log("🔍 Getting dealers with offers...");
+    
+    await loadDealerMaster();
+    loadOffers();
+    
+    const result = [];
+    const processed = new Set();
+    
+    console.log(`📊 dealerOfferMap keys: ${Object.keys(dealerOfferMap).length}`);
+    
+    if (Object.keys(dealerOfferMap).length === 0 && currentOffers.length > 0) {
+        console.log('⚠️ dealerOfferMap is empty but currentOffers has data. Rebuilding...');
+        
+        currentOffers.forEach(o => {
+            const dealerName = o.dealer || o.dealerRaw || '';
+            if (!dealerName) return;
+            const key = normalizeDealerName(dealerName);
+            if (!key) return;
+            if (!dealerOfferMap[key]) dealerOfferMap[key] = [];
+            dealerOfferMap[key].push(o);
+        });
+        
+        console.log(`📊 Rebuilt dealerOfferMap with ${Object.keys(dealerOfferMap).length} keys`);
+    }
+    
+    // Build from dealerOfferMap using EXACT matching
+    for (const [key, offers] of Object.entries(dealerOfferMap)) {
+        if (offers.length === 0 || processed.has(key)) continue;
+        processed.add(key);
+        
+        let dealer = dealerMasterMap.get(key);
+        
+        if (!dealer) {
+            const firstOffer = offers[0];
+            const searchName = firstOffer.dealer || firstOffer.dealerRaw || '';
+            dealer = findDealer(searchName);
+        }
+        
+        const firstOffer = offers[0];
+        const myStockCount = offers.filter(o => o.stockType === 'my-stock' || o.stockType === 'our-stock').length;
+        const distStockCount = offers.filter(o => o.stockType === 'distributor-stock').length;
+        
+        result.push({
+            name: (firstOffer.dealer || firstOffer.dealerRaw || key).toUpperCase(),
+            normalized: key,
+            phone: dealer?.phone || '',
+            district: dealer?.district || '',
+            rlpCode: dealer?.rlpCode || '',
+            offerCount: offers.length,
+            hasPhone: !!dealer?.phone,
+            myStockCount: myStockCount,
+            distStockCount: distStockCount,
+            offers: offers,
+            matchedBy: dealer?.matchedBy || 'unknown'
+        });
+    }
+    
+    result.sort((a, b) => a.name.localeCompare(b.name));
+    
+    const withPhone = result.filter(d => d.hasPhone).length;
+    const withRlp = result.filter(d => d.rlpCode).length;
+    
+    console.log(`✅ Found ${result.length} dealers with offers`);
+    console.log(`   📞 With exact phone: ${withPhone}`);
+    console.log(`   🆔 With RLP CODE: ${withRlp}`);
+    
+    return result;
+}
+
+// ===================================================
 // INDEXEDDB FUNCTIONS
 // ===================================================
 async function loadDealersFromDB() {
@@ -1657,6 +1677,7 @@ async function loadDealersFromDB() {
             normalized: d.normalized || d.name?.toUpperCase() || '',
             phone: safePhone(d.phone || ''),
             district: safeString(d.district || ''),
+            rlpCode: safeString(d.rlpCode || ''),
             offerCount: d.offerCount || 0,
             hasPhone: !!d.phone,
             myStockCount: d.myStockCount || 0,
@@ -1730,14 +1751,99 @@ async function saveOffersToDB(offers) {
 function debugDealerKeys() {
     console.log('=== DEALER KEYS DEBUG ===');
     console.log('dealerOfferMap keys:', Object.keys(dealerOfferMap));
-    console.log('dealerOfferMapLower keys:', Object.keys(dealerOfferMapLower));
     console.log('Total offers:', currentOffers.length);
+    console.log('RLP CODE Map size:', rlpCodeMap.size);
     console.log('=== END DEBUG ===');
     return {
         offerKeys: Object.keys(dealerOfferMap),
-        lowerKeys: Object.keys(dealerOfferMapLower),
-        totalOffers: currentOffers.length
+        totalOffers: currentOffers.length,
+        rlpCodeCount: rlpCodeMap.size
     };
+}
+
+// ===================================================
+// GENERATE ALL FLYERS - EXACT MATCH WITH RLP CODE
+// ===================================================
+async function generateAllFlyers() {
+    console.log('📊 Generating all flyers with EXACT matching...');
+    
+    try {
+        // Load dealer master with RLP CODE
+        await loadDealerMaster();
+        loadOffers();
+        
+        // Get dealers with offers using EXACT matching
+        const dealers = await getDealersWithOffers();
+        
+        if (!dealers || dealers.length === 0) {
+            showToast('No dealers found with offers', 'warning');
+            return;
+        }
+        
+        // Update the flyer list in the dashboard
+        const flyerList = document.getElementById('flyerList');
+        if (!flyerList) {
+            console.warn('flyerList element not found');
+            return;
+        }
+        
+        flyerList.innerHTML = '';
+        
+        // Add summary header
+        const totalOffers = dealers.reduce((sum, d) => sum + d.offerCount, 0);
+        const withPhone = dealers.filter(d => d.hasPhone).length;
+        const withRlp = dealers.filter(d => d.rlpCode).length;
+        
+        const summary = document.createElement('div');
+        summary.style.cssText = 'width:100%;padding:10px;background:#0f172a;border-radius:8px;margin-bottom:10px;color:#94a3b8;font-size:14px;';
+        summary.innerHTML = `
+            📊 Showing <strong style="color:#facc15;">${dealers.length}</strong> dealers with offers 
+            (total offers: <strong style="color:#4ade80;">${totalOffers.toLocaleString()}</strong>) 
+            | 📞 <strong style="color:#25D366;">${withPhone}</strong> have EXACT phone matches
+            | 🆔 <strong style="color:#8b5cf6;">${withRlp}</strong> have RLP CODE matches
+            | ⚠️ <strong style="color:#f87171;">${dealers.length - withPhone}</strong> need phone numbers
+        `;
+        flyerList.appendChild(summary);
+        
+        // Create flyer cards
+        let count = 0;
+        for (const d of dealers) {
+            if (d.offerCount === 0) continue;
+            
+            count++;
+            const card = document.createElement('div');
+            card.className = 'flyer-card';
+            card.innerHTML = `
+                <div class="flyer-title">${escapeHtml(d.name)}</div>
+                <div>Total Offers: <strong style="color:#4ade80;">${d.offerCount}</strong></div>
+                <div style="font-size:11px;color:#94a3b8;">
+                    My Stock: ${d.myStockCount || 0} | Dist Stock: ${d.distStockCount || 0}
+                    ${d.rlpCode ? ` 🆔 RLP: <span style="color:#8b5cf6;">${escapeHtml(d.rlpCode)}</span>` : ''}
+                    ${d.hasPhone ? ` 📞 <span style="color:#25D366;font-weight:bold;">${d.phone}</span>` : ' ⚠️ <span style="color:#f87171;">No Phone</span>'}
+                    ${d.district ? ` 📍 ${escapeHtml(d.district)}` : ''}
+                    ${d.matchedBy === 'rlp-code' || d.matchedBy === 'rlp-code-master' ? ' ✅ <span style="color:#4ade80;">Verified</span>' : ''}
+                </div>
+                <div class="flyer-buttons">
+                    <button class="btn btn-small" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
+                    <button class="btn btn-purple btn-small" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
+                    <button class="btn btn-excel btn-small" onclick="exportSingleExcel('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📊 Excel</button>
+                    ${d.hasPhone ? `<button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i> Send</button>` : `<button class="btn btn-secondary btn-small" disabled title="No phone number available"><i class="fas fa-phone-slash"></i> No Phone</button>`}
+                </div>
+            `;
+            flyerList.appendChild(card);
+            
+            // Small delay to prevent UI freeze
+            if (count % 20 === 0) {
+                await new Promise(r => setTimeout(r, 10));
+            }
+        }
+        
+        showToast(`✅ Generated ${count} flyers (${withPhone} with EXACT phone numbers)`, 'success');
+        
+    } catch (err) {
+        console.error('Error generating flyers:', err);
+        showToast('Error generating flyers: ' + err.message, 'error');
+    }
 }
 
 // ===================================================
@@ -1763,6 +1869,7 @@ async function init() {
         console.log(`🚀 SYSTEM READY`);
         console.log(`   📊 Offers: ${currentOffers.length}`);
         console.log(`   📞 Dealers: ${dealerMaster.length}`);
+        console.log(`   🆔 RLP CODEs: ${rlpCodeMap.size}`);
         console.log(`   🏭 Distributor Stock: ${distributorStock.length} items`);
         console.log(`   📝 Descriptions: ${partDescriptions.size}, Applications: ${partApplications.size}`);
         console.log(`   🗂️  Dealer keys in offer map: ${Object.keys(dealerOfferMap).length}`);
@@ -1809,6 +1916,7 @@ window.BrochureGenerator = {
         console.log('=== OFFER DEBUG ===');
         console.log('dealerOfferMap keys:', Object.keys(dealerOfferMap));
         console.log('Current offers count:', currentOffers.length);
+        console.log('RLP CODE Map size:', rlpCodeMap.size);
         console.log('=== END DEBUG ===');
     },
     debugDealerKeys: debugDealerKeys,
@@ -1821,7 +1929,8 @@ window.BrochureGenerator = {
     loadDealersFromDB,
     loadOffersForDealerFromDB,
     getStorageStatusFromDB,
-    saveOffersToDB
+    saveOffersToDB,
+    generateAllFlyers
 };
 
 // ===================================================
@@ -1858,7 +1967,8 @@ function buildDealerListFromOffers(offers) {
                 myStockCount: 0,
                 distStockCount: 0,
                 phone: '',
-                district: ''
+                district: '',
+                rlpCode: ''
             });
         }
         const dealer = dealerMap.get(name);
@@ -1875,6 +1985,7 @@ function buildDealerListFromOffers(offers) {
             if (dealer) {
                 d.phone = dealer.phone || '';
                 d.district = dealer.district || '';
+                d.rlpCode = dealer.rlpCode || '';
             }
         });
     } catch(e) {
