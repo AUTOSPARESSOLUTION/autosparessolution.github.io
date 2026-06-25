@@ -756,6 +756,17 @@ LOAD APPLICATION SCRIPTS IN ORDER
 
 <script>
 // ============================================================
+// NORMALIZE DEALER NAME HELPER - GLOBAL
+// ============================================================
+function normalizeDealerName(name) {
+    if (!name) return '';
+    return String(name)
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase();
+}
+
+// ============================================================
 // SYSTEM STATUS CHECK
 // ============================================================
 function checkSystemStatus() {
@@ -1118,7 +1129,6 @@ async function runAnalysis() {
         document.getElementById('areasCount').innerText = result?.areasAnalysed || 0;
         displayOffers(result?.offers || []);
         
-        // Update dealer count from IndexedDB
         if (typeof DealerDB !== 'undefined') {
             try {
                 const status = await DealerDB.getStorageStatus();
@@ -1128,7 +1138,6 @@ async function runAnalysis() {
             }
         }
         
-        // Load all dealers from IndexedDB
         setTimeout(async () => {
             await loadAllDealersFromPagination();
             await loadAllFlyerDealersFromPagination();
@@ -1243,347 +1252,23 @@ function displayOffers(offers) {
 }
 
 // ============================================================
-// FLYER FUNCTIONS
+// ESCAPE HTML
 // ============================================================
-async function sendSingleWhatsApp(dealerName) {
-    try {
-        if (typeof BrochureGenerator === 'undefined') { 
-            showToast('BrochureGenerator not loaded', 'error');
-            return; 
-        }
-        await BrochureGenerator.loadDealerMaster();
-        BrochureGenerator.loadOffers();
-        BrochureGenerator.sendFlyerToWhatsApp(dealerName);
-    } catch(err) { 
-        console.error(err); 
-        showToast(err.message, 'error');
-    }
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 // ============================================================
-// GENERATE ALL FLYERS - FIXED: Loads from IndexedDB
+// FLYER FUNCTIONS - FIXED with normalizeDealerName
 // ============================================================
-// ============================================================
-// GENERATE ALL FLYERS - COMPLETE FIX with phone lookup
-// ============================================================
-async function generateAllFlyers() {
-    const btn = document.getElementById('generateFlyersBtn');
-    
-    try {
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading dealers...';
-        }
-        
-        showToast('Loading dealers with phone numbers...', 'info');
-        
-        // ============================================================
-        // STEP 1: Load dealer master from all sources
-        // ============================================================
-        let dealerMasterMap = new Map();
-        let dealerMasterList = [];
-        
-        // Source 1: Load from Excel (RETAILER data Deatils.xlsx)
-        try {
-            if (typeof BrochureGenerator !== 'undefined') {
-                await BrochureGenerator.loadDealerMaster();
-                // Try to get the master map from BrochureGenerator
-                if (window.BrochureGenerator._dealerMasterMap) {
-                    dealerMasterMap = window.BrochureGenerator._dealerMasterMap;
-                    dealerMasterList = Array.from(dealerMasterMap.values());
-                    console.log(`📋 Loaded ${dealerMasterList.length} dealers from Excel master`);
-                }
-            }
-        } catch(e) {
-            console.warn('Could not load from BrochureGenerator:', e);
-        }
-        
-        // Source 2: Load from localStorage Customer Master
-        try {
-            const customers = JSON.parse(localStorage.getItem('customers') || '[]');
-            if (customers.length > 0) {
-                console.log(`📋 Loading ${customers.length} customers from localStorage`);
-                customers.forEach(c => {
-                    const name = (c.name || c.businessName || '').toUpperCase().trim();
-                    if (name) {
-                        const phone = (c.mobileNo || c.phone || c.mobile || '').replace(/\D/g, '');
-                        const district = c.district || c.city || '';
-                        const key = name;
-                        if (!dealerMasterMap.has(key)) {
-                            dealerMasterMap.set(key, {
-                                name: name,
-                                normalized: key,
-                                phone: phone,
-                                district: district,
-                                source: 'customer-master'
-                            });
-                        } else {
-                            const existing = dealerMasterMap.get(key);
-                            if (!existing.phone && phone) existing.phone = phone;
-                            if (!existing.district && district) existing.district = district;
-                        }
-                    }
-                });
-                console.log(`✅ Added ${customers.length} customers to master map`);
-            }
-        } catch(e) {
-            console.warn('Could not load customers:', e);
-        }
-        
-        // Source 3: Load from localStorage users/dealers
-        try {
-            const users = JSON.parse(localStorage.getItem('users') || '[]');
-            const dealers = JSON.parse(localStorage.getItem('dealers') || '[]');
-            const allUsers = [...users, ...dealers];
-            
-            allUsers.forEach(u => {
-                const name = (u.name || u.business || u.businessName || '').toUpperCase().trim();
-                if (name) {
-                    const phone = (u.phone || u.mobile || u.mobileNo || '').replace(/\D/g, '');
-                    const district = u.district || u.city || '';
-                    const key = name;
-                    if (!dealerMasterMap.has(key)) {
-                        dealerMasterMap.set(key, {
-                            name: name,
-                            normalized: key,
-                            phone: phone,
-                            district: district,
-                            source: 'user-dealer'
-                        });
-                    } else {
-                        const existing = dealerMasterMap.get(key);
-                        if (!existing.phone && phone) existing.phone = phone;
-                        if (!existing.district && district) existing.district = district;
-                    }
-                }
-            });
-            console.log(`✅ Added ${allUsers.length} users/dealers to master map`);
-        } catch(e) {
-            console.warn('Could not load users/dealers:', e);
-        }
-        
-        // Source 4: Load from BrochureGenerator's dealer master (already loaded)
-        if (typeof BrochureGenerator !== 'undefined' && BrochureGenerator.dealerMaster) {
-            const bgDealers = BrochureGenerator.dealerMaster || [];
-            bgDealers.forEach(d => {
-                const key = (d.normalized || d.name || '').toUpperCase().trim();
-                if (key && !dealerMasterMap.has(key)) {
-                    dealerMasterMap.set(key, {
-                        name: d.name || key,
-                        normalized: key,
-                        phone: d.phone || '',
-                        district: d.district || '',
-                        source: 'brochure-generator'
-                    });
-                }
-            });
-            console.log(`✅ Added ${bgDealers.length} dealers from BrochureGenerator`);
-        }
-        
-        console.log(`📋 Total dealer master entries: ${dealerMasterMap.size}`);
-        const withPhone = Array.from(dealerMasterMap.values()).filter(d => d.phone).length;
-        console.log(`📞 Dealers with phone: ${withPhone}`);
-        
-        // ============================================================
-        // STEP 2: Load offers from IndexedDB
-        // ============================================================
-        let dealers = [];
-        
-        if (typeof DealerDB !== 'undefined') {
-            const dbDealers = await DealerDB.getAllDealersFromDB();
-            
-            if (dbDealers && dbDealers.length > 0) {
-                console.log(`📊 Loaded ${dbDealers.length} dealers from IndexedDB`);
-                
-                dealers = dbDealers.map(d => {
-                    const name = d.name || d.normalized || 'Unknown';
-                    const normalized = (d.normalized || name).toUpperCase().trim();
-                    
-                    // ============================================================
-                    // STEP 3: Find phone number from master (with fuzzy matching)
-                    // ============================================================
-                    let phone = d.phone || '';
-                    let district = d.district || '';
-                    
-                    // Try exact match first
-                    if (dealerMasterMap.has(normalized)) {
-                        const master = dealerMasterMap.get(normalized);
-                        phone = master.phone || phone;
-                        district = master.district || district;
-                        if (phone) {
-                            console.log(`📞 Exact match: "${name}" -> ${phone}`);
-                        }
-                    } else {
-                        // Try normalized name match (remove special chars)
-                        const cleanNormalized = normalized.replace(/[^A-Z0-9]/g, '');
-                        for (const [key, master] of dealerMasterMap) {
-                            const cleanKey = key.replace(/[^A-Z0-9]/g, '');
-                            if (cleanKey === cleanNormalized) {
-                                phone = master.phone || phone;
-                                district = master.district || district;
-                                if (phone) {
-                                    console.log(`📞 Clean match: "${name}" -> ${phone}`);
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        // Try contains match if still no phone
-                        if (!phone) {
-                            const words = normalized.split(' ').filter(w => w.length > 2);
-                            for (const [key, master] of dealerMasterMap) {
-                                let matches = 0;
-                                for (const word of words) {
-                                    if (key.includes(word)) matches++;
-                                }
-                                const score = words.length > 0 ? matches / words.length : 0;
-                                if (score > 0.6) {
-                                    phone = master.phone || phone;
-                                    district = master.district || district;
-                                    if (phone) {
-                                        console.log(`📞 Word match (${Math.round(score * 100)}%): "${name}" -> ${phone}`);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    return {
-                        name: name,
-                        normalized: normalized,
-                        phone: phone || '',
-                        district: district || '',
-                        offerCount: d.offerCount || 0,
-                        hasPhone: !!phone,
-                        myStockCount: d.myStockCount || 0,
-                        distStockCount: d.distStockCount || 0
-                    };
-                });
-                
-                // Sort by offer count (highest first)
-                dealers.sort((a, b) => b.offerCount - a.offerCount);
-                
-                const withPhoneCount = dealers.filter(d => d.hasPhone).length;
-                console.log(`✅ Found ${dealers.length} dealers with offers`);
-                console.log(`📞 ${withPhoneCount} have phone numbers`);
-            }
-        }
-        
-        // ============================================================
-        // STEP 4: Fallback to BrochureGenerator if no IndexedDB data
-        // ============================================================
-        if (dealers.length === 0 && typeof BrochureGenerator !== 'undefined') {
-            console.log('⚠️ No dealers in IndexedDB, trying BrochureGenerator...');
-            const localDealers = await BrochureGenerator.getDealersWithOffers();
-            if (localDealers && localDealers.length > 0) {
-                dealers = localDealers.map(d => {
-                    const name = d.name || 'Unknown';
-                    const normalized = (d.normalized || name).toUpperCase().trim();
-                    
-                    let phone = d.phone || '';
-                    let district = d.district || '';
-                    
-                    // Look up phone from master
-                    if (dealerMasterMap.has(normalized)) {
-                        const master = dealerMasterMap.get(normalized);
-                        phone = master.phone || phone;
-                        district = master.district || district;
-                    }
-                    
-                    return {
-                        name: name,
-                        normalized: normalized,
-                        phone: phone || '',
-                        district: district || '',
-                        offerCount: d.offerCount || 0,
-                        hasPhone: !!phone,
-                        myStockCount: d.myStockCount || 0,
-                        distStockCount: d.distStockCount || 0
-                    };
-                });
-                console.log(`✅ Found ${dealers.length} dealers from BrochureGenerator`);
-            }
-        }
-        
-        if (dealers.length === 0) {
-            showToast('No dealers found. Run Analysis first.', 'warning');
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-file-alt"></i> Generate Flyers';
-            }
-            return;
-        }
-        
-        // ============================================================
-        // STEP 5: Update UI and generate flyer cards
-        // ============================================================
-        const dealerCountEl = document.getElementById('dealerCount');
-        if (dealerCountEl) {
-            dealerCountEl.innerText = dealers.length;
-        }
-        
-        const div = document.getElementById('flyerList');
-        if (div) {
-            div.innerHTML = '';
-            
-            const totalOffers = dealers.reduce((sum, d) => sum + d.offerCount, 0);
-            const dealersWithPhone = dealers.filter(d => d.hasPhone).length;
-            
-            // Summary header
-            const countInfo = document.createElement('div');
-            countInfo.style.cssText = 'width:100%;padding:10px;background:#0f172a;border-radius:8px;margin-bottom:10px;color:#94a3b8;font-size:14px;';
-            countInfo.innerHTML = `
-                📊 Showing <strong style="color:#facc15;">${dealers.length}</strong> dealers with offers 
-                (total offers: <strong style="color:#4ade80;">${totalOffers.toLocaleString()}</strong>) 
-                | 📞 <strong style="color:#25D366;">${dealersWithPhone}</strong> have phone numbers
-                | ⚠️ <strong style="color:#f87171;">${dealers.length - dealersWithPhone}</strong> need phone numbers
-            `;
-            div.appendChild(countInfo);
-            
-            // Create flyer cards
-            let count = 0;
-            for (const d of dealers) {
-                if (d.offerCount === 0) continue;
-                
-                count++;
-                const card = document.createElement('div');
-                card.className = 'flyer-card';
-                card.innerHTML = `
-                    <div class="flyer-title">${escapeHtml(d.name)}</div>
-                    <div>Total Offers: <strong style="color:#4ade80;">${d.offerCount}</strong></div>
-                    <div style="font-size:11px;color:#94a3b8;">
-                        My Stock: ${d.myStockCount || 0} | Dist Stock: ${d.distStockCount || 0}
-                        ${d.hasPhone ? ` 📞 <span style="color:#25D366;font-weight:bold;">${d.phone}</span>` : ' ⚠️ <span style="color:#f87171;">No Phone</span>'}
-                        ${d.district ? ` 📍 ${escapeHtml(d.district)}` : ''}
-                    </div>
-                    <div class="flyer-buttons">
-                        <button class="btn btn-small" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
-                        <button class="btn btn-purple btn-small" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
-                        <button class="btn btn-excel btn-small" onclick="exportSingleExcel('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📊 Excel</button>
-                        ${d.hasPhone ? `<button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i> Send</button>` : `<button class="btn btn-secondary btn-small" disabled title="No phone number available"><i class="fas fa-phone-slash"></i> No Phone</button>`}
-                    </div>
-                `;
-                div.appendChild(card);
-                
-                if (count % 20 === 0) {
-                    await new Promise(r => setTimeout(r, 10));
-                }
-            }
-            
-            showToast(`✅ Generated ${count} flyers (${dealersWithPhone} with phone numbers)`, 'success');
-        }
-        
-    } catch(err) {
-        console.error('Error generating flyers:', err);
-        showToast('Error: ' + err.message, 'error');
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-file-alt"></i> Generate Flyers';
-        }
-    }
-}
+
+// PREVIEW FLYER
 async function previewFlyer(dealerName) {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
@@ -1597,18 +1282,17 @@ async function previewFlyer(dealerName) {
         let offers = [];
         let matchedKey = null;
         
-        // Get all dealer keys
         const dealerKeys = Object.keys(BrochureGenerator.dealerOfferMap || {});
         console.log(`📊 Available dealer keys: ${dealerKeys.length}`);
         
-        // === Level 1: Exact match ===
+        // Level 1: EXACT MATCH
         offers = BrochureGenerator.getAllDealerOffers(dealerName);
         if (offers.length > 0) {
             matchedKey = dealerName;
             console.log(`✅ Level 1 - Exact match found: "${matchedKey}"`);
         }
         
-        // === Level 2: Normalized match ===
+        // Level 2: NORMALIZED MATCH
         if (offers.length === 0 && normalizedName !== dealerName) {
             offers = BrochureGenerator.getAllDealerOffers(normalizedName);
             if (offers.length > 0) {
@@ -1617,49 +1301,29 @@ async function previewFlyer(dealerName) {
             }
         }
         
-        // === Level 3: Case-insensitive match ===
+        // Level 3: RLP CODE MATCH
         if (offers.length === 0) {
-            const lowerNormalized = normalizedName.toLowerCase();
-            for (const key of dealerKeys) {
-                if (key.toLowerCase() === lowerNormalized) {
-                    offers = BrochureGenerator.getAllDealerOffers(key);
-                    if (offers.length > 0) {
-                        matchedKey = key;
-                        console.log(`✅ Level 3 - Case-insensitive match found: "${matchedKey}"`);
-                        break;
-                    }
+            const rlpMap = window._rlpCodeMap || new Map();
+            if (rlpMap.has(normalizedName)) {
+                const dealerData = rlpMap.get(normalizedName);
+                const dealerNameFromRlp = normalizeDealerName(dealerData.name);
+                offers = BrochureGenerator.getAllDealerOffers(dealerNameFromRlp);
+                if (offers.length > 0) {
+                    matchedKey = dealerNameFromRlp;
+                    console.log(`✅ Level 3 - RLP CODE match: "${normalizedName}" → "${matchedKey}"`);
                 }
             }
         }
         
-        // === Level 4: Contains match ===
+        // Level 4: KEY MATCH
         if (offers.length === 0) {
-            const words = normalizedName.split(' ').filter(w => w.length > 2);
             for (const key of dealerKeys) {
-                let matches = 0;
-                for (const word of words) {
-                    if (key.includes(word) || word.includes(key)) matches++;
-                }
-                const score = words.length > 0 ? matches / words.length : 0;
-                if (score > 0.5) {
+                const keyNormalized = normalizeDealerName(key);
+                if (keyNormalized === normalizedName) {
                     offers = BrochureGenerator.getAllDealerOffers(key);
                     if (offers.length > 0) {
                         matchedKey = key;
-                        console.log(`✅ Level 4 - Contains match (${Math.round(score * 100)}%): "${matchedKey}"`);
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // === Level 5: Check if dealer name is a substring of any key ===
-        if (offers.length === 0) {
-            for (const key of dealerKeys) {
-                if (key.includes(normalizedName) || normalizedName.includes(key)) {
-                    offers = BrochureGenerator.getAllDealerOffers(key);
-                    if (offers.length > 0) {
-                        matchedKey = key;
-                        console.log(`✅ Level 5 - Substring match found: "${matchedKey}"`);
+                        console.log(`✅ Level 4 - Key match found: "${matchedKey}"`);
                         break;
                     }
                 }
@@ -1668,7 +1332,6 @@ async function previewFlyer(dealerName) {
         
         if (offers.length === 0) {
             console.log(`❌ No offers found for "${dealerName}"`);
-            console.log(`   Available keys:`, dealerKeys.slice(0, 10));
             showToast(`❌ No offers found for "${dealerName}"`, "error");
             return;
         }
@@ -1680,17 +1343,90 @@ async function previewFlyer(dealerName) {
         BrochureGenerator.showBrochurePreview(dealerName);
         
     } catch(err) { 
+        console.error('Preview error:', err); 
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+// SEND SINGLE WHATSAPP
+async function sendSingleWhatsApp(dealerName) {
+    try {
+        if (typeof BrochureGenerator === 'undefined') { 
+            showToast('BrochureGenerator not loaded', 'error');
+            return; 
+        }
+        
+        const normalizedName = normalizeDealerName(dealerName);
+        console.log(`📱 WhatsApp: Looking for "${dealerName}" (normalized: "${normalizedName}")`);
+        
+        let offers = BrochureGenerator.getAllDealerOffers(dealerName);
+        
+        if (offers.length === 0 && normalizedName !== dealerName) {
+            offers = BrochureGenerator.getAllDealerOffers(normalizedName);
+        }
+        
+        if (offers.length === 0) {
+            const dealerKeys = Object.keys(BrochureGenerator.dealerOfferMap || {});
+            for (const key of dealerKeys) {
+                if (normalizeDealerName(key) === normalizedName) {
+                    offers = BrochureGenerator.getAllDealerOffers(key);
+                    if (offers.length > 0) {
+                        console.log(`✅ Found offers using key: "${key}"`);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (offers.length === 0) {
+            showToast(`❌ No offers found for "${dealerName}"`, "error");
+            return;
+        }
+        
+        await BrochureGenerator.loadDealerMaster();
+        BrochureGenerator.loadOffers();
+        BrochureGenerator.sendFlyerToWhatsApp(dealerName);
+    } catch(err) { 
         console.error(err); 
         showToast(err.message, 'error');
     }
 }
 
+// DOWNLOAD SINGLE PDF
 async function downloadSinglePDF(dealerName) {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
             showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
+        
+        const normalizedName = normalizeDealerName(dealerName);
+        console.log(`📄 PDF: Looking for "${dealerName}" (normalized: "${normalizedName}")`);
+        
+        let offers = BrochureGenerator.getAllDealerOffers(dealerName);
+        
+        if (offers.length === 0 && normalizedName !== dealerName) {
+            offers = BrochureGenerator.getAllDealerOffers(normalizedName);
+        }
+        
+        if (offers.length === 0) {
+            const dealerKeys = Object.keys(BrochureGenerator.dealerOfferMap || {});
+            for (const key of dealerKeys) {
+                if (normalizeDealerName(key) === normalizedName) {
+                    offers = BrochureGenerator.getAllDealerOffers(key);
+                    if (offers.length > 0) {
+                        console.log(`✅ Found offers using key: "${key}"`);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (offers.length === 0) {
+            showToast(`❌ No offers found for "${dealerName}"`, "error");
+            return;
+        }
+        
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         await BrochureGenerator.downloadPDF(dealerName);
@@ -1700,6 +1436,7 @@ async function downloadSinglePDF(dealerName) {
     }
 }
 
+// DOWNLOAD ALL FLYERS PDF
 async function downloadAllFlyersPDF() {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
@@ -1724,15 +1461,41 @@ async function downloadAllFlyersPDF() {
     }
 }
 
-// ============================================================
-// EXCEL EXPORT FUNCTIONS
-// ============================================================
+// EXPORT SINGLE EXCEL
 async function exportSingleExcel(dealerName) {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
             showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
+        
+        const normalizedName = normalizeDealerName(dealerName);
+        console.log(`📊 Excel: Looking for "${dealerName}" (normalized: "${normalizedName}")`);
+        
+        let offers = BrochureGenerator.getAllDealerOffers(dealerName);
+        
+        if (offers.length === 0 && normalizedName !== dealerName) {
+            offers = BrochureGenerator.getAllDealerOffers(normalizedName);
+        }
+        
+        if (offers.length === 0) {
+            const dealerKeys = Object.keys(BrochureGenerator.dealerOfferMap || {});
+            for (const key of dealerKeys) {
+                if (normalizeDealerName(key) === normalizedName) {
+                    offers = BrochureGenerator.getAllDealerOffers(key);
+                    if (offers.length > 0) {
+                        console.log(`✅ Found offers using key: "${key}"`);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (offers.length === 0) {
+            showToast(`❌ No offers found for "${dealerName}"`, "error");
+            return;
+        }
+        
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         BrochureGenerator.exportDealerOffersToExcel(dealerName);
@@ -1742,6 +1505,7 @@ async function exportSingleExcel(dealerName) {
     }
 }
 
+// EXPORT ALL EXCEL
 async function exportAllExcel() {
     try {
         if (typeof BrochureGenerator === 'undefined') { 
@@ -1763,6 +1527,102 @@ async function exportAllExcel() {
     } catch(err) { 
         console.error(err); 
         showToast('Error exporting Excel: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// GENERATE ALL FLYERS
+// ============================================================
+async function generateAllFlyers() {
+    const btn = document.getElementById('generateFlyersBtn');
+    
+    try {
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+        }
+        
+        showToast('Generating flyers with exact matching...', 'info');
+        
+        // Use the BrochureGenerator's generateAllFlyers method
+        if (typeof BrochureGenerator !== 'undefined' && BrochureGenerator.generateAllFlyers) {
+            await BrochureGenerator.generateAllFlyers();
+        } else {
+            // Fallback: load dealers and generate flyers manually
+            await BrochureGenerator.loadDealerMaster();
+            BrochureGenerator.loadOffers();
+            
+            const dealers = await BrochureGenerator.getDealersWithOffers();
+            
+            if (!dealers || dealers.length === 0) {
+                showToast('No dealers found. Run Analysis first.', 'warning');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-file-alt"></i> Generate Flyers';
+                }
+                return;
+            }
+            
+            const div = document.getElementById('flyerList');
+            if (div) {
+                div.innerHTML = '';
+                
+                const totalOffers = dealers.reduce((sum, d) => sum + d.offerCount, 0);
+                const withPhone = dealers.filter(d => d.hasPhone).length;
+                const withRlp = dealers.filter(d => d.rlpCode).length;
+                
+                const countInfo = document.createElement('div');
+                countInfo.style.cssText = 'width:100%;padding:10px;background:#0f172a;border-radius:8px;margin-bottom:10px;color:#94a3b8;font-size:14px;';
+                countInfo.innerHTML = `
+                    📊 Showing <strong style="color:#facc15;">${dealers.length}</strong> dealers with offers 
+                    (total offers: <strong style="color:#4ade80;">${totalOffers.toLocaleString()}</strong>) 
+                    | 📞 <strong style="color:#25D366;">${withPhone}</strong> have EXACT phone matches
+                    | 🆔 <strong style="color:#8b5cf6;">${withRlp}</strong> have RLP CODE matches
+                `;
+                div.appendChild(countInfo);
+                
+                let count = 0;
+                for (const d of dealers) {
+                    if (d.offerCount === 0) continue;
+                    
+                    count++;
+                    const card = document.createElement('div');
+                    card.className = 'flyer-card';
+                    card.innerHTML = `
+                        <div class="flyer-title">${escapeHtml(d.name)}</div>
+                        <div>Total Offers: <strong style="color:#4ade80;">${d.offerCount}</strong></div>
+                        <div style="font-size:11px;color:#94a3b8;">
+                            My Stock: ${d.myStockCount || 0} | Dist Stock: ${d.distStockCount || 0}
+                            ${d.rlpCode ? ` 🆔 RLP: <span style="color:#8b5cf6;">${escapeHtml(d.rlpCode)}</span>` : ''}
+                            ${d.hasPhone ? ` 📞 <span style="color:#25D366;font-weight:bold;">${d.phone}</span>` : ' ⚠️ <span style="color:#f87171;">No Phone</span>'}
+                            ${d.district ? ` 📍 ${escapeHtml(d.district)}` : ''}
+                        </div>
+                        <div class="flyer-buttons">
+                            <button class="btn btn-small" onclick="previewFlyer('${escapeHtml(d.name).replace(/'/g, "\\'")}')">👁 Preview</button>
+                            <button class="btn btn-purple btn-small" onclick="downloadSinglePDF('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📄 PDF</button>
+                            <button class="btn btn-excel btn-small" onclick="exportSingleExcel('${escapeHtml(d.name).replace(/'/g, "\\'")}')">📊 Excel</button>
+                            ${d.hasPhone ? `<button class="btn btn-whatsapp btn-small" onclick="sendSingleWhatsApp('${escapeHtml(d.name).replace(/'/g, "\\'")}')"><i class="fab fa-whatsapp"></i> Send</button>` : `<button class="btn btn-secondary btn-small" disabled title="No phone number available"><i class="fas fa-phone-slash"></i> No Phone</button>`}
+                        </div>
+                    `;
+                    div.appendChild(card);
+                    
+                    if (count % 20 === 0) {
+                        await new Promise(r => setTimeout(r, 10));
+                    }
+                }
+                
+                showToast(`✅ Generated ${count} flyers (${withPhone} with EXACT phone numbers)`, 'success');
+            }
+        }
+        
+    } catch(err) {
+        console.error('Error generating flyers:', err);
+        showToast('Error: ' + err.message, 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-file-alt"></i> Generate Flyers';
+        }
     }
 }
 
@@ -1887,19 +1747,6 @@ function processWhatsAppQueue() {
 }
 
 // ============================================================
-// ESCAPE HTML
-// ============================================================
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-// ============================================================
 // TOAST
 // ============================================================
 function showToast(message, type = 'info') {
@@ -1912,7 +1759,7 @@ function showToast(message, type = 'info') {
 }
 
 // ============================================================
-// DEALER COUNTER - PAGINATION SYSTEM (FIXED: Loads from IndexedDB)
+// DEALER COUNTER - PAGINATION SYSTEM
 // ============================================================
 
 let dealerCounterList = [];
@@ -1929,9 +1776,7 @@ async function loadAllDealersFromPagination() {
         let dealers = [];
         let dealerMasterMap = new Map();
         
-        // Load dealer master from all sources
         try {
-            // Load from BrochureGenerator
             if (typeof BrochureGenerator !== 'undefined') {
                 await BrochureGenerator.loadDealerMaster();
                 if (window.BrochureGenerator._dealerMasterMap) {
@@ -1939,7 +1784,6 @@ async function loadAllDealersFromPagination() {
                 }
             }
             
-            // Load from Customer Master
             const customers = JSON.parse(localStorage.getItem('customers') || '[]');
             customers.forEach(c => {
                 const name = (c.name || '').toUpperCase().trim();
@@ -1955,7 +1799,6 @@ async function loadAllDealersFromPagination() {
                 }
             });
             
-            // Load from users/dealers
             const users = JSON.parse(localStorage.getItem('users') || '[]');
             const dealersData = JSON.parse(localStorage.getItem('dealers') || '[]');
             [...users, ...dealersData].forEach(u => {
@@ -1975,7 +1818,6 @@ async function loadAllDealersFromPagination() {
             console.warn('Could not load dealer master:', e);
         }
         
-        // Load from IndexedDB
         if (typeof DealerDB !== 'undefined') {
             const dbDealers = await DealerDB.getAllDealersFromDB();
             
@@ -1987,14 +1829,12 @@ async function loadAllDealersFromPagination() {
                     let phone = d.phone || '';
                     let district = d.district || '';
                     
-                    // Look up phone from master
                     if (!phone && dealerMasterMap.has(normalized)) {
                         const master = dealerMasterMap.get(normalized);
                         phone = master.phone || '';
                         district = master.district || district;
                     }
                     
-                    // Try contains match if still no phone
                     if (!phone) {
                         const words = normalized.split(' ').filter(w => w.length > 2);
                         for (const [key, master] of dealerMasterMap) {
@@ -2028,7 +1868,6 @@ async function loadAllDealersFromPagination() {
             }
         }
         
-        // Fallback to localStorage
         if (dealers.length === 0 && typeof BrochureGenerator !== 'undefined') {
             const localDealers = await BrochureGenerator.getDealersWithOffers();
             if (localDealers && localDealers.length > 0) {
@@ -2061,6 +1900,7 @@ async function loadAllDealersFromPagination() {
         showToast('Error loading dealers: ' + err.message, 'error');
     }
 }
+
 function dealerGridRenderPage() {
     const perPage = dealerGridPerPage;
     const totalDealers = dealerGridAllDealers.length;
@@ -2278,7 +2118,7 @@ function dealerCounterDownloadPDF() {
 }
 
 // ============================================================
-// FLYER COUNTER (FIXED: Loads from IndexedDB)
+// FLYER COUNTER
 // ============================================================
 
 let flyerCounterList = [];
@@ -2294,7 +2134,6 @@ async function loadAllFlyerDealersFromPagination() {
         
         let dealers = [];
         
-        // Load from IndexedDB
         if (typeof DealerDB !== 'undefined') {
             const dbDealers = await DealerDB.getAllDealersFromDB();
             
@@ -2313,15 +2152,11 @@ async function loadAllFlyerDealersFromPagination() {
                     offers: []
                 }));
                 
-                // Filter dealers with offers
                 dealers = dealers.filter(d => d.offerCount > 0);
-                
-                // Sort by offer count
                 dealers.sort((a, b) => b.offerCount - a.offerCount);
             }
         }
         
-        // Fallback to localStorage
         if (dealers.length === 0 && typeof BrochureGenerator !== 'undefined') {
             console.log('⚠️ No dealers in IndexedDB, using localStorage...');
             const localDealers = await BrochureGenerator.getDealersWithOffers();
@@ -2335,7 +2170,6 @@ async function loadAllFlyerDealersFromPagination() {
             return;
         }
         
-        // Update the flyer counter
         flyerGridAllDealers = dealers;
         document.getElementById('flyerTotalCount').innerText = `(${dealers.length} total dealers)`;
         document.getElementById('flyerCounterStatus').innerText = `✅ Loaded ${dealers.length} flyer dealers from database`;
@@ -2736,7 +2570,7 @@ async function clearDatabase() {
 }
 
 // ============================================================
-// LOAD DEALERS FROM INDEXEDDB (Alternative to pagination)
+// LOAD DEALERS FROM INDEXEDDB
 // ============================================================
 async function loadAllDealersFromDB() {
     try {
@@ -2834,4 +2668,4 @@ window.addEventListener('load', function() {
 });
 </script>
 </body>
-</html>
+    </html>
