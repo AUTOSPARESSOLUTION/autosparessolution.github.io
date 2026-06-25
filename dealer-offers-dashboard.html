@@ -1590,9 +1590,95 @@ async function previewFlyer(dealerName) {
             showToast('BrochureGenerator not loaded', 'error');
             return; 
         }
+        
+        const normalizedName = normalizeDealerName(dealerName);
+        console.log(`🔍 Preview: Looking for "${dealerName}" (normalized: "${normalizedName}")`);
+        
+        let offers = [];
+        let matchedKey = null;
+        
+        // Get all dealer keys
+        const dealerKeys = Object.keys(BrochureGenerator.dealerOfferMap || {});
+        console.log(`📊 Available dealer keys: ${dealerKeys.length}`);
+        
+        // === Level 1: Exact match ===
+        offers = BrochureGenerator.getAllDealerOffers(dealerName);
+        if (offers.length > 0) {
+            matchedKey = dealerName;
+            console.log(`✅ Level 1 - Exact match found: "${matchedKey}"`);
+        }
+        
+        // === Level 2: Normalized match ===
+        if (offers.length === 0 && normalizedName !== dealerName) {
+            offers = BrochureGenerator.getAllDealerOffers(normalizedName);
+            if (offers.length > 0) {
+                matchedKey = normalizedName;
+                console.log(`✅ Level 2 - Normalized match found: "${matchedKey}"`);
+            }
+        }
+        
+        // === Level 3: Case-insensitive match ===
+        if (offers.length === 0) {
+            const lowerNormalized = normalizedName.toLowerCase();
+            for (const key of dealerKeys) {
+                if (key.toLowerCase() === lowerNormalized) {
+                    offers = BrochureGenerator.getAllDealerOffers(key);
+                    if (offers.length > 0) {
+                        matchedKey = key;
+                        console.log(`✅ Level 3 - Case-insensitive match found: "${matchedKey}"`);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // === Level 4: Contains match ===
+        if (offers.length === 0) {
+            const words = normalizedName.split(' ').filter(w => w.length > 2);
+            for (const key of dealerKeys) {
+                let matches = 0;
+                for (const word of words) {
+                    if (key.includes(word) || word.includes(key)) matches++;
+                }
+                const score = words.length > 0 ? matches / words.length : 0;
+                if (score > 0.5) {
+                    offers = BrochureGenerator.getAllDealerOffers(key);
+                    if (offers.length > 0) {
+                        matchedKey = key;
+                        console.log(`✅ Level 4 - Contains match (${Math.round(score * 100)}%): "${matchedKey}"`);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // === Level 5: Check if dealer name is a substring of any key ===
+        if (offers.length === 0) {
+            for (const key of dealerKeys) {
+                if (key.includes(normalizedName) || normalizedName.includes(key)) {
+                    offers = BrochureGenerator.getAllDealerOffers(key);
+                    if (offers.length > 0) {
+                        matchedKey = key;
+                        console.log(`✅ Level 5 - Substring match found: "${matchedKey}"`);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (offers.length === 0) {
+            console.log(`❌ No offers found for "${dealerName}"`);
+            console.log(`   Available keys:`, dealerKeys.slice(0, 10));
+            showToast(`❌ No offers found for "${dealerName}"`, "error");
+            return;
+        }
+        
+        console.log(`✅ Found ${offers.length} offers for "${dealerName}" (matched key: "${matchedKey}")`);
+        
         await BrochureGenerator.loadDealerMaster();
         BrochureGenerator.loadOffers();
         BrochureGenerator.showBrochurePreview(dealerName);
+        
     } catch(err) { 
         console.error(err); 
         showToast(err.message, 'error');
