@@ -1757,5 +1757,91 @@ console.log('🤖 AI Sales Assistant loaded successfully!');
 <!-- ============================================ -->
 <!-- END AI SALES ASSISTANT                       -->
 <!-- ============================================ -->
+    <!-- ============================================ -->
+<!-- 📱 WHATSAPP AI AUTO-REPLY SYSTEM             -->
+<!-- ============================================ -->
+
+<script>
+// ===== WHATSAPP CONFIGURATION =====
+const WHATSAPP_CONFIG = {
+    phoneNumberId: 'YOUR_PHONE_NUMBER_ID',  // Get from Meta Developers
+    accessToken: 'YOUR_ACCESS_TOKEN',        // Get from Meta Developers
+    businessPhone: '919830300193'            // Your WhatsApp number
+};
+
+// ===== Webhook to receive WhatsApp messages =====
+// You'll need a server (free: Render.com / Vercel) to receive webhooks
+
+// ===== Function to send WhatsApp message =====
+async function sendWhatsAppMessage(toNumber, message) {
+    const url = `https://graph.facebook.com/v18.0/${WHATSAPP_CONFIG.phoneNumberId}/messages`;
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${WHATSAPP_CONFIG.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: toNumber,
+                type: 'text',
+                text: { body: message }
+            })
+        });
+        const data = await response.json();
+        console.log('✅ WhatsApp message sent:', data);
+        return data;
+    } catch (error) {
+        console.error('❌ WhatsApp error:', error);
+    }
+}
+
+// ===== Process incoming message =====
+function processWhatsAppMessage(message) {
+    const query = message.toLowerCase().trim();
+    
+    // Search for part number
+    const results = aiSearch(query);
+    
+    if (results.length > 0) {
+        const p = results[0];
+        const priceGST = aiPriceWithGST(p.price, p.gst || 18);
+        const reply = `🔍 *Part Found!*\n\n` +
+                     `📝 *Part No:* ${p.part}\n` +
+                     `📋 *Description:* ${p.desc}\n` +
+                     `🏷️ *Brand:* ${p.brand || 'N/A'}\n` +
+                     `💰 *Price:* ₹${priceGST.toFixed(2)} (incl. GST)\n` +
+                     `📦 *Stock:* ${p.stock} pcs\n\n` +
+                     `🛒 *Order now:* https://autosparessolution.github.io\n` +
+                     `📞 *Call:* 9830300193`;
+        return reply;
+    } else {
+        // Use Gemini AI for intelligent reply
+        return `🔍 I couldn't find "${message}" in our inventory.\n\n` +
+               `💡 Try sending a part number like *0357*\n` +
+               `📞 Or call us at *9830300193* for assistance.`;
+    }
+}
+
+// ===== Test function =====
+async function testWhatsApp() {
+    const testMessage = "0357";
+    const reply = processWhatsAppMessage(testMessage);
+    console.log('📱 Auto-reply:', reply);
+    
+    // To actually send, uncomment:
+    // await sendWhatsAppMessage('9198300300193', reply);
+}
+
+// Expose functions globally
+window.sendWhatsAppMessage = sendWhatsAppMessage;
+window.processWhatsAppMessage = processWhatsAppMessage;
+window.testWhatsApp = testWhatsApp;
+
+console.log('📱 WhatsApp AI Ready!');
+console.log('💡 Run testWhatsApp() to test');
+</script>
 </body>
                 </html>
