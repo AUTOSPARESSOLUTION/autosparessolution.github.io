@@ -1819,29 +1819,254 @@ function processWhatsAppMessage(message) {
         return reply;
     } else {
         // Use Gemini AI for intelligent reply
-        return `🔍 I couldn't find "${message}" in our inventory.\n\n` +
-               `💡 Try sending a part number like *0357*\n` +
-               `📞 Or call us at *9830300193* for assistance.`;
+<!-- ============================================ -->
+<!-- 📱 WHATSAPP AI AUTO-REPLY SYSTEM             -->
+<!-- ============================================ -->
+
+<script>
+// ===== WHATSAPP CONFIGURATION (UPDATED) =====
+const WHATSAPP_CONFIG = {
+    phoneNumberId: '656459610887355',  // ✅ Your Phone Number ID
+    accessToken: 'EAAOS2aPmhzYBR9uZCQQhNguEMAVbbW5iwypMrh1ZA0DWjHqOhNMqKathKpWpD091OFxCQIOudVbZCSVgZCpX07nZC0z4mz1GdCG8GmXJIedgKyn4FXhW4eZBwjPzFhqM4M3EF8ayq3eQZBn0yXOs7pWUpZBJiDZBilu5BGXRi382aqTKClX2aOU8uGdcREV7ZAkgZDZD',  // ✅ Your System User Token
+    businessPhone: '919038899962'  // ✅ Updated Business WhatsApp Number
+};
+
+// ===== Webhook to receive WhatsApp messages =====
+// You'll need a server (free: Render.com / Vercel) to receive webhooks
+
+// ===== Function to send WhatsApp message =====
+async function sendWhatsAppMessage(toNumber, message) {
+    const url = `https://graph.facebook.com/v18.0/${WHATSAPP_CONFIG.phoneNumberId}/messages`;
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${WHATSAPP_CONFIG.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: toNumber,
+                type: 'text',
+                text: { body: message }
+            })
+        });
+        const data = await response.json();
+        console.log('✅ WhatsApp message sent:', data);
+        return data;
+    } catch (error) {
+        console.error('❌ WhatsApp error:', error);
     }
+}
+
+// ===== Process incoming message with enhanced AI =====
+function processWhatsAppMessage(message) {
+    const query = message.toLowerCase().trim();
+    
+    // Check if it's a help request
+    if (query === 'help' || query === 'hi' || query === 'hello') {
+        return `👋 *Welcome to Auto Spares Solution!*
+
+I'm your AI Sales Assistant. Here's what I can help with:
+
+🔍 *Search Parts*
+Send part number: "0357"
+Send description: "clutch plate"
+
+💰 *Check Price*
+"Price 0357"
+
+📦 *Check Stock*
+"Stock 0357"
+
+🛒 *Place Order*
+"Order 0357"
+
+📞 *Call:* ${WHATSAPP_CONFIG.businessPhone}
+🛒 *Shop:* https://autosparessolution.github.io
+
+*How can I help you today?* 🚗`;
+    }
+    
+    // Search for part number
+    const results = aiSearch(query);
+    
+    if (results.length > 0) {
+        // Display all results (max 3)
+        let reply = `🔍 *Found ${results.length} result(s)*\n\n`;
+        
+        results.slice(0, 3).forEach((p, index) => {
+            const priceGST = aiPriceWithGST(p.price, p.gst || 18);
+            const stockStatus = p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock';
+            
+            reply += `*${index + 1}. ${p.part}*\n`;
+            reply += `📝 ${p.desc || 'N/A'}\n`;
+            reply += `🏷️ ${p.brand || 'N/A'}\n`;
+            reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
+            reply += `📦 ${stockStatus}\n\n`;
+        });
+        
+        reply += `🛒 *Order now:* https://autosparessolution.github.io\n`;
+        reply += `📞 *Call:* ${WHATSAPP_CONFIG.businessPhone}\n\n`;
+        reply += `💬 *Quick Actions:*\n`;
+        reply += `- "Order {part}" → Place order\n`;
+        reply += `- "Price {part}" → Check price\n`;
+        reply += `- "Stock {part}" → Check availability`;
+        
+        return reply;
+    } else {
+        // Check if it's a price/stock/order command
+        if (query.includes('price') || query.includes('stock') || query.includes('order')) {
+            // Extract potential part number
+            const words = query.split(' ');
+            const possiblePart = words.find(word => word.match(/^[A-Z0-9]{5,10}$/i));
+            
+            if (possiblePart) {
+                // Try to find the part
+                const partResult = aiSearch(possiblePart);
+                if (partResult.length > 0) {
+                    const p = partResult[0];
+                    const priceGST = aiPriceWithGST(p.price, p.gst || 18);
+                    
+                    let reply = '';
+                    if (query.includes('price')) {
+                        reply = `💰 *Price: ${p.part}*\n\n`;
+                        reply += `📝 ${p.desc || 'N/A'}\n`;
+                        reply += `💳 *Our Price:* ₹${p.price || 0}\n`;
+                        reply += `🧾 *GST:* ${p.gst || 18}%\n`;
+                        reply += `💰 *Total:* ₹${priceGST.toFixed(2)} (incl. GST)\n\n`;
+                        reply += `🛒 *Order:* https://autosparessolution.github.io`;
+                    } else if (query.includes('stock')) {
+                        reply = `📦 *Stock: ${p.part}*\n\n`;
+                        reply += `📝 ${p.desc || 'N/A'}\n`;
+                        reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs available` : '❌ Out of Stock'}\n\n`;
+                        reply += `🛒 *Order:* https://autosparessolution.github.io`;
+                    } else if (query.includes('order')) {
+                        reply = `🛒 *Order: ${p.part}*\n\n`;
+                        reply += `📝 ${p.desc || 'N/A'}\n`;
+                        reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
+                        reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs available` : '❌ Out of Stock'}\n\n`;
+                        if (p.stock > 0) {
+                            reply += `✅ *Confirm order?* Click: https://autosparessolution.github.io`;
+                        } else {
+                            reply += `🔔 *We'll notify you when back in stock!*`;
+                        }
+                    }
+                    return reply;
+                }
+            }
+            
+            // If no part found with command
+            return `❌ *Could not find part number in your request.*
+
+💡 *Please try:*
+"Price 0357"
+"Stock 0357"
+"Order 0357"
+
+📞 *Call:* ${WHATSAPP_CONFIG.businessPhone}`;
+        }
+        
+        // No results - use Gemini AI for intelligent reply
+        return `🔍 *I couldn't find "${message}" in our inventory.*
+
+💡 *Here's what you can try:*
+1️⃣ Send a part number like *0357*
+2️⃣ Send a description like *clutch plate*
+3️⃣ Send a brand name like *TVS*
+
+📋 *Quick Commands:*
+- "Price 0357" → Check price
+- "Stock 0357" → Check availability
+- "Order 0357" → Place order
+
+📞 *Call:* ${WHATSAPP_CONFIG.businessPhone}
+🛒 *Shop:* https://autosparessolution.github.io
+
+*We'll help you find the right part!* 🚗`;
+    }
+}
+
+// ===== Helper: AI Search (uses your product data) =====
+function aiSearch(query) {
+    if (!window.allProducts || window.allProducts.length === 0) {
+        return [];
+    }
+    
+    query = query.toLowerCase().trim();
+    return window.allProducts.filter(p => {
+        const part = (p.part || '').toLowerCase();
+        const desc = (p.desc || '').toLowerCase();
+        const brand = (p.brand || '').toLowerCase();
+        return part.includes(query) || desc.includes(query) || brand.includes(query);
+    }).slice(0, 5);
+}
+
+// ===== Helper: Calculate Price with GST =====
+function aiPriceWithGST(price, gst = 18) {
+    return price + (price * gst / 100);
 }
 
 // ===== Test function =====
 async function testWhatsApp() {
-    const testMessage = "0357";
-    const reply = processWhatsAppMessage(testMessage);
-    console.log('📱 Auto-reply:', reply);
+    console.log('🧪 Testing WhatsApp AI...\n');
     
-    // To actually send, uncomment:
-    // await sendWhatsAppMessage('9198300300193', reply);
+    const testScenarios = [
+        { message: '0357', description: 'Part search' },
+        { message: 'Price 0357', description: 'Price check' },
+        { message: 'Stock 0357', description: 'Stock check' },
+        { message: 'Order 0357', description: 'Order' },
+        { message: 'clutch plate', description: 'Description search' },
+        { message: 'help', description: 'Help' }
+    ];
+    
+    for (const scenario of testScenarios) {
+        console.log(`\n📩 Testing: "${scenario.message}" (${scenario.description})`);
+        console.log('━'.repeat(40));
+        const reply = processWhatsAppMessage(scenario.message);
+        console.log(reply);
+        console.log('━'.repeat(40));
+    }
+    
+    // Send actual WhatsApp message (uncomment when ready)
+    // const testReply = processWhatsAppMessage('0357');
+    // await sendWhatsAppMessage('919038899962', testReply);
+    // console.log('\n📱 Test message sent to 919038899962');
+}
+
+// ===== Send a test WhatsApp message =====
+async function sendTestWhatsApp() {
+    console.log('📱 Sending test WhatsApp message...');
+    const testMessage = `🚀 *ASSIST AI Test*\n\n` +
+                        `✅ WhatsApp API is working!\n` +
+                        `📱 Business Number: ${WHATSAPP_CONFIG.businessPhone}\n` +
+                        `🆔 Phone Number ID: ${WHATSAPP_CONFIG.phoneNumberId}\n\n` +
+                        `🎉 Your AI Sales Assistant is now ready!\n\n` +
+                        `💬 *Try these commands:*\n` +
+                        `📦 "Stock 0357"\n` +
+                        `💰 "Price 0357"\n` +
+                        `🛒 "Order 0357"`;
+    
+    await sendWhatsAppMessage('919038899962', testMessage);
 }
 
 // Expose functions globally
 window.sendWhatsAppMessage = sendWhatsAppMessage;
 window.processWhatsAppMessage = processWhatsAppMessage;
 window.testWhatsApp = testWhatsApp;
+window.sendTestWhatsApp = sendTestWhatsApp;
+window.aiSearch = aiSearch;
+window.aiPriceWithGST = aiPriceWithGST;
 
 console.log('📱 WhatsApp AI Ready!');
-console.log('💡 Run testWhatsApp() to test');
+console.log('📞 Business Number:', WHATSAPP_CONFIG.businessPhone);
+console.log('🆔 Phone Number ID:', WHATSAPP_CONFIG.phoneNumberId);
+console.log('🔑 Token:', WHATSAPP_CONFIG.accessToken.substring(0, 20) + '...');
+console.log('\n💡 Available functions:');
+console.log('  testWhatsApp() - Test all scenarios');
+console.log('  sendTestWhatsApp() - Send actual WhatsApp message');
+console.log('  processWhatsAppMessage("message") - Process a message');
 </script>
 </body>
                 </html>
