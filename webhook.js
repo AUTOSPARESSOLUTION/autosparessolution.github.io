@@ -12,7 +12,7 @@ app.use(express.json());
 // ===== CONFIGURATION =====
 const CONFIG = {
     phoneNumberId: process.env.ID || '1211088452085321',
-    accessToken: process.env.TOKEN || 'EAAOS2aPmhzYBRZCj0k3qvlZBs7CB2KWZARtZAyuqdPtLHUWV6lkJkqoPY7bXnw2MSjZCntQPojMIoGkW7tnV3Ogu5TlCQ0AHtZA50KzBUFOoidaA3QXDssNqIPJgBr6RBUw9Hs3KQeF7AGD4TXvvT7RygWu8drawM0eVLhA0cZClgAdLkFZBnoOplET9Yr1eFg0vYGoRZBzibInZAkVDZBBb3BrseIkL0yOMUW4aQZDZDEAAOS2aPmhz...',
+    accessToken: process.env.TOKEN || 'EAAOS2aPmhzYBRyydYO5ALkt4tVZCKtIk1XSg0RYs2wIv6E1HiNEZA8lFzsXYznt7wgs5rRtvFZAVRiD0g0CUJqGAXOwvAZCOcSWbWYs65TRQ73pI51zEP9kXTZCBqpPQUq0k9Fv2PtEhQqdwZBIozEZCPalwBrPHMTZBkietBFsx1QnobOC3NZCN4IfOrfkNDlAZDZD',
     verifyToken: process.env.VERIFY || 'assist123',
     businessPhone: process.env.PHONE || '919038899962'
 };
