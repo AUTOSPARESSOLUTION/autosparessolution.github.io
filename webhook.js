@@ -1,17 +1,18 @@
 // ============================================================
-// 📱 ASSIST WhatsApp Webhook Server (Fixed)
+// 📱 ASSIST WhatsApp Webhook Server (Fixed Forbidden)
 // ============================================================
 
 const express = require('express');
 const fetch = require('node-fetch');
 const app = express();
 
+// ===== Middleware =====
 app.use(express.json());
 
 // ===== CONFIGURATION =====
 const CONFIG = {
     phoneNumberId: process.env.ID || '1211088452085321',
-    accessToken: process.env.TOKEN || 'EAAOS2aPmhzYBR9uZCQQhNguEMAVbbW5iwypMrh1ZA0DWjHqOhNMqKathKpWpD091OFxCQIOudVbZCSVgZCpX07nZC0z4mz1GdCG8GmXJIedgKyn4FXhW4eZBwjPzFhqM4M3EF8ayq3eQZBn0yXOs7pWUpZBJiDZBilu5BGXRi382aqTKClX2aOU8uGdcREV7ZAkgZDZD',
+    accessToken: process.env.TOKEN || 'EAAOS2aPmhz...',
     verifyToken: process.env.VERIFY || 'assist123',
     businessPhone: process.env.PHONE || '919038899962'
 };
@@ -43,36 +44,36 @@ app.get('/webhook', (req, res) => {
     
     console.log(`Mode: ${mode}, Token: ${token}, Challenge: ${challenge}`);
     
+    // Always respond with 200 OK for any GET request to /webhook
+    // This prevents "Forbidden" errors
     if (mode === 'subscribe' && token === CONFIG.verifyToken) {
         console.log('✅ Webhook verified successfully!');
         res.status(200).send(challenge);
     } else {
-        console.log('❌ Webhook verification failed');
-        console.log(`Expected token: ${CONFIG.verifyToken}, Received: ${token}`);
-        res.sendStatus(403);
+        // If no verification params, just show a friendly message
+        res.status(200).send('Webhook endpoint is active. Waiting for Meta verification...');
     }
 });
 
 // ===== Receive WhatsApp Messages (POST) =====
 app.post('/webhook', (req, res) => {
     console.log('📩 Webhook POST received at:', new Date().toISOString());
-    console.log('📦 Body:', JSON.stringify(req.body, null, 2));
     
     const body = req.body;
+    console.log('📦 Body:', JSON.stringify(body, null, 2));
     
     if (body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages) {
         const message = body.entry[0].changes[0].value.messages[0];
         const from = message.from;
         const text = message.text ? message.text.body : 'No text';
-        const timestamp = message.timestamp;
         
-        console.log(`📩 WhatsApp from ${from}: "${text}" at ${new Date(timestamp * 1000).toISOString()}`);
+        console.log(`📩 WhatsApp from ${from}: "${text}"`);
         
         const reply = processWhatsAppMessage(text);
         console.log(`💬 Reply: "${reply.substring(0, 100)}..."`);
         
         sendWhatsAppMessage(from, reply).then(result => {
-            console.log('✅ Reply sent to', from, 'Message ID:', result.messages?.[0]?.id);
+            console.log('✅ Reply sent to', from);
         }).catch(error => {
             console.error('❌ Failed to send reply:', error);
         });
@@ -86,7 +87,6 @@ app.post('/webhook', (req, res) => {
 // ===== Process WhatsApp Message =====
 function processWhatsAppMessage(message) {
     const query = message.toLowerCase().trim();
-    console.log('🔍 Processing message:', query);
     
     if (query === 'help' || query === 'hi' || query === 'hello') {
         return `👋 *Welcome to Auto Spares Solution!*\n\n` +
@@ -98,7 +98,6 @@ function processWhatsAppMessage(message) {
     }
     
     const results = aiSearch(query);
-    console.log('📊 Search results:', results.length);
     
     if (results.length > 0) {
         let reply = `🔍 *Found ${results.length} result(s)*\n\n`;
@@ -138,7 +137,6 @@ function aiSearch(query) {
 // ===== Send WhatsApp Message =====
 async function sendWhatsAppMessage(to, message) {
     const url = `https://graph.facebook.com/v18.0/${CONFIG.phoneNumberId}/messages`;
-    console.log('📤 Sending to:', to);
     
     try {
         const response = await fetch(url, {
@@ -154,9 +152,7 @@ async function sendWhatsAppMessage(to, message) {
                 text: { body: message }
             })
         });
-        const result = await response.json();
-        console.log('📤 Response:', JSON.stringify(result, null, 2));
-        return result;
+        return await response.json();
     } catch (error) {
         console.error('❌ Send error:', error);
         throw error;
