@@ -8,15 +8,18 @@ const app = express();
 
 app.use(express.json());
 
-// ===== CONFIGURATION =====
+// ===== CONFIGURATION (Simple, valid variable names) =====
 const CONFIG = {
-    phoneNumberId: process.env.PHONE_NUMBER_ID || '1211088452085321',
-    accessToken: process.env.ACCESS_TOKEN || 'EAAOS2aPmhzYBR9uZCQQhNguEMAVbbW5iwypMrh1ZA0DWjHqOhNMqKathKpWpD091OFxCQIOudVbZCSVgZCpX07nZC0z4mz1GdCG8GmXJIedgKyn4FXhW4eZBwjPzFhqM4M3EF8ayq3eQZBn0yXOs7pWUpZBJiDZBilu5BGXRi382aqTKClX2aOU8uGdcREV7ZAkgZDZD',
-    verifyToken: process.env.VERIFY_TOKEN || 'assist123',
-    businessPhone: process.env.BUSINESS_PHONE || '919038899962'
+    phoneNumberId: process.env.ID || '1211088452085321',
+    accessToken: process.env.TOKEN || 'EAAOS2aPmhzYBR9uZCQQhNguEMAVbbW5iwypMrh1ZA0DWjHqOhNMqKathKpWpD091OFxCQIOudVbZCSVgZCpX07nZC0z4mz1GdCG8GmXJIedgKyn4FXhW4eZBwjPzFhqM4M3EF8ayq3eQZBn0yXOs7pWUpZBJiDZBilu5BGXRi382aqTKClX2aOU8uGdcREV7ZAkgZDZD',
+    verifyToken: process.env.VERIFY || 'assist123',
+    businessPhone: process.env.PHONE || '919038899962'
 };
 
 console.log('📱 ASSIST WhatsApp Webhook Starting...');
+console.log('📞 Business Phone:', CONFIG.businessPhone);
+console.log('🆔 Phone ID:', CONFIG.phoneNumberId);
+console.log('🔑 Verify Token:', CONFIG.verifyToken);
 
 // ===== Webhook Verification =====
 app.get('/webhook', (req, res) => {
@@ -28,6 +31,7 @@ app.get('/webhook', (req, res) => {
         console.log('✅ Webhook verified successfully!');
         res.status(200).send(challenge);
     } else {
+        console.log('❌ Webhook verification failed');
         res.sendStatus(403);
     }
 });
@@ -43,10 +47,8 @@ app.post('/webhook', (req, res) => {
         
         console.log(`📩 WhatsApp from ${from}: "${text}"`);
         
-        // Process the message
         const reply = processWhatsAppMessage(text);
         
-        // Send reply back
         sendWhatsAppMessage(from, reply).then(() => {
             console.log('✅ Reply sent to', from);
         }).catch(error => {
@@ -80,7 +82,6 @@ function processWhatsAppMessage(message) {
                `📞 Call: ${CONFIG.businessPhone}`;
     }
     
-    // Search for parts
     const results = aiSearch(query);
     
     if (results.length > 0) {
@@ -100,6 +101,22 @@ function processWhatsAppMessage(message) {
     return `🔍 *I couldn't find "${message}" in our inventory.*\n\n` +
            `💡 Send a part number like *0357*\n` +
            `📞 *Call:* ${CONFIG.businessPhone}`;
+}
+
+// ===== AI Search =====
+function aiSearch(query) {
+    const products = [
+        { part: '0357', desc: 'Clutch Plate Alto', price: 425, stock: 18 },
+        { part: '0358', desc: 'Brake Pad Swift', price: 550, stock: 12 },
+        { part: 'A40778820', desc: 'Engine Mounting', price: 890, stock: 5 }
+    ];
+    
+    const q = query.toLowerCase();
+    return products.filter(p => {
+        const part = p.part.toLowerCase();
+        const desc = p.desc.toLowerCase();
+        return part.includes(q) || desc.includes(q);
+    });
 }
 
 // ===== Send WhatsApp Message =====
@@ -124,23 +141,6 @@ async function sendWhatsAppMessage(to, message) {
     } catch (error) {
         throw error;
     }
-}
-
-// ===== AI Search =====
-function aiSearch(query) {
-    // Sample data - replace with your actual product data
-    const products = [
-        { part: '0357', desc: 'Clutch Plate Alto', price: 425, stock: 18 },
-        { part: '0358', desc: 'Brake Pad Swift', price: 550, stock: 12 },
-        { part: 'A40778820', desc: 'Engine Mounting', price: 890, stock: 5 }
-    ];
-    
-    return products.filter(p => {
-        const part = p.part.toLowerCase();
-        const desc = p.desc.toLowerCase();
-        const q = query.toLowerCase();
-        return part.includes(q) || desc.includes(q);
-    });
 }
 
 // ===== Start Server =====
