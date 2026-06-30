@@ -1,0 +1,13 @@
+{
+  "name": "assist-whatsapp-webhook",
+  "version": "1.0.0",
+  "description": "ASSIST WhatsApp Webhook Server",
+  "main": "webhook.js",
+  "scripts": {
+    "start": "node webhook.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.6.7"
+  }
+}
