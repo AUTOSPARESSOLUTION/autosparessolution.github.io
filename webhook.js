@@ -14,7 +14,7 @@ const CONFIG = {
     phoneNumberId: process.env.ID || '1158072170724432',
     accessToken: process.env.TOKEN || 'EAAOS2aPmhzYBRyydYO5ALkt4tVZCKtIk1XSg0RYs2wIv6E1HiNEZA8lFzsXYznt7wgs5rRtvFZAVRiD0g0CUJqGAXOwvAZCOcSWbWYs65TRQ73pI51zEP9kXTZCBqpPQUq0k9Fv2PtEhQqdwZBIozEZCPalwBrPHMTZBkietBFsx1QnobOC3NZCN4IfOrfkNDlAZDZD',
     verifyToken: process.env.VERIFY || 'assist123',
-    businessPhone: process.env.PHONE || '919038899962'
+    businessPhone: process.env.PHONE || '919330102828'
 };
 
 console.log('📱 ASSIST WhatsApp Webhook Starting...');
