@@ -260,14 +260,14 @@ How can I help you today? 🚗`;
                     reply += `🧾 GST: ${p.gst || 18}%\n`;
                     reply += `💰 Total: ₹${priceGST.toFixed(2)} (incl. GST)\n\n`;
                     reply += `📦 Stock: ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
-                    reply += `🛒 Order: https://autosparessolution.github.io`;
+                    reply += `🛒 Order: https://autosparessolution.com`;
                 } else if (msg.includes("stock")) {
                     reply = `📦 *Stock: ${p.part}*\n\n`;
                     reply += `📝 ${p.desc || 'N/A'}\n`;
                     reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs available` : '❌ Out of Stock'}\n`;
                     if (p.stock > 0) {
                         reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n\n`;
-                        reply += `🛒 Order: https://autosparessolution.github.io`;
+                        reply += `🛒 Order: https://autosparessolution.com`;
                     } else {
                         reply += `\n🔔 We'll notify you when back in stock!`;
                     }
@@ -277,7 +277,7 @@ How can I help you today? 🚗`;
                     if (p.stock > 0) {
                         reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
                         reply += `📦 ✅ ${p.stock} pcs available\n\n`;
-                        reply += `✅ Confirm order: https://autosparessolution.github.io\n`;
+                        reply += `✅ Confirm order: https://autosparessolution.com\n`;
                         reply += `📞 Call: ${CONFIG.businessPhone}`;
                     } else {
                         reply += `📦 ❌ Out of Stock\n\n`;
