@@ -305,7 +305,7 @@ How can I help you today? 🚗`;
             reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
             reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
         });
-        reply += `🛒 Order: https://autosparessolution.github.io\n`;
+        reply += `🛒 Order: https://autosparessolution.com\n`;
         reply += `📞 Call: ${CONFIG.businessPhone}`;
         return reply;
     }
