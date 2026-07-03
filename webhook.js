@@ -1,5 +1,5 @@
 // ============================================================
-// 📱 ASSIST WhatsApp Webhook Server (Using Your AI Engine)
+// 📱 ASSIST WhatsApp Webhook (Using Website AI Logic)
 // ============================================================
 
 const express = require("express");
@@ -8,40 +8,28 @@ const fs = require("fs");
 const path = require("path");
 
 const app = express();
-
 app.use(express.json());
 
-// ============================================================
-// CONFIG
-// ============================================================
-
+// ===== CONFIGURATION =====
 const CONFIG = {
     phoneNumberId: process.env.ID || "1158072170724432",
     accessToken: process.env.TOKEN || "EAAOS2aPmhzYBR5dGgAiTkz5nH5JOoheHnvI45lmOJiF3rnZA1cL6CR3POy3s6gI9mk1lxq3bjtOiBixhSvvFAxcbR6ut6kp2dZArnw3yk7r4TlqRpBbmMzV4YVAmVuFLZCTQ3bN7neJsZAiR6pNqZBmcQWP2341T59RvpG4hJnk4WfqIb5QLvZCYm40H17zXLNQQZDZD",
     verifyToken: process.env.VERIFY || "assist123",
-    businessPhone: process.env.PHONE || "919038899962",
-    // ===== YOUR GEMINI API KEY (from index.html) =====
-    geminiKey: process.env.GEMINI_KEY || "AQ.Ab8RN6IQvM9VZYkn6_7mDEWir5IDPkLcHDfJcOGt5rsLheW_eg"
+    businessPhone: process.env.PHONE || "919330102828"
 };
 
 console.log("====================================");
 console.log("🚀 ASSIST WhatsApp Started");
 console.log("Phone Number ID:", CONFIG.phoneNumberId);
 console.log("Business Phone :", CONFIG.businessPhone);
-console.log("Gemini Key    :", CONFIG.geminiKey ? "✅ Set" : "❌ Missing");
 console.log("====================================");
 
-// ============================================================
-// PRODUCT DATABASE (Loaded from prices.csv)
-// ============================================================
-
+// ===== PRODUCT DATABASE (Same as website) =====
 let productDatabase = [];
-let productsLoaded = false;
 
 function loadProducts() {
     try {
         const csvPath = path.join(__dirname, 'prices.csv');
-        
         if (fs.existsSync(csvPath)) {
             const csvData = fs.readFileSync(csvPath, 'utf8');
             const lines = csvData.split('\n');
@@ -55,15 +43,11 @@ function loadProducts() {
                 headers.forEach((h, idx) => {
                     product[h] = values[idx] || '';
                 });
-                
                 product.price = parseFloat(product.price) || 0;
                 product.stock = parseInt(product.stock) || 0;
                 product.gst = parseFloat(product.gst) || 18;
-                
                 productDatabase.push(product);
             }
-            
-            productsLoaded = true;
             console.log(`✅ Loaded ${productDatabase.length} products from prices.csv`);
         } else {
             console.log('⚠️ prices.csv not found. Using sample data.');
@@ -81,15 +65,14 @@ function loadSampleProducts() {
         { part: "0358", desc: "Brake Pad Swift", price: 550, stock: 12, brand: "TVS", gst: 18 },
         { part: "A40778820", desc: "Engine Mounting", price: 890, stock: 5, brand: "Mitsubishi", gst: 18 }
     ];
-    productsLoaded = true;
     console.log(`✅ Loaded ${productDatabase.length} sample products`);
 }
 
 // ============================================================
-// YOUR AI ENGINE FUNCTIONS (from index.html)
+// AI FUNCTIONS (EXACT COPY FROM YOUR WEBSITE)
 // ============================================================
 
-// ===== AI Search (YOUR EXACT FUNCTION) =====
+// ===== AI Search (IDENTICAL to index.html) =====
 function aiSearch(query) {
     if (!query || !productDatabase.length) return [];
     
@@ -98,56 +81,17 @@ function aiSearch(query) {
         const part = (p.part || '').toLowerCase();
         const desc = (p.desc || '').toLowerCase();
         const brand = (p.brand || '').toLowerCase();
-        return part.includes(q) || desc.includes(q) || brand.includes(q);
-    });
+        const make = (p.make || '').toLowerCase();
+        const model = (p.model || '').toLowerCase();
+        
+        return part.includes(q) || desc.includes(q) || brand.includes(q) || 
+               make.includes(q) || model.includes(q);
+    }).slice(0, 5);
 }
 
-// ===== AI Price with GST (YOUR EXACT FUNCTION) =====
+// ===== AI Price with GST (IDENTICAL to index.html) =====
 function aiPriceWithGST(price, gst = 18) {
     return price + (price * gst / 100);
-}
-
-// ===== GEMINI AI (YOUR EXACT FUNCTION from index.html) =====
-async function aiGetGeminiReply(query) {
-    if (!CONFIG.geminiKey || CONFIG.geminiKey === "YOUR_FREE_GEMINI_API_KEY") {
-        return null;
-    }
-
-    try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${CONFIG.geminiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: `You are an auto spares assistant for "Auto Spares Solution" in India.
-                            Customer asks: "${query}"
-                            
-                            If they ask for a part:
-                            - Suggest checking with part number
-                            - Mention we have TVS, Mitsubishi, and other brands
-                            
-                            If they ask for help:
-                            - Be friendly and helpful
-                            - Reply in Hinglish (Hindi + English)
-                            - Keep it short (2-3 sentences)
-                            
-                            If they ask about price or stock, ask for the part number.
-                            
-                            Reply in simple Hinglish.`
-                        }]
-                    }]
-                })
-            }
-        );
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-    } catch (error) {
-        console.error('Gemini error:', error);
-        return null;
-    }
 }
 
 // ============================================================
@@ -159,9 +103,7 @@ app.get("/", (req, res) => {
         status: "running",
         phone: CONFIG.businessPhone,
         phoneNumberId: CONFIG.phoneNumberId,
-        productsLoaded: productsLoaded,
-        productCount: productDatabase.length,
-        gemini: CONFIG.geminiKey ? "✅ Configured" : "❌ Missing",
+        productsLoaded: productDatabase.length,
         time: new Date()
     });
 });
@@ -207,9 +149,7 @@ app.post("/webhook", async (req, res) => {
             console.log("Message From :", from);
             console.log("Message Text :", text);
 
-            // ===== AI ENGINE PROCESSES THE MESSAGE =====
-            const reply = await processMessageWithAI(text);
-            
+            const reply = processWhatsAppMessage(text);
             console.log("AI Reply:");
             console.log(reply);
 
@@ -223,10 +163,10 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ============================================================
-// AI ENGINE - PROCESS MESSAGE (Using Your Functions)
+// PROCESS MESSAGE (USING WEBSITE AI LOGIC)
 // ============================================================
 
-async function processMessageWithAI(msg) {
+function processWhatsAppMessage(msg) {
     msg = msg.toLowerCase().trim();
     
     // ===== HELP COMMANDS =====
@@ -236,18 +176,18 @@ async function processMessageWithAI(msg) {
 🤖 I'm your AI Sales Assistant
 
 🔍 Search Parts:
-Send part number like "0357"
+Send part number like "0357" or "0802CAA08871N"
 Send description like "clutch plate"
-Send brand like "TVS"
+Send brand like "TVS" or "M&M"
 
 💰 Check Price:
-"Price 0357"
+"Price 0802CAA08871N"
 
 📦 Check Stock:
-"Stock 0357"
+"Stock 0802CAA08871N"
 
 🛒 Place Order:
-"Order 0357"
+"Order 0802CAA08871N"
 
 📞 Call: ${CONFIG.businessPhone}
 🛒 Shop: https://autosparessolution.github.io
@@ -257,15 +197,15 @@ How can I help you today? 🚗`;
     
     // ===== PRICE / STOCK / ORDER COMMANDS =====
     if (msg.includes("price") || msg.includes("stock") || msg.includes("order")) {
+        // Extract part number (alphanumeric, 5-12 chars)
         const words = msg.split(' ');
         const possiblePart = words.find(w => w.match(/^[A-Z0-9]{5,12}$/i));
         
         if (possiblePart) {
-            // ===== USING YOUR aiSearch() FUNCTION =====
+            // ===== USING WEBSITE AI SEARCH =====
             const results = aiSearch(possiblePart);
             if (results.length > 0) {
                 const p = results[0];
-                // ===== USING YOUR aiPriceWithGST() FUNCTION =====
                 const priceGST = aiPriceWithGST(p.price, p.gst || 18);
                 
                 let reply = '';
@@ -273,7 +213,7 @@ How can I help you today? 🚗`;
                 if (msg.includes("price")) {
                     reply = `💰 *Price: ${p.part}*\n\n`;
                     reply += `📝 ${p.desc || 'N/A'}\n`;
-                    reply += `🏷️ ${p.brand || 'N/A'}\n`;
+                    reply += `🏷️ Brand: ${p.brand || 'N/A'}\n`;
                     reply += `💳 Base Price: ₹${p.price || 0}\n`;
                     reply += `🧾 GST: ${p.gst || 18}%\n`;
                     reply += `💰 Total: ₹${priceGST.toFixed(2)} (incl. GST)\n\n`;
@@ -310,45 +250,32 @@ How can I help you today? 🚗`;
         return `❌ No product found.
 
 💡 Try:
-"Price 0357"
-"Stock 0357"
-"Order 0357"
+"Price 0802CAA08871N"
+"Stock 0802CAA08871N"
+"Order 0802CAA08871N"
 
 📞 Call: ${CONFIG.businessPhone}`;
     }
     
-    // ===== SEARCH PRODUCTS (Using YOUR aiSearch) =====
+    // ===== SEARCH PRODUCTS (USING WEBSITE AI) =====
     const results = aiSearch(msg);
     
     if (results.length > 0) {
         return formatProductReply(results);
     }
     
-    // ===== NO RESULTS - USE GEMINI AI (YOUR FUNCTION) =====
-    console.log("🤖 No product found. Using Gemini AI...");
-    const geminiReply = await aiGetGeminiReply(msg);
-    
-    if (geminiReply) {
-        return `🔍 I couldn't find "${msg}" in our inventory.
-
-${geminiReply}
-
-📞 Call: ${CONFIG.businessPhone}
-🛒 Shop: https://autosparessolution.github.io`;
-    }
-    
-    // ===== FALLBACK =====
+    // ===== NO RESULTS FOUND =====
     return `🔍 I couldn't find "${msg}" in our inventory.
 
 💡 Try:
-1️⃣ Part number like 0357
+1️⃣ Part number like 0357 or 0802CAA08871N
 2️⃣ Description like clutch plate
-3️⃣ Brand name like TVS
+3️⃣ Brand name like TVS or M&M
 
 📋 Quick Commands:
-"Price 0357" → Check price
-"Stock 0357" → Check availability
-"Order 0357" → Place order
+"Price 0802CAA08871N" → Check price
+"Stock 0802CAA08871N" → Check availability
+"Order 0802CAA08871N" → Place order
 
 📞 Call: ${CONFIG.businessPhone}
 🛒 Shop: https://autosparessolution.github.io
@@ -357,7 +284,7 @@ We'll help you find the right part! 🚗`;
 }
 
 // ============================================================
-// FORMAT PRODUCT REPLY (Using Your Functions)
+// FORMAT PRODUCT REPLY
 // ============================================================
 
 function formatProductReply(results) {
@@ -370,15 +297,15 @@ function formatProductReply(results) {
     let reply = `🔍 Found ${results.length} result(s)\n\n`;
     
     results.forEach((p, index) => {
-        // ===== USING YOUR aiPriceWithGST() FUNCTION =====
         const priceGST = aiPriceWithGST(p.price, p.gst || 18);
         const stockStatus = p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock';
         const brand = p.brand || 'N/A';
         const desc = p.desc || 'N/A';
+        const part = p.part || 'N/A';
         
-        reply += `${index + 1}. ${p.part}\n`;
+        reply += `${index + 1}. **${part}**\n`;
         reply += `📝 ${desc}\n`;
-        reply += `🏷️ ${brand}\n`;
+        reply += `🏷️ Brand: ${brand}\n`;
         reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
         reply += `📦 ${stockStatus}\n\n`;
     });
