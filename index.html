@@ -2068,5 +2068,97 @@ console.log('  testWhatsApp() - Test all scenarios');
 console.log('  sendTestWhatsApp() - Send actual WhatsApp message');
 console.log('  processWhatsAppMessage("message") - Process a message');
 </script>
+    <!-- ============================================ -->
+<!-- 🔒 HIDE ADMIN-ONLY MENUS                    -->
+<!-- ============================================ -->
+
+<script>
+// ============================================================
+// 🔒 HIDE ADMIN-ONLY MENUS (Only 3 items)
+// ============================================================
+
+function hideAdminMenus() {
+    // Check if current user is admin
+    const user = JSON.parse(localStorage.getItem('currentUser'));
+    const isAdmin = user && user.email === 'dipankar@autosparessolution.com';
+    
+    console.log('🔒 Admin check:', isAdmin ? '✅ Admin' : '❌ Not admin');
+    
+    // ===== Only hide these 3 menus from non-admin =====
+    const adminOnlyLinks = [
+        'invoice-stock.html',           // Invoice (Stock)
+        'distributor-stock-viewer.html', // Distributor Stock List
+        'dealer-offers-dashboard.html'   // Dealer Offers & Intelligence
+    ];
+    
+    // Find all navigation links
+    const allLinks = document.querySelectorAll('.nav-link');
+    
+    allLinks.forEach(link => {
+        const href = link.getAttribute('href');
+        if (!href) return;
+        
+        // Check if this is one of the admin-only links
+        const isAdminLink = adminOnlyLinks.some(item => href.includes(item));
+        
+        if (isAdminLink) {
+            if (isAdmin) {
+                // Admin: Show the link
+                link.style.display = 'flex';
+                console.log('✅ Showing admin menu:', href);
+            } else {
+                // Non-admin: Hide the link
+                link.style.display = 'none';
+                console.log('🔒 Hiding admin menu:', href);
+            }
+        } else {
+            // All other links: Always visible (including ERP)
+            link.style.display = 'flex';
+        }
+    });
+    
+    // Hide empty group titles if all links in group are hidden
+    document.querySelectorAll('.nav-group').forEach(group => {
+        const visibleLinks = group.querySelectorAll('.nav-link[style*="display: flex"]');
+        const groupTitle = group.querySelector('.group-title');
+        if (visibleLinks.length === 0 && groupTitle) {
+            groupTitle.style.display = 'none';
+        } else if (groupTitle) {
+            groupTitle.style.display = 'block';
+        }
+    });
+}
+
+// ===== Run on page load =====
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(hideAdminMenus, 100);
+});
+
+// ===== Run after login =====
+function updateAdminMenus() {
+    hideAdminMenus();
+}
+
+// ===== Update login function =====
+const originalLogin = window.login;
+if (typeof originalLogin === 'function') {
+    window.login = function() {
+        originalLogin();
+        setTimeout(updateAdminMenus, 500);
+    };
+}
+
+// ===== Update logout function =====
+const originalLogout = window.logout;
+if (typeof originalLogout === 'function') {
+    window.logout = function() {
+        originalLogout();
+        setTimeout(hideAdminMenus, 500);
+    };
+}
+
+console.log('🔒 Admin menu security loaded - Only 3 menus hidden from non-admin');
+console.log('🔒 Hidden menus: Invoice(Stock), Distributor Stock, Dealer Intelligence');
+</script>
 </body>
                 </html>
