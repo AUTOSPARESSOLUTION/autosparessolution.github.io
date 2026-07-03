@@ -1,5 +1,5 @@
 // ============================================================
-// 📱 ASSIST WhatsApp Webhook (Using Website AI Logic)
+// 📱 ASSIST WhatsApp Webhook (Using Website's AI Logic)
 // ============================================================
 
 const express = require("express");
@@ -20,64 +20,71 @@ const CONFIG = {
 
 console.log("====================================");
 console.log("🚀 ASSIST WhatsApp Started");
-console.log("Phone Number ID:", CONFIG.phoneNumberId);
-console.log("Business Phone :", CONFIG.businessPhone);
+console.log("📞 Business Phone:", CONFIG.businessPhone);
 console.log("====================================");
 
-// ===== PRODUCT DATABASE (Same as website) =====
-let productDatabase = [];
+// ============================================================
+// PRODUCT DATABASE (Same structure as website)
+// ============================================================
+
+let allProducts = [];
 
 function loadProducts() {
     try {
         const csvPath = path.join(__dirname, 'prices.csv');
+        
         if (fs.existsSync(csvPath)) {
             const csvData = fs.readFileSync(csvPath, 'utf8');
             const lines = csvData.split('\n');
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
             
-            productDatabase = [];
+            // Skip header row (same as website)
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i].trim()) continue;
-                const values = lines[i].split(',').map(v => v.trim());
-                const product = {};
-                headers.forEach((h, idx) => {
-                    product[h] = values[idx] || '';
+                const cols = lines[i].split(',').map(c => c.trim());
+                
+                allProducts.push({
+                    part: cols[0] || '',
+                    desc: cols[1] || 'Auto Spare Part',
+                    price: parseFloat(cols[6]) || 0,
+                    stock: parseInt(cols[7]) || 0,
+                    brand: cols[10] || 'Unknown',
+                    make: cols[11] || '',
+                    model: cols[12] || '',
+                    gst: 18,
+                    image: cols[4] || ''
                 });
-                product.price = parseFloat(product.price) || 0;
-                product.stock = parseInt(product.stock) || 0;
-                product.gst = parseFloat(product.gst) || 18;
-                productDatabase.push(product);
             }
-            console.log(`✅ Loaded ${productDatabase.length} products from prices.csv`);
+            
+            console.log(`✅ Loaded ${allProducts.length} products from prices.csv`);
         } else {
-            console.log('⚠️ prices.csv not found. Using sample data.');
-            loadSampleProducts();
+            console.log('⚠️ prices.csv not found. Using fallback data.');
+            loadFallbackProducts();
         }
     } catch (error) {
         console.error('❌ Error loading products:', error);
-        loadSampleProducts();
+        loadFallbackProducts();
     }
 }
 
-function loadSampleProducts() {
-    productDatabase = [
+function loadFallbackProducts() {
+    allProducts = [
         { part: "0357", desc: "Clutch Plate Alto", price: 425, stock: 18, brand: "TVS", gst: 18 },
         { part: "0358", desc: "Brake Pad Swift", price: 550, stock: 12, brand: "TVS", gst: 18 },
-        { part: "A40778820", desc: "Engine Mounting", price: 890, stock: 5, brand: "Mitsubishi", gst: 18 }
+        { part: "0802CAA08871N", desc: "CONCENTRIC SLAVE CYLINDER", price: 2336.88, stock: 18, brand: "M&M", gst: 18 }
     ];
-    console.log(`✅ Loaded ${productDatabase.length} sample products`);
+    console.log(`✅ Loaded ${allProducts.length} fallback products`);
 }
 
 // ============================================================
-// AI FUNCTIONS (EXACT COPY FROM YOUR WEBSITE)
+// AI FUNCTIONS (EXACTLY AS IN YOUR index.html)
 // ============================================================
 
-// ===== AI Search (IDENTICAL to index.html) =====
+// ===== AI Search (IDENTICAL to your website) =====
 function aiSearch(query) {
-    if (!query || !productDatabase.length) return [];
+    if (!query || !allProducts.length) return [];
     
     const q = query.toLowerCase().trim();
-    return productDatabase.filter(p => {
+    const results = allProducts.filter(p => {
         const part = (p.part || '').toLowerCase();
         const desc = (p.desc || '').toLowerCase();
         const brand = (p.brand || '').toLowerCase();
@@ -86,44 +93,88 @@ function aiSearch(query) {
         
         return part.includes(q) || desc.includes(q) || brand.includes(q) || 
                make.includes(q) || model.includes(q);
-    }).slice(0, 5);
+    });
+    
+    // Sort: exact part match first, then stock availability (matches website behavior)
+    results.sort((a, b) => {
+        const aExact = (a.part || '').toLowerCase() === q;
+        const bExact = (b.part || '').toLowerCase() === q;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        return (b.stock || 0) - (a.stock || 0);
+    });
+    
+    return results.slice(0, 5);
 }
 
-// ===== AI Price with GST (IDENTICAL to index.html) =====
+// ===== AI Price with GST (IDENTICAL to your website) =====
 function aiPriceWithGST(price, gst = 18) {
     return price + (price * gst / 100);
 }
 
+// ===== Gemini AI (IDENTICAL to your website) =====
+async function aiGetGeminiReply(query) {
+    const geminiKey = "AQ.Ab8RN6IQvM9VZYkn6_7mDEWir5IDPkLcHDfJcOGt5rsLheW_eg";
+    
+    if (!geminiKey) return null;
+    
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: `You are an auto spares assistant for "Auto Spares Solution" in India.
+                            Customer asks: "${query}"
+                            
+                            If they ask for a part:
+                            - Suggest checking with part number
+                            - Mention we have TVS, Mitsubishi, and other brands
+                            
+                            If they ask for help:
+                            - Be friendly and helpful
+                            - Reply in Hinglish (Hindi + English)
+                            - Keep it short (2-3 sentences)
+                            
+                            Reply in simple Hinglish.`
+                        }]
+                    }]
+                })
+            }
+        );
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    } catch (error) {
+        console.error('Gemini error:', error);
+        return null;
+    }
+}
+
 // ============================================================
-// HOME
+// ROUTES
 // ============================================================
 
 app.get("/", (req, res) => {
     res.json({
         status: "running",
         phone: CONFIG.businessPhone,
-        phoneNumberId: CONFIG.phoneNumberId,
-        productsLoaded: productDatabase.length,
+        productsLoaded: allProducts.length,
         time: new Date()
     });
 });
-
-// ============================================================
-// WEBHOOK VERIFY
-// ============================================================
 
 app.get("/webhook", (req, res) => {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
 
-    console.log("Webhook Verification Request");
-
     if (mode === "subscribe" && token === CONFIG.verifyToken) {
-        console.log("Webhook Verified");
+        console.log("✅ Webhook Verified");
         return res.status(200).send(challenge);
     }
-
     res.status(200).send("Webhook Active");
 });
 
@@ -132,44 +183,38 @@ app.get("/webhook", (req, res) => {
 // ============================================================
 
 app.post("/webhook", async (req, res) => {
-    console.log("====================================");
-    console.log("Incoming Webhook");
-    console.log(JSON.stringify(req.body, null, 2));
+    console.log("📨 Incoming Webhook");
 
     try {
-        if (
-            req.body.entry &&
-            req.body.entry[0].changes &&
-            req.body.entry[0].changes[0].value.messages
-        ) {
+        if (req.body.entry?.[0]?.changes?.[0]?.value?.messages) {
             const message = req.body.entry[0].changes[0].value.messages[0];
             const from = message.from;
-            const text = message.text ? message.text.body : "";
+            const text = message.text?.body || "";
 
-            console.log("Message From :", from);
-            console.log("Message Text :", text);
+            console.log(`📩 From: ${from} | Text: ${text}`);
 
-            const reply = processWhatsAppMessage(text);
-            console.log("AI Reply:");
-            console.log(reply);
-
+            // Process using website's logic
+            const reply = await processMessage(text);
+            
+            console.log("🤖 Reply:", reply);
             await sendWhatsAppMessage(from, reply);
         }
     } catch (err) {
-        console.error(err);
+        console.error("❌ Error:", err);
     }
 
     res.sendStatus(200);
 });
 
 // ============================================================
-// PROCESS MESSAGE (USING WEBSITE AI LOGIC)
+// PROCESS MESSAGE (Using Website's Logic)
 // ============================================================
 
-function processWhatsAppMessage(msg) {
+async function processMessage(msg) {
+    const originalMsg = msg;
     msg = msg.toLowerCase().trim();
     
-    // ===== HELP COMMANDS =====
+    // Help commands (matches website's behavior)
     if (msg === "hi" || msg === "hello" || msg === "help" || msg === "start") {
         return `👋 Welcome to Auto Spares Solution!
 
@@ -195,21 +240,18 @@ Send brand like "TVS" or "M&M"
 How can I help you today? 🚗`;
     }
     
-    // ===== PRICE / STOCK / ORDER COMMANDS =====
+    // Price/Stock/Order commands
     if (msg.includes("price") || msg.includes("stock") || msg.includes("order")) {
-        // Extract part number (alphanumeric, 5-12 chars)
-        const words = msg.split(' ');
+        const words = originalMsg.split(' ');
         const possiblePart = words.find(w => w.match(/^[A-Z0-9]{5,12}$/i));
         
         if (possiblePart) {
-            // ===== USING WEBSITE AI SEARCH =====
             const results = aiSearch(possiblePart);
             if (results.length > 0) {
                 const p = results[0];
                 const priceGST = aiPriceWithGST(p.price, p.gst || 18);
                 
                 let reply = '';
-                
                 if (msg.includes("price")) {
                     reply = `💰 *Price: ${p.part}*\n\n`;
                     reply += `📝 ${p.desc || 'N/A'}\n`;
@@ -247,25 +289,35 @@ How can I help you today? 🚗`;
             }
         }
         
-        return `❌ No product found.
-
-💡 Try:
-"Price 0802CAA08871N"
-"Stock 0802CAA08871N"
-"Order 0802CAA08871N"
-
-📞 Call: ${CONFIG.businessPhone}`;
+        return `❌ No product found.\n\n💡 Try:\n"Price 0802CAA08871N"\n"Stock 0802CAA08871N"\n"Order 0802CAA08871N"\n\n📞 Call: ${CONFIG.businessPhone}`;
     }
     
-    // ===== SEARCH PRODUCTS (USING WEBSITE AI) =====
+    // Search products (same as website)
     const results = aiSearch(msg);
     
     if (results.length > 0) {
-        return formatProductReply(results);
+        let reply = `🔍 Found ${results.length} result(s)\n\n`;
+        results.forEach((p, index) => {
+            const priceGST = aiPriceWithGST(p.price, p.gst || 18);
+            reply += `${index + 1}. **${p.part}**\n`;
+            reply += `📝 ${p.desc || 'N/A'}\n`;
+            reply += `🏷️ Brand: ${p.brand || 'N/A'}\n`;
+            reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
+            reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
+        });
+        reply += `🛒 Order: https://autosparessolution.github.io\n`;
+        reply += `📞 Call: ${CONFIG.businessPhone}`;
+        return reply;
     }
     
-    // ===== NO RESULTS FOUND =====
-    return `🔍 I couldn't find "${msg}" in our inventory.
+    // No results - try Gemini
+    const geminiReply = await aiGetGeminiReply(originalMsg);
+    if (geminiReply) {
+        return `🔍 I couldn't find "${originalMsg}" in our inventory.\n\n${geminiReply}\n\n📞 Call: ${CONFIG.businessPhone}\n🛒 Shop: https://autosparessolution.github.io`;
+    }
+    
+    // Final fallback
+    return `🔍 I couldn't find "${originalMsg}" in our inventory.
 
 💡 Try:
 1️⃣ Part number like 0357 or 0802CAA08871N
@@ -284,64 +336,12 @@ We'll help you find the right part! 🚗`;
 }
 
 // ============================================================
-// FORMAT PRODUCT REPLY
-// ============================================================
-
-function formatProductReply(results) {
-    if (results.length === 0) {
-        return `🔍 No products found in our inventory.
-
-📞 Call: ${CONFIG.businessPhone}`;
-    }
-    
-    let reply = `🔍 Found ${results.length} result(s)\n\n`;
-    
-    results.forEach((p, index) => {
-        const priceGST = aiPriceWithGST(p.price, p.gst || 18);
-        const stockStatus = p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock';
-        const brand = p.brand || 'N/A';
-        const desc = p.desc || 'N/A';
-        const part = p.part || 'N/A';
-        
-        reply += `${index + 1}. **${part}**\n`;
-        reply += `📝 ${desc}\n`;
-        reply += `🏷️ Brand: ${brand}\n`;
-        reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
-        reply += `📦 ${stockStatus}\n\n`;
-    });
-    
-    reply += `🛒 Order: https://autosparessolution.github.io\n`;
-    reply += `📞 Call: ${CONFIG.businessPhone}\n\n`;
-    reply += `Quick Actions:\n`;
-    reply += `- "Price ${results[0].part}" → Check price\n`;
-    reply += `- "Stock ${results[0].part}" → Check availability\n`;
-    reply += `- "Order ${results[0].part}" → Place order`;
-    
-    return reply;
-}
-
-// ============================================================
 // SEND WHATSAPP MESSAGE
 // ============================================================
 
 async function sendWhatsAppMessage(to, message) {
-    const url =
-        `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
-
-    console.log("Sending Message...");
-
-    const payload = {
-        messaging_product: "whatsapp",
-        to: to,
-        type: "text",
-        text: {
-            body: message
-        }
-    };
-
-    console.log("Payload:");
-    console.log(JSON.stringify(payload, null, 2));
-
+    const url = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
+    
     try {
         const response = await fetch(url, {
             method: "POST",
@@ -349,25 +349,18 @@ async function sendWhatsAppMessage(to, message) {
                 Authorization: `Bearer ${CONFIG.accessToken}`,
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                to: to,
+                type: "text",
+                text: { body: message }
+            })
         });
-
         const result = await response.json();
-
-        console.log("====================================");
-        console.log("META RESPONSE");
-        console.log(JSON.stringify(result, null, 2));
-        console.log("====================================");
-
-        if (!response.ok) {
-            console.log("Meta returned an error.");
-        } else {
-            console.log("✅ Message Sent Successfully");
-        }
-
+        console.log("✅ Meta Response:", result.messages?.[0]?.id ? "Message Sent" : "Error");
         return result;
     } catch (err) {
-        console.log(err);
+        console.error("❌ Send error:", err);
     }
 }
 
@@ -378,7 +371,6 @@ async function sendWhatsAppMessage(to, message) {
 loadProducts();
 
 const PORT = process.env.PORT || 10000;
-
 app.listen(PORT, () => {
     console.log("====================================");
     console.log("Server Running On Port", PORT);
