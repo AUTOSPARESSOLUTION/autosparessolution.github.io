@@ -221,9 +221,9 @@ async function processMessage(msg) {
 🤖 I'm your AI Sales Assistant
 
 🔍 Search Parts:
-Send part number like "0357" or "0802CAA08871N"
-Send description like "clutch plate"
-Send brand like "TVS" or "M&M"
+Send part number like "0801CAA00490N" or "0802CAA08871N"
+Send description like "clutch plate" or " Brake Pad"
+Send brand like "TVS" or "M&M" or "STL" or "VF" or "MTBL" or "LMM"
 
 💰 Check Price:
 "Price 0802CAA08871N"
@@ -235,7 +235,7 @@ Send brand like "TVS" or "M&M"
 "Order 0802CAA08871N"
 
 📞 Call: ${CONFIG.businessPhone}
-🛒 Shop: https://autosparessolution.github.io
+🛒 Shop: https://autosparessolution.com
 
 How can I help you today? 🚗`;
     }
