@@ -68,8 +68,8 @@ function loadProducts() {
 
 function loadFallbackProducts() {
     allProducts = [
-        { part: "0357", desc: "Clutch Plate Alto", price: 425, stock: 18, brand: "TVS", gst: 18 },
-        { part: "0358", desc: "Brake Pad Swift", price: 550, stock: 12, brand: "TVS", gst: 18 },
+        { part: "A15979020-0200", desc: "M22X2.5X115 BOLT WITH M85900 NUT", price: 170.60, stock: 1800, brand: "TVS", gst: 18 },
+        { part: "0603BA0291N", desc: "THAR - KIT BRAKE PAD", price: 4001.42, stock: 12, brand: "M&M", gst: 18 },
         { part: "0802CAA08871N", desc: "CONCENTRIC SLAVE CYLINDER", price: 2336.88, stock: 18, brand: "M&M", gst: 18 }
     ];
     console.log(`✅ Loaded ${allProducts.length} fallback products`);
