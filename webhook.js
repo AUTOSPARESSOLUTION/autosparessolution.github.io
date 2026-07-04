@@ -223,7 +223,7 @@ async function processMessage(msg) {
 🔍 Search Parts:
 Send part number like "0801CAA00490N" or "0802CAA08871N"
 Send description like "clutch plate" or " Brake Pad"
-Send brand like "TVS" or "M&M" or "STL" or "VF" or "MTBL" or "LMM"
+Send brand like "GIRLING" or "WABCO" or "TVS" or "M&M" or "STL" or "VF" or "MTBL" or "LMM"
 
 💰 Check Price:
 "Price 0802CAA08871N"
