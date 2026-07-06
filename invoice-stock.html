@@ -22,7 +22,7 @@
             border: 1px solid #dee2e6;
         }
         @media print {
-            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp, .add-item-btn, .price-info-label { display: none !important; }
+            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp, .add-item-btn, .price-info-label, .debug-toggle { display: none !important; }
             body { background: white; padding: 0; margin: 0; }
             .invoice-container { box-shadow: none; border-radius: 0; padding: 0 10px 5px 10px; margin: 0; border: none; }
             .company-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0a7c71; color: white; margin: 0 -10px 10px -10px; }
@@ -119,19 +119,26 @@
             color: #6c757d; 
             margin-left: 10px;
         }
-        /* Debug info styles */
-        .debug-info {
-            font-size: 10px;
-            color: #999;
-            margin-top: 5px;
-            padding: 5px;
-            background: #f5f5f5;
+        .debug-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
             border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 11px;
+            max-height: 300px;
+            overflow-y: auto;
             display: none;
+            font-family: monospace;
+            white-space: pre-wrap;
         }
-        .debug-info.show {
+        .debug-panel.show {
             display: block;
         }
+        .debug-panel .success { color: #28a745; }
+        .debug-panel .error { color: #dc3545; }
+        .debug-panel .warning { color: #ffc107; }
+        .debug-panel .info { color: #17a2b8; }
     </style>
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -219,12 +226,19 @@
         <span class="price-info-label no-print">
             <span style="background: #ff9800; color: white; padding: 1px 6px; border-radius: 10px;">M&M</span> = MRP from CSV (Column D)
         </span>
+        <button type="button" class="debug-toggle" onclick="toggleDebug()" style="background: #6c757d; padding: 4px 10px; font-size: 11px; margin-left: 10px;">🐛 Debug</button>
     </div>
 
     <table class="items-table" id="itemsTable">
         <thead id="itemsTableHead"></thead>
         <tbody id="itemsBody"></tbody>
     </table>
+
+    <!-- Debug Panel -->
+    <div id="debugPanel" class="debug-panel">
+        <strong>🔍 Debug Information</strong>
+        <div id="debugContent">Loading...</div>
+    </div>
 
     <div class="packing-section no-print">
         <div class="packing-field"><label>📦 Carton Quantity</label><input type="number" id="packingCartons" value="0" step="1" min="0" onchange="calculatePackingCharges()"></div>
@@ -279,6 +293,94 @@
     let invoiceAlreadySaved = false;
     let priceData = {};
     let priceDataLoaded = false;
+    let debugMode = false;
+    let debugLogs = [];
+
+    // ========== DEBUG FUNCTIONS ==========
+    function toggleDebug() {
+        debugMode = !debugMode;
+        const panel = document.getElementById('debugPanel');
+        if (debugMode) {
+            panel.classList.add('show');
+            updateDebugPanel();
+        } else {
+            panel.classList.remove('show');
+        }
+    }
+
+    function logDebug(message, type) {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = { timestamp, message, type: type || 'info' };
+        debugLogs.push(logEntry);
+        if (debugMode) {
+            updateDebugPanel();
+        }
+        console.log(`[${timestamp}] ${message}`);
+    }
+
+    function updateDebugPanel() {
+        const content = document.getElementById('debugContent');
+        let html = '';
+        
+        html += '=== SYSTEM STATUS ===\n';
+        html += 'CSV Loaded: ' + (priceDataLoaded ? '✅ Yes' : '❌ No') + '\n';
+        html += 'Total Items in CSV: ' + Object.keys(priceData).length + '\n';
+        html += 'Cart Items: ' + cart.length + '\n';
+        html += 'Debug Mode: ' + (debugMode ? 'ON' : 'OFF') + '\n\n';
+        
+        html += '=== CSV SAMPLE DATA (First 10) ===\n';
+        let count = 0;
+        for (let key in priceData) {
+            if (count < 10) {
+                const data = priceData[key];
+                html += `${key} → Make: "${data.make}", MRP: ${data.mrp}\n`;
+                count++;
+            } else {
+                html += `... and ${Object.keys(priceData).length - 10} more items\n`;
+                break;
+            }
+        }
+        
+        if (Object.keys(priceData).length === 0) {
+            html += '⚠️ No data loaded from CSV!\n';
+            html += 'Check if prices.csv exists at: https://www.autosparessolution.github.io/prices.csv\n';
+        }
+        
+        html += '\n=== CART ITEMS ===\n';
+        cart.forEach((item, idx) => {
+            const part = item.part || '(empty)';
+            const price = item.price || 0;
+            const source = item.priceSource || 'none';
+            const csvData = getPriceFromCSV(part);
+            const isMM = isMMMake(part);
+            const mrp = getMRPForMM(part);
+            
+            html += `Item ${idx+1}:\n`;
+            html += `  Part: "${part}"\n`;
+            html += `  Price: ${price} (Source: ${source})\n`;
+            html += `  isMM: ${isMM ? '✅ Yes' : '❌ No'}\n`;
+            if (csvData) {
+                html += `  CSV Make: "${csvData.make}", MRP: ${csvData.mrp}\n`;
+            } else {
+                html += `  CSV Data: Not found\n`;
+            }
+            if (mrp !== null) {
+                html += `  MRP Applied: ${mrp}\n`;
+            }
+            html += '\n';
+        });
+        
+        html += '\n=== RECENT LOGS ===\n';
+        const recentLogs = debugLogs.slice(-30);
+        recentLogs.forEach(log => {
+            const icon = log.type === 'success' ? '✅' : 
+                        log.type === 'error' ? '❌' : 
+                        log.type === 'warning' ? '⚠️' : 'ℹ️';
+            html += `${icon} [${log.timestamp}] ${log.message}\n`;
+        });
+        
+        content.textContent = html;
+    }
 
     // ========== LOAD PRICES.CSV ==========
     function loadPriceData() {
@@ -288,31 +390,51 @@
                 return;
             }
 
+            logDebug('Loading prices.csv...', 'info');
             const csvUrl = 'https://www.autosparessolution.github.io/prices.csv';
             
             fetch(csvUrl)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('CSV file not found');
+                        throw new Error('CSV file not found (Status: ' + response.status + ')');
                     }
                     return response.text();
                 })
                 .then(csvText => {
+                    logDebug('CSV loaded, parsing...', 'info');
                     const lines = csvText.split('\n');
                     let parsedCount = 0;
+                    let headerDetected = false;
                     
-                    console.log('CSV First 3 lines:', lines.slice(0, 3));
+                    // Log first 5 lines for debugging
+                    logDebug('First 5 lines of CSV:', 'info');
+                    for (let i = 0; i < Math.min(5, lines.length); i++) {
+                        logDebug(`Line ${i+1}: ${lines[i].substring(0, 100)}`, 'info');
+                    }
                     
-                    for (let i = 1; i < lines.length; i++) {
+                    // Try to detect header row
+                    let startRow = 0;
+                    if (lines.length > 0) {
+                        const firstLine = lines[0].toLowerCase();
+                        if (firstLine.includes('material') || firstLine.includes('make') || firstLine.includes('mrp') || firstLine.includes('price')) {
+                            startRow = 1;
+                            headerDetected = true;
+                            logDebug('Header row detected, starting from row 2', 'info');
+                        }
+                    }
+                    
+                    for (let i = startRow; i < lines.length; i++) {
                         if (!lines[i].trim()) continue;
                         const cols = lines[i].split(',').map(c => c.trim());
                         
+                        // Check if we have enough columns
                         if (cols.length >= 12) {
                             const material = cols[0];      // Column A
                             const mrpPrice = parseFloat(cols[3]) || 0;  // Column D
                             const make = cols[11] || '';    // Column L
                             
-                            if (material && material !== '') {
+                            // Skip if material is empty or looks like a header
+                            if (material && material !== '' && material.toLowerCase() !== 'material') {
                                 priceData[material.toUpperCase()] = {
                                     make: make,
                                     mrp: mrpPrice
@@ -320,55 +442,113 @@
                                 parsedCount++;
                                 
                                 if (parsedCount <= 3) {
-                                    console.log(`CSV Sample: Material="${material}", Make="${make}", MRP="${mrpPrice}"`);
+                                    logDebug(`Sample ${parsedCount}: Material="${material}", Make="${make}", MRP="${mrpPrice}"`, 'success');
                                 }
+                            }
+                        } else if (cols.length >= 4) {
+                            // Try with fewer columns (maybe the CSV has different structure)
+                            const material = cols[0];
+                            const mrpPrice = parseFloat(cols[3]) || 0;
+                            
+                            if (material && material !== '' && material.toLowerCase() !== 'material') {
+                                // Try to find make in other columns
+                                let make = '';
+                                for (let j = 4; j < Math.min(cols.length, 12); j++) {
+                                    if (cols[j] && (cols[j].toUpperCase().includes('M&M') || cols[j].toUpperCase().includes('M & M') || cols[j].toUpperCase() === 'MM')) {
+                                        make = cols[j];
+                                        break;
+                                    }
+                                }
+                                
+                                priceData[material.toUpperCase()] = {
+                                    make: make,
+                                    mrp: mrpPrice
+                                };
+                                parsedCount++;
                             }
                         }
                     }
                     
                     priceDataLoaded = true;
-                    console.log('✅ Price data loaded:', parsedCount, 'items from CSV');
+                    logDebug(`✅ Price data loaded: ${parsedCount} items from CSV`, 'success');
+                    logDebug(`📊 Sample keys: ${Object.keys(priceData).slice(0, 5).join(', ')}`, 'info');
+                    
+                    // Check if any M&M items were found
+                    let mmCount = 0;
+                    for (let key in priceData) {
+                        if (isMMMake(key)) mmCount++;
+                    }
+                    logDebug(`🔍 Found ${mmCount} M&M items in CSV`, mmCount > 0 ? 'success' : 'warning');
+                    
                     resolve(priceData);
                 })
                 .catch(err => {
-                    console.warn('⚠️ Could not load prices.csv:', err.message);
+                    logDebug('⚠️ Could not load prices.csv: ' + err.message, 'error');
                     resolve(priceData);
                 });
         });
     }
 
+    // ========== GET PRICE FROM CSV ==========
     function getPriceFromCSV(partNo) {
         if (!partNo) return null;
         const upperPart = partNo.toUpperCase().trim();
         
+        // Direct match
         if (priceData[upperPart]) {
             return priceData[upperPart];
         }
         
+        // Try without spaces
         const cleanPart = upperPart.replace(/\s/g, '');
         if (priceData[cleanPart]) {
             return priceData[cleanPart];
         }
         
+        // Try partial match (for cases where part number might be abbreviated)
+        for (let key in priceData) {
+            if (key.includes(upperPart) || upperPart.includes(key)) {
+                return priceData[key];
+            }
+        }
+        
         return null;
     }
 
+    // ========== CHECK IF M&M MAKE ==========
     function isMMMake(partNo) {
         const data = getPriceFromCSV(partNo);
-        if (!data) return false;
+        if (!data) {
+            if (debugMode && partNo && partNo.trim() !== '') {
+                logDebug(`No CSV data found for: "${partNo}"`, 'warning');
+            }
+            return false;
+        }
         const make = (data.make || '').toUpperCase().trim();
-        return make === 'M&M' || 
+        const result = make === 'M&M' || 
                make === 'M & M' || 
                make === 'MM' || 
                make.includes('M&M') ||
                make.includes('M & M');
+        
+        if (debugMode && partNo && partNo.trim() !== '') {
+            logDebug(`isMMMake: "${partNo}" → Make="${make}" → ${result ? '✅ Yes' : '❌ No'}`, result ? 'success' : 'info');
+        }
+        return result;
     }
 
+    // ========== GET MRP FOR M&M PART ==========
     function getMRPForMM(partNo) {
         const data = getPriceFromCSV(partNo);
         if (!data) return null;
         if (isMMMake(partNo)) {
+            if (debugMode && partNo && partNo.trim() !== '') {
+                logDebug(`✅ MRP found: "${partNo}" → ${data.mrp}`, 'success');
+            }
             return data.mrp;
+        }
+        if (debugMode && partNo && partNo.trim() !== '') {
+            logDebug(`❌ Not M&M: "${partNo}" (Make: "${data.make}")`, 'info');
         }
         return null;
     }
@@ -406,35 +586,29 @@
         const maxNum = getMaxCashBillNumber();
         const prefix = getCashBillPrefix();
         let nextNumber = maxNum + 1;
-        if (maxNum === 0) {
-            nextNumber = 4;
-        }
+        if (nextNumber < 4) nextNumber = 4;
         return prefix + nextNumber.toString().padStart(3, '0');
-    }
-
-    function getNextCreditBillNumber() {
-        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        const finYear = getFinancialYear();
-        let prefix = `ASS/${finYear}/`;
-        let maxNumber = 0;
-        allInvoices.forEach(inv => {
-            if (inv.invoiceType === 'credit' && inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
-                const match = inv.invoiceNo.match(/(\d+)$/);
-                if (match) {
-                    const num = parseInt(match[1]);
-                    if (num > maxNumber) maxNumber = num;
-                }
-            }
-        });
-        const nextNumber = maxNumber + 1;
-        return prefix + nextNumber.toString().padStart(4, '0');
     }
 
     function getNextInvoiceNumber(type) {
         if (type === 'cash') {
             return getNextCashBillNumber();
         } else {
-            return getNextCreditBillNumber();
+            const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+            const finYear = getFinancialYear();
+            let prefix = `ASS/${finYear}/`;
+            let maxNumber = 0;
+            allInvoices.forEach(inv => {
+                if (inv.invoiceType === 'credit' && inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
+                    const match = inv.invoiceNo.match(/(\d+)$/);
+                    if (match) {
+                        const num = parseInt(match[1]);
+                        if (num > maxNumber) maxNumber = num;
+                    }
+                }
+            });
+            const nextNumber = maxNumber + 1;
+            return prefix + nextNumber.toString().padStart(4, '0');
         }
     }
 
@@ -466,6 +640,7 @@
         cart.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0, unit: 'pc', priceSource: '' });
         renderItemsAndTaxSummary();
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
+        if (debugMode) updateDebugPanel();
     }
 
     function calculatePackingCharges() {
@@ -595,6 +770,7 @@
         document.getElementById('grandTotal').innerText = (grandTotal || 0).toFixed(2);
     }
 
+    // ========== RENDER FUNCTION WITH M&M PRICE CHECK ==========
     function renderItemsAndTaxSummary() {
         const isLocal = isLocalGst();
         const thead = document.getElementById('itemsTableHead');
@@ -615,11 +791,15 @@
             let price = item.price;
             let priceSource = item.priceSource || '';
             
+            // Check if part is M&M and get MRP
             if (item.part && item.part.trim() !== '' && priceSource !== 'manual') {
                 const mrp = getMRPForMM(item.part);
                 if (mrp !== null && mrp > 0) {
                     price = mrp;
                     priceSource = 'CSV-MRP';
+                    logDebug(`✅ Item ${idx+1}: "${item.part}" → MRP=${mrp} applied`, 'success');
+                } else if (debugMode) {
+                    logDebug(`⚠️ Item ${idx+1}: "${item.part}" → No MRP found or not M&M`, 'warning');
                 }
             }
             
@@ -681,17 +861,24 @@
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
         updateTotalsWithPackingAndRound();
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
+        
+        if (debugMode) updateDebugPanel();
     }
 
+    // ========== UPDATE FUNCTIONS ==========
     function updatePart(idx, value) { 
         if (cart[idx]) { 
             cart[idx].part = value; 
             cart[idx].priceSource = '';
             if (value && value.trim() !== '') {
+                logDebug(`Checking part: "${value}"`, 'info');
                 const mrp = getMRPForMM(value);
                 if (mrp !== null && mrp > 0) {
                     cart[idx].price = mrp;
                     cart[idx].priceSource = 'CSV-MRP';
+                    logDebug(`✅ Part "${value}" → MRP=${mrp} applied`, 'success');
+                } else {
+                    logDebug(`⚠️ Part "${value}" not found as M&M in CSV`, 'warning');
                 }
             }
             renderItemsAndTaxSummary(); 
@@ -736,6 +923,7 @@
         return true;
     }
 
+    // ========== RESET BUTTON FUNCTION ==========
     function resetSaveButton() {
         const saveBtn = document.getElementById('saveInvoiceBtn');
         saveBtn.disabled = false;
@@ -744,6 +932,7 @@
         isSaving = false;
     }
 
+    // ========== SAVE INVOICE FUNCTION ==========
     function saveInvoice() {
         const saveBtn = document.getElementById('saveInvoiceBtn');
         
@@ -927,7 +1116,7 @@
                 
                 invoiceAlreadySaved = true;
                 localStorage.setItem('invoiceCart', '[]');
-                alert(`✅ Invoice ${proposedNo} saved successfully!`);
+                alert(`✅ Invoice ${proposedNo} saved successfully!\n${validCart.filter(i => i.priceSource === 'CSV-MRP').length} items used MRP from CSV.`);
                 saveBtn.textContent = "Saved Successfully";
                 setTimeout(() => window.close(), 1000);
             }).catch(() => {
@@ -940,6 +1129,7 @@
         }
     }
 
+    // ========== PRINT AND PDF FUNCTIONS ==========
     function printInvoice() {
         if (!invoiceAlreadySaved && !confirm("Invoice not saved yet. Print anyway? Data won't be stored.")) return;
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
@@ -969,10 +1159,8 @@
 
     function generatePDF() {
         if (!invoiceAlreadySaved && !confirm("Invoice not saved yet. Generate PDF anyway? Data won't be stored.")) return;
-        
         const originalContainer = document.getElementById('invoiceContainer');
         const clone = originalContainer.cloneNode(true);
-        
         clone.querySelectorAll('input, textarea, select').forEach(el => {
             const span = document.createElement('span');
             span.className = 'info-value-text';
@@ -987,56 +1175,34 @@
             span.style.width = '100%';
             el.parentNode.replaceChild(span, el);
         });
-        
         clone.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
-        
         const typeSelector = clone.querySelector('.invoice-type');
         if (typeSelector) typeSelector.style.display = 'none';
-        
-        // Hide Add New Item button and M&M label
+        // Hide Add Item button and M&M label
         const addItemDiv = clone.querySelector('.add-item-btn')?.closest('div');
         if (addItemDiv) addItemDiv.style.display = 'none';
-        
-        // Hide packing section
-        const packingSection = clone.querySelector('.packing-section');
-        if (packingSection) packingSection.style.display = 'none';
-        
-        const actions = clone.querySelector('.actions');
-        if (actions) actions.style.display = 'none';
-        
-        const editDateBtn = clone.querySelector('.edit-date-btn');
-        if (editDateBtn) editDateBtn.style.display = 'none';
-        
-        const creditFields = clone.querySelector('#creditFields');
-        if (creditFields) creditFields.style.display = 'none';
-        
+        // Hide debug button
+        const debugBtn = clone.querySelector('.debug-toggle');
+        if (debugBtn) debugBtn.style.display = 'none';
+        // Hide debug panel
+        const debugPanel = clone.querySelector('#debugPanel');
+        if (debugPanel) debugPanel.style.display = 'none';
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
-        
         const opt = {
             margin: [0.3, 0.3, 0.3, 0.3],
             filename: `Invoice_${document.getElementById('invoiceNo').innerText}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { 
-                scale: 2, 
-                letterRendering: true, 
-                useCORS: true,
-                logging: false
-            },
+            html2canvas: { scale: 2, letterRendering: true, useCORS: true },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
-        
         html2pdf().set(opt).from(clone).save().then(() => {
             document.body.removeChild(clone);
             originalContainer.style.display = '';
-        }).catch(err => {
-            console.error('PDF generation error:', err);
-            document.body.removeChild(clone);
-            originalContainer.style.display = '';
-            alert('Error generating PDF. Please try again.');
         });
     }
 
+    // ========== CUSTOMER DROPDOWN (ADMIN) ==========
     function populateCustomerSelect() {
         const select = document.getElementById('quickCustomerSelect');
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
@@ -1069,11 +1235,12 @@
     // ========== INITIALISATION ==========
     loadPriceData().then(() => {
         renderItemsAndTaxSummary();
-        console.log('✅ System ready with CSV price data');
-        console.log('📊 Total items in CSV:', Object.keys(priceData).length);
+        logDebug('✅ System ready with CSV price data', 'success');
+        logDebug('📊 Total items in CSV: ' + Object.keys(priceData).length, 'info');
+        if (debugMode) updateDebugPanel();
     }).catch(() => {
         renderItemsAndTaxSummary();
-        console.log('⚠️ System running without CSV price data');
+        logDebug('⚠️ System running without CSV price data', 'warning');
     });
 
     if (currentUser) {
@@ -1155,4 +1322,4 @@
     })();
 </script>
 </body>
-</html>
+    </html>
