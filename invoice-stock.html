@@ -5,14 +5,234 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Auto Spares – Professional Invoice (Stock Integrated)</title>
     <style>
-        /* ... (all existing styles remain the same) ... */
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e9ecef;
+            margin: 0;
+            padding: 20px;
+        }
+        .invoice-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 0 15px 15px 15px;
+            border: 1px solid #dee2e6;
+        }
+        @media print {
+            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp { display: none !important; }
+            body { background: white; padding: 0; margin: 0; }
+            .invoice-container { box-shadow: none; border-radius: 0; padding: 0 10px 5px 10px; margin: 0; border: none; }
+            .company-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0a7c71; color: white; margin: 0 -10px 10px -10px; }
+            .items-table th, .tax-summary-table th { background: #f8f9fa !important; }
+            .qr-box, .signature-row, .packing-section, .totals, .info-box { page-break-inside: avoid; break-inside: avoid; }
+            .company-header, .totals { page-break-after: avoid; break-after: avoid; }
+            .invoice-container { font-size: 10pt; }
+            .info-box, .packing-section { padding: 5px 8px; margin-bottom: 8px; }
+            .items-table td, .items-table th { padding: 4px 3px; font-size: 9pt; }
+            .totals table { width: 300px; margin-left: auto; }
+            .totals td { border: none; padding: 3px; }
+            .qr-box img { max-width: 80px; }
+            .signature-box { padding-top: 3px; }
+            .footer-legal { margin-top: 8px; padding-top: 5px; }
+        }
+        .company-header { background: #0a7c71; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin: 0 -15px 15px -15px; }
+        .logo-area { display: flex; align-items: center; gap: 15px; }
+        .logo-area img { height: 60px; }
+        .company-details h1 { margin: 0; font-size: 24px; }
+        .company-details p { margin: 3px 0 0; font-size: 12px; opacity: 0.8; }
+        .invoice-title h2 { margin: 0; font-size: 20px; }
+        .invoice-title p { margin: 5px 0; font-size: 12px; }
+        .info-box { background: #f8f9fa; border-radius: 6px; padding: 8px; margin-bottom: 10px; width: 100%; }
+        .info-box h3 { margin: 0 0 8px 0; font-size: 14px; color: #0a7c71; border-bottom: 1px solid #dee2e6; padding-bottom: 4px; }
+        .info-row { display: flex; margin-bottom: 5px; font-size: 12px; }
+        .info-label { width: 110px; font-weight: 600; color: #555; }
+        .info-value { flex: 1; color: #333; word-break: break-word; }
+        input, textarea, select { width: 100%; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: inherit; }
+        .editable { background: #fff9e0; }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 12px;
+            table-layout: fixed;
+        }
+        .items-table th, .items-table td {
+            border: 1px solid #dee2e6;
+            padding: 6px 4px;
+            text-align: left;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .items-table th:nth-child(1), .items-table td:nth-child(1) { width: 4%; text-align: center; }
+        .items-table th:nth-child(2), .items-table td:nth-child(2) { width: 12%; }
+        .items-table th:nth-child(3), .items-table td:nth-child(3) { width: 18%; }
+        .items-table th:nth-child(4), .items-table td:nth-child(4) { width: 8%; }
+        .items-table th:nth-child(5), .items-table td:nth-child(5) { width: 5%; }
+        .items-table th:nth-child(6), .items-table td:nth-child(6) { width: 6%; }
+        .items-table th:nth-child(7), .items-table td:nth-child(7) { width: 8%; }
+        .items-table th:nth-child(8), .items-table td:nth-child(8) { width: 6%; }
+        .items-table th:nth-child(9), .items-table td:nth-child(9) { width: 8%; }
+        .items-table th:nth-child(10), .items-table td:nth-child(10) { width: 5%; }
+        .items-table th:nth-child(11), .items-table td:nth-child(11) { width: 6%; }
+        .items-table th:nth-child(12), .items-table td:nth-child(12) { width: 6%; }
+        .items-table th:nth-child(13), .items-table td:nth-child(13) { width: 8%; }
+        .tax-summary-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; }
+        .tax-summary-table th, .tax-summary-table td { border: 1px solid #dee2e6; padding: 6px 4px; text-align: left; }
+        .totals { text-align: right; margin-top: 15px; font-size: 12px; }
+        .totals table { width: 300px; margin-left: auto; }
+        .totals td { border: none; padding: 3px; }
+        .qr-box, .carton-box { background: #f8f9fa; border-radius: 6px; padding: 8px; margin: 8px 0; border: 1px solid #dee2e6; }
+        .qr-box img { max-width: 120px; height: auto; }
+        .signature-row { display: flex; justify-content: space-between; margin-top: 12px; gap: 15px; }
+        .signature-box { text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 5px; }
+        .footer-legal { font-size: 9px; text-align: center; margin-top: 10px; color: #555; border-top: 1px solid #dee2e6; padding-top: 8px; }
+        .actions { margin-top: 30px; display: flex; gap: 15px; justify-content: flex-end; }
+        button { background: #0a7c71; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #09645a; }
+        .invoice-type { gap: 20px; align-items: center; margin-bottom: 15px; background: #f8f9fa; padding: 10px 15px; border-radius: 8px; flex-wrap: wrap; font-size: 13px; }
+        .page-number { text-align: center; font-size: 10px; color: #777; margin-top: 10px; }
+        .packing-section { background: #f8f9fa; padding: 8px 15px; border-radius: 8px; margin: 15px 0; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; border: 1px solid #dee2e6; }
+        .packing-field { display: flex; flex-direction: column; gap: 4px; }
+        .packing-field label { font-size: 11px; font-weight: 600; color: #555; }
+        .packing-field input { width: 120px; padding: 6px; }
+        .edit-date-btn { background: none; border: none; cursor: pointer; margin-left: 6px; font-size: 14px; vertical-align: middle; color: #ffc107; }
+        .date-picker-temp { position: absolute; z-index: 1000; background: white; border: 1px solid #ccc; border-radius: 4px; padding: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .add-item-btn { background: #28a745; margin-right: 10px; }
+        .add-item-btn:hover { background: #218838; }
+        .disabled-btn { background: #6c757d; cursor: not-allowed; opacity: 0.6; }
+        .disabled-btn:hover { background: #6c757d; }
     </style>
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="invoice-container" id="invoiceContainer">
-    <!-- ... (all existing HTML remains the same) ... -->
+    <div class="company-header">
+        <div class="logo-area">
+            <img src="images/ASS.jpg" alt="Logo" onerror="this.src='https://via.placeholder.com/60'">
+            <div class="company-details">
+                <h1>Auto Spares Solution</h1>
+                <p>GSTIN: 19ANOPD3300R1ZO</p>
+                <p>101, 1st floor, 57/5, Q Road, Howrah, WB 711108</p>
+            </div>
+        </div>
+        <div class="invoice-title">
+            <h2>TAX INVOICE</h2>
+            <p><strong>Invoice No:</strong> <span id="invoiceNo"></span></p>
+            <p><strong>Date:</strong> <span id="invoiceDate"></span> <button class="edit-date-btn no-print" id="editDateBtn" title="Edit Invoice Date">📅</button></p>
+            <p><strong>Due Date:</strong> <span id="dueDate"></span></p>
+        </div>
+    </div>
+
+    <div class="invoice-type no-print">
+        <div>
+            <label><input type="radio" name="invoiceType" value="cash" checked> Cash Bill</label>
+            <label><input type="radio" name="invoiceType" value="credit"> Credit Bill</label>
+        </div>
+        <div id="creditFields" style="display:none;">
+            <label>Payment Terms (days):</label> <input type="number" id="paymentTerms" value="30" step="1" min="1" style="width:80px;">
+            <span style="margin-left:10px;">Due date = Invoice date + this number</span>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 240px;">
+            <div class="info-box">
+                <h3>Buyer (Bill to)</h3>
+                <div class="info-row no-print" id="adminCustomerSelect" style="display:none;">
+                    <div class="info-label">Quick Select:</div>
+                    <div class="info-value"><select id="quickCustomerSelect" onchange="loadCustomerData()"><option value="">-- Select Customer (Admin only) --</option></select></div>
+                </div>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="buyerName" class="editable" placeholder="Customer name"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="buyerAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                <div class="info-row"><div class="info-label">GSTIN/PAN:</div><div class="info-value"><input type="text" id="buyerGstin" class="editable" placeholder="GSTIN or PAN"></div></div>
+                <div class="info-row"><div class="info-label">State:</div><div class="info-value"><input type="text" id="buyerState" class="editable" placeholder="State"></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="buyerPhone" class="editable" placeholder="Phone"></div></div>
+                <div class="info-row"><div class="info-label">Email:</div><div class="info-value"><input type="email" id="buyerEmail" class="editable" placeholder="Email"></div></div>
+            </div>
+        </div>
+        <div style="flex: 1; min-width: 240px;">
+            <div class="info-box">
+                <h3>Consignee (Ship to)</h3>
+                <div class="info-row"><div class="info-label">Name:</div><div class="info-value"><input type="text" id="consigneeName" class="editable" placeholder="Consignee name"></div></div>
+                <div class="info-row"><div class="info-label">Address:</div><div class="info-value"><textarea id="consigneeAddress" rows="2" class="editable" placeholder="Address"></textarea></div></div>
+                <div class="info-row"><div class="info-label">Contact:</div><div class="info-value"><input type="text" id="consigneePhone" class="editable" placeholder="Phone"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex: 1;">
+            <div class="info-box">
+                <h3>Order Details</h3>
+                <div class="info-row"><div class="info-label">Customer Code:</div><div class="info-value"><input type="text" id="customerCode" class="editable" placeholder="Code"></div></div>
+                <div class="info-row"><div class="info-label">Sales Order No:</div><div class="info-value"><input type="text" id="salesOrderNo" class="editable" placeholder="SO No."></div></div>
+                <div class="info-row"><div class="info-label">Reference No:</div><div class="info-value"><input type="text" id="referenceNo" class="editable" placeholder="Ref No."></div></div>
+                <div class="info-row"><div class="info-label">Order Payment Terms:</div><div class="info-value"><input type="text" id="paymentTermsField" class="editable" placeholder="e.g., 30 days"></div></div>
+            </div>
+        </div>
+        <div style="flex: 1;">
+            <div class="info-box">
+                <h3>Dispatch Details</h3>
+                <div class="info-row"><div class="info-label">Dispatch Doc No:</div><div class="info-value"><input type="text" id="dispatchDocNo" class="editable" placeholder="Doc No."></div></div>
+                <div class="info-row"><div class="info-label">Mode of Transport:</div><div class="info-value"><input type="text" id="transportMode" class="editable" placeholder="Road/Rail/Air"></div></div>
+                <div class="info-row"><div class="info-label">Vehicle No:</div><div class="info-value"><input type="text" id="vehicleNo" class="editable" placeholder="Optional"></div></div>
+                <div class="info-row"><div class="info-label">No. of Cartons:</div><div class="info-value"><input type="text" id="cartons" class="editable" placeholder="Number of cartons"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 10px;">
+        <button type="button" class="add-item-btn" onclick="addNewItem()"><i class="fas fa-plus"></i> ➕ Add New Item</button>
+    </div>
+
+    <table class="items-table" id="itemsTable">
+        <thead id="itemsTableHead"></thead>
+        <tbody id="itemsBody"></tbody>
+    </table>
+
+    <div class="packing-section no-print">
+        <div class="packing-field"><label>📦 Carton Quantity</label><input type="number" id="packingCartons" value="0" step="1" min="0" onchange="calculatePackingCharges()"></div>
+        <div class="packing-field"><label>💰 Charges per Carton (₹)</label><input type="number" id="packingRate" value="0" step="0.01" min="0" onchange="calculatePackingCharges()"></div>
+        <div class="packing-field"><label>🧾 Total Packing Charges (₹)</label><input type="text" id="packingTotal" readonly style="background:#e9ecef; font-weight:bold;"></div>
+        <div class="packing-field"><span style="font-size:11px; color:#6c757d;">(No GST applicable)</span></div>
+    </div>
+
+    <table class="tax-summary-table">
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th><tr></thead>
+        <tbody id="taxSummaryBody"></tbody>
+    </table>
+
+    <div class="totals">
+        <table>
+            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr id="packingRow"><td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
+            <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</strong></td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></td></tr>
+            <tr id="roundOffRow"><td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+        </table>
+    </div>
+
+    <div class="qr-box">
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+            <div><img src="images/ASS.QR.jpg" alt="Payment QR" style="max-width: 120px;"></div>
+            <div><strong>Bank Details:</strong><br>Account Name: Auto Spares Solution<br>Bank: Union Bank of India<br>Account No: 021111100007383<br>IFSC: UBINO802115<br>UPI: ass08@uboi</div>
+        </div>
+    </div>
+
+    <div class="signature-row">
+        <div class="signature-box">Customer's Stamp & Signature<br><span style="font-size: 10px;">(Receiver's acknowledgment)</span></div>
+        <div class="signature-box">For Auto Spares Solution<br>(Authorised Signatory)<br><span style="font-size: 10px;">(Stamp & Signature)</span></div>
+    </div>
+
+    <div class="footer-legal">This is a computer generated invoice. All disputes are subject to Howrah jurisdiction only.</div>
+    <div id="pageNumber" class="page-number"></div>
 </div>
 
 <div class="actions no-print">
@@ -27,7 +247,7 @@
     let isSaving = false;
     let invoiceAlreadySaved = false;
 
-    // ========== UPDATED INVOICE NUMBER LOGIC ==========
+    // ========== INVOICE NUMBER LOGIC - UPDATED ==========
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -36,17 +256,16 @@
         else return `${year-1}-${year.toString().slice(-2)}`;
     }
 
-    // NEW: Get the base prefix for cash bills with CH and initial numbering
-    function getCashBillBasePrefix() {
+    // Cash bill prefix - fixed to ASS/26-27/CH/
+    function getCashBillPrefix() {
         return `ASS/26-27/CH/`;
     }
 
-    // NEW: Get the current maximum number for cash bills
+    // Get max cash bill number from existing invoices
     function getMaxCashBillNumber() {
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-        const prefix = getCashBillBasePrefix();
+        const prefix = getCashBillPrefix();
         let maxNumber = 0;
-        
         allInvoices.forEach(inv => {
             if (inv.invoiceType === 'cash' && inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
                 const match = inv.invoiceNo.match(/(\d+)$/);
@@ -59,26 +278,26 @@
         return maxNumber;
     }
 
-    // NEW: Get next cash bill number with CH/XXX format
+    // Get next cash bill number - starts from 004 if no existing
     function getNextCashBillNumber() {
         const maxNum = getMaxCashBillNumber();
-        const nextNumber = maxNum + 1;
-        const prefix = getCashBillBasePrefix();
+        const prefix = getCashBillPrefix();
         // Start from 004 if no existing cash bills
-        const startNumber = 4;
-        const currentNumber = Math.max(nextNumber, startNumber);
-        return prefix + currentNumber.toString().padStart(3, '0');
+        let nextNumber = maxNum + 1;
+        if (nextNumber < 4) nextNumber = 4;
+        return prefix + nextNumber.toString().padStart(3, '0');
     }
 
-    // UPDATED: Main invoice number generation function
+    // Main invoice number function - CREDIT BILLS UNCHANGED
     function getNextInvoiceNumber(type) {
         if (type === 'cash') {
+            // Use new CH format for cash bills
             return getNextCashBillNumber();
         } else {
-            // Credit bills remain unchanged
+            // Credit bills - ORIGINAL FORMAT PRESERVED (no CREDIT word)
             const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
             const finYear = getFinancialYear();
-            let prefix = `ASS/${finYear}/CREDIT/`;
+            let prefix = `ASS/${finYear}/`;
             let maxNumber = 0;
             allInvoices.forEach(inv => {
                 if (inv.invoiceType === 'credit' && inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
@@ -112,7 +331,7 @@
     let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
     let customers = JSON.parse(localStorage.getItem('customers') || '[]');
 
-    // ========== HELPER FUNCTIONS (unchanged) ==========
+    // ========== HELPER FUNCTIONS ==========
     function escapeHtml(str) {
         if (!str) return '';
         return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;');
@@ -284,13 +503,13 @@
                 <td><input type="text" value="${escapeHtml(item.unit || 'pc')}" style="width:100%; background:#fff9e0;" onchange="updateUnitByIndex('${idx}', this.value)"></td>
                 <td style="text-align:center;"><input type="number" step="0.01" value="${item.qty}" style="width:80px;" onchange="updateQtyByIndex('${idx}', this.value)"></td>
                 <td style="text-align:right;"><input type="number" step="0.01" value="${item.price}" style="width:100px;" onchange="updatePriceByIndex('${idx}', this.value)"></td>
-                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscountByIndex('${idx}', this.value)">%</strong></td>
-                <td style="text-align:right;">₹${taxable.toFixed(2)}</strong></td>
-                <td style="text-align:center;">18%</strong></td>`;
+                <td style="text-align:center;"><input type="number" step="0.01" value="${discount}" style="width:60px;" onchange="updateDiscountByIndex('${idx}', this.value)">%</td>
+                <td style="text-align:right;">₹${taxable.toFixed(2)}</td>
+                <td style="text-align:center;">18%</td>`;
             if (isLocal) {
-                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</strong><td style="text-align:right;">₹${sgst.toFixed(2)}</strong><td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
+                row += `<td style="text-align:right;">₹${cgst.toFixed(2)}</td><td style="text-align:right;">₹${sgst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
             } else {
-                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</strong><td style="text-align:right;">₹${totalItem.toFixed(2)}</strong></td>`;
+                row += `<td style="text-align:right;">₹${igst.toFixed(2)}</td><td style="text-align:right;">₹${totalItem.toFixed(2)}</td>`;
             }
             row += `</tr>`;
             itemsHtml += row;
@@ -304,11 +523,11 @@
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
                 <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
-                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
-                ${totals.isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</strong></td>` : ''}
-                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="text-align:right;">${totals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
+                ${totals.isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>` : ''}
+                <td style="text-align:right;">${!totals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -359,11 +578,10 @@
         isSaving = false;
     }
 
-    // ========== UPDATED SAVE INVOICE FUNCTION ==========
+    // ========== SAVE INVOICE FUNCTION ==========
     function saveInvoice() {
         const saveBtn = document.getElementById('saveInvoiceBtn');
         
-        // HARD LOCK
         if (saveBtn.disabled || isSaving || invoiceAlreadySaved) {
             return;
         }
@@ -374,7 +592,6 @@
         isSaving = true;
         
         try {
-            // VALIDATE ITEMS
             const validCart = cart.filter(item => item.part && item.part.trim() !== '');
             if (validCart.length === 0) {
                 alert('Please add at least one item with a Part No.');
@@ -383,23 +600,16 @@
             }
             
             const type = document.querySelector('input[name="invoiceType"]:checked').value;
-            
-            // ALWAYS READ LATEST STORAGE
             let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-            
-            // GENERATE INVOICE NUMBER
             let proposedNo = getNextInvoiceNumber(type);
             
-            // DUPLICATE CHECK
+            // Duplicate check and fix
             const alreadyExists = allInvoices.some(inv => inv.invoiceNo === proposedNo);
-            
-            // AUTO FIX DUPLICATE NUMBER
             if (alreadyExists) {
                 if (type === 'cash') {
-                    // For cash bills, increment the CH number
                     let counter = 1;
                     let newNo;
-                    const prefix = getCashBillBasePrefix();
+                    const prefix = getCashBillPrefix();
                     do {
                         const match = proposedNo.match(/(\d+)$/);
                         const current = parseInt(match[1]) + counter;
@@ -408,25 +618,26 @@
                     } while (allInvoices.some(inv => inv.invoiceNo === newNo));
                     proposedNo = newNo;
                 } else {
-                    // For credit bills
                     let counter = 1;
                     let newNo;
+                    const finYear = getFinancialYear();
+                    let prefix = `ASS/${finYear}/`;
                     do {
                         const match = proposedNo.match(/(\d+)$/);
                         const current = parseInt(match[1]) + counter;
-                        newNo = proposedNo.replace(/\d+$/, current.toString().padStart(4, '0'));
+                        newNo = prefix + current.toString().padStart(4, '0');
                         counter++;
                     } while (allInvoices.some(inv => inv.invoiceNo === newNo));
                     proposedNo = newNo;
                 }
             }
             
-            // PRODUCT MASTER UPDATE
+            // Product master update
             for (let item of validCart) {
                 ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
             }
             
-            // BUYER DETAILS
+            // Buyer details
             const buyer = {
                 name: document.getElementById('buyerName').value.trim(),
                 email: document.getElementById('buyerEmail').value.trim(),
@@ -436,14 +647,13 @@
                 state: document.getElementById('buyerState').value.trim()
             };
             
-            // EMAIL REQUIRED
             if (!buyer.email) {
                 alert('Customer email is required.');
                 resetSaveButton();
                 return;
             }
             
-            // CUSTOMER SAVE
+            // Customer save
             let customersList = JSON.parse(localStorage.getItem('customers') || '[]');
             let existingCustomer = customersList.find(c => c.email === buyer.email);
             if (!existingCustomer && buyer.email) {
@@ -466,7 +676,7 @@
                 localStorage.setItem('customers', JSON.stringify(customersList));
             }
             
-            // TOTALS
+            // Totals
             const taxableTotals = calculateTaxableTotals();
             const gstApplicable = getGSTApplicableTotal();
             const packing = getPackingCharge();
@@ -474,11 +684,11 @@
             const roundOff = roundedGSTApplicable - gstApplicable;
             const grandTotal = roundedGSTApplicable + packing;
             
-            // DATE FORMAT
+            // Date format
             const dateParts = document.getElementById('invoiceDate').innerText.split('/');
             const invoiceDateFormatted = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
             
-            // CREATE INVOICE OBJECT (using proposedNo as ID)
+            // Create invoice
             const invoice = {
                 id: proposedNo,
                 date: invoiceDateFormatted,
@@ -522,7 +732,7 @@
                 }))
             };
             
-            // FINAL STORAGE CHECK
+            // Final storage check
             allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
             if (allInvoices.some(inv => inv.invoiceNo === proposedNo)) {
                 alert('Duplicate invoice prevented.');
@@ -530,30 +740,18 @@
                 return;
             }
             
-            // SAVE MAIN INVOICE
+            // Save main invoice
             allInvoices.push(invoice);
             localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
             
-            // SAVE SALES INVOICE
+            // Save sales invoice
             let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
             if (!salesInvoices.some(inv => inv.invoiceNo === proposedNo)) {
                 salesInvoices.push(invoice);
                 localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
             }
             
-            // OPTIONAL EXTERNAL FUNCTION
-            if (typeof createSalesInvoice === 'function') {
-                try {
-                    const existsAlready = salesInvoices.some(inv => inv.invoiceNo === proposedNo);
-                    if (!existsAlready) {
-                        createSalesInvoice(invoice);
-                    }
-                } catch (e) {
-                    console.warn(e);
-                }
-            }
-            
-            // CUSTOMER LEDGER UPDATE
+            // Customer ledger update
             const custIndex = customersList.findIndex(c => c.email === buyer.email);
             if (custIndex !== -1) {
                 customersList[custIndex].outstanding = (customersList[custIndex].outstanding || 0) + invoice.grandTotal;
@@ -561,7 +759,6 @@
                 localStorage.setItem('customers', JSON.stringify(customersList));
             }
             
-            // SUCCESS
             invoiceAlreadySaved = true;
             localStorage.setItem('invoiceCart', '[]');
             alert(`Invoice ${proposedNo} saved successfully!`);
@@ -749,4 +946,4 @@
     })();
 </script>
 </body>
-</html>
+                                                                                                               </html>
