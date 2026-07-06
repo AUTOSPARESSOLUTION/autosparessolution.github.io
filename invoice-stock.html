@@ -119,14 +119,18 @@
             color: #6c757d; 
             margin-left: 10px;
         }
-        /* Hide print elements in PDF */
-        .pdf-hide {
-            display: inline-block;
+        /* Debug info styles */
+        .debug-info {
+            font-size: 10px;
+            color: #999;
+            margin-top: 5px;
+            padding: 5px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            display: none;
         }
-        @media print {
-            .pdf-hide {
-                display: none !important;
-            }
+        .debug-info.show {
+            display: block;
         }
     </style>
     <script src="data-manager.js"></script>
@@ -215,12 +219,19 @@
         <span class="price-info-label no-print">
             <span style="background: #ff9800; color: white; padding: 1px 6px; border-radius: 10px;">M&M</span> = MRP from CSV (Column D)
         </span>
+        <button type="button" onclick="toggleDebug()" style="background: #6c757d; padding: 4px 10px; font-size: 11px; margin-left: 10px;">🐛 Debug</button>
     </div>
 
     <table class="items-table" id="itemsTable">
         <thead id="itemsTableHead"></thead>
         <tbody id="itemsBody"></tbody>
     </table>
+
+    <!-- Debug Info -->
+    <div id="debugInfo" class="debug-info">
+        <strong>Debug Info:</strong><br>
+        <span id="debugContent">Loading...</span>
+    </div>
 
     <div class="packing-section no-print">
         <div class="packing-field"><label>📦 Carton Quantity</label><input type="number" id="packingCartons" value="0" step="1" min="0" onchange="calculatePackingCharges()"></div>
@@ -275,6 +286,38 @@
     let invoiceAlreadySaved = false;
     let priceData = {};
     let priceDataLoaded = false;
+    let debugMode = false;
+
+    // ========== TOGGLE DEBUG ==========
+    function toggleDebug() {
+        debugMode = !debugMode;
+        const debugDiv = document.getElementById('debugInfo');
+        if (debugMode) {
+            debugDiv.classList.add('show');
+            updateDebugInfo();
+        } else {
+            debugDiv.classList.remove('show');
+        }
+    }
+
+    function updateDebugInfo() {
+        if (!debugMode) return;
+        const debugContent = document.getElementById('debugContent');
+        let html = '';
+        html += `Price Data Loaded: ${priceDataLoaded ? '✅ Yes' : '❌ No'}<br>`;
+        html += `Total Items in CSV: ${Object.keys(priceData).length}<br>`;
+        html += `Cart Items: ${cart.length}<br>`;
+        html += `<hr>`;
+        cart.forEach((item, idx) => {
+            const part = item.part || '(empty)';
+            const price = item.price || 0;
+            const source = item.priceSource || 'none';
+            const mrp = getMRPForMM(part);
+            const isMM = isMMMake(part);
+            html += `Item ${idx+1}: Part="${part}" | Price=${price} | Source=${source} | isMM=${isMM} | MRP=${mrp || 'N/A'}<br>`;
+        });
+        debugContent.innerHTML = html;
+    }
 
     // ========== LOAD PRICES.CSV ==========
     function loadPriceData() {
@@ -297,14 +340,17 @@
                     const lines = csvText.split('\n');
                     let parsedCount = 0;
                     
+                    // Log first few lines for debugging
+                    console.log('CSV First 3 lines:', lines.slice(0, 3));
+                    
                     for (let i = 1; i < lines.length; i++) {
                         if (!lines[i].trim()) continue;
                         const cols = lines[i].split(',').map(c => c.trim());
                         
                         if (cols.length >= 12) {
-                            const material = cols[0];
-                            const mrpPrice = parseFloat(cols[3]) || 0;
-                            const make = cols[11] || '';
+                            const material = cols[0];      // Column A
+                            const mrpPrice = parseFloat(cols[3]) || 0;  // Column D
+                            const make = cols[11] || '';    // Column L
                             
                             if (material && material !== '') {
                                 priceData[material.toUpperCase()] = {
@@ -312,12 +358,18 @@
                                     mrp: mrpPrice
                                 };
                                 parsedCount++;
+                                
+                                // Log first 5 items for debugging
+                                if (parsedCount <= 5) {
+                                    console.log(`CSV Item ${parsedCount}: Material="${material}", Make="${make}", MRP="${mrpPrice}"`);
+                                }
                             }
                         }
                     }
                     
                     priceDataLoaded = true;
                     console.log('✅ Price data loaded:', parsedCount, 'items from CSV');
+                    console.log('📊 Sample data:', Object.keys(priceData).slice(0, 5));
                     resolve(priceData);
                 })
                 .catch(err => {
@@ -347,17 +399,25 @@
         const data = getPriceFromCSV(partNo);
         if (!data) return false;
         const make = (data.make || '').toUpperCase().trim();
-        return make === 'M&M' || 
+        const result = make === 'M&M' || 
                make === 'M & M' || 
                make === 'MM' || 
                make.includes('M&M') ||
                make.includes('M & M');
+        
+        if (debugMode && partNo) {
+            console.log(`isMMMake: ${partNo} → Make="${make}" → ${result}`);
+        }
+        return result;
     }
 
     function getMRPForMM(partNo) {
         const data = getPriceFromCSV(partNo);
         if (!data) return null;
         if (isMMMake(partNo)) {
+            if (debugMode && partNo) {
+                console.log(`getMRPForMM: ${partNo} → MRP=${data.mrp}`);
+            }
             return data.mrp;
         }
         return null;
@@ -458,6 +518,7 @@
         cart.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0, unit: 'pc', priceSource: '' });
         renderItemsAndTaxSummary();
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
+        if (debugMode) updateDebugInfo();
     }
 
     function calculatePackingCharges() {
@@ -607,11 +668,15 @@
             let price = item.price;
             let priceSource = item.priceSource || '';
             
+            // Check for M&M part and get MRP
             if (item.part && item.part.trim() !== '' && priceSource !== 'manual') {
                 const mrp = getMRPForMM(item.part);
                 if (mrp !== null && mrp > 0) {
                     price = mrp;
                     priceSource = 'CSV-MRP';
+                    if (debugMode) {
+                        console.log(`✅ Item ${idx+1}: ${item.part} → MRP=${mrp} applied`);
+                    }
                 }
             }
             
@@ -673,6 +738,8 @@
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
         updateTotalsWithPackingAndRound();
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
+        
+        if (debugMode) updateDebugInfo();
     }
 
     function updatePart(idx, value) { 
@@ -684,6 +751,11 @@
                 if (mrp !== null && mrp > 0) {
                     cart[idx].price = mrp;
                     cart[idx].priceSource = 'CSV-MRP';
+                    if (debugMode) {
+                        console.log(`✅ Part updated: ${value} → MRP=${mrp} applied`);
+                    }
+                } else if (debugMode) {
+                    console.log(`⚠️ Part ${value} not found as M&M in CSV`);
                 }
             }
             renderItemsAndTaxSummary(); 
@@ -1004,8 +1076,9 @@
         const editDateBtn = clone.querySelector('.edit-date-btn');
         if (editDateBtn) editDateBtn.style.display = 'none';
         
-        // Hide price source badges in PDF (optional - keep or remove)
-        // clone.querySelectorAll('.price-source-badge').forEach(badge => badge.style.display = 'none');
+        // Hide debug info
+        const debugInfo = clone.querySelector('#debugInfo');
+        if (debugInfo) debugInfo.style.display = 'none';
         
         // Hide credit fields
         const creditFields = clone.querySelector('#creditFields');
@@ -1071,6 +1144,7 @@
     loadPriceData().then(() => {
         renderItemsAndTaxSummary();
         console.log('✅ System ready with CSV price data');
+        console.log('📊 Total items in CSV:', Object.keys(priceData).length);
     }).catch(() => {
         renderItemsAndTaxSummary();
         console.log('⚠️ System running without CSV price data');
