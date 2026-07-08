@@ -25,6 +25,7 @@ const CONFIG = {
 console.log("====================================");
 console.log("🚀 ASSIST WhatsApp Started");
 console.log("📞 Business Phone:", CONFIG.businessPhone);
+console.log("🧠 Gemini Key:", CONFIG.geminiKey ? "✅ Configured" : "❌ Missing");
 console.log("====================================");
 
 // ============================================================
@@ -156,44 +157,73 @@ async function aiGetGeminiReply(query) {
 }
 
 // ============================================================
-// 🖼️ GEMINI IMAGE ANALYSIS - COMPLETE FIX
+// 🖼️ IMAGE ANALYSIS WITH GEMINI
 // ============================================================
 
 async function analyzeImageWithGemini(imageBuffer, caption = '') {
     const geminiKey = CONFIG.geminiKey;
-    const base64Image = imageBuffer.toString('base64');
+    
+    if (!geminiKey) {
+        console.error('❌ Gemini key not configured');
+        return null;
+    }
     
     try {
+        const base64Image = imageBuffer.toString('base64');
+        const mimeType = 'image/jpeg';
+        
+        console.log(`📸 Sending image to Gemini (${imageBuffer.length} bytes)`);
+        
+        const requestBody = {
+            contents: [{
+                parts: [
+                    {
+                        text: `You are an auto spares assistant for "Auto Spares Solution" in India.
+                        Customer sent an image with message: "${caption || 'No caption'}"
+                        
+                        Analyze this image and do the following:
+                        1. Identify any auto parts visible in the image
+                        2. If you see any part numbers (format: 5-15 characters with letters, numbers, and hyphens), extract them
+                        3. Suggest what part it might be
+                        4. If the image contains text, read it
+                        
+                        Return a helpful response describing what you see.
+                        If you find part numbers, list them clearly.
+                        Keep response short and useful.`
+                    },
+                    {
+                        inline_data: {
+                            mime_type: mimeType,
+                            data: base64Image
+                        }
+                    }
+                ]
+            }]
+        };
+        
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { 
-                                text: `You are an auto spares assistant. Customer sent an image with message: "${caption}". 
-                                Analyze this image and do the following:
-                                1. Identify any auto parts visible
-                                2. If you see any part numbers (format: 5-15 characters with letters, numbers, hyphens), extract them
-                                3. Suggest what part it might be
-                                4. Be helpful and friendly
-                                Keep response short and useful.`
-                            },
-                            {
-                                inline_data: {
-                                    mime_type: "image/jpeg",
-                                    data: base64Image
-                                }
-                            }
-                        ]
-                    }]
-                })
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
             }
         );
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Gemini API error (${response.status}):`, errorText);
+            return null;
+        }
+        
         const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        console.log('✅ Gemini analysis complete');
+        
+        const analysis = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        return analysis;
+        
     } catch (error) {
         console.error('❌ Image analysis error:', error);
         return null;
@@ -201,7 +231,7 @@ async function analyzeImageWithGemini(imageBuffer, caption = '') {
 }
 
 async function processPhotoWithGemini(imageBuffer, caption, from) {
-    console.log(`🖼️ Analyzing photo from ${from}...`);
+    console.log(`🖼️ Processing photo from ${from}...`);
     
     try {
         const imageAnalysis = await analyzeImageWithGemini(imageBuffer, caption);
@@ -223,13 +253,15 @@ async function processPhotoWithGemini(imageBuffer, caption, from) {
                     }
                 }
                 reply += `\n💡 Reply "Add ${partMatches[0]}" to add to cart\n`;
+            } else {
+                reply += `💡 If you know the part number, please send it.\n`;
             }
             
             reply += `\n📞 *Call:* ${CONFIG.businessPhone}`;
             return reply;
         }
         
-        return `📸 *Photo Received!*\n\n⚠️ Could not analyze image. Please try again with a clearer photo.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+        return `📸 *Photo Received!*\n\n⚠️ Could not analyze image. Please try:\n1️⃣ Take a clearer photo\n2️⃣ Make sure part number is visible\n3️⃣ Or send part number directly\n\n📞 *Call:* ${CONFIG.businessPhone}`;
         
     } catch (error) {
         console.error('❌ Photo processing error:', error);
@@ -684,10 +716,15 @@ app.post("/webhook", async (req, res) => {
                 const caption = message.image.caption || "";
 
                 console.log(`🖼️ Image from: ${from} | Caption: "${caption}"`);
+                console.log(`📸 Media ID: ${mediaId}`);
 
                 try {
                     const mediaUrl = await getMediaURL(mediaId);
+                    console.log(`📸 Media URL: ${mediaUrl}`);
+                    
                     const imageBuffer = await downloadMedia(mediaUrl);
+                    console.log(`📸 Image size: ${imageBuffer.length} bytes`);
+                    
                     const reply = await processPhotoWithGemini(imageBuffer, caption, from);
                     console.log("🤖 Reply:", reply);
                     await sendWhatsAppMessage(from, reply);
