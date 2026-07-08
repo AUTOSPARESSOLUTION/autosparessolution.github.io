@@ -155,6 +155,10 @@ async function aiGetGeminiReply(query) {
     }
 }
 
+// ============================================================
+// 🖼️ GEMINI IMAGE ANALYSIS - COMPLETE FIX
+// ============================================================
+
 async function analyzeImageWithGemini(imageBuffer, caption = '') {
     const geminiKey = CONFIG.geminiKey;
     const base64Image = imageBuffer.toString('base64');
@@ -168,8 +172,21 @@ async function analyzeImageWithGemini(imageBuffer, caption = '') {
                 body: JSON.stringify({
                     contents: [{
                         parts: [
-                            { text: `You are an auto spares assistant. Customer sent an image with message: "${caption}". Analyze the image and identify any auto parts visible. Suggest possible part numbers if recognizable.` },
-                            { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+                            { 
+                                text: `You are an auto spares assistant. Customer sent an image with message: "${caption}". 
+                                Analyze this image and do the following:
+                                1. Identify any auto parts visible
+                                2. If you see any part numbers (format: 5-15 characters with letters, numbers, hyphens), extract them
+                                3. Suggest what part it might be
+                                4. Be helpful and friendly
+                                Keep response short and useful.`
+                            },
+                            {
+                                inline_data: {
+                                    mime_type: "image/jpeg",
+                                    data: base64Image
+                                }
+                            }
                         ]
                     }]
                 })
@@ -183,6 +200,43 @@ async function analyzeImageWithGemini(imageBuffer, caption = '') {
     }
 }
 
+async function processPhotoWithGemini(imageBuffer, caption, from) {
+    console.log(`🖼️ Analyzing photo from ${from}...`);
+    
+    try {
+        const imageAnalysis = await analyzeImageWithGemini(imageBuffer, caption);
+        
+        if (imageAnalysis) {
+            const partMatches = imageAnalysis.match(/\b[A-Z0-9\-]{5,15}\b/g) || [];
+            
+            let reply = `📸 *Photo Analysis*\n\n📝 ${imageAnalysis}\n\n`;
+            
+            if (partMatches.length > 0) {
+                reply += `🔍 *Parts Found:*\n`;
+                for (const part of partMatches) {
+                    const product = allProducts.find(p => p.part.toUpperCase() === part.toUpperCase());
+                    if (product) {
+                        const priceGST = product.price * 1.18;
+                        reply += `✅ ${part} - ${product.desc} - ₹${priceGST.toFixed(2)}\n`;
+                    } else {
+                        reply += `⚠️ ${part} - Not found in inventory\n`;
+                    }
+                }
+                reply += `\n💡 Reply "Add ${partMatches[0]}" to add to cart\n`;
+            }
+            
+            reply += `\n📞 *Call:* ${CONFIG.businessPhone}`;
+            return reply;
+        }
+        
+        return `📸 *Photo Received!*\n\n⚠️ Could not analyze image. Please try again with a clearer photo.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+        
+    } catch (error) {
+        console.error('❌ Photo processing error:', error);
+        return `📸 *Photo Received!*\n\n❌ Error analyzing image. Please try again.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+    }
+}
+
 // ============================================================
 // MULTI-PRODUCT FUNCTIONS
 // ============================================================
@@ -190,10 +244,8 @@ async function analyzeImageWithGemini(imageBuffer, caption = '') {
 function parseMultiProductEnquiryEnhanced(message) {
     const items = [];
     
-    // Remove extra spaces and split by comma or newline
     let parts = message.split(/[,;\n]/).map(p => p.trim()).filter(p => p.length > 0);
     
-    // If no comma, try splitting by space pattern
     if (parts.length === 1 && !message.includes(',')) {
         const msg = message.trim();
         
@@ -585,165 +637,6 @@ async function processWithGeminiFallback(message, from) {
 }
 
 // ============================================================
-// PHOTO PROCESSING
-// ============================================================
-
-async function processPhotoWithGemini(imageBuffer, caption, from) {
-    console.log(`🖼️ Analyzing photo from ${from} with Gemini...`);
-    
-    try {
-        const imageAnalysis = await analyzeImageWithGemini(imageBuffer, caption);
-        
-        let items = [];
-        let reply = '';
-        
-        if (caption && caption.trim().length > 0) {
-            const parsed = parseMultiProductEnquiryEnhanced(caption);
-            if (parsed.length > 0) {
-                items = parsed;
-            } else {
-                const multiCheck = detectMultipleItemsWithoutQty(caption);
-                if (multiCheck.isMulti) {
-                    items = multiCheck.parts.map(part => ({
-                        part: part.toUpperCase(),
-                        qty: 1
-                    }));
-                }
-            }
-        }
-        
-        if (items.length === 0 && imageAnalysis) {
-            const partExtraction = await extractPartNumbersFromImage(imageBuffer, caption);
-            if (partExtraction && partExtraction.length > 0) {
-                items = partExtraction;
-            }
-        }
-        
-        if (items.length > 0) {
-            let productDetails = [];
-            let subtotal = 0;
-            let notFoundParts = [];
-            
-            for (const item of items) {
-                const product = allProducts.find(p => p.part.toUpperCase() === item.part.toUpperCase());
-                if (product) {
-                    const priceGST = product.price * 1.18;
-                    const total = priceGST * item.qty;
-                    subtotal += total;
-                    
-                    productDetails.push({
-                        part: item.part,
-                        description: product.desc || 'N/A',
-                        brand: product.brand || 'N/A',
-                        price: product.price,
-                        priceGST: priceGST,
-                        qty: item.qty,
-                        stock: product.stock || 0,
-                        total: total,
-                        inStock: product.stock > 0
-                    });
-                } else {
-                    notFoundParts.push(item.part);
-                }
-            }
-            
-            const gstAmount = subtotal * 0.18;
-            const grandTotal = subtotal + gstAmount;
-            
-            saveCart(from, productDetails, subtotal, grandTotal);
-            
-            reply = `📋 *ITEMS FROM YOUR PHOTO*\n`;
-            if (imageAnalysis) {
-                reply += `📸 *AI Analysis:* ${imageAnalysis.substring(0, 150)}...\n\n`;
-            }
-            reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-            
-            for (const p of productDetails) {
-                reply += `*${p.part}*`;
-                reply += `\n📝 ${p.description.substring(0, 35)}...\n`;
-                reply += `🏷️ ${p.brand}\n`;
-                reply += `📦 ${p.qty} x ₹${p.priceGST.toFixed(2)} = ₹${p.total.toFixed(2)}\n`;
-                reply += `${p.inStock ? `✅ ${p.stock} pcs available` : '❌ OUT OF STOCK'}\n\n`;
-            }
-            
-            if (notFoundParts.length > 0) {
-                reply += `⚠️ *Not Found:* ${notFoundParts.join(', ')}\n\n`;
-            }
-            
-            reply += `━━━━━━━━━━━━━━━━━━━━\n`;
-            reply += `📊 *Summary:*\n`;
-            reply += `📦 Items: ${productDetails.length}\n`;
-            reply += `💰 Subtotal: ₹${subtotal.toFixed(2)}\n`;
-            reply += `🧾 GST (18%): ₹${gstAmount.toFixed(2)}\n`;
-            reply += `💳 *Grand Total: ₹${grandTotal.toFixed(2)}*\n`;
-            reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-            reply += `*What would you like to do?*\n`;
-            reply += `🛒 "Confirm Order" - Place order\n`;
-            reply += `📄 "Get Quote" - Generate quotation\n`;
-            reply += `🗑️ "Clear Cart" - Start fresh\n\n`;
-            reply += `📞 *Call:* ${CONFIG.businessPhone}`;
-            
-            return reply;
-        }
-        
-        if (imageAnalysis) {
-            return `📸 *Photo Analysis*\n\n📝 ${imageAnalysis}\n\n💡 Try sending part numbers with the photo.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
-        }
-        
-        return `📸 *Photo Received!*\n\n✅ We'll review and get back to you.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
-        
-    } catch (error) {
-        console.error('❌ Photo processing error:', error);
-        return `📸 *Photo Received!*\n\n❌ Error analyzing image. Please try again or send part numbers.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
-    }
-}
-
-async function extractPartNumbersFromImage(imageBuffer, caption = '') {
-    const geminiKey = CONFIG.geminiKey;
-    const base64Image = imageBuffer.toString('base64');
-    
-    try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            {
-                                text: `Analyze this image of auto parts. If you can identify any part numbers visible in the image, return them as a comma-separated list. If you see text on the parts, extract those numbers. Return ONLY the part numbers, one per line. If no part numbers are visible, return "NONE".`
-                            },
-                            {
-                                inline_data: {
-                                    mime_type: "image/jpeg",
-                                    data: base64Image
-                                }
-                            }
-                        ]
-                    }]
-                })
-            }
-        );
-        const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        
-        const partMatches = text.match(/\b[A-Z0-9\-]{5,15}\b/g) || [];
-        if (partMatches.length > 0) {
-            return partMatches.map(part => ({
-                part: part.toUpperCase(),
-                qty: 1
-            }));
-        }
-        
-        return [];
-    } catch (error) {
-        console.error('❌ Part extraction error:', error);
-        return [];
-    }
-}
-
-// ============================================================
 // ROUTES
 // ============================================================
 
@@ -800,7 +693,7 @@ app.post("/webhook", async (req, res) => {
                     await sendWhatsAppMessage(from, reply);
                 } catch (error) {
                     console.error('❌ Image error:', error);
-                    await sendWhatsAppMessage(from, "🖼️ Sorry, I couldn't process your image. Please try again.");
+                    await sendWhatsAppMessage(from, "📸 Sorry, I couldn't process your image. Please try again.");
                 }
 
                 res.sendStatus(200);
