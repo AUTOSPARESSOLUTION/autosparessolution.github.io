@@ -1,5 +1,5 @@
 // ============================================================
-// 📱 ASSIST WhatsApp Webhook (Complete - All Features)
+// 📱 ASSIST WhatsApp Webhook (Complete - Secure)
 // ============================================================
 
 const express = require("express");
@@ -11,20 +11,31 @@ const app = express();
 app.use(express.json());
 
 // ============================================================
-// CONFIG
+// CONFIG - 🔒 USE ENVIRONMENT VARIABLES ONLY!
 // ============================================================
 
 const CONFIG = {
     phoneNumberId: process.env.ID || "1158072170724432",
-    accessToken: process.env.TOKEN || "EAAOS2aPmhzYBR5dGgAiTkz5nH5JOoheHnvI45lmOJiF3rnZA1cL6CR3POy3s6gI9mk1lxq3bjtOiBixhSvvFAxcbR6ut6kp2dZArnw3yk7r4TlqRpBbmMzV4YVAmVuFLZCTQ3bN7neJsZAiR6pNqZBmcQWP2341T59RvpG4hJnk4WfqIb5QLvZCYm40H17zXLNQQZDZD",
+    // 🔒 NEVER HARDCODE TOKENS - USE ENVIRONMENT VARIABLES
+    accessToken: process.env.TOKEN,
     verifyToken: process.env.VERIFY || "assist123",
     businessPhone: process.env.PHONE || "919330102828",
-    geminiKey: "AQ.Ab8RN6IQvM9VZYkn6_7mDEWir5IDPkLcHDfJcOGt5rsLheW_eg"
+    // 🔒 USE ENVIRONMENT VARIABLE FOR GEMINI KEY
+    geminiKey: process.env.GEMINI_API_KEY
 };
+
+// Check if credentials are set
+if (!CONFIG.accessToken) {
+    console.error('❌ CRITICAL: Meta Access Token not set in environment variables!');
+}
+if (!CONFIG.geminiKey) {
+    console.error('❌ CRITICAL: Gemini API Key not set in environment variables!');
+}
 
 console.log("====================================");
 console.log("🚀 ASSIST WhatsApp Started");
 console.log("📞 Business Phone:", CONFIG.businessPhone);
+console.log("🔑 Meta Token:", CONFIG.accessToken ? "✅ Set" : "❌ Missing");
 console.log("🧠 Gemini Key:", CONFIG.geminiKey ? "✅ Set" : "❌ Missing");
 console.log("====================================");
 
@@ -75,9 +86,7 @@ function loadFallbackProducts() {
         { part: "0108FAW00360N", desc: "CLUTCH PRESSURE PLATE", price: 2336.88, stock: 18, brand: "M&M", gst: 18 },
         { part: "0108FAW00370N", desc: "CLUTCH PLATE", price: 2415.25, stock: 12, brand: "M&M", gst: 18 },
         { part: "0108FAW00400N", desc: "RELEASE BEARING", price: 1059.75, stock: 20, brand: "M&M", gst: 18 },
-        { part: "0108FAW00410N", desc: "CLUTCH COVER", price: 2711.86, stock: 8, brand: "M&M", gst: 18 },
-        { part: "0802CAA08871N", desc: "CONCENTRIC SLAVE CYLINDER", price: 2336.88, stock: 18, brand: "M&M", gst: 18 },
-        { part: "A15979020-0200", desc: "M22X2.5X115 BOLT WITH M85900 NUT", price: 170.60, stock: 1800, brand: "TVS", gst: 18 }
+        { part: "0108FAW00410N", desc: "CLUTCH COVER", price: 2711.86, stock: 8, brand: "M&M", gst: 18 }
     ];
     console.log(`✅ Loaded ${allProducts.length} fallback products`);
 }
@@ -122,34 +131,41 @@ async function aiGetGeminiReply(query) {
     if (!geminiKey) return null;
     
     try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: `You are an auto spares assistant for "Auto Spares Solution" in India.
-                            Customer asks: "${query}"
-                            
-                            If they ask for a part:
-                            - Suggest checking with part number
-                            - Mention we have TVS, Mitsubishi, and other brands
-                            
-                            If they ask for help:
-                            - Be friendly and helpful
-                            - Reply in Hinglish (Hindi + English)
-                            - Keep it short (2-3 sentences)
-                            
-                            Reply in simple Hinglish.`
-                        }]
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: `You are an auto spares assistant for "Auto Spares Solution" in India.
+                        Customer asks: "${query}"
+                        
+                        If they ask for a part:
+                        - Suggest checking with part number
+                        - Mention we have TVS, Mitsubishi, and other brands
+                        
+                        If they ask for help:
+                        - Be friendly and helpful
+                        - Reply in Hinglish (Hindi + English)
+                        - Keep it short (2-3 sentences)
+                        
+                        Reply in simple Hinglish.`
                     }]
-                })
-            }
-        );
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+                }]
+            })
+        });
+        
+        const result = await response.json();
+        console.log("📝 Gemini Response Status:", response.status);
+        
+        if (!response.ok) {
+            console.error("❌ Gemini Error:", JSON.stringify(result, null, 2));
+            return null;
+        }
+        
+        return result.candidates?.[0]?.content?.parts?.[0]?.text || null;
     } catch (error) {
         console.error('Gemini error:', error);
         return null;
@@ -157,8 +173,21 @@ async function aiGetGeminiReply(query) {
 }
 
 // ============================================================
-// 🖼️ SIMPLIFIED IMAGE ANALYSIS
+// 🖼️ IMAGE ANALYSIS WITH GEMINI
 // ============================================================
+
+function detectImageMimeType(buffer) {
+    // Check file signature (magic bytes)
+    const hex = buffer.toString('hex', 0, 4);
+    
+    if (hex.startsWith('ffd8')) return 'image/jpeg';
+    if (hex.startsWith('89504e47')) return 'image/png';
+    if (hex.startsWith('47494638')) return 'image/gif';
+    if (hex.startsWith('52494646')) return 'image/webp';
+    if (hex.startsWith('49492a00') || hex.startsWith('4d4d002a')) return 'image/tiff';
+    
+    return 'image/jpeg'; // Default
+}
 
 async function analyzeImageWithGemini(imageBuffer, caption = '') {
     const geminiKey = CONFIG.geminiKey;
@@ -170,19 +199,27 @@ async function analyzeImageWithGemini(imageBuffer, caption = '') {
     
     try {
         const base64Image = imageBuffer.toString('base64');
+        const mimeType = detectImageMimeType(imageBuffer);
         
-        console.log(`📸 Sending image to Gemini (${imageBuffer.length} bytes)`);
+        console.log(`📸 Sending image to Gemini (${imageBuffer.length} bytes, MIME: ${mimeType})`);
+        
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
         
         const requestBody = {
             contents: [{
                 parts: [
                     {
-                        text: `You are an auto spares assistant. Customer sent an image with message: "${caption || 'No caption'}". 
-                        Identify any auto parts in this image. If you see part numbers, list them. Keep response short.`
+                        text: `You are an auto spares assistant for "Auto Spares Solution" in India.
+                        Customer sent an image with message: "${caption || 'No caption'}"
+                        
+                        Analyze this image and:
+                        1. Identify any auto parts visible
+                        2. If you see part numbers, list them
+                        3. Keep response short and useful`
                     },
                     {
                         inline_data: {
-                            mime_type: "image/jpeg",
+                            mime_type: mimeType,
                             data: base64Image
                         }
                     }
@@ -190,24 +227,22 @@ async function analyzeImageWithGemini(imageBuffer, caption = '') {
             }]
         };
         
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            }
-        );
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+        
+        const result = await response.json();
+        console.log("📸 Gemini Status:", response.status);
         
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`❌ Gemini API error:`, errorText);
+            console.error("❌ Gemini Image Error:", JSON.stringify(result, null, 2));
             return null;
         }
         
-        const data = await response.json();
-        console.log('✅ Gemini analysis complete');
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        console.log('✅ Gemini image analysis complete');
+        return result.candidates?.[0]?.content?.parts?.[0]?.text || null;
         
     } catch (error) {
         console.error('❌ Image analysis error:', error);
@@ -232,9 +267,9 @@ async function processPhotoWithGemini(imageBuffer, caption, from) {
                     const product = allProducts.find(p => p.part.toUpperCase() === part.toUpperCase());
                     if (product) {
                         const priceGST = product.price * 1.18;
-                        reply += `✅ ${part} - ₹${priceGST.toFixed(2)}\n`;
+                        reply += `✅ ${part} - ${product.desc} - ₹${priceGST.toFixed(2)}\n`;
                     } else {
-                        reply += `⚠️ ${part} - Not found\n`;
+                        reply += `⚠️ ${part} - Not found in inventory\n`;
                     }
                 }
                 reply += `\n💡 Reply "Add ${partMatches[0]}" to add to cart\n`;
@@ -242,6 +277,26 @@ async function processPhotoWithGemini(imageBuffer, caption, from) {
             
             reply += `\n📞 *Call:* ${CONFIG.businessPhone}`;
             return reply;
+        }
+        
+        // Fallback: Check if caption has part number
+        if (caption) {
+            const partMatch = caption.match(/\b[A-Z0-9\-]{5,15}\b/i);
+            if (partMatch) {
+                const results = aiSearch(partMatch[0]);
+                if (results.length > 0) {
+                    let reply = `📸 *Photo Received!*\n\n🔍 Found part in your caption: ${partMatch[0]}\n\n`;
+                    results.forEach((p, index) => {
+                        const priceGST = aiPriceWithGST(p.price, p.gst || 18);
+                        reply += `${index + 1}. **${p.part}**\n`;
+                        reply += `📝 ${p.desc || 'N/A'}\n`;
+                        reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
+                        reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
+                    });
+                    reply += `📞 *Call:* ${CONFIG.businessPhone}`;
+                    return reply;
+                }
+            }
         }
         
         return `📸 *Photo Received!*\n\n⚠️ Could not analyze image. Please send the part number directly.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
@@ -505,19 +560,19 @@ async function formatEnquiryWithGemini(message, from) {
     console.log(`🧠 Sending to Gemini for formatting: "${message}"`);
     
     try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.geminiKey}`;
+        
         const productContext = allProducts.slice(0, 20).map(p => 
             `- ${p.part}: ${p.desc} (₹${p.price}, Stock: ${p.stock})`
         ).join('\n');
         
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.geminiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: `You are an auto spares assistant for "Auto Spares Solution".
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: `You are an auto spares assistant for "Auto Spares Solution".
 
 Available Products:
 ${productContext}
@@ -534,14 +589,20 @@ Analyze the customer's message and do the following:
 If you cannot extract any part numbers, tell the user you didn't understand and ask for part numbers.
 
 Reply in a professional but friendly tone.`
-                        }]
                     }]
-                })
-            }
-        );
+                }]
+            })
+        });
         
-        const data = await response.json();
-        const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        const result = await response.json();
+        console.log("📝 Gemini Status:", response.status);
+        
+        if (!response.ok) {
+            console.error("❌ Gemini Error:", JSON.stringify(result, null, 2));
+            return null;
+        }
+        
+        const aiReply = result.candidates?.[0]?.content?.parts?.[0]?.text || null;
         
         if (aiReply) {
             const extracted = extractStructuredDataFromAI(aiReply);
@@ -702,31 +763,12 @@ app.post("/webhook", async (req, res) => {
 
                 try {
                     const mediaUrl = await getMediaURL(mediaId);
+                    console.log(`📸 Media URL: ${mediaUrl}`);
+                    
                     const imageBuffer = await downloadMedia(mediaUrl);
+                    console.log(`📸 Image size: ${imageBuffer.length} bytes`);
                     
-                    // Try Gemini analysis
-                    let reply = await processPhotoWithGemini(imageBuffer, caption, from);
-                    
-                    // If Gemini fails, check if caption has part numbers
-                    if (reply.includes('Could not analyze image') && caption) {
-                        const partMatch = caption.match(/\b[A-Z0-9\-]{5,15}\b/i);
-                        if (partMatch) {
-                            const results = aiSearch(partMatch[0]);
-                            if (results.length > 0) {
-                                let productReply = `📸 *Photo Received!*\n\n🔍 Found part in your caption: ${partMatch[0]}\n\n`;
-                                results.forEach((p, index) => {
-                                    const priceGST = aiPriceWithGST(p.price, p.gst || 18);
-                                    productReply += `${index + 1}. **${p.part}**\n`;
-                                    productReply += `📝 ${p.desc || 'N/A'}\n`;
-                                    productReply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
-                                    productReply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
-                                });
-                                productReply += `📞 *Call:* ${CONFIG.businessPhone}`;
-                                reply = productReply;
-                            }
-                        }
-                    }
-                    
+                    const reply = await processPhotoWithGemini(imageBuffer, caption, from);
                     console.log("🤖 Reply:", reply);
                     await sendWhatsAppMessage(from, reply);
                 } catch (error) {
