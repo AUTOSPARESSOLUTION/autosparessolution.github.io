@@ -197,42 +197,30 @@ function parseMultiProductEnquiryEnhanced(message) {
     if (parts.length === 1 && !message.includes(',')) {
         const msg = message.trim();
         
-        // Pattern: part = qty or part-qty
         let match = msg.match(/^([A-Z0-9\-]{5,15})\s*[=\-]\s*(\d+)$/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
             return items;
         }
         
-        // Pattern: part x qty or part*qty
         match = msg.match(/^([A-Z0-9\-]{5,15})\s*[x*]\s*(\d+)$/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
             return items;
         }
         
-        // Pattern: qty part
         match = msg.match(/^(\d+)\s+([A-Z0-9\-]{5,15})$/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) });
             return items;
         }
         
-        // Pattern: part qty
         match = msg.match(/^([A-Z0-9\-]{5,15})\s+(\d+)$/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
             return items;
         }
         
-        // Pattern: part, qty
-        match = msg.match(/^([A-Z0-9\-]{5,15})\s*[,;]\s*(\d+)$/i);
-        if (match) {
-            items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
-            return items;
-        }
-        
-        // Pattern: Just part number (no quantity)
         match = msg.match(/^([A-Z0-9\-]{5,15})$/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: 1 });
@@ -240,46 +228,33 @@ function parseMultiProductEnquiryEnhanced(message) {
         }
     }
     
-    // Process each part (comma separated)
     for (const part of parts) {
         if (!part) continue;
         
-        // Format: part = qty
         let match = part.match(/^([A-Z0-9\-]{5,15})\s*[=\-]\s*(\d+)$/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
             continue;
         }
         
-        // Format: part x qty
         match = part.match(/^([A-Z0-9\-]{5,15})\s*[x*]\s*(\d+)$/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
             continue;
         }
         
-        // Format: qty part
         match = part.match(/^(\d+)\s+([A-Z0-9\-]{5,15})$/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) });
             continue;
         }
         
-        // Format: part qty
         match = part.match(/^([A-Z0-9\-]{5,15})\s+(\d+)$/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
             continue;
         }
         
-        // Format: part,qty
-        match = part.match(/^([A-Z0-9\-]{5,15})\s*[,;]\s*(\d+)$/i);
-        if (match) {
-            items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
-            continue;
-        }
-        
-        // Format: just part number
         match = part.match(/^([A-Z0-9\-]{5,15})$/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: 1 });
@@ -300,6 +275,18 @@ function detectMultipleItemsWithoutQty(message) {
     }
     
     return { isMulti: false, parts: [] };
+}
+
+function detectQuantityWithUnit(message) {
+    const unitPatterns = ['pcs', 'nos', 'no', 'piece', 'pieces', 'unit', 'units', 'qty'];
+    const lowerMsg = message.toLowerCase();
+    
+    for (const unit of unitPatterns) {
+        if (lowerMsg.includes(unit)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 async function processMultiProductEnquiryEnhanced(message, from) {
@@ -351,7 +338,6 @@ async function processMultiProductEnquiryEnhanced(message, from) {
     const gstAmount = subtotal * 0.18;
     const grandTotal = subtotal + gstAmount;
     
-    // Save cart
     saveCart(from, productDetails, subtotal, grandTotal);
     
     let reply = `📋 *MULTI-PRODUCT ENQUIRY*\n`;
@@ -445,79 +431,233 @@ async function downloadMedia(mediaUrl) {
 }
 
 // ============================================================
+// GEMINI - HANDLE ALL ENQUIRY FORMATS
+// ============================================================
+
+async function formatEnquiryWithGemini(message, from) {
+    console.log(`🧠 Sending to Gemini for formatting: "${message}"`);
+    
+    try {
+        const productContext = allProducts.slice(0, 20).map(p => 
+            `- ${p.part}: ${p.desc} (₹${p.price}, Stock: ${p.stock})`
+        ).join('\n');
+        
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.geminiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: `You are an auto spares assistant for "Auto Spares Solution".
+
+Available Products:
+${productContext}
+
+Customer Enquiry: "${message}"
+
+Analyze the customer's message and do the following:
+1. Extract all part numbers mentioned (format: 5-15 characters with letters, numbers, and hyphens)
+2. Extract quantities mentioned (look for numbers after "x", "*", "=", "-", or space, or words like "pcs", "nos", "piece")
+3. If no quantity specified, use 1
+4. Detect if it's a price enquiry, stock enquiry, or order enquiry
+5. Format the reply as a clean structured response
+
+If you cannot extract any part numbers, tell the user you didn't understand and ask for part numbers.
+
+Reply in a professional but friendly tone.`
+                        }]
+                    }]
+                })
+            }
+        );
+        
+        const data = await response.json();
+        const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        
+        if (aiReply) {
+            const extracted = extractStructuredDataFromAI(aiReply);
+            if (extracted.items.length > 0) {
+                return await processMultiProductEnquiryEnhanced(
+                    extracted.items.map(i => `${i.part} x${i.qty}`).join(', '), 
+                    from
+                );
+            }
+            
+            return `🤖 *AI Assistant*\n\n${aiReply}\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+        }
+        
+        return null;
+        
+    } catch (error) {
+        console.error('❌ Gemini formatting error:', error);
+        return null;
+    }
+}
+
+function extractStructuredDataFromAI(aiText) {
+    const items = [];
+    const partMatches = aiText.match(/\b([A-Z0-9\-]{5,15})\b/g) || [];
+    
+    for (const part of partMatches) {
+        const cleanPart = part.toUpperCase();
+        const qtyMatch = aiText.match(new RegExp(`${part}\\s*(?:x|\\*|=|\\-)?\\s*(\\d+)`, 'i'));
+        let qty = 1;
+        if (qtyMatch && qtyMatch[1]) {
+            qty = parseInt(qtyMatch[1]);
+        }
+        items.push({ part: cleanPart, qty });
+    }
+    
+    if (items.length === 0 && partMatches.length > 0) {
+        for (const part of partMatches) {
+            items.push({ part: part.toUpperCase(), qty: 1 });
+        }
+    }
+    
+    return { items };
+}
+
+async function processWithGeminiFallback(message, from) {
+    console.log(`🔄 Processing with Gemini fallback: "${message}"`);
+    
+    const parsed = parseMultiProductEnquiryEnhanced(message);
+    if (parsed.length > 0) {
+        return await processMultiProductEnquiryEnhanced(message, from);
+    }
+    
+    const multiCheck = detectMultipleItemsWithoutQty(message);
+    if (multiCheck.isMulti) {
+        const items = multiCheck.parts.map(part => ({
+            part: part.toUpperCase(),
+            qty: 1
+        }));
+        const itemMessage = items.map(item => `${item.part} x${item.qty}`).join(', ');
+        return await processMultiProductEnquiryEnhanced(itemMessage, from);
+    }
+    
+    if (detectQuantityWithUnit(message)) {
+        const formatted = await formatEnquiryWithGemini(message, from);
+        if (formatted) {
+            return formatted;
+        }
+    }
+    
+    const singleMatch = message.match(/\b([A-Z0-9\-]{5,15})\b/i);
+    if (singleMatch) {
+        const results = aiSearch(singleMatch[1]);
+        if (results.length > 0) {
+            let reply = `🔍 Found ${results.length} result(s)\n\n`;
+            results.forEach((p, index) => {
+                const priceGST = aiPriceWithGST(p.price, p.gst || 18);
+                reply += `${index + 1}. **${p.part}**\n`;
+                reply += `📝 ${p.desc || 'N/A'}\n`;
+                reply += `🏷️ Brand: ${p.brand || 'N/A'}\n`;
+                reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
+                reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
+            });
+            reply += `🛒 Order: https://autosparessolution.com\n`;
+            reply += `📞 Call: ${CONFIG.businessPhone}`;
+            return reply;
+        }
+    }
+    
+    try {
+        const geminiReply = await aiGetGeminiReply(message);
+        if (geminiReply) {
+            return `🤖 *AI Assistant*\n\n${geminiReply}\n\n📞 *Call:* ${CONFIG.businessPhone}\n🛒 *Shop:* https://autosparessolution.github.io`;
+        }
+    } catch (error) {
+        console.error('❌ Gemini final error:', error);
+    }
+    
+    return `❌ I couldn't understand your request.
+
+💡 Please try:
+1️⃣ Part number: "0108FAW00360N"
+2️⃣ Multiple parts: "0108FAW00360N 0108FAW00370N"
+3️⃣ With quantity: "0108FAW00360N x5"
+4️⃣ Or describe what you need
+
+📞 Call: ${CONFIG.businessPhone}
+🛒 Shop: https://autosparessolution.github.io`;
+}
+
+// ============================================================
 // PHOTO PROCESSING
 // ============================================================
 
-async function processPhotoMessage(imageBuffer, caption, from) {
-    console.log(`🖼️ Processing photo from ${from} with caption: "${caption}"`);
+async function processPhotoWithGemini(imageBuffer, caption, from) {
+    console.log(`🖼️ Analyzing photo from ${from} with Gemini...`);
     
-    // Analyze image with Gemini
-    const imageAnalysis = await analyzeImageWithGemini(imageBuffer, caption);
-    
-    let items = [];
-    let reply = '';
-    
-    if (caption && caption.trim().length > 0) {
-        // Check if caption has multiple part numbers without quantity
-        const multiCheck = detectMultipleItemsWithoutQty(caption);
-        if (multiCheck.isMulti) {
-            items = multiCheck.parts.map(part => ({
-                part: part.toUpperCase(),
-                qty: 1
-            }));
-        } else {
+    try {
+        const imageAnalysis = await analyzeImageWithGemini(imageBuffer, caption);
+        
+        let items = [];
+        let reply = '';
+        
+        if (caption && caption.trim().length > 0) {
             const parsed = parseMultiProductEnquiryEnhanced(caption);
             if (parsed.length > 0) {
                 items = parsed;
             } else {
-                const singleMatch = caption.match(/\b([A-Z0-9\-]{5,15})\b/i);
-                if (singleMatch) {
-                    items = [{ part: singleMatch[1].toUpperCase(), qty: 1 }];
+                const multiCheck = detectMultipleItemsWithoutQty(caption);
+                if (multiCheck.isMulti) {
+                    items = multiCheck.parts.map(part => ({
+                        part: part.toUpperCase(),
+                        qty: 1
+                    }));
                 }
             }
         }
-    }
-    
-    if (items.length > 0) {
-        let productDetails = [];
-        let subtotal = 0;
-        let notFoundParts = [];
         
-        for (const item of items) {
-            const product = allProducts.find(p => p.part.toUpperCase() === item.part.toUpperCase());
-            if (product) {
-                const priceGST = product.price * 1.18;
-                const total = priceGST * item.qty;
-                subtotal += total;
-                
-                productDetails.push({
-                    part: item.part,
-                    description: product.desc || 'N/A',
-                    brand: product.brand || 'N/A',
-                    price: product.price,
-                    priceGST: priceGST,
-                    qty: item.qty,
-                    stock: product.stock || 0,
-                    total: total,
-                    inStock: product.stock > 0
-                });
-            } else {
-                notFoundParts.push(item.part);
+        if (items.length === 0 && imageAnalysis) {
+            const partExtraction = await extractPartNumbersFromImage(imageBuffer, caption);
+            if (partExtraction && partExtraction.length > 0) {
+                items = partExtraction;
             }
         }
         
-        const gstAmount = subtotal * 0.18;
-        const grandTotal = subtotal + gstAmount;
-        
-        saveCart(from, productDetails, subtotal, grandTotal);
-        
-        reply = `📋 *ITEMS FROM YOUR PHOTO*\n`;
-        if (imageAnalysis) {
-            reply += `📸 *AI Analysis:* ${imageAnalysis.substring(0, 150)}...\n\n`;
-        }
-        reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-        
-        if (productDetails.length > 0) {
+        if (items.length > 0) {
+            let productDetails = [];
+            let subtotal = 0;
+            let notFoundParts = [];
+            
+            for (const item of items) {
+                const product = allProducts.find(p => p.part.toUpperCase() === item.part.toUpperCase());
+                if (product) {
+                    const priceGST = product.price * 1.18;
+                    const total = priceGST * item.qty;
+                    subtotal += total;
+                    
+                    productDetails.push({
+                        part: item.part,
+                        description: product.desc || 'N/A',
+                        brand: product.brand || 'N/A',
+                        price: product.price,
+                        priceGST: priceGST,
+                        qty: item.qty,
+                        stock: product.stock || 0,
+                        total: total,
+                        inStock: product.stock > 0
+                    });
+                } else {
+                    notFoundParts.push(item.part);
+                }
+            }
+            
+            const gstAmount = subtotal * 0.18;
+            const grandTotal = subtotal + gstAmount;
+            
+            saveCart(from, productDetails, subtotal, grandTotal);
+            
+            reply = `📋 *ITEMS FROM YOUR PHOTO*\n`;
+            if (imageAnalysis) {
+                reply += `📸 *AI Analysis:* ${imageAnalysis.substring(0, 150)}...\n\n`;
+            }
+            reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+            
             for (const p of productDetails) {
                 reply += `*${p.part}*`;
                 reply += `\n📝 ${p.description.substring(0, 35)}...\n`;
@@ -525,34 +665,82 @@ async function processPhotoMessage(imageBuffer, caption, from) {
                 reply += `📦 ${p.qty} x ₹${p.priceGST.toFixed(2)} = ₹${p.total.toFixed(2)}\n`;
                 reply += `${p.inStock ? `✅ ${p.stock} pcs available` : '❌ OUT OF STOCK'}\n\n`;
             }
+            
+            if (notFoundParts.length > 0) {
+                reply += `⚠️ *Not Found:* ${notFoundParts.join(', ')}\n\n`;
+            }
+            
+            reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+            reply += `📊 *Summary:*\n`;
+            reply += `📦 Items: ${productDetails.length}\n`;
+            reply += `💰 Subtotal: ₹${subtotal.toFixed(2)}\n`;
+            reply += `🧾 GST (18%): ₹${gstAmount.toFixed(2)}\n`;
+            reply += `💳 *Grand Total: ₹${grandTotal.toFixed(2)}*\n`;
+            reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `*What would you like to do?*\n`;
+            reply += `🛒 "Confirm Order" - Place order\n`;
+            reply += `📄 "Get Quote" - Generate quotation\n`;
+            reply += `🗑️ "Clear Cart" - Start fresh\n\n`;
+            reply += `📞 *Call:* ${CONFIG.businessPhone}`;
+            
+            return reply;
         }
         
-        if (notFoundParts.length > 0) {
-            reply += `⚠️ *Not Found:* ${notFoundParts.join(', ')}\n\n`;
+        if (imageAnalysis) {
+            return `📸 *Photo Analysis*\n\n📝 ${imageAnalysis}\n\n💡 Try sending part numbers with the photo.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
         }
         
-        reply += `━━━━━━━━━━━━━━━━━━━━\n`;
-        reply += `📊 *Summary:*\n`;
-        reply += `📦 Items: ${productDetails.length}\n`;
-        reply += `💰 Subtotal: ₹${subtotal.toFixed(2)}\n`;
-        reply += `🧾 GST (18%): ₹${gstAmount.toFixed(2)}\n`;
-        reply += `💳 *Grand Total: ₹${grandTotal.toFixed(2)}*\n`;
-        reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+        return `📸 *Photo Received!*\n\n✅ We'll review and get back to you.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
         
-        reply += `*What would you like to do?*\n`;
-        reply += `🛒 "Confirm Order" - Place order\n`;
-        reply += `📄 "Get Quote" - Generate quotation\n`;
-        reply += `🗑️ "Clear Cart" - Start fresh\n\n`;
-        reply += `📞 *Call:* ${CONFIG.businessPhone}`;
+    } catch (error) {
+        console.error('❌ Photo processing error:', error);
+        return `📸 *Photo Received!*\n\n❌ Error analyzing image. Please try again or send part numbers.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+    }
+}
+
+async function extractPartNumbersFromImage(imageBuffer, caption = '') {
+    const geminiKey = CONFIG.geminiKey;
+    const base64Image = imageBuffer.toString('base64');
+    
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            {
+                                text: `Analyze this image of auto parts. If you can identify any part numbers visible in the image, return them as a comma-separated list. If you see text on the parts, extract those numbers. Return ONLY the part numbers, one per line. If no part numbers are visible, return "NONE".`
+                            },
+                            {
+                                inline_data: {
+                                    mime_type: "image/jpeg",
+                                    data: base64Image
+                                }
+                            }
+                        ]
+                    }]
+                })
+            }
+        );
+        const data = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         
-        return reply;
+        const partMatches = text.match(/\b[A-Z0-9\-]{5,15}\b/g) || [];
+        if (partMatches.length > 0) {
+            return partMatches.map(part => ({
+                part: part.toUpperCase(),
+                qty: 1
+            }));
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('❌ Part extraction error:', error);
+        return [];
     }
-    
-    if (imageAnalysis) {
-        return `📸 *Photo Received!*\n\n📝 ${imageAnalysis}\n\n📞 *Call:* ${CONFIG.businessPhone}`;
-    }
-    
-    return `📸 *Photo Received!*\n\n✅ We'll review and get back to you.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
 }
 
 // ============================================================
@@ -607,7 +795,7 @@ app.post("/webhook", async (req, res) => {
                 try {
                     const mediaUrl = await getMediaURL(mediaId);
                     const imageBuffer = await downloadMedia(mediaUrl);
-                    const reply = await processPhotoMessage(imageBuffer, caption, from);
+                    const reply = await processPhotoWithGemini(imageBuffer, caption, from);
                     console.log("🤖 Reply:", reply);
                     await sendWhatsAppMessage(from, reply);
                 } catch (error) {
@@ -654,7 +842,33 @@ async function processMessage(msg, from = null) {
     const originalMsg = msg;
     const msgLower = msg.toLowerCase().trim();
     
-    // ===== HELP COMMANDS =====
+    // ============================================================
+    // 🆕 GEMINI FALLBACK FOR UNKNOWN FORMATS
+    // ============================================================
+    const knownPatterns = [
+        /^hi$|^hello$|^help$|^start$/i,
+        /^confirm order$|^place order$/i,
+        /^clear cart$|^clear$/i,
+        /^get quote$|^quotation$/i,
+        /^price\s+/i,
+        /^stock\s+/i,
+        /^order\s+/i,
+        /\b[A-Z0-9\-]{5,15}\b/
+    ];
+    
+    const matchesKnownPattern = knownPatterns.some(pattern => pattern.test(originalMsg));
+    
+    if (!matchesKnownPattern) {
+        console.log(`🔄 No known pattern found. Using Gemini for: "${originalMsg}"`);
+        const geminiReply = await processWithGeminiFallback(originalMsg, from);
+        if (geminiReply) {
+            return geminiReply;
+        }
+    }
+    
+    // ============================================================
+    // HELP COMMANDS
+    // ============================================================
     if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start") {
         return `👋 Welcome to Auto Spares Solution!
 
@@ -668,7 +882,6 @@ Send brand like "TVS" or "M&M"
 📦 *Multiple Products:*
 "0108FAW00360N 0108FAW00370N 0108FAW00400N"
 "0108FAW00360N x2, 0108FAW00370N x3"
-"0108FAW00360N-2 0108FAW00370N-3"
 
 📸 *Upload Photo:*
 Send photo of any part
@@ -691,11 +904,13 @@ Send voice note with your query
 How can I help you today? 🚗`;
     }
     
-    // ===== CONFIRM ORDER =====
+    // ============================================================
+    // CONFIRM ORDER
+    // ============================================================
     if (msgLower === "confirm order" || msgLower === "place order") {
         const cart = getCart(from);
         if (!cart || cart.items.length === 0) {
-            return `🛒 Your cart is empty.\n\n💡 Add items: "0108FAW00360N 0108FAW00370N 0108FAW00400N"`;
+            return `🛒 Your cart is empty.\n\n💡 Add items: "0108FAW00360N 0108FAW00370N"`;
         }
         
         let orderSummary = `✅ *ORDER CONFIRMED*\n\n`;
@@ -718,17 +933,21 @@ How can I help you today? 🚗`;
         return orderSummary;
     }
     
-    // ===== CLEAR CART =====
+    // ============================================================
+    // CLEAR CART
+    // ============================================================
     if (msgLower === "clear cart" || msgLower === "clear") {
         clearCart(from);
         return `🗑️ Cart cleared!`;
     }
     
-    // ===== GET QUOTE =====
+    // ============================================================
+    // GET QUOTE
+    // ============================================================
     if (msgLower === "get quote" || msgLower === "quotation") {
         const cart = getCart(from);
         if (!cart || cart.items.length === 0) {
-            return `📄 Your cart is empty.\n\n💡 Add items: "0108FAW00360N 0108FAW00370N 0108FAW00400N"`;
+            return `📄 Your cart is empty.\n\n💡 Add items: "0108FAW00360N 0108FAW00370N"`;
         }
         
         const quotationNo = `Q-${Date.now().toString().slice(-6)}`;
@@ -763,7 +982,6 @@ How can I help you today? 🚗`;
     // MULTI-PRODUCT DETECTION
     // ============================================================
     
-    // Check for multiple items without quantity
     const multiWithoutQty = detectMultipleItemsWithoutQty(originalMsg);
     if (multiWithoutQty.isMulti) {
         const items = multiWithoutQty.parts.map(part => ({
@@ -777,7 +995,6 @@ How can I help you today? 🚗`;
         }
     }
     
-    // Check for multi-product with formats
     const hasMultiPattern = /[,;]/.test(originalMsg) ||
                            /\d+\s+[A-Z0-9\-]/.test(originalMsg) ||
                            /[A-Z0-9\-]\s*[=x*\-]\s*\d/.test(originalMsg) ||
@@ -946,3 +1163,4 @@ console.log('✅ All features loaded successfully!');
 console.log('📱 Multi-product support active');
 console.log('🖼️ Photo analysis active');
 console.log('🎤 Voice message support active');
+console.log('🧠 Gemini fallback for all formats active');
