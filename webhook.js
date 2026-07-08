@@ -376,3 +376,163 @@ app.listen(PORT, () => {
     console.log("Server Running On Port", PORT);
     console.log("====================================");
 });
+
+// ============================================================
+// 🆕 NEW FEATURES ADDED BELOW (Without changing any existing code)
+// ============================================================
+
+// ===== 1. MULTI-PRODUCT ENQUIRY PARSER =====
+function parseMultiProductEnquiry(message) {
+    const items = [];
+    const parts = message.split(',');
+    
+    for (const part of parts) {
+        const trimmed = part.trim();
+        const match = trimmed.match(/^([A-Z0-9\-]{5,15})\s*(?:x\s*)?(\d+)?$/i);
+        if (match) {
+            const partNumber = match[1].toUpperCase();
+            const quantity = parseInt(match[2]) || 1;
+            items.push({ part: partNumber, qty: quantity });
+        } else {
+            const singleMatch = trimmed.match(/^([A-Z0-9\-]{5,15})$/i);
+            if (singleMatch) {
+                items.push({ part: singleMatch[1].toUpperCase(), qty: 1 });
+            }
+        }
+    }
+    
+    return items;
+}
+
+// ===== 2. MULTI-PRODUCT ENQUIRY HANDLER =====
+async function processMultiProductEnquiry(message, from) {
+    const items = parseMultiProductEnquiry(message);
+    
+    if (items.length === 0) return null;
+    
+    console.log(`🧠 Processing ${items.length} products`);
+    
+    let productDetails = [];
+    let subtotal = 0;
+    
+    for (const item of items) {
+        const product = allProducts.find(p => p.part.toUpperCase() === item.part.toUpperCase());
+        if (product) {
+            const priceGST = product.price * 1.18;
+            const total = priceGST * item.qty;
+            subtotal += total;
+            
+            productDetails.push({
+                part: item.part,
+                description: product.desc || 'N/A',
+                brand: product.brand || 'N/A',
+                price: product.price,
+                priceGST: priceGST,
+                qty: item.qty,
+                stock: product.stock || 0,
+                total: total,
+                inStock: product.stock > 0
+            });
+        } else {
+            productDetails.push({
+                part: item.part,
+                description: '❌ NOT FOUND',
+                brand: 'N/A',
+                price: 0,
+                priceGST: 0,
+                qty: item.qty,
+                stock: 0,
+                total: 0,
+                inStock: false,
+                notFound: true
+            });
+        }
+    }
+    
+    const gstAmount = subtotal * 0.18;
+    const grandTotal = subtotal + gstAmount;
+    
+    let reply = `📋 *MULTI-PRODUCT ENQUIRY*\n`;
+    reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    let outOfStockItems = [];
+    let totalItems = 0;
+    
+    for (const p of productDetails) {
+        totalItems += p.qty;
+        reply += `*${p.part}*`;
+        if (p.notFound) {
+            reply += ` ❌ NOT FOUND\n`;
+        } else {
+            reply += `\n📝 ${p.description.substring(0, 35)}...\n`;
+            reply += `🏷️ ${p.brand}\n`;
+            reply += `📦 ${p.qty} x ₹${p.priceGST.toFixed(2)} = ₹${p.total.toFixed(2)}\n`;
+            reply += `${p.inStock ? `✅ ${p.stock} pcs available` : '❌ OUT OF STOCK'}\n`;
+            if (!p.inStock) {
+                outOfStockItems.push(p.part);
+            }
+            reply += `\n`;
+        }
+    }
+    
+    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    reply += `📊 *Summary:*\n`;
+    reply += `📦 Items: ${items.length}\n`;
+    reply += `📦 Qty: ${totalItems}\n`;
+    reply += `💰 Subtotal: ₹${subtotal.toFixed(2)}\n`;
+    reply += `🧾 GST (18%): ₹${gstAmount.toFixed(2)}\n`;
+    reply += `💳 *Grand Total: ₹${grandTotal.toFixed(2)}*\n`;
+    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    
+    if (outOfStockItems.length > 0) {
+        reply += `⚠️ *Out of Stock:* ${outOfStockItems.join(', ')}\n`;
+        reply += `🔔 We'll notify you when available.\n\n`;
+    }
+    
+    reply += `*What would you like to do?*\n`;
+    reply += `🛒 "Confirm Order" - Place order\n`;
+    reply += `📄 "Get Quote" - Generate quotation\n`;
+    reply += `🗑️ "Clear Cart" - Start fresh\n\n`;
+    reply += `📞 *Call:* ${CONFIG.businessPhone}`;
+    
+    return reply;
+}
+
+// ===== 3. SAVE CART (in-memory) =====
+const carts = new Map();
+
+function saveCart(phone, items, subtotal, grandTotal) {
+    carts.set(phone, { items, subtotal, grandTotal, updatedAt: Date.now() });
+}
+
+function getCart(phone) {
+    return carts.get(phone) || null;
+}
+
+function clearCart(phone) {
+    carts.delete(phone);
+}
+
+// ===== 4. INTERCEPT PROCESS MESSAGE FOR MULTI-PRODUCT =====
+// We check if message contains multiple parts
+const originalProcessMessage = processMessage;
+
+processMessage = async function(msg) {
+    const originalMsg = msg;
+    const msgLower = msg.toLowerCase().trim();
+    
+    // Check if it's a multi-product message (comma separated or multiple part numbers)
+    const hasComma = msgLower.includes(',');
+    const partMatches = msgLower.match(/\b[A-Z0-9\-]{5,15}\b/g) || [];
+    const isMulti = hasComma || partMatches.length > 1;
+    
+    if (isMulti && !msgLower.includes('price') && !msgLower.includes('stock') && !msgLower.includes('order')) {
+        const multiReply = await processMultiProductEnquiry(msg, 'unknown');
+        if (multiReply) {
+            return multiReply;
+        }
+    }
+    
+    // Fallback to original processMessage
+    return originalProcessMessage.call(this, msg);
+};
