@@ -25,7 +25,7 @@ const CONFIG = {
 console.log("====================================");
 console.log("🚀 ASSIST WhatsApp Started");
 console.log("📞 Business Phone:", CONFIG.businessPhone);
-console.log("🧠 Gemini Key:", CONFIG.geminiKey ? "✅ Configured" : "❌ Missing");
+console.log("🧠 Gemini Key:", CONFIG.geminiKey ? "✅ Set" : "❌ Missing");
 console.log("====================================");
 
 // ============================================================
@@ -157,7 +157,7 @@ async function aiGetGeminiReply(query) {
 }
 
 // ============================================================
-// 🖼️ IMAGE ANALYSIS WITH GEMINI
+// 🖼️ SIMPLIFIED IMAGE ANALYSIS
 // ============================================================
 
 async function analyzeImageWithGemini(imageBuffer, caption = '') {
@@ -170,7 +170,6 @@ async function analyzeImageWithGemini(imageBuffer, caption = '') {
     
     try {
         const base64Image = imageBuffer.toString('base64');
-        const mimeType = 'image/jpeg';
         
         console.log(`📸 Sending image to Gemini (${imageBuffer.length} bytes)`);
         
@@ -178,22 +177,12 @@ async function analyzeImageWithGemini(imageBuffer, caption = '') {
             contents: [{
                 parts: [
                     {
-                        text: `You are an auto spares assistant for "Auto Spares Solution" in India.
-                        Customer sent an image with message: "${caption || 'No caption'}"
-                        
-                        Analyze this image and do the following:
-                        1. Identify any auto parts visible in the image
-                        2. If you see any part numbers (format: 5-15 characters with letters, numbers, and hyphens), extract them
-                        3. Suggest what part it might be
-                        4. If the image contains text, read it
-                        
-                        Return a helpful response describing what you see.
-                        If you find part numbers, list them clearly.
-                        Keep response short and useful.`
+                        text: `You are an auto spares assistant. Customer sent an image with message: "${caption || 'No caption'}". 
+                        Identify any auto parts in this image. If you see part numbers, list them. Keep response short.`
                     },
                     {
                         inline_data: {
-                            mime_type: mimeType,
+                            mime_type: "image/jpeg",
                             data: base64Image
                         }
                     }
@@ -205,24 +194,20 @@ async function analyzeImageWithGemini(imageBuffer, caption = '') {
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
             {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             }
         );
         
         if (!response.ok) {
             const errorText = await response.text();
-            console.error(`❌ Gemini API error (${response.status}):`, errorText);
+            console.error(`❌ Gemini API error:`, errorText);
             return null;
         }
         
         const data = await response.json();
         console.log('✅ Gemini analysis complete');
-        
-        const analysis = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-        return analysis;
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
         
     } catch (error) {
         console.error('❌ Image analysis error:', error);
@@ -239,7 +224,7 @@ async function processPhotoWithGemini(imageBuffer, caption, from) {
         if (imageAnalysis) {
             const partMatches = imageAnalysis.match(/\b[A-Z0-9\-]{5,15}\b/g) || [];
             
-            let reply = `📸 *Photo Analysis*\n\n📝 ${imageAnalysis}\n\n`;
+            let reply = `📸 *Photo Analysis*\n\n${imageAnalysis}\n\n`;
             
             if (partMatches.length > 0) {
                 reply += `🔍 *Parts Found:*\n`;
@@ -247,21 +232,19 @@ async function processPhotoWithGemini(imageBuffer, caption, from) {
                     const product = allProducts.find(p => p.part.toUpperCase() === part.toUpperCase());
                     if (product) {
                         const priceGST = product.price * 1.18;
-                        reply += `✅ ${part} - ${product.desc} - ₹${priceGST.toFixed(2)}\n`;
+                        reply += `✅ ${part} - ₹${priceGST.toFixed(2)}\n`;
                     } else {
-                        reply += `⚠️ ${part} - Not found in inventory\n`;
+                        reply += `⚠️ ${part} - Not found\n`;
                     }
                 }
                 reply += `\n💡 Reply "Add ${partMatches[0]}" to add to cart\n`;
-            } else {
-                reply += `💡 If you know the part number, please send it.\n`;
             }
             
             reply += `\n📞 *Call:* ${CONFIG.businessPhone}`;
             return reply;
         }
         
-        return `📸 *Photo Received!*\n\n⚠️ Could not analyze image. Please try:\n1️⃣ Take a clearer photo\n2️⃣ Make sure part number is visible\n3️⃣ Or send part number directly\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+        return `📸 *Photo Received!*\n\n⚠️ Could not analyze image. Please send the part number directly.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
         
     } catch (error) {
         console.error('❌ Photo processing error:', error);
@@ -716,16 +699,34 @@ app.post("/webhook", async (req, res) => {
                 const caption = message.image.caption || "";
 
                 console.log(`🖼️ Image from: ${from} | Caption: "${caption}"`);
-                console.log(`📸 Media ID: ${mediaId}`);
 
                 try {
                     const mediaUrl = await getMediaURL(mediaId);
-                    console.log(`📸 Media URL: ${mediaUrl}`);
-                    
                     const imageBuffer = await downloadMedia(mediaUrl);
-                    console.log(`📸 Image size: ${imageBuffer.length} bytes`);
                     
-                    const reply = await processPhotoWithGemini(imageBuffer, caption, from);
+                    // Try Gemini analysis
+                    let reply = await processPhotoWithGemini(imageBuffer, caption, from);
+                    
+                    // If Gemini fails, check if caption has part numbers
+                    if (reply.includes('Could not analyze image') && caption) {
+                        const partMatch = caption.match(/\b[A-Z0-9\-]{5,15}\b/i);
+                        if (partMatch) {
+                            const results = aiSearch(partMatch[0]);
+                            if (results.length > 0) {
+                                let productReply = `📸 *Photo Received!*\n\n🔍 Found part in your caption: ${partMatch[0]}\n\n`;
+                                results.forEach((p, index) => {
+                                    const priceGST = aiPriceWithGST(p.price, p.gst || 18);
+                                    productReply += `${index + 1}. **${p.part}**\n`;
+                                    productReply += `📝 ${p.desc || 'N/A'}\n`;
+                                    productReply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
+                                    productReply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
+                                });
+                                productReply += `📞 *Call:* ${CONFIG.businessPhone}`;
+                                reply = productReply;
+                            }
+                        }
+                    }
+                    
                     console.log("🤖 Reply:", reply);
                     await sendWhatsAppMessage(from, reply);
                 } catch (error) {
@@ -773,7 +774,7 @@ async function processMessage(msg, from = null) {
     const msgLower = msg.toLowerCase().trim();
     
     // ============================================================
-    // 🆕 GEMINI FALLBACK FOR UNKNOWN FORMATS
+    // GEMINI FALLBACK FOR UNKNOWN FORMATS
     // ============================================================
     const knownPatterns = [
         /^hi$|^hello$|^help$|^start$/i,
