@@ -198,7 +198,7 @@
     <div style="margin-bottom: 10px;">
         <button type="button" class="add-item-btn" onclick="addNewItem()"><i class="fas fa-plus"></i> ➕ Add New Item</button>
         <span style="font-size: 11px; color: #6c757d; margin-left: 10px;">
-            <span style="background: #ff9800; color: white; padding: 1px 6px; border-radius: 10px;">M&M</span> = MRP from CSV
+            <span style="background: #ff9800; color: white; padding: 1px 6px; border-radius: 10px;">M&M</span> = MRP from CSV (Column D)
         </span>
     </div>
 
@@ -258,7 +258,7 @@
     // ========== GLOBAL VARIABLES ==========
     let isSaving = false;
     let invoiceAlreadySaved = false;
-    let priceData = {}; // Cache for CSV price data
+    let priceData = {};
     let priceDataLoaded = false;
 
     // ========== LOAD PRICES.CSV ==========
@@ -279,126 +279,66 @@
                     return response.text();
                 })
                 .then(csvText => {
-                    // Parse CSV
                     const lines = csvText.split('\n');
-                    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                    let parsedCount = 0;
                     
-                    // Find column indices
-                    const partNoIndex = headers.findIndex(h => h.includes('part') || h.includes('sku') || h.includes('code'));
-                    const makeIndex = headers.findIndex(h => h.includes('make') || h.includes('brand'));
-                    const mrpIndex = headers.findIndex(h => h.includes('mrp') || h.includes('price'));
-                    
-                    if (partNoIndex === -1 || makeIndex === -1 || mrpIndex === -1) {
-                        console.warn('CSV columns not found. Using defaults.');
-                        // Try alternative column names
-                        const altPartIndex = headers.findIndex(h => h === 'partno' || h === 'part_no');
-                        const altMakeIndex = headers.findIndex(h => h === 'make');
-                        const altMrpIndex = headers.findIndex(h => h === 'mrp');
+                    for (let i = 1; i < lines.length; i++) {
+                        if (!lines[i].trim()) continue;
+                        const cols = lines[i].split(',').map(c => c.trim());
                         
-                        // Use whatever we found
-                        const pIdx = altPartIndex !== -1 ? altPartIndex : partNoIndex;
-                        const mIdx = altMakeIndex !== -1 ? altMakeIndex : makeIndex;
-                        const rIdx = altMrpIndex !== -1 ? altMrpIndex : mrpIndex;
-                        
-                        if (pIdx === -1 || mIdx === -1 || rIdx === -1) {
-                            reject(new Error('Could not find required columns in CSV'));
-                            return;
-                        }
-                        
-                        // Parse with found indices
-                        for (let i = 1; i < lines.length; i++) {
-                            if (!lines[i].trim()) continue;
-                            const cols = lines[i].split(',').map(c => c.trim());
-                            if (cols.length > Math.max(pIdx, mIdx, rIdx)) {
-                                const partNo = cols[pIdx];
-                                const make = cols[mIdx];
-                                const mrp = parseFloat(cols[rIdx]) || 0;
-                                if (partNo) {
-                                    priceData[partNo.toUpperCase()] = { make, mrp };
-                                }
-                            }
-                        }
-                    } else {
-                        // Parse with detected indices
-                        for (let i = 1; i < lines.length; i++) {
-                            if (!lines[i].trim()) continue;
-                            const cols = lines[i].split(',').map(c => c.trim());
-                            if (cols.length > Math.max(partNoIndex, makeIndex, mrpIndex)) {
-                                const partNo = cols[partNoIndex];
-                                const make = cols[makeIndex];
-                                const mrp = parseFloat(cols[mrpIndex]) || 0;
-                                if (partNo) {
-                                    priceData[partNo.toUpperCase()] = { make, mrp };
-                                }
+                        if (cols.length >= 12) {
+                            const material = cols[0];
+                            const mrpPrice = parseFloat(cols[3]) || 0;
+                            const make = cols[11] || '';
+                            
+                            if (material && material !== '') {
+                                priceData[material.toUpperCase()] = {
+                                    make: make,
+                                    mrp: mrpPrice
+                                };
+                                parsedCount++;
                             }
                         }
                     }
                     
                     priceDataLoaded = true;
-                    console.log('Price data loaded:', Object.keys(priceData).length, 'items');
+                    console.log('✅ Price data loaded:', parsedCount, 'items from CSV');
                     resolve(priceData);
                 })
                 .catch(err => {
-                    console.warn('Could not load prices.csv:', err.message);
-                    // Try alternative URL
-                    fetch('/prices.csv')
-                        .then(response => response.text())
-                        .then(csvText => {
-                            // Parse with same logic
-                            const lines = csvText.split('\n');
-                            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-                            const partIdx = headers.findIndex(h => h.includes('part') || h.includes('sku') || h.includes('code'));
-                            const makeIdx = headers.findIndex(h => h.includes('make') || h.includes('brand'));
-                            const mrpIdx = headers.findIndex(h => h.includes('mrp') || h.includes('price'));
-                            
-                            for (let i = 1; i < lines.length; i++) {
-                                if (!lines[i].trim()) continue;
-                                const cols = lines[i].split(',').map(c => c.trim());
-                                if (cols.length > Math.max(partIdx, makeIdx, mrpIdx) && partIdx !== -1) {
-                                    const partNo = cols[partIdx];
-                                    const make = cols[makeIdx] || '';
-                                    const mrp = parseFloat(cols[mrpIdx]) || 0;
-                                    if (partNo) {
-                                        priceData[partNo.toUpperCase()] = { make, mrp };
-                                    }
-                                }
-                            }
-                            priceDataLoaded = true;
-                            resolve(priceData);
-                        })
-                        .catch(() => {
-                            console.warn('Using default price data');
-                            resolve(priceData);
-                        });
+                    console.warn('⚠️ Could not load prices.csv:', err.message);
+                    resolve(priceData);
                 });
         });
     }
 
-    // ========== GET PRICE FROM CSV ==========
     function getPriceFromCSV(partNo) {
         if (!partNo) return null;
         const upperPart = partNo.toUpperCase().trim();
+        
         if (priceData[upperPart]) {
             return priceData[upperPart];
         }
-        // Try partial match
-        for (let key in priceData) {
-            if (key.includes(upperPart) || upperPart.includes(key)) {
-                return priceData[key];
-            }
+        
+        const cleanPart = upperPart.replace(/\s/g, '');
+        if (priceData[cleanPart]) {
+            return priceData[cleanPart];
         }
+        
         return null;
     }
 
-    // ========== CHECK IF M&M MAKE ==========
     function isMMMake(partNo) {
         const data = getPriceFromCSV(partNo);
         if (!data) return false;
         const make = (data.make || '').toUpperCase().trim();
-        return make === 'M&M' || make === 'M&M' || make === 'MM' || make.includes('M&M');
+        return make === 'M&M' || 
+               make === 'M & M' || 
+               make === 'MM' || 
+               make.includes('M&M') ||
+               make.includes('M & M');
     }
 
-    // ========== GET MRP FOR M&M PART ==========
     function getMRPForMM(partNo) {
         const data = getPriceFromCSV(partNo);
         if (!data) return null;
@@ -408,7 +348,7 @@
         return null;
     }
 
-    // ========== INVOICE NUMBER LOGIC ==========
+    // ========== INVOICE NUMBER LOGIC - FIXED ==========
     function getFinancialYear() {
         const now = new Date();
         const year = now.getFullYear();
@@ -417,14 +357,17 @@
         else return `${year-1}-${year.toString().slice(-2)}`;
     }
 
+    // Cash bill prefix
     function getCashBillPrefix() {
         return `ASS/26-27/CH/`;
     }
 
+    // Get max cash bill number from existing invoices
     function getMaxCashBillNumber() {
         const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
         const prefix = getCashBillPrefix();
         let maxNumber = 0;
+        
         allInvoices.forEach(inv => {
             if (inv.invoiceType === 'cash' && inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
                 const match = inv.invoiceNo.match(/(\d+)$/);
@@ -437,33 +380,44 @@
         return maxNumber;
     }
 
+    // Get next cash bill number - properly checks existing
     function getNextCashBillNumber() {
         const maxNum = getMaxCashBillNumber();
         const prefix = getCashBillPrefix();
         let nextNumber = maxNum + 1;
-        if (nextNumber < 4) nextNumber = 4;
+        // Only start from 004 if NO existing cash bills exist
+        if (maxNum === 0) {
+            nextNumber = 4;
+        }
         return prefix + nextNumber.toString().padStart(3, '0');
     }
 
+    // Credit bills - ORIGINAL FORMAT - NO CHANGES
+    function getNextCreditBillNumber() {
+        const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
+        const finYear = getFinancialYear();
+        let prefix = `ASS/${finYear}/`;
+        let maxNumber = 0;
+        
+        allInvoices.forEach(inv => {
+            if (inv.invoiceType === 'credit' && inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
+                const match = inv.invoiceNo.match(/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > maxNumber) maxNumber = num;
+                }
+            }
+        });
+        const nextNumber = maxNumber + 1;
+        return prefix + nextNumber.toString().padStart(4, '0');
+    }
+
+    // Main invoice number function
     function getNextInvoiceNumber(type) {
         if (type === 'cash') {
             return getNextCashBillNumber();
         } else {
-            const allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
-            const finYear = getFinancialYear();
-            let prefix = `ASS/${finYear}/`;
-            let maxNumber = 0;
-            allInvoices.forEach(inv => {
-                if (inv.invoiceType === 'credit' && inv.invoiceNo && inv.invoiceNo.startsWith(prefix)) {
-                    const match = inv.invoiceNo.match(/(\d+)$/);
-                    if (match) {
-                        const num = parseInt(match[1]);
-                        if (num > maxNumber) maxNumber = num;
-                    }
-                }
-            });
-            const nextNumber = maxNumber + 1;
-            return prefix + nextNumber.toString().padStart(4, '0');
+            return getNextCreditBillNumber();
         }
     }
 
@@ -624,7 +578,6 @@
         document.getElementById('grandTotal').innerText = (grandTotal || 0).toFixed(2);
     }
 
-    // ========== UPDATED RENDER FUNCTION WITH M&M PRICE CHECK ==========
     function renderItemsAndTaxSummary() {
         const isLocal = isLocalGst();
         const thead = document.getElementById('itemsTableHead');
@@ -642,11 +595,10 @@
         cart.forEach((item, idx) => {
             const discount = item.discount || 0;
             
-            // Check if part is M&M and get MRP
             let price = item.price;
             let priceSource = item.priceSource || '';
             
-            if (item.part && item.part.trim() !== '') {
+            if (item.part && item.part.trim() !== '' && priceSource !== 'manual') {
                 const mrp = getMRPForMM(item.part);
                 if (mrp !== null && mrp > 0) {
                     price = mrp;
@@ -654,7 +606,6 @@
                 }
             }
             
-            // Update item price if changed
             if (price !== item.price || priceSource !== item.priceSource) {
                 item.price = price;
                 item.priceSource = priceSource;
@@ -670,7 +621,6 @@
             }
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             
-            // Show price source badge
             const priceBadge = priceSource === 'CSV-MRP' ? ' <span class="price-source-badge">M&M-MRP</span>' : '';
             
             let row = `<tr>
@@ -716,13 +666,10 @@
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
     }
 
-    // ========== UPDATE FUNCTIONS ==========
     function updatePart(idx, value) { 
         if (cart[idx]) { 
             cart[idx].part = value; 
-            // Reset price source when part changes
             cart[idx].priceSource = '';
-            // Check if new part is M&M
             if (value && value.trim() !== '') {
                 const mrp = getMRPForMM(value);
                 if (mrp !== null && mrp > 0) {
@@ -740,7 +687,6 @@
     function updatePriceByIndex(idx, value) { 
         if (cart[idx]) { 
             cart[idx].price = parseFloat(value) || 0; 
-            // User manually changed price, clear source
             cart[idx].priceSource = 'manual';
             renderItemsAndTaxSummary(); 
         } 
@@ -773,7 +719,6 @@
         return true;
     }
 
-    // ========== RESET BUTTON FUNCTION ==========
     function resetSaveButton() {
         const saveBtn = document.getElementById('saveInvoiceBtn');
         saveBtn.disabled = false;
@@ -782,7 +727,6 @@
         isSaving = false;
     }
 
-    // ========== SAVE INVOICE FUNCTION ==========
     function saveInvoice() {
         const saveBtn = document.getElementById('saveInvoiceBtn');
         
@@ -796,9 +740,7 @@
         isSaving = true;
         
         try {
-            // First, ensure price data is loaded
             loadPriceData().then(() => {
-                // Now process the cart with updated prices
                 const validCart = cart.filter(item => item.part && item.part.trim() !== '');
                 if (validCart.length === 0) {
                     alert('Please add at least one item with a Part No.');
@@ -806,9 +748,8 @@
                     return;
                 }
                 
-                // Update prices from CSV for M&M items
                 validCart.forEach(item => {
-                    if (item.part && item.part.trim() !== '') {
+                    if (item.part && item.part.trim() !== '' && item.priceSource !== 'manual') {
                         const mrp = getMRPForMM(item.part);
                         if (mrp !== null && mrp > 0) {
                             item.price = mrp;
@@ -821,7 +762,6 @@
                 let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
                 let proposedNo = getNextInvoiceNumber(type);
                 
-                // Duplicate check and fix
                 const alreadyExists = allInvoices.some(inv => inv.invoiceNo === proposedNo);
                 if (alreadyExists) {
                     if (type === 'cash') {
@@ -850,12 +790,10 @@
                     }
                 }
                 
-                // Product master update
                 for (let item of validCart) {
                     ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
                 }
                 
-                // Buyer details
                 const buyer = {
                     name: document.getElementById('buyerName').value.trim(),
                     email: document.getElementById('buyerEmail').value.trim(),
@@ -871,7 +809,6 @@
                     return;
                 }
                 
-                // Customer save
                 let customersList = JSON.parse(localStorage.getItem('customers') || '[]');
                 let existingCustomer = customersList.find(c => c.email === buyer.email);
                 if (!existingCustomer && buyer.email) {
@@ -894,7 +831,6 @@
                     localStorage.setItem('customers', JSON.stringify(customersList));
                 }
                 
-                // Totals
                 const taxableTotals = calculateTaxableTotals();
                 const gstApplicable = getGSTApplicableTotal();
                 const packing = getPackingCharge();
@@ -902,11 +838,9 @@
                 const roundOff = roundedGSTApplicable - gstApplicable;
                 const grandTotal = roundedGSTApplicable + packing;
                 
-                // Date format
                 const dateParts = document.getElementById('invoiceDate').innerText.split('/');
                 const invoiceDateFormatted = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
                 
-                // Create invoice
                 const invoice = {
                     id: proposedNo,
                     date: invoiceDateFormatted,
@@ -951,7 +885,6 @@
                     }))
                 };
                 
-                // Final storage check
                 allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
                 if (allInvoices.some(inv => inv.invoiceNo === proposedNo)) {
                     alert('Duplicate invoice prevented.');
@@ -959,18 +892,15 @@
                     return;
                 }
                 
-                // Save main invoice
                 allInvoices.push(invoice);
                 localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
                 
-                // Save sales invoice
                 let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
                 if (!salesInvoices.some(inv => inv.invoiceNo === proposedNo)) {
                     salesInvoices.push(invoice);
                     localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
                 }
                 
-                // Customer ledger update
                 const custIndex = customersList.findIndex(c => c.email === buyer.email);
                 if (custIndex !== -1) {
                     customersList[custIndex].outstanding = (customersList[custIndex].outstanding || 0) + invoice.grandTotal;
@@ -980,24 +910,19 @@
                 
                 invoiceAlreadySaved = true;
                 localStorage.setItem('invoiceCart', '[]');
-                alert(`Invoice ${proposedNo} saved successfully!`);
+                alert(`✅ Invoice ${proposedNo} saved successfully!`);
                 saveBtn.textContent = "Saved Successfully";
                 setTimeout(() => window.close(), 1000);
             }).catch(() => {
-                // If CSV fails to load, still save with current prices
-                alert('Warning: Could not load price data. Using manual prices.');
-                // Continue with save using existing cart prices
-                // (re-run save logic without price check)
-                // For simplicity, we'll just show the warning and proceed
+                alert('⚠️ Warning: Could not load price data. Using manual prices.');
                 resetSaveButton();
             });
         } catch (err) {
-            alert("Error: " + err.message);
+            alert("❌ Error: " + err.message);
             resetSaveButton();
         }
     }
 
-    // ========== PRINT AND PDF FUNCTIONS ==========
     function printInvoice() {
         if (!invoiceAlreadySaved && !confirm("Invoice not saved yet. Print anyway? Data won't be stored.")) return;
         const inputs = document.querySelectorAll('#invoiceContainer input, #invoiceContainer textarea, #invoiceContainer select');
@@ -1061,7 +986,6 @@
         });
     }
 
-    // ========== CUSTOMER DROPDOWN (ADMIN) ==========
     function populateCustomerSelect() {
         const select = document.getElementById('quickCustomerSelect');
         customers = JSON.parse(localStorage.getItem('customers') || '[]');
@@ -1092,13 +1016,12 @@
     }
 
     // ========== INITIALISATION ==========
-    // Load price data first
     loadPriceData().then(() => {
-        // Now render with price data
         renderItemsAndTaxSummary();
+        console.log('✅ System ready with CSV price data');
     }).catch(() => {
-        // Render without price data
         renderItemsAndTaxSummary();
+        console.log('⚠️ System running without CSV price data');
     });
 
     if (currentUser) {
@@ -1133,7 +1056,6 @@
     updateGstDisplay();
     calculatePackingCharges();
 
-    // Date picker
     (function addDateEdit() {
         const editBtn = document.getElementById('editDateBtn');
         if (!editBtn) return;
