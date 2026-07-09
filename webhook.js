@@ -1,5 +1,5 @@
 // ============================================================
-// 📱 ASSIST WhatsApp Webhook (Multi-API Fallback)
+// 📱 ASSIST WhatsApp Webhook (Complete Working Version)
 // ============================================================
 
 const express = require("express");
@@ -11,7 +11,7 @@ const app = express();
 app.use(express.json());
 
 // ============================================================
-// CONFIG - ALL API KEYS
+// CONFIG - ALL API KEYS (Environment Variables)
 // ============================================================
 
 const CONFIG = {
@@ -36,10 +36,11 @@ console.log("🧠 ChatGPT Key:", CONFIG.chatgptKey ? "✅ Set" : "❌ Missing");
 console.log("====================================");
 
 // ============================================================
-// PRODUCT DATABASE
+// PRODUCT DATABASE (with Map for O(1) lookups)
 // ============================================================
 
 let allProducts = [];
+let productMap = new Map(); // For O(1) lookups
 
 function loadProducts() {
     try {
@@ -53,7 +54,7 @@ function loadProducts() {
                 if (!lines[i].trim()) continue;
                 const cols = lines[i].split(',').map(c => c.trim());
                 
-                allProducts.push({
+                const product = {
                     part: cols[0] || '',
                     desc: cols[1] || 'Auto Spare Part',
                     price: parseFloat(cols[6]) || 0,
@@ -63,7 +64,9 @@ function loadProducts() {
                     model: cols[12] || '',
                     gst: 18,
                     image: cols[4] || ''
-                });
+                };
+                allProducts.push(product);
+                productMap.set(product.part.toUpperCase(), product);
             }
             
             console.log(`✅ Loaded ${allProducts.length} products from prices.csv`);
@@ -78,12 +81,16 @@ function loadProducts() {
 }
 
 function loadFallbackProducts() {
-    allProducts = [
+    const fallback = [
         { part: "0108FAW00360N", desc: "CLUTCH PRESSURE PLATE", price: 2336.88, stock: 18, brand: "M&M", gst: 18 },
         { part: "0108FAW00370N", desc: "CLUTCH PLATE", price: 2415.25, stock: 12, brand: "M&M", gst: 18 },
         { part: "0108FAW00400N", desc: "RELEASE BEARING", price: 1059.75, stock: 20, brand: "M&M", gst: 18 },
         { part: "0108FAW00410N", desc: "CLUTCH COVER", price: 2711.86, stock: 8, brand: "M&M", gst: 18 }
     ];
+    fallback.forEach(p => {
+        allProducts.push(p);
+        productMap.set(p.part.toUpperCase(), p);
+    });
     console.log(`✅ Loaded ${allProducts.length} fallback products`);
 }
 
@@ -114,11 +121,121 @@ function aiSearch(query) {
         return (b.stock || 0) - (a.stock || 0);
     });
     
-    return results.slice(0, 10);
+    return results.slice(0, 10); // Limit to 10 results
 }
 
 function aiPriceWithGST(price, gst = 18) {
     return price + (price * gst / 100);
+}
+
+// ============================================================
+// 🖼️ COMPLETE IMAGE ANALYSIS WITH GEMINI
+// ============================================================
+
+async function processPhotoWithGemini(imageBuffer, caption, from) {
+    console.log(`🖼️ Processing photo from ${from}...`);
+    
+    // First try to extract part number from caption
+    if (caption) {
+        const partMatch = caption.match(/\b[A-Z0-9\-]{5,15}\b/i);
+        if (partMatch) {
+            const product = productMap.get(partMatch[0].toUpperCase());
+            if (product) {
+                const priceGST = aiPriceWithGST(product.price, product.gst || 18);
+                return `📸 *Photo Received!*\n\n🔍 Found part in caption: ${product.part}\n\n` +
+                       `📝 ${product.desc}\n` +
+                       `🏷️ Brand: ${product.brand}\n` +
+                       `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n` +
+                       `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}\n\n` +
+                       `💡 Reply "Add ${product.part}" to add to cart\n\n` +
+                       `📞 *Call:* ${CONFIG.businessPhone}`;
+            }
+        }
+    }
+    
+    // If no caption, try Gemini image analysis
+    const geminiKey = CONFIG.geminiKey;
+    if (!geminiKey) {
+        return `📸 *Photo Received!*\n\n💡 Please add the part number in the caption.\n📝 Example: "0108FAW00360N"\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+    }
+    
+    try {
+        const base64Image = imageBuffer.toString('base64');
+        
+        // Detect MIME type
+        const hex = imageBuffer.toString('hex', 0, 4);
+        let mimeType = 'image/jpeg';
+        if (hex.startsWith('89504e47')) mimeType = 'image/png';
+        else if (hex.startsWith('47494638')) mimeType = 'image/gif';
+        else if (hex.startsWith('52494646')) mimeType = 'image/webp';
+        
+        console.log(`📸 Image: ${imageBuffer.length} bytes, ${mimeType}`);
+        
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [
+                        {
+                            text: `You are an auto spares assistant. Customer sent an image. 
+                            Identify any auto parts and part numbers visible. 
+                            If you see text, read it. Keep response short and useful.
+                            If you find part numbers, list them clearly.`
+                        },
+                        {
+                            inline_data: {
+                                mime_type: mimeType,
+                                data: base64Image
+                            }
+                        }
+                    ]
+                }]
+            })
+        });
+        
+        const result = await response.json();
+        console.log(`📸 Gemini Status: ${response.status}`);
+        
+        if (!response.ok) {
+            console.error('❌ Gemini Error:', JSON.stringify(result, null, 2));
+            return `📸 *Photo Received!*\n\n💡 Please add the part number in the caption.\n📝 Example: "0108FAW00360N"\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+        }
+        
+        const analysis = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        console.log('✅ Gemini analysis complete');
+        
+        if (analysis) {
+            // Extract part numbers from analysis
+            const partMatches = analysis.match(/\b[A-Z0-9\-]{5,15}\b/g) || [];
+            let reply = `📸 *Photo Analysis*\n\n${analysis}\n\n`;
+            
+            if (partMatches.length > 0) {
+                reply += `🔍 *Parts Found:*\n`;
+                for (const part of partMatches) {
+                    const product = productMap.get(part.toUpperCase());
+                    if (product) {
+                        const priceGST = aiPriceWithGST(product.price, product.gst || 18);
+                        reply += `✅ ${part} - ${product.desc} - ₹${priceGST.toFixed(2)}\n`;
+                    } else {
+                        reply += `⚠️ ${part} - Not found in inventory\n`;
+                    }
+                }
+                reply += `\n💡 Reply "Add ${partMatches[0]}" to add to cart\n`;
+            }
+            
+            reply += `\n📞 *Call:* ${CONFIG.businessPhone}`;
+            return reply;
+        }
+        
+        return `📸 *Photo Received!*\n\n💡 Please add the part number in the caption.\n📝 Example: "0108FAW00360N"\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+        
+    } catch (error) {
+        console.error('❌ Image analysis error:', error);
+        return `📸 *Photo Received!*\n\n💡 Please add the part number in the caption.\n📝 Example: "0108FAW00360N"\n\n📞 *Call:* ${CONFIG.businessPhone}`;
+    }
 }
 
 // ============================================================
@@ -221,7 +338,7 @@ async function callDeepSeekAPI(message) {
             'Authorization': `Bearer ${CONFIG.deepseekKey}`
         },
         body: JSON.stringify({
-            model: 'deepseek-v4-flash',
+            model: 'deepseek-chat', // Fixed model name
             messages: [
                 {
                     role: 'system',
@@ -397,8 +514,12 @@ async function processMultiProductEnquiryEnhanced(message, from) {
     let subtotal = 0;
     let notFoundParts = [];
     
-    for (const item of items) {
-        const product = allProducts.find(p => p.part.toUpperCase() === item.part.toUpperCase());
+    // Limit to prevent WhatsApp message overflow
+    const MAX_ITEMS = 10;
+    const displayItems = items.slice(0, MAX_ITEMS);
+    
+    for (const item of displayItems) {
+        const product = productMap.get(item.part.toUpperCase());
         if (product) {
             const priceGST = product.price * 1.18;
             const total = priceGST * item.qty;
@@ -458,6 +579,10 @@ async function processMultiProductEnquiryEnhanced(message, from) {
             }
             reply += `\n`;
         }
+    }
+    
+    if (items.length > MAX_ITEMS) {
+        reply += `⚠️ Showing ${MAX_ITEMS} of ${items.length} items\n\n`;
     }
     
     reply += `━━━━━━━━━━━━━━━━━━━━\n`;
@@ -583,28 +708,7 @@ app.post("/webhook", async (req, res) => {
                     const imageBuffer = await downloadMedia(mediaUrl);
                     console.log(`📸 Image size: ${imageBuffer.length} bytes`);
                     
-                    // Try Gemini first, then fallback to caption
-                    let reply = await processPhotoWithGemini(imageBuffer, caption, from);
-                    
-                    // If Gemini fails and caption has part number, use it
-                    if (reply.includes('Could not analyze image') && caption) {
-                        const partMatch = caption.match(/\b[A-Z0-9\-]{5,15}\b/i);
-                        if (partMatch) {
-                            const results = aiSearch(partMatch[0]);
-                            if (results.length > 0) {
-                                let productReply = `📸 *Photo Received!*\n\n🔍 Found part in your caption: ${partMatch[0]}\n\n`;
-                                results.forEach((p, index) => {
-                                    const priceGST = aiPriceWithGST(p.price, p.gst || 18);
-                                    productReply += `${index + 1}. **${p.part}**\n`;
-                                    productReply += `📝 ${p.desc || 'N/A'}\n`;
-                                    productReply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
-                                    productReply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
-                                });
-                                productReply += `📞 *Call:* ${CONFIG.businessPhone}`;
-                                reply = productReply;
-                            }
-                        }
-                    }
+                    const reply = await processPhotoWithGemini(imageBuffer, caption, from);
                     
                     console.log("🤖 Reply:", reply);
                     await sendWhatsAppMessage(from, reply);
@@ -653,7 +757,7 @@ async function processMessage(msg, from = null) {
     const msgLower = msg.toLowerCase().trim();
     
     // ============================================================
-    // GEMINI FALLBACK FOR UNKNOWN FORMATS
+    // AI FALLBACK FOR UNKNOWN FORMATS
     // ============================================================
     const knownPatterns = [
         /^hi$|^hello$|^help$|^start$/i,
@@ -694,7 +798,7 @@ Send brand like "TVS" or "M&M"
 "0108FAW00360N x2, 0108FAW00370N x3"
 
 📸 *Upload Photo:*
-Send photo of any part
+Send photo of any part (add part number in caption)
 
 🎤 *Voice Message:*
 Send voice note with your query
@@ -768,7 +872,7 @@ How can I help you today? 🚗`;
         reply += `━━━━━━━━━━━━━━━━━━━━\n`;
         
         for (const item of cart.items) {
-            const product = allProducts.find(p => p.part.toUpperCase() === item.part.toUpperCase());
+            const product = productMap.get(item.part.toUpperCase());
             const priceGST = product ? product.price * 1.18 : 0;
             const total = priceGST * item.qty;
             reply += `📦 ${item.part} x${item.qty}\n`;
@@ -832,37 +936,36 @@ How can I help you today? 🚗`;
         const possiblePart = words.find(w => w.match(/^[A-Z0-9\-]{5,15}$/i));
         
         if (possiblePart) {
-            const results = aiSearch(possiblePart);
-            if (results.length > 0) {
-                const p = results[0];
-                const priceGST = aiPriceWithGST(p.price, p.gst || 18);
+            const product = productMap.get(possiblePart.toUpperCase());
+            if (product) {
+                const priceGST = aiPriceWithGST(product.price, product.gst || 18);
                 
                 let reply = '';
                 if (msgLower.includes("price")) {
-                    reply = `💰 *Price: ${p.part}*\n\n`;
-                    reply += `📝 ${p.desc || 'N/A'}\n`;
-                    reply += `🏷️ Brand: ${p.brand || 'N/A'}\n`;
-                    reply += `💳 Base Price: ₹${p.price || 0}\n`;
-                    reply += `🧾 GST: ${p.gst || 18}%\n`;
+                    reply = `💰 *Price: ${product.part}*\n\n`;
+                    reply += `📝 ${product.desc || 'N/A'}\n`;
+                    reply += `🏷️ Brand: ${product.brand || 'N/A'}\n`;
+                    reply += `💳 Base Price: ₹${product.price || 0}\n`;
+                    reply += `🧾 GST: ${product.gst || 18}%\n`;
                     reply += `💰 Total: ₹${priceGST.toFixed(2)} (incl. GST)\n\n`;
-                    reply += `📦 Stock: ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
+                    reply += `📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}\n\n`;
                     reply += `🛒 Order: https://autosparessolution.com`;
                 } else if (msgLower.includes("stock")) {
-                    reply = `📦 *Stock: ${p.part}*\n\n`;
-                    reply += `📝 ${p.desc || 'N/A'}\n`;
-                    reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs available` : '❌ Out of Stock'}\n`;
-                    if (p.stock > 0) {
+                    reply = `📦 *Stock: ${product.part}*\n\n`;
+                    reply += `📝 ${product.desc || 'N/A'}\n`;
+                    reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}\n`;
+                    if (product.stock > 0) {
                         reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n\n`;
                         reply += `🛒 Order: https://autosparessolution.com`;
                     } else {
                         reply += `\n🔔 We'll notify you when back in stock!`;
                     }
                 } else if (msgLower.includes("order")) {
-                    reply = `🛒 *Order: ${p.part}*\n\n`;
-                    reply += `📝 ${p.desc || 'N/A'}\n`;
-                    if (p.stock > 0) {
+                    reply = `🛒 *Order: ${product.part}*\n\n`;
+                    reply += `📝 ${product.desc || 'N/A'}\n`;
+                    if (product.stock > 0) {
                         reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
-                        reply += `📦 ✅ ${p.stock} pcs available\n\n`;
+                        reply += `📦 ✅ ${product.stock} pcs available\n\n`;
                         reply += `✅ Confirm order: https://autosparessolution.com\n`;
                         reply += `📞 Call: ${CONFIG.businessPhone}`;
                     } else {
@@ -932,6 +1035,11 @@ We'll help you find the right part! 🚗`;
 // ============================================================
 
 async function sendWhatsAppMessage(to, message) {
+    // Truncate message if too long (WhatsApp limit ~4096 characters)
+    if (message.length > 4000) {
+        message = message.substring(0, 3950) + "\n\n... (truncated)";
+    }
+    
     const url = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
     
     try {
@@ -974,3 +1082,5 @@ console.log('📱 Multi-product support active');
 console.log('🖼️ Photo analysis active');
 console.log('🎤 Voice message support active');
 console.log('🧠 Multi-API fallback active (Gemini → DeepSeek → ChatGPT)');
+console.log('📦 Product Map: O(1) lookups enabled');
+console.log('📏 WhatsApp message length limit: 4000 chars');
