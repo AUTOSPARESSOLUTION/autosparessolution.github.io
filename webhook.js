@@ -611,7 +611,7 @@ function extractItemsFromTextUltimate(text) {
 }
 
 // ============================================================
-// 🖼️ OCR & ORDER EXTRACTION - FIXED
+// 🖼️ OCR & ORDER EXTRACTION
 // ============================================================
 
 async function extractOrderFromImage(imageBuffer, mimeType) {
@@ -1329,7 +1329,7 @@ app.get("/webhook", (req, res) => {
 });
 
 // ============================================================
-// 📩 RECEIVE MESSAGE - FIXED IMAGE HANDLER
+// 📩 RECEIVE MESSAGE - COMPLETE FIXED
 // ============================================================
 
 app.post("/webhook", async (req, res) => {
@@ -1347,7 +1347,7 @@ app.post("/webhook", async (req, res) => {
             await getOrCreateCustomer(from);
             
             // ============================================================
-            // 🖼️ IMAGE MESSAGE - FIXED
+            // 🖼️ IMAGE MESSAGE
             // ============================================================
             if (type === 'image') {
                 const mediaId = message.image.id;
@@ -1364,14 +1364,48 @@ app.post("/webhook", async (req, res) => {
                     const imageBuffer = await downloadMedia(mediaUrl);
                     logger.info(`📸 Image size: ${imageBuffer.length} bytes`);
                     
-                    // Run OCR
-                    const ocrResult = await extractOrderFromImage(imageBuffer, mimeType);
-                    logger.info(`📝 OCR Result: ${JSON.stringify(ocrResult)}`);
+                    let extractedItems = [];
+                    let source = 'none';
                     
-                    if (ocrResult.items && ocrResult.items.length > 0) {
-                        // Build order text from OCR results
-                        const orderText = ocrResult.items.map(i => `${i.part} ${i.qty}`).join('\n');
-                        logger.info(`📝 Order text: ${orderText}`);
+                    // STEP 1: Try OCR on the image
+                    try {
+                        const ocrResult = await extractOrderFromImage(imageBuffer, mimeType);
+                        if (ocrResult.items && ocrResult.items.length > 0) {
+                            extractedItems = ocrResult.items;
+                            source = 'ocr';
+                            logger.info(`✅ OCR extracted ${extractedItems.length} items: ${JSON.stringify(extractedItems)}`);
+                        }
+                    } catch (ocrError) {
+                        logger.error(`❌ OCR error: ${ocrError.message}`);
+                    }
+                    
+                    // STEP 2: If OCR found nothing, try the caption
+                    if (extractedItems.length === 0 && caption && caption.trim().length > 0) {
+                        const captionItems = extractItemsFromTextUltimate(caption);
+                        if (captionItems && captionItems.length > 0) {
+                            extractedItems = captionItems;
+                            source = 'caption';
+                            logger.info(`✅ Caption extracted ${extractedItems.length} items: ${JSON.stringify(extractedItems)}`);
+                        }
+                    }
+                    
+                    // STEP 3: If still nothing, try manual parsing
+                    if (extractedItems.length === 0 && caption && caption.trim().length > 0) {
+                        const manualMatches = caption.match(/\b([A-Z0-9А-Я\-]{5,30})\b/gi);
+                        if (manualMatches && manualMatches.length > 0) {
+                            extractedItems = manualMatches.map(p => ({
+                                part: p.toUpperCase(),
+                                qty: 1
+                            }));
+                            source = 'manual';
+                            logger.info(`✅ Manual extracted ${extractedItems.length} items: ${JSON.stringify(extractedItems)}`);
+                        }
+                    }
+                    
+                    // STEP 4: Process the extracted items
+                    if (extractedItems.length > 0) {
+                        const orderText = extractedItems.map(i => `${i.part} ${i.qty || 1}`).join('\n');
+                        logger.info(`📝 Order text (source: ${source}): ${orderText}`);
                         
                         const reply = await processOrder(orderText, from);
                         if (reply) {
@@ -1381,28 +1415,16 @@ app.post("/webhook", async (req, res) => {
                         }
                     }
                     
-                    // If OCR found nothing, check caption
-                    if (caption) {
-                        const captionItems = extractItemsFromTextUltimate(caption);
-                        if (captionItems && captionItems.length > 0) {
-                            const orderText = captionItems.map(i => `${i.part} ${i.qty}`).join('\n');
-                            const reply = await processOrder(orderText, from);
-                            if (reply) {
-                                await sendWhatsAppMessage(from, reply);
-                                res.sendStatus(200);
-                                return;
-                            }
-                        }
-                    }
-                    
-                    // Final fallback
-                    await sendWhatsAppMessage(from, `📸 *Photo Received!*\n\n` +
-                        `I couldn't read any part numbers from this image.\n\n` +
+                    // STEP 5: Final fallback
+                    await sendWhatsAppMessage(from, 
+                        `📸 *Photo Received!*\n\n` +
+                        `I couldn't read any part numbers from the image${caption ? ' or caption' : ''}.\n\n` +
                         `💡 Please:\n` +
-                        `1️⃣ Take a clearer photo\n` +
-                        `2️⃣ Add part numbers in the caption\n` +
-                        `📝 Example: "0108FAW00360N 2"\n\n` +
-                        `📞 Call: ${CONFIG.businessPhone}`);
+                        `1️⃣ Send the part number directly\n` +
+                        `2️⃣ Or add it in the caption\n` +
+                        `📝 Example: "0108FAW00360N"\n\n` +
+                        `📞 Call: ${CONFIG.businessPhone}`
+                    );
                     
                 } catch (error) {
                     logger.error(`❌ Image error: ${error.message}`);
