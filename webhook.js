@@ -1,5 +1,5 @@
 // ============================================================
-// 📱 ASSIST WhatsApp Webhook (Complete - Multi-API)
+// 📱 ASSIST WhatsApp Webhook (Multi-API Fallback)
 // ============================================================
 
 const express = require("express");
@@ -27,15 +27,9 @@ const CONFIG = {
     chatgptKey: process.env.CHATGPT_API_KEY
 };
 
-// Check if credentials are set
-if (!CONFIG.accessToken) {
-    console.error('❌ CRITICAL: Meta Access Token not set in environment variables!');
-}
-
 console.log("====================================");
 console.log("🚀 ASSIST WhatsApp Started");
 console.log("📞 Business Phone:", CONFIG.businessPhone);
-console.log("🔑 Meta Token:", CONFIG.accessToken ? "✅ Set" : "❌ Missing");
 console.log("🧠 Gemini Key:", CONFIG.geminiKey ? "✅ Set" : "❌ Missing");
 console.log("🧠 DeepSeek Key:", CONFIG.deepseekKey ? "✅ Set" : "❌ Missing");
 console.log("🧠 ChatGPT Key:", CONFIG.chatgptKey ? "✅ Set" : "❌ Missing");
@@ -128,22 +122,22 @@ function aiPriceWithGST(price, gst = 18) {
 }
 
 // ============================================================
-// 🧠 MULTI-API AI ENGINE
+// 🧠 MULTI-API AI ENGINE (Gemini → DeepSeek → ChatGPT)
 // ============================================================
 
-async function getAIResponse(message) {
+async function getAIResponse(message, from = null) {
     console.log(`🧠 Getting AI response for: "${message}"`);
     
     // ============================================================
-    // 1. TRY GEMINI API
+    // 1. FIRST TRY: GEMINI API
     // ============================================================
     if (CONFIG.geminiKey) {
         try {
             console.log('🔄 Trying Gemini API...');
-            const response = await callGeminiAPI(message);
-            if (response) {
+            const geminiResponse = await callGeminiAPI(message);
+            if (geminiResponse) {
                 console.log('✅ Gemini response received');
-                return response;
+                return geminiResponse;
             }
         } catch (error) {
             console.log('❌ Gemini failed:', error.message);
@@ -151,15 +145,15 @@ async function getAIResponse(message) {
     }
     
     // ============================================================
-    // 2. TRY DEEPSEEK API
+    // 2. SECOND TRY: DEEPSEEK API
     // ============================================================
     if (CONFIG.deepseekKey) {
         try {
             console.log('🔄 Trying DeepSeek API...');
-            const response = await callDeepSeekAPI(message);
-            if (response) {
+            const deepseekResponse = await callDeepSeekAPI(message);
+            if (deepseekResponse) {
                 console.log('✅ DeepSeek response received');
-                return response;
+                return deepseekResponse;
             }
         } catch (error) {
             console.log('❌ DeepSeek failed:', error.message);
@@ -167,15 +161,15 @@ async function getAIResponse(message) {
     }
     
     // ============================================================
-    // 3. TRY CHATGPT API
+    // 3. THIRD TRY: CHATGPT API
     // ============================================================
     if (CONFIG.chatgptKey) {
         try {
             console.log('🔄 Trying ChatGPT API...');
-            const response = await callChatGPTAPI(message);
-            if (response) {
+            const chatgptResponse = await callChatGPTAPI(message);
+            if (chatgptResponse) {
                 console.log('✅ ChatGPT response received');
-                return response;
+                return chatgptResponse;
             }
         } catch (error) {
             console.log('❌ ChatGPT failed:', error.message);
@@ -183,9 +177,9 @@ async function getAIResponse(message) {
     }
     
     // ============================================================
-    // 4. FALLBACK
+    // 4. FINAL FALLBACK
     // ============================================================
-    console.log('⚠️ All APIs failed.');
+    console.log('⚠️ All APIs failed. Using fallback response.');
     return null;
 }
 
@@ -286,140 +280,6 @@ async function callChatGPTAPI(message) {
     }
     
     return data.choices?.[0]?.message?.content || null;
-}
-
-// ============================================================
-// IMAGE ANALYSIS WITH GEMINI
-// ============================================================
-
-function detectImageMimeType(buffer) {
-    const hex = buffer.toString('hex', 0, 4);
-    
-    if (hex.startsWith('ffd8')) return 'image/jpeg';
-    if (hex.startsWith('89504e47')) return 'image/png';
-    if (hex.startsWith('47494638')) return 'image/gif';
-    if (hex.startsWith('52494646')) return 'image/webp';
-    if (hex.startsWith('49492a00') || hex.startsWith('4d4d002a')) return 'image/tiff';
-    
-    return 'image/jpeg';
-}
-
-async function analyzeImageWithGemini(imageBuffer, caption = '') {
-    const geminiKey = CONFIG.geminiKey;
-    
-    if (!geminiKey) {
-        console.error('❌ Gemini key not configured');
-        return null;
-    }
-    
-    try {
-        const base64Image = imageBuffer.toString('base64');
-        const mimeType = detectImageMimeType(imageBuffer);
-        
-        console.log(`📸 Sending image to Gemini (${imageBuffer.length} bytes, MIME: ${mimeType})`);
-        
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-        
-        const requestBody = {
-            contents: [{
-                parts: [
-                    {
-                        text: `You are an auto spares assistant for "Auto Spares Solution" in India.
-                        Customer sent an image with message: "${caption || 'No caption'}"
-                        
-                        Analyze this image and:
-                        1. Identify any auto parts visible
-                        2. If you see part numbers, list them
-                        3. Keep response short and useful`
-                    },
-                    {
-                        inline_data: {
-                            mime_type: mimeType,
-                            data: base64Image
-                        }
-                    }
-                ]
-            }]
-        };
-        
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-        
-        const result = await response.json();
-        console.log("📸 Gemini Status:", response.status);
-        
-        if (!response.ok) {
-            console.error("❌ Gemini Image Error:", JSON.stringify(result, null, 2));
-            return null;
-        }
-        
-        console.log('✅ Gemini image analysis complete');
-        return result.candidates?.[0]?.content?.parts?.[0]?.text || null;
-        
-    } catch (error) {
-        console.error('❌ Image analysis error:', error);
-        return null;
-    }
-}
-
-async function processPhotoWithGemini(imageBuffer, caption, from) {
-    console.log(`🖼️ Processing photo from ${from}...`);
-    
-    try {
-        const imageAnalysis = await analyzeImageWithGemini(imageBuffer, caption);
-        
-        if (imageAnalysis) {
-            const partMatches = imageAnalysis.match(/\b[A-Z0-9\-]{5,15}\b/g) || [];
-            
-            let reply = `📸 *Photo Analysis*\n\n${imageAnalysis}\n\n`;
-            
-            if (partMatches.length > 0) {
-                reply += `🔍 *Parts Found:*\n`;
-                for (const part of partMatches) {
-                    const product = allProducts.find(p => p.part.toUpperCase() === part.toUpperCase());
-                    if (product) {
-                        const priceGST = product.price * 1.18;
-                        reply += `✅ ${part} - ${product.desc} - ₹${priceGST.toFixed(2)}\n`;
-                    } else {
-                        reply += `⚠️ ${part} - Not found in inventory\n`;
-                    }
-                }
-                reply += `\n💡 Reply "Add ${partMatches[0]}" to add to cart\n`;
-            }
-            
-            reply += `\n📞 *Call:* ${CONFIG.businessPhone}`;
-            return reply;
-        }
-        
-        // Fallback: Check if caption has part number
-        if (caption) {
-            const partMatch = caption.match(/\b[A-Z0-9\-]{5,15}\b/i);
-            if (partMatch) {
-                const results = aiSearch(partMatch[0]);
-                if (results.length > 0) {
-                    let reply = `📸 *Photo Received!*\n\n🔍 Found part in your caption: ${partMatch[0]}\n\n`;
-                    results.forEach((p, index) => {
-                        const priceGST = aiPriceWithGST(p.price, p.gst || 18);
-                        reply += `${index + 1}. **${p.part}**\n`;
-                        reply += `📝 ${p.desc || 'N/A'}\n`;
-                        reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
-                        reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
-                    });
-                    reply += `📞 *Call:* ${CONFIG.businessPhone}`;
-                    return reply;
-                }
-            }
-        }
-        
-        return `📸 *Photo Received!*\n\n⚠️ Could not analyze image. Please send the part number directly.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
-        
-    } catch (error) {
-        console.error('❌ Photo processing error:', error);
-        return `📸 *Photo Received!*\n\n❌ Error analyzing image. Please try again.\n\n📞 *Call:* ${CONFIG.businessPhone}`;
-    }
 }
 
 // ============================================================
@@ -723,7 +583,29 @@ app.post("/webhook", async (req, res) => {
                     const imageBuffer = await downloadMedia(mediaUrl);
                     console.log(`📸 Image size: ${imageBuffer.length} bytes`);
                     
-                    const reply = await processPhotoWithGemini(imageBuffer, caption, from);
+                    // Try Gemini first, then fallback to caption
+                    let reply = await processPhotoWithGemini(imageBuffer, caption, from);
+                    
+                    // If Gemini fails and caption has part number, use it
+                    if (reply.includes('Could not analyze image') && caption) {
+                        const partMatch = caption.match(/\b[A-Z0-9\-]{5,15}\b/i);
+                        if (partMatch) {
+                            const results = aiSearch(partMatch[0]);
+                            if (results.length > 0) {
+                                let productReply = `📸 *Photo Received!*\n\n🔍 Found part in your caption: ${partMatch[0]}\n\n`;
+                                results.forEach((p, index) => {
+                                    const priceGST = aiPriceWithGST(p.price, p.gst || 18);
+                                    productReply += `${index + 1}. **${p.part}**\n`;
+                                    productReply += `📝 ${p.desc || 'N/A'}\n`;
+                                    productReply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
+                                    productReply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
+                                });
+                                productReply += `📞 *Call:* ${CONFIG.businessPhone}`;
+                                reply = productReply;
+                            }
+                        }
+                    }
+                    
                     console.log("🤖 Reply:", reply);
                     await sendWhatsAppMessage(from, reply);
                 } catch (error) {
@@ -763,12 +645,36 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ============================================================
-// PROCESS MESSAGE - UPDATED WITH MULTI-API
+// PROCESS MESSAGE
 // ============================================================
 
 async function processMessage(msg, from = null) {
     const originalMsg = msg;
     const msgLower = msg.toLowerCase().trim();
+    
+    // ============================================================
+    // GEMINI FALLBACK FOR UNKNOWN FORMATS
+    // ============================================================
+    const knownPatterns = [
+        /^hi$|^hello$|^help$|^start$/i,
+        /^confirm order$|^place order$/i,
+        /^clear cart$|^clear$/i,
+        /^get quote$|^quotation$/i,
+        /^price\s+/i,
+        /^stock\s+/i,
+        /^order\s+/i,
+        /\b[A-Z0-9\-]{5,15}\b/
+    ];
+    
+    const matchesKnownPattern = knownPatterns.some(pattern => pattern.test(originalMsg));
+    
+    if (!matchesKnownPattern) {
+        console.log(`🔄 No known pattern found. Using AI for: "${originalMsg}"`);
+        const aiReply = await getAIResponse(originalMsg);
+        if (aiReply) {
+            return `🤖 *AI Assistant*\n\n${aiReply}\n\n📞 *Call:* ${CONFIG.businessPhone}\n🛒 *Shop:* https://autosparessolution.github.io`;
+        }
+    }
     
     // ============================================================
     // HELP COMMANDS
@@ -993,11 +899,11 @@ How can I help you today? 🚗`;
     }
     
     // ============================================================
-    // MULTI-API AI FALLBACK (Gemini → DeepSeek → ChatGPT)
+    // AI FALLBACK (Gemini → DeepSeek → ChatGPT)
     // ============================================================
     const aiReply = await getAIResponse(originalMsg);
     if (aiReply) {
-        return `🔍 I couldn't find "${originalMsg}" in our inventory.\n\n${aiReply}\n\n📞 Call: ${CONFIG.businessPhone}\n🛒 Shop: https://autosparessolution.github.io`;
+        return `🤖 *AI Assistant*\n\n${aiReply}\n\n📞 Call: ${CONFIG.businessPhone}\n🛒 Shop: https://autosparessolution.github.io`;
     }
     
     // ============================================================
@@ -1067,4 +973,4 @@ console.log('✅ All features loaded successfully!');
 console.log('📱 Multi-product support active');
 console.log('🖼️ Photo analysis active');
 console.log('🎤 Voice message support active');
-console.log('🧠 Multi-API support (Gemini → DeepSeek → ChatGPT) active');
+console.log('🧠 Multi-API fallback active (Gemini → DeepSeek → ChatGPT)');
