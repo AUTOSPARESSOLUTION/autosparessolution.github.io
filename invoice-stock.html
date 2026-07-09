@@ -22,7 +22,7 @@
             border: 1px solid #dee2e6;
         }
         @media print {
-            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp, .add-item-btn, .price-info-label, .debug-toggle { display: none !important; }
+            .no-print, .actions, .invoice-type, button, input, textarea, select, .edit-date-btn, .date-picker-temp { display: none !important; }
             body { background: white; padding: 0; margin: 0; }
             .invoice-container { box-shadow: none; border-radius: 0; padding: 0 10px 5px 10px; margin: 0; border: none; }
             .company-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0a7c71; color: white; margin: 0 -10px 10px -10px; }
@@ -114,31 +114,6 @@
             border-radius: 10px; 
             margin-left: 4px;
         }
-        .price-info-label {
-            font-size: 11px; 
-            color: #6c757d; 
-            margin-left: 10px;
-        }
-        .debug-panel {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 10px;
-            margin: 10px 0;
-            font-size: 11px;
-            max-height: 300px;
-            overflow-y: auto;
-            display: none;
-            font-family: monospace;
-            white-space: pre-wrap;
-        }
-        .debug-panel.show {
-            display: block;
-        }
-        .debug-panel .success { color: #28a745; }
-        .debug-panel .error { color: #dc3545; }
-        .debug-panel .warning { color: #ffc107; }
-        .debug-panel .info { color: #17a2b8; }
     </style>
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -220,25 +195,17 @@
         </div>
     </div>
 
-    <!-- Add Item Button - Hidden in PDF -->
-    <div style="margin-bottom: 10px;" class="no-print">
+    <div style="margin-bottom: 10px;">
         <button type="button" class="add-item-btn" onclick="addNewItem()"><i class="fas fa-plus"></i> ➕ Add New Item</button>
-        <span class="price-info-label no-print">
+        <span style="font-size: 11px; color: #6c757d; margin-left: 10px;">
             <span style="background: #ff9800; color: white; padding: 1px 6px; border-radius: 10px;">M&M</span> = MRP from CSV (Column D)
         </span>
-        <button type="button" class="debug-toggle" onclick="toggleDebug()" style="background: #6c757d; padding: 4px 10px; font-size: 11px; margin-left: 10px;">🐛 Debug</button>
     </div>
 
     <table class="items-table" id="itemsTable">
         <thead id="itemsTableHead"></thead>
         <tbody id="itemsBody"></tbody>
     </table>
-
-    <!-- Debug Panel -->
-    <div id="debugPanel" class="debug-panel">
-        <strong>🔍 Debug Information</strong>
-        <div id="debugContent">Loading...</div>
-    </div>
 
     <div class="packing-section no-print">
         <div class="packing-field"><label>📦 Carton Quantity</label><input type="number" id="packingCartons" value="0" step="1" min="0" onchange="calculatePackingCharges()"></div>
@@ -291,96 +258,8 @@
     // ========== GLOBAL VARIABLES ==========
     let isSaving = false;
     let invoiceAlreadySaved = false;
-    let priceData = {};
+    let priceData = {}; // Cache for CSV price data
     let priceDataLoaded = false;
-    let debugMode = false;
-    let debugLogs = [];
-
-    // ========== DEBUG FUNCTIONS ==========
-    function toggleDebug() {
-        debugMode = !debugMode;
-        const panel = document.getElementById('debugPanel');
-        if (debugMode) {
-            panel.classList.add('show');
-            updateDebugPanel();
-        } else {
-            panel.classList.remove('show');
-        }
-    }
-
-    function logDebug(message, type) {
-        const timestamp = new Date().toLocaleTimeString();
-        const logEntry = { timestamp, message, type: type || 'info' };
-        debugLogs.push(logEntry);
-        if (debugMode) {
-            updateDebugPanel();
-        }
-        console.log(`[${timestamp}] ${message}`);
-    }
-
-    function updateDebugPanel() {
-        const content = document.getElementById('debugContent');
-        let html = '';
-        
-        html += '=== SYSTEM STATUS ===\n';
-        html += 'CSV Loaded: ' + (priceDataLoaded ? '✅ Yes' : '❌ No') + '\n';
-        html += 'Total Items in CSV: ' + Object.keys(priceData).length + '\n';
-        html += 'Cart Items: ' + cart.length + '\n';
-        html += 'Debug Mode: ' + (debugMode ? 'ON' : 'OFF') + '\n\n';
-        
-        html += '=== CSV SAMPLE DATA (First 10) ===\n';
-        let count = 0;
-        for (let key in priceData) {
-            if (count < 10) {
-                const data = priceData[key];
-                html += `${key} → Make: "${data.make}", MRP: ${data.mrp}\n`;
-                count++;
-            } else {
-                html += `... and ${Object.keys(priceData).length - 10} more items\n`;
-                break;
-            }
-        }
-        
-        if (Object.keys(priceData).length === 0) {
-            html += '⚠️ No data loaded from CSV!\n';
-            html += 'Check if prices.csv exists at: https://www.autosparessolution.github.io/prices.csv\n';
-        }
-        
-        html += '\n=== CART ITEMS ===\n';
-        cart.forEach((item, idx) => {
-            const part = item.part || '(empty)';
-            const price = item.price || 0;
-            const source = item.priceSource || 'none';
-            const csvData = getPriceFromCSV(part);
-            const isMM = isMMMake(part);
-            const mrp = getMRPForMM(part);
-            
-            html += `Item ${idx+1}:\n`;
-            html += `  Part: "${part}"\n`;
-            html += `  Price: ${price} (Source: ${source})\n`;
-            html += `  isMM: ${isMM ? '✅ Yes' : '❌ No'}\n`;
-            if (csvData) {
-                html += `  CSV Make: "${csvData.make}", MRP: ${csvData.mrp}\n`;
-            } else {
-                html += `  CSV Data: Not found\n`;
-            }
-            if (mrp !== null) {
-                html += `  MRP Applied: ${mrp}\n`;
-            }
-            html += '\n';
-        });
-        
-        html += '\n=== RECENT LOGS ===\n';
-        const recentLogs = debugLogs.slice(-30);
-        recentLogs.forEach(log => {
-            const icon = log.type === 'success' ? '✅' : 
-                        log.type === 'error' ? '❌' : 
-                        log.type === 'warning' ? '⚠️' : 'ℹ️';
-            html += `${icon} [${log.timestamp}] ${log.message}\n`;
-        });
-        
-        content.textContent = html;
-    }
 
     // ========== LOAD PRICES.CSV ==========
     function loadPriceData() {
@@ -390,101 +269,98 @@
                 return;
             }
 
-            logDebug('Loading prices.csv...', 'info');
             const csvUrl = 'https://www.autosparessolution.github.io/prices.csv';
             
             fetch(csvUrl)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('CSV file not found (Status: ' + response.status + ')');
+                        throw new Error('CSV file not found');
                     }
                     return response.text();
                 })
                 .then(csvText => {
-                    logDebug('CSV loaded, parsing...', 'info');
+                    // Parse CSV with specific column mapping
+                    // Column A = Material (index 0)
+                    // Column D = MRP PRICE (index 3)
+                    // Column L = Make (index 11)
+                    
                     const lines = csvText.split('\n');
                     let parsedCount = 0;
-                    let headerDetected = false;
                     
-                    // Log first 5 lines for debugging
-                    logDebug('First 5 lines of CSV:', 'info');
-                    for (let i = 0; i < Math.min(5, lines.length); i++) {
-                        logDebug(`Line ${i+1}: ${lines[i].substring(0, 100)}`, 'info');
-                    }
-                    
-                    // Try to detect header row
-                    let startRow = 0;
-                    if (lines.length > 0) {
-                        const firstLine = lines[0].toLowerCase();
-                        if (firstLine.includes('material') || firstLine.includes('make') || firstLine.includes('mrp') || firstLine.includes('price')) {
-                            startRow = 1;
-                            headerDetected = true;
-                            logDebug('Header row detected, starting from row 2', 'info');
-                        }
-                    }
-                    
-                    for (let i = startRow; i < lines.length; i++) {
+                    // Skip header row (assuming first row is headers)
+                    for (let i = 1; i < lines.length; i++) {
                         if (!lines[i].trim()) continue;
+                        
+                        // Split by comma, but handle quoted values
                         const cols = lines[i].split(',').map(c => c.trim());
                         
-                        // Check if we have enough columns
+                        // Check if we have enough columns (at least 12 columns for column L)
                         if (cols.length >= 12) {
-                            const material = cols[0];      // Column A
-                            const mrpPrice = parseFloat(cols[3]) || 0;  // Column D
-                            const make = cols[11] || '';    // Column L
+                            const material = cols[0]; // Column A
+                            const mrpPrice = parseFloat(cols[3]) || 0; // Column D
+                            const make = cols[11] || ''; // Column L
                             
-                            // Skip if material is empty or looks like a header
-                            if (material && material !== '' && material.toLowerCase() !== 'material') {
+                            if (material && material !== '') {
+                                // Store data with material as key
                                 priceData[material.toUpperCase()] = {
                                     make: make,
                                     mrp: mrpPrice
                                 };
                                 parsedCount++;
                                 
-                                if (parsedCount <= 3) {
-                                    logDebug(`Sample ${parsedCount}: Material="${material}", Make="${make}", MRP="${mrpPrice}"`, 'success');
+                                // Also store without spaces for better matching
+                                const cleanMaterial = material.toUpperCase().replace(/\s/g, '');
+                                if (!priceData[cleanMaterial]) {
+                                    priceData[cleanMaterial] = {
+                                        make: make,
+                                        mrp: mrpPrice
+                                    };
                                 }
-                            }
-                        } else if (cols.length >= 4) {
-                            // Try with fewer columns (maybe the CSV has different structure)
-                            const material = cols[0];
-                            const mrpPrice = parseFloat(cols[3]) || 0;
-                            
-                            if (material && material !== '' && material.toLowerCase() !== 'material') {
-                                // Try to find make in other columns
-                                let make = '';
-                                for (let j = 4; j < Math.min(cols.length, 12); j++) {
-                                    if (cols[j] && (cols[j].toUpperCase().includes('M&M') || cols[j].toUpperCase().includes('M & M') || cols[j].toUpperCase() === 'MM')) {
-                                        make = cols[j];
-                                        break;
-                                    }
-                                }
-                                
-                                priceData[material.toUpperCase()] = {
-                                    make: make,
-                                    mrp: mrpPrice
-                                };
-                                parsedCount++;
                             }
                         }
                     }
                     
                     priceDataLoaded = true;
-                    logDebug(`✅ Price data loaded: ${parsedCount} items from CSV`, 'success');
-                    logDebug(`📊 Sample keys: ${Object.keys(priceData).slice(0, 5).join(', ')}`, 'info');
-                    
-                    // Check if any M&M items were found
-                    let mmCount = 0;
-                    for (let key in priceData) {
-                        if (isMMMake(key)) mmCount++;
-                    }
-                    logDebug(`🔍 Found ${mmCount} M&M items in CSV`, mmCount > 0 ? 'success' : 'warning');
-                    
+                    console.log('✅ Price data loaded:', parsedCount, 'items from CSV');
+                    console.log('📊 Sample data:', Object.keys(priceData).slice(0, 5));
                     resolve(priceData);
                 })
                 .catch(err => {
-                    logDebug('⚠️ Could not load prices.csv: ' + err.message, 'error');
-                    resolve(priceData);
+                    console.warn('⚠️ Could not load prices.csv from main URL:', err.message);
+                    // Try alternative URL
+                    fetch('/prices.csv')
+                        .then(response => response.text())
+                        .then(csvText => {
+                            const lines = csvText.split('\n');
+                            let parsedCount = 0;
+                            
+                            for (let i = 1; i < lines.length; i++) {
+                                if (!lines[i].trim()) continue;
+                                const cols = lines[i].split(',').map(c => c.trim());
+                                
+                                if (cols.length >= 12) {
+                                    const material = cols[0];
+                                    const mrpPrice = parseFloat(cols[3]) || 0;
+                                    const make = cols[11] || '';
+                                    
+                                    if (material && material !== '') {
+                                        priceData[material.toUpperCase()] = {
+                                            make: make,
+                                            mrp: mrpPrice
+                                        };
+                                        parsedCount++;
+                                    }
+                                }
+                            }
+                            
+                            priceDataLoaded = true;
+                            console.log('✅ Price data loaded from fallback:', parsedCount, 'items');
+                            resolve(priceData);
+                        })
+                        .catch(() => {
+                            console.warn('⚠️ Using default price data (CSV not available)');
+                            resolve(priceData);
+                        });
                 });
         });
     }
@@ -518,23 +394,14 @@
     // ========== CHECK IF M&M MAKE ==========
     function isMMMake(partNo) {
         const data = getPriceFromCSV(partNo);
-        if (!data) {
-            if (debugMode && partNo && partNo.trim() !== '') {
-                logDebug(`No CSV data found for: "${partNo}"`, 'warning');
-            }
-            return false;
-        }
+        if (!data) return false;
         const make = (data.make || '').toUpperCase().trim();
-        const result = make === 'M&M' || 
+        // Check for M&M, M & M, MM, or variants
+        return make === 'M&M' || 
                make === 'M & M' || 
                make === 'MM' || 
                make.includes('M&M') ||
                make.includes('M & M');
-        
-        if (debugMode && partNo && partNo.trim() !== '') {
-            logDebug(`isMMMake: "${partNo}" → Make="${make}" → ${result ? '✅ Yes' : '❌ No'}`, result ? 'success' : 'info');
-        }
-        return result;
     }
 
     // ========== GET MRP FOR M&M PART ==========
@@ -542,13 +409,7 @@
         const data = getPriceFromCSV(partNo);
         if (!data) return null;
         if (isMMMake(partNo)) {
-            if (debugMode && partNo && partNo.trim() !== '') {
-                logDebug(`✅ MRP found: "${partNo}" → ${data.mrp}`, 'success');
-            }
             return data.mrp;
-        }
-        if (debugMode && partNo && partNo.trim() !== '') {
-            logDebug(`❌ Not M&M: "${partNo}" (Make: "${data.make}")`, 'info');
         }
         return null;
     }
@@ -640,7 +501,6 @@
         cart.push({ part: '', desc: '', hsn: '', qty: 1, price: 0, discount: 0, unit: 'pc', priceSource: '' });
         renderItemsAndTaxSummary();
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
-        if (debugMode) updateDebugPanel();
     }
 
     function calculatePackingCharges() {
@@ -770,7 +630,7 @@
         document.getElementById('grandTotal').innerText = (grandTotal || 0).toFixed(2);
     }
 
-    // ========== RENDER FUNCTION WITH M&M PRICE CHECK ==========
+    // ========== UPDATED RENDER FUNCTION WITH M&M PRICE CHECK ==========
     function renderItemsAndTaxSummary() {
         const isLocal = isLocalGst();
         const thead = document.getElementById('itemsTableHead');
@@ -788,21 +648,19 @@
         cart.forEach((item, idx) => {
             const discount = item.discount || 0;
             
+            // Check if part is M&M and get MRP
             let price = item.price;
             let priceSource = item.priceSource || '';
             
-            // Check if part is M&M and get MRP
-            if (item.part && item.part.trim() !== '' && priceSource !== 'manual') {
+            if (item.part && item.part.trim() !== '') {
                 const mrp = getMRPForMM(item.part);
-                if (mrp !== null && mrp > 0) {
+                if (mrp !== null && mrp > 0 && priceSource !== 'manual') {
                     price = mrp;
                     priceSource = 'CSV-MRP';
-                    logDebug(`✅ Item ${idx+1}: "${item.part}" → MRP=${mrp} applied`, 'success');
-                } else if (debugMode) {
-                    logDebug(`⚠️ Item ${idx+1}: "${item.part}" → No MRP found or not M&M`, 'warning');
                 }
             }
             
+            // Update item price if changed
             if (price !== item.price || priceSource !== item.priceSource) {
                 item.price = price;
                 item.priceSource = priceSource;
@@ -818,6 +676,7 @@
             }
             const totalItem = taxable + (isLocal ? cgst + sgst : igst);
             
+            // Show price source badge
             const priceBadge = priceSource === 'CSV-MRP' ? ' <span class="price-source-badge">M&M-MRP</span>' : '';
             
             let row = `<tr>
@@ -861,24 +720,20 @@
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
         updateTotalsWithPackingAndRound();
         localStorage.setItem('invoiceCart', JSON.stringify(cart));
-        
-        if (debugMode) updateDebugPanel();
     }
 
     // ========== UPDATE FUNCTIONS ==========
     function updatePart(idx, value) { 
         if (cart[idx]) { 
             cart[idx].part = value; 
+            // Reset price source when part changes
             cart[idx].priceSource = '';
+            // Check if new part is M&M
             if (value && value.trim() !== '') {
-                logDebug(`Checking part: "${value}"`, 'info');
                 const mrp = getMRPForMM(value);
                 if (mrp !== null && mrp > 0) {
                     cart[idx].price = mrp;
                     cart[idx].priceSource = 'CSV-MRP';
-                    logDebug(`✅ Part "${value}" → MRP=${mrp} applied`, 'success');
-                } else {
-                    logDebug(`⚠️ Part "${value}" not found as M&M in CSV`, 'warning');
                 }
             }
             renderItemsAndTaxSummary(); 
@@ -891,6 +746,7 @@
     function updatePriceByIndex(idx, value) { 
         if (cart[idx]) { 
             cart[idx].price = parseFloat(value) || 0; 
+            // User manually changed price, clear source
             cart[idx].priceSource = 'manual';
             renderItemsAndTaxSummary(); 
         } 
@@ -946,7 +802,9 @@
         isSaving = true;
         
         try {
+            // First, ensure price data is loaded
             loadPriceData().then(() => {
+                // Now process the cart with updated prices
                 const validCart = cart.filter(item => item.part && item.part.trim() !== '');
                 if (validCart.length === 0) {
                     alert('Please add at least one item with a Part No.');
@@ -954,6 +812,7 @@
                     return;
                 }
                 
+                // Update prices from CSV for M&M items
                 validCart.forEach(item => {
                     if (item.part && item.part.trim() !== '' && item.priceSource !== 'manual') {
                         const mrp = getMRPForMM(item.part);
@@ -968,6 +827,7 @@
                 let allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
                 let proposedNo = getNextInvoiceNumber(type);
                 
+                // Duplicate check and fix
                 const alreadyExists = allInvoices.some(inv => inv.invoiceNo === proposedNo);
                 if (alreadyExists) {
                     if (type === 'cash') {
@@ -996,10 +856,12 @@
                     }
                 }
                 
+                // Product master update
                 for (let item of validCart) {
                     ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
                 }
                 
+                // Buyer details
                 const buyer = {
                     name: document.getElementById('buyerName').value.trim(),
                     email: document.getElementById('buyerEmail').value.trim(),
@@ -1015,6 +877,7 @@
                     return;
                 }
                 
+                // Customer save
                 let customersList = JSON.parse(localStorage.getItem('customers') || '[]');
                 let existingCustomer = customersList.find(c => c.email === buyer.email);
                 if (!existingCustomer && buyer.email) {
@@ -1037,6 +900,7 @@
                     localStorage.setItem('customers', JSON.stringify(customersList));
                 }
                 
+                // Totals
                 const taxableTotals = calculateTaxableTotals();
                 const gstApplicable = getGSTApplicableTotal();
                 const packing = getPackingCharge();
@@ -1044,9 +908,11 @@
                 const roundOff = roundedGSTApplicable - gstApplicable;
                 const grandTotal = roundedGSTApplicable + packing;
                 
+                // Date format
                 const dateParts = document.getElementById('invoiceDate').innerText.split('/');
                 const invoiceDateFormatted = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
                 
+                // Create invoice
                 const invoice = {
                     id: proposedNo,
                     date: invoiceDateFormatted,
@@ -1091,6 +957,7 @@
                     }))
                 };
                 
+                // Final storage check
                 allInvoices = JSON.parse(localStorage.getItem('allInvoices') || '[]');
                 if (allInvoices.some(inv => inv.invoiceNo === proposedNo)) {
                     alert('Duplicate invoice prevented.');
@@ -1098,15 +965,18 @@
                     return;
                 }
                 
+                // Save main invoice
                 allInvoices.push(invoice);
                 localStorage.setItem('allInvoices', JSON.stringify(allInvoices));
                 
+                // Save sales invoice
                 let salesInvoices = JSON.parse(localStorage.getItem('salesInvoices') || '[]');
                 if (!salesInvoices.some(inv => inv.invoiceNo === proposedNo)) {
                     salesInvoices.push(invoice);
                     localStorage.setItem('salesInvoices', JSON.stringify(salesInvoices));
                 }
                 
+                // Customer ledger update
                 const custIndex = customersList.findIndex(c => c.email === buyer.email);
                 if (custIndex !== -1) {
                     customersList[custIndex].outstanding = (customersList[custIndex].outstanding || 0) + invoice.grandTotal;
@@ -1120,7 +990,9 @@
                 saveBtn.textContent = "Saved Successfully";
                 setTimeout(() => window.close(), 1000);
             }).catch(() => {
+                // If CSV fails to load, still save with current prices
                 alert('⚠️ Warning: Could not load price data. Using manual prices.');
+                // Continue with save using existing cart prices
                 resetSaveButton();
             });
         } catch (err) {
@@ -1178,15 +1050,6 @@
         clone.querySelectorAll('.editable').forEach(el => el.classList.remove('editable'));
         const typeSelector = clone.querySelector('.invoice-type');
         if (typeSelector) typeSelector.style.display = 'none';
-        // Hide Add Item button and M&M label
-        const addItemDiv = clone.querySelector('.add-item-btn')?.closest('div');
-        if (addItemDiv) addItemDiv.style.display = 'none';
-        // Hide debug button
-        const debugBtn = clone.querySelector('.debug-toggle');
-        if (debugBtn) debugBtn.style.display = 'none';
-        // Hide debug panel
-        const debugPanel = clone.querySelector('#debugPanel');
-        if (debugPanel) debugPanel.style.display = 'none';
         originalContainer.style.display = 'none';
         document.body.appendChild(clone);
         const opt = {
@@ -1233,14 +1096,15 @@
     }
 
     // ========== INITIALISATION ==========
+    // Load price data first
     loadPriceData().then(() => {
+        // Now render with price data
         renderItemsAndTaxSummary();
-        logDebug('✅ System ready with CSV price data', 'success');
-        logDebug('📊 Total items in CSV: ' + Object.keys(priceData).length, 'info');
-        if (debugMode) updateDebugPanel();
+        console.log('✅ System ready with CSV price data');
     }).catch(() => {
+        // Render without price data
         renderItemsAndTaxSummary();
-        logDebug('⚠️ System running without CSV price data', 'warning');
+        console.log('⚠️ System running without CSV price data');
     });
 
     if (currentUser) {
@@ -1275,6 +1139,7 @@
     updateGstDisplay();
     calculatePackingCharges();
 
+    // Date picker
     (function addDateEdit() {
         const editBtn = document.getElementById('editDateBtn');
         if (!editBtn) return;
@@ -1322,4 +1187,4 @@
     })();
 </script>
 </body>
-    </html>
+</html>
