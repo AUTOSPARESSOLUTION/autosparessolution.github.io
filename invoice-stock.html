@@ -198,7 +198,7 @@
     <div style="margin-bottom: 10px;">
         <button type="button" class="add-item-btn" onclick="addNewItem()"><i class="fas fa-plus"></i> ➕ Add New Item</button>
         <span style="font-size: 11px; color: #6c757d; margin-left: 10px;">
-            <span style="background: #ff9800; color: white; padding: 1px 6px; border-radius: 10px;">M&M</span> = MRP from CSV
+            <span style="background: #ff9800; color: white; padding: 1px 6px; border-radius: 10px;">M&M</span> = MRP from CSV (Column D)
         </span>
     </div>
 
@@ -279,95 +279,86 @@
                     return response.text();
                 })
                 .then(csvText => {
-                    // Parse CSV
+                    // Parse CSV with specific column mapping
+                    // Column A = Material (index 0)
+                    // Column D = MRP PRICE (index 3)
+                    // Column L = Make (index 11)
+                    
                     const lines = csvText.split('\n');
-                    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                    let parsedCount = 0;
                     
-                    // Find column indices
-                    const partNoIndex = headers.findIndex(h => h.includes('part') || h.includes('sku') || h.includes('code'));
-                    const makeIndex = headers.findIndex(h => h.includes('make') || h.includes('brand'));
-                    const mrpIndex = headers.findIndex(h => h.includes('mrp') || h.includes('price'));
-                    
-                    if (partNoIndex === -1 || makeIndex === -1 || mrpIndex === -1) {
-                        console.warn('CSV columns not found. Using defaults.');
-                        // Try alternative column names
-                        const altPartIndex = headers.findIndex(h => h === 'partno' || h === 'part_no');
-                        const altMakeIndex = headers.findIndex(h => h === 'make');
-                        const altMrpIndex = headers.findIndex(h => h === 'mrp');
+                    // Skip header row (assuming first row is headers)
+                    for (let i = 1; i < lines.length; i++) {
+                        if (!lines[i].trim()) continue;
                         
-                        // Use whatever we found
-                        const pIdx = altPartIndex !== -1 ? altPartIndex : partNoIndex;
-                        const mIdx = altMakeIndex !== -1 ? altMakeIndex : makeIndex;
-                        const rIdx = altMrpIndex !== -1 ? altMrpIndex : mrpIndex;
+                        // Split by comma, but handle quoted values
+                        const cols = lines[i].split(',').map(c => c.trim());
                         
-                        if (pIdx === -1 || mIdx === -1 || rIdx === -1) {
-                            reject(new Error('Could not find required columns in CSV'));
-                            return;
-                        }
-                        
-                        // Parse with found indices
-                        for (let i = 1; i < lines.length; i++) {
-                            if (!lines[i].trim()) continue;
-                            const cols = lines[i].split(',').map(c => c.trim());
-                            if (cols.length > Math.max(pIdx, mIdx, rIdx)) {
-                                const partNo = cols[pIdx];
-                                const make = cols[mIdx];
-                                const mrp = parseFloat(cols[rIdx]) || 0;
-                                if (partNo) {
-                                    priceData[partNo.toUpperCase()] = { make, mrp };
-                                }
-                            }
-                        }
-                    } else {
-                        // Parse with detected indices
-                        for (let i = 1; i < lines.length; i++) {
-                            if (!lines[i].trim()) continue;
-                            const cols = lines[i].split(',').map(c => c.trim());
-                            if (cols.length > Math.max(partNoIndex, makeIndex, mrpIndex)) {
-                                const partNo = cols[partNoIndex];
-                                const make = cols[makeIndex];
-                                const mrp = parseFloat(cols[mrpIndex]) || 0;
-                                if (partNo) {
-                                    priceData[partNo.toUpperCase()] = { make, mrp };
+                        // Check if we have enough columns (at least 12 columns for column L)
+                        if (cols.length >= 12) {
+                            const material = cols[0]; // Column A
+                            const mrpPrice = parseFloat(cols[3]) || 0; // Column D
+                            const make = cols[11] || ''; // Column L
+                            
+                            if (material && material !== '') {
+                                // Store data with material as key
+                                priceData[material.toUpperCase()] = {
+                                    make: make,
+                                    mrp: mrpPrice
+                                };
+                                parsedCount++;
+                                
+                                // Also store without spaces for better matching
+                                const cleanMaterial = material.toUpperCase().replace(/\s/g, '');
+                                if (!priceData[cleanMaterial]) {
+                                    priceData[cleanMaterial] = {
+                                        make: make,
+                                        mrp: mrpPrice
+                                    };
                                 }
                             }
                         }
                     }
                     
                     priceDataLoaded = true;
-                    console.log('Price data loaded:', Object.keys(priceData).length, 'items');
+                    console.log('✅ Price data loaded:', parsedCount, 'items from CSV');
+                    console.log('📊 Sample data:', Object.keys(priceData).slice(0, 5));
                     resolve(priceData);
                 })
                 .catch(err => {
-                    console.warn('Could not load prices.csv:', err.message);
+                    console.warn('⚠️ Could not load prices.csv from main URL:', err.message);
                     // Try alternative URL
                     fetch('/prices.csv')
                         .then(response => response.text())
                         .then(csvText => {
-                            // Parse with same logic
                             const lines = csvText.split('\n');
-                            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-                            const partIdx = headers.findIndex(h => h.includes('part') || h.includes('sku') || h.includes('code'));
-                            const makeIdx = headers.findIndex(h => h.includes('make') || h.includes('brand'));
-                            const mrpIdx = headers.findIndex(h => h.includes('mrp') || h.includes('price'));
+                            let parsedCount = 0;
                             
                             for (let i = 1; i < lines.length; i++) {
                                 if (!lines[i].trim()) continue;
                                 const cols = lines[i].split(',').map(c => c.trim());
-                                if (cols.length > Math.max(partIdx, makeIdx, mrpIdx) && partIdx !== -1) {
-                                    const partNo = cols[partIdx];
-                                    const make = cols[makeIdx] || '';
-                                    const mrp = parseFloat(cols[mrpIdx]) || 0;
-                                    if (partNo) {
-                                        priceData[partNo.toUpperCase()] = { make, mrp };
+                                
+                                if (cols.length >= 12) {
+                                    const material = cols[0];
+                                    const mrpPrice = parseFloat(cols[3]) || 0;
+                                    const make = cols[11] || '';
+                                    
+                                    if (material && material !== '') {
+                                        priceData[material.toUpperCase()] = {
+                                            make: make,
+                                            mrp: mrpPrice
+                                        };
+                                        parsedCount++;
                                     }
                                 }
                             }
+                            
                             priceDataLoaded = true;
+                            console.log('✅ Price data loaded from fallback:', parsedCount, 'items');
                             resolve(priceData);
                         })
                         .catch(() => {
-                            console.warn('Using default price data');
+                            console.warn('⚠️ Using default price data (CSV not available)');
                             resolve(priceData);
                         });
                 });
@@ -378,15 +369,25 @@
     function getPriceFromCSV(partNo) {
         if (!partNo) return null;
         const upperPart = partNo.toUpperCase().trim();
+        
+        // Direct match
         if (priceData[upperPart]) {
             return priceData[upperPart];
         }
-        // Try partial match
+        
+        // Try without spaces
+        const cleanPart = upperPart.replace(/\s/g, '');
+        if (priceData[cleanPart]) {
+            return priceData[cleanPart];
+        }
+        
+        // Try partial match (for cases where part number might be abbreviated)
         for (let key in priceData) {
             if (key.includes(upperPart) || upperPart.includes(key)) {
                 return priceData[key];
             }
         }
+        
         return null;
     }
 
@@ -395,7 +396,12 @@
         const data = getPriceFromCSV(partNo);
         if (!data) return false;
         const make = (data.make || '').toUpperCase().trim();
-        return make === 'M&M' || make === 'M&M' || make === 'MM' || make.includes('M&M');
+        // Check for M&M, M & M, MM, or variants
+        return make === 'M&M' || 
+               make === 'M & M' || 
+               make === 'MM' || 
+               make.includes('M&M') ||
+               make.includes('M & M');
     }
 
     // ========== GET MRP FOR M&M PART ==========
@@ -648,7 +654,7 @@
             
             if (item.part && item.part.trim() !== '') {
                 const mrp = getMRPForMM(item.part);
-                if (mrp !== null && mrp > 0) {
+                if (mrp !== null && mrp > 0 && priceSource !== 'manual') {
                     price = mrp;
                     priceSource = 'CSV-MRP';
                 }
@@ -808,7 +814,7 @@
                 
                 // Update prices from CSV for M&M items
                 validCart.forEach(item => {
-                    if (item.part && item.part.trim() !== '') {
+                    if (item.part && item.part.trim() !== '' && item.priceSource !== 'manual') {
                         const mrp = getMRPForMM(item.part);
                         if (mrp !== null && mrp > 0) {
                             item.price = mrp;
@@ -980,19 +986,17 @@
                 
                 invoiceAlreadySaved = true;
                 localStorage.setItem('invoiceCart', '[]');
-                alert(`Invoice ${proposedNo} saved successfully!`);
+                alert(`✅ Invoice ${proposedNo} saved successfully!\n${validCart.filter(i => i.priceSource === 'CSV-MRP').length} items used MRP from CSV.`);
                 saveBtn.textContent = "Saved Successfully";
                 setTimeout(() => window.close(), 1000);
             }).catch(() => {
                 // If CSV fails to load, still save with current prices
-                alert('Warning: Could not load price data. Using manual prices.');
+                alert('⚠️ Warning: Could not load price data. Using manual prices.');
                 // Continue with save using existing cart prices
-                // (re-run save logic without price check)
-                // For simplicity, we'll just show the warning and proceed
                 resetSaveButton();
             });
         } catch (err) {
-            alert("Error: " + err.message);
+            alert("❌ Error: " + err.message);
             resetSaveButton();
         }
     }
@@ -1096,9 +1100,11 @@
     loadPriceData().then(() => {
         // Now render with price data
         renderItemsAndTaxSummary();
+        console.log('✅ System ready with CSV price data');
     }).catch(() => {
         // Render without price data
         renderItemsAndTaxSummary();
+        console.log('⚠️ System running without CSV price data');
     });
 
     if (currentUser) {
