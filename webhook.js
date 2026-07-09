@@ -1,6 +1,6 @@
 // ============================================================
-// 📱 SMART ORDER ENGINE V10 - Production-Ready
-// Complete: OCR + Real-World Formats + Database + Payments
+// 📱 SMART ORDER ENGINE V10 - COMPLETE FIXED
+// OCR + Real-World Formats + Database + Payments
 // ============================================================
 
 const express = require("express");
@@ -611,7 +611,7 @@ function extractItemsFromTextUltimate(text) {
 }
 
 // ============================================================
-// 🖼️ OCR & ORDER EXTRACTION
+// 🖼️ OCR & ORDER EXTRACTION - FIXED
 // ============================================================
 
 async function extractOrderFromImage(imageBuffer, mimeType) {
@@ -629,6 +629,8 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
     if (CONFIG.geminiKey) {
         try {
             const base64Image = imageBuffer.toString('base64');
+            logger.info('📸 Sending to Gemini Vision...');
+            
             const response = await fetchWithTimeout(
                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.geminiKey}`,
                 {
@@ -645,9 +647,17 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
                 },
                 CONFIG.aiTimeout
             );
+            
             const data = await response.json();
-            const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            return parseOCRResponse(content);
+            logger.info(`📸 Gemini Status: ${response.status}`);
+            
+            if (response.ok) {
+                const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                logger.info(`📸 Gemini Content: ${content}`);
+                return parseOCRResponse(content);
+            } else {
+                logger.error(`📸 Gemini Error: ${JSON.stringify(data)}`);
+            }
         } catch (error) {
             logger.error(`❌ Gemini OCR failed: ${error.message}`);
         }
@@ -657,6 +667,8 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
     if (CONFIG.chatgptKey) {
         try {
             const base64Image = imageBuffer.toString('base64');
+            logger.info('📸 Sending to ChatGPT Vision...');
+            
             const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -682,9 +694,17 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
                     temperature: 0
                 })
             }, CONFIG.aiTimeout);
+            
             const data = await response.json();
-            const content = data.choices?.[0]?.message?.content || '';
-            return parseOCRResponse(content);
+            logger.info(`📸 ChatGPT Status: ${response.status}`);
+            
+            if (response.ok) {
+                const content = data.choices?.[0]?.message?.content || '';
+                logger.info(`📸 ChatGPT Content: ${content}`);
+                return parseOCRResponse(content);
+            } else {
+                logger.error(`📸 ChatGPT Error: ${JSON.stringify(data)}`);
+            }
         } catch (error) {
             logger.error(`❌ ChatGPT OCR failed: ${error.message}`);
         }
@@ -692,9 +712,11 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
     
     // Fallback to Tesseract
     try {
+        logger.info('📸 Falling back to Tesseract...');
         const result = await Tesseract.recognize(imageBuffer, 'eng', {
             logger: m => logger.debug(m.status)
         });
+        logger.info(`📸 Tesseract Result: ${result.data.text}`);
         return parseOCRText(result.data.text);
     } catch (error) {
         logger.error(`❌ Tesseract OCR failed: ${error.message}`);
@@ -1306,6 +1328,10 @@ app.get("/webhook", (req, res) => {
     res.status(200).send("Webhook Active");
 });
 
+// ============================================================
+// 📩 RECEIVE MESSAGE - FIXED IMAGE HANDLER
+// ============================================================
+
 app.post("/webhook", async (req, res) => {
     if (!verifyWhatsAppSignature(req)) {
         return res.status(403).send('Invalid signature');
@@ -1320,36 +1346,85 @@ app.post("/webhook", async (req, res) => {
             
             await getOrCreateCustomer(from);
             
+            // ============================================================
+            // 🖼️ IMAGE MESSAGE - FIXED
+            // ============================================================
             if (type === 'image') {
                 const mediaId = message.image.id;
+                const caption = message.image.caption || "";
                 const mimeType = message.image.mime_type || 'image/jpeg';
+                
+                logger.info(`🖼️ Image from: ${from} | Caption: "${caption}" | MIME: ${mimeType}`);
+                
                 try {
+                    // Download the image
                     const mediaUrl = await getMediaURL(mediaId);
+                    logger.info(`📸 Media URL: ${mediaUrl}`);
+                    
                     const imageBuffer = await downloadMedia(mediaUrl);
+                    logger.info(`📸 Image size: ${imageBuffer.length} bytes`);
+                    
+                    // Run OCR
                     const ocrResult = await extractOrderFromImage(imageBuffer, mimeType);
-                    if (ocrResult.items.length > 0) {
-                        const text = ocrResult.items.map(i => `${i.part} ${i.qty}`).join('\n');
-                        const reply = await processOrder(text, from);
+                    logger.info(`📝 OCR Result: ${JSON.stringify(ocrResult)}`);
+                    
+                    if (ocrResult.items && ocrResult.items.length > 0) {
+                        // Build order text from OCR results
+                        const orderText = ocrResult.items.map(i => `${i.part} ${i.qty}`).join('\n');
+                        logger.info(`📝 Order text: ${orderText}`);
+                        
+                        const reply = await processOrder(orderText, from);
                         if (reply) {
                             await sendWhatsAppMessage(from, reply);
                             res.sendStatus(200);
                             return;
                         }
                     }
+                    
+                    // If OCR found nothing, check caption
+                    if (caption) {
+                        const captionItems = extractItemsFromTextUltimate(caption);
+                        if (captionItems && captionItems.length > 0) {
+                            const orderText = captionItems.map(i => `${i.part} ${i.qty}`).join('\n');
+                            const reply = await processOrder(orderText, from);
+                            if (reply) {
+                                await sendWhatsAppMessage(from, reply);
+                                res.sendStatus(200);
+                                return;
+                            }
+                        }
+                    }
+                    
+                    // Final fallback
+                    await sendWhatsAppMessage(from, `📸 *Photo Received!*\n\n` +
+                        `I couldn't read any part numbers from this image.\n\n` +
+                        `💡 Please:\n` +
+                        `1️⃣ Take a clearer photo\n` +
+                        `2️⃣ Add part numbers in the caption\n` +
+                        `📝 Example: "0108FAW00360N 2"\n\n` +
+                        `📞 Call: ${CONFIG.businessPhone}`);
+                    
                 } catch (error) {
                     logger.error(`❌ Image error: ${error.message}`);
+                    await sendWhatsAppMessage(from, `📸 Sorry, I couldn't process your image. Please try again.\n\n📞 Call: ${CONFIG.businessPhone}`);
                 }
-                await sendWhatsAppMessage(from, `📸 *Photo Received!*\n\nPlease add part numbers in the caption.\n📝 Example: "0108FAW00360N 2"\n\n📞 Call: ${CONFIG.businessPhone}`);
+                
                 res.sendStatus(200);
                 return;
             }
             
+            // ============================================================
+            // 🎤 VOICE MESSAGE
+            // ============================================================
             if (type === 'audio') {
                 await sendWhatsAppMessage(from, `🎤 *Voice Received!*\n\nPlease send text or images.\n\n📞 Call: ${CONFIG.businessPhone}`);
                 res.sendStatus(200);
                 return;
             }
             
+            // ============================================================
+            // 📝 TEXT MESSAGE
+            // ============================================================
             const text = message.text?.body || "";
             logger.info(`💬 From: ${from} | Text: ${text.substring(0, 50)}...`);
             
