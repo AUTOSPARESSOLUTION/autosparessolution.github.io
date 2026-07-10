@@ -1,6 +1,5 @@
 // ============================================================
-// 📱 SMART ORDER ENGINE - COMPLETE FIXED VERSION
-// Works with all existing features, no PQueue errors
+// 📱 SMART ORDER ENGINE - COMPLETE FIXED WITH PROXY SUPPORT
 // ============================================================
 
 const express = require("express");
@@ -18,10 +17,14 @@ const Tesseract = require('tesseract.js');
 const { FormData } = require('node-fetch');
 const sharp = require('sharp');
 
-// ✅ FIX: PQueue - use the correct import for v6
+// ✅ FIX: PQueue import
 const PQueue = require('p-queue').default || require('p-queue');
 
 const app = express();
+
+// ✅ FIX: Enable trust proxy for rate limiting behind a proxy (Render, Heroku, etc.)
+app.set('trust proxy', 1);
+
 app.use(helmet());
 
 // ============================================================
@@ -83,7 +86,7 @@ for (const key of requiredConfig) {
     }
 }
 
-logger.info('🚀 SMART ORDER ENGINE - COMPLETE FIXED Started');
+logger.info('🚀 SMART ORDER ENGINE - PROXY FIXED Started');
 
 // ============================================================
 // ⏱️ FETCH WITH TIMEOUT & RETRY
@@ -1120,11 +1123,9 @@ async function cleanupPDF(filepath) {
 // ✅ FIX: Try to create PQueue with fallback
 let messageQueue;
 try {
-    // For p-queue v7+
     const { default: PQueueDefault } = require('p-queue');
     messageQueue = new PQueueDefault({ concurrency: 5, interval: 1000, intervalCap: 10 });
 } catch (e) {
-    // For p-queue v6
     const PQueueV6 = require('p-queue');
     messageQueue = new PQueueV6({ concurrency: 5, interval: 1000, intervalCap: 10 });
 }
@@ -1263,7 +1264,7 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-    res.json({ status: "ok", version: "FIXED", message: "Smart Order Engine is running" });
+    res.json({ status: "ok", version: "PROXY-FIXED", message: "Smart Order Engine is running" });
 });
 
 app.get("/webhook", (req, res) => {
@@ -1471,7 +1472,7 @@ async function handleMessage(message, from, type) {
 async function startServer() {
     try {
         console.log("====================================");
-        console.log("🚀 SMART ORDER ENGINE - FIXED VERSION");
+        console.log("🚀 SMART ORDER ENGINE - PROXY FIXED");
         console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
         console.log(`🧠 ChatGPT Key: ${CONFIG.chatgptKey ? '✅ Set' : '❌ Not set'}`);
         console.log(`🧠 DeepSeek Key: ${CONFIG.deepseekKey ? '✅ Set' : '❌ Not set'}`);
