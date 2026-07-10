@@ -1,6 +1,6 @@
 // ============================================================
-// 📱 SMART ORDER ENGINE V12.2 - COMPLETE FIXED
-// MRP + LIST + GST on Billing Price + Search Results
+// 📱 SMART ORDER ENGINE V13 - AUTO COLUMN DETECTION
+// Complete CSV Support with GST on Billing Price
 // ============================================================
 
 const express = require("express");
@@ -83,7 +83,7 @@ for (const key of required) {
     }
 }
 
-logger.info('🚀 SMART ORDER ENGINE V12.2 Started');
+logger.info('🚀 SMART ORDER ENGINE V13 Started');
 
 // ============================================================
 // ⏱️ FETCH WITH TIMEOUT & RETRY
@@ -178,6 +178,28 @@ async function initDatabase() {
     try {
         await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
 
+        // Updated products table with all fields
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS products (
+                id SERIAL PRIMARY KEY,
+                part VARCHAR(80) UNIQUE NOT NULL,
+                description TEXT,
+                brand VARCHAR(50),
+                make VARCHAR(50),
+                type VARCHAR(50),
+                finish VARCHAR(50),
+                list_value DECIMAL(12,2) DEFAULT 0,
+                mrp DECIMAL(12,2) DEFAULT 0,
+                billing_price DECIMAL(12,2) DEFAULT 0,
+                stock INTEGER DEFAULT 0,
+                box_qty INTEGER DEFAULT 0,
+                carton INTEGER DEFAULT 0,
+                gst DECIMAL(5,2) DEFAULT 18,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS customers (
                 id SERIAL PRIMARY KEY,
@@ -195,47 +217,6 @@ async function initDatabase() {
                 last_contact TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
-
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS products (
-                id SERIAL PRIMARY KEY,
-                part VARCHAR(50) UNIQUE NOT NULL,
-                description TEXT,
-                brand VARCHAR(50),
-                list_value DECIMAL(12,2),
-                mrp DECIMAL(12,2),
-                billing_price DECIMAL(12,2),
-                stock INTEGER DEFAULT 0,
-                box_qty INTEGER DEFAULT 0,
-                carton_qty INTEGER DEFAULT 0,
-                make VARCHAR(50),
-                type VARCHAR(50),
-                finish VARCHAR(50),
-                gst DECIMAL(5,2) DEFAULT 18,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // Add new columns if they don't exist
-        const columns = [
-            'billing_price DECIMAL(12,2)',
-            'box_qty INTEGER DEFAULT 0',
-            'carton_qty INTEGER DEFAULT 0',
-            'make VARCHAR(50)',
-            'type VARCHAR(50)',
-            'finish VARCHAR(50)'
-        ];
-        
-        for (const col of columns) {
-            const colName = col.split(' ')[0];
-            try {
-                await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS ${col}`);
-                logger.info(`✅ Added column: ${colName}`);
-            } catch (e) {
-                // Column might already exist
-            }
-        }
 
         await pool.query(`
             CREATE TABLE IF NOT EXISTS carts (
@@ -299,6 +280,7 @@ async function initDatabase() {
             )
         `);
 
+        // Create indexes
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
@@ -313,6 +295,7 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_carts_phone ON carts(phone)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id)`);
 
+        // Clean old carts
         await pool.query(`
             DELETE FROM carts
             WHERE updated_at < NOW() - INTERVAL '7 days'
@@ -326,7 +309,41 @@ async function initDatabase() {
 }
 
 // ============================================================
-// 📦 PRODUCT LOADING - UPDATED FOR NEW CSV STRUCTURE
+// 🔍 AUTO COLUMN DETECTION
+// ============================================================
+
+function getColumnValue(row, variations) {
+    for (const variation of variations) {
+        // Try exact match
+        if (row[variation] !== undefined && row[variation] !== null && row[variation] !== '') {
+            return row[variation];
+        }
+        // Try case-insensitive
+        const lowerKey = variation.toLowerCase();
+        for (const key of Object.keys(row)) {
+            if (key.toLowerCase() === lowerKey) {
+                return row[key];
+            }
+        }
+    }
+    return null;
+}
+
+function getNumericValue(row, variations, defaultValue = 0) {
+    const value = getColumnValue(row, variations);
+    if (value === null || value === undefined || value === '') return defaultValue;
+    const num = parseFloat(String(value).replace(/,/g, ''));
+    return isNaN(num) ? defaultValue : num;
+}
+
+function getStringValue(row, variations, defaultValue = '') {
+    const value = getColumnValue(row, variations);
+    if (value === null || value === undefined || value === '') return defaultValue;
+    return String(value).trim();
+}
+
+// ============================================================
+// 📦 PRODUCT LOADING - AUTO COLUMN DETECTION
 // ============================================================
 
 async function loadProductsFromCSV() {
@@ -337,29 +354,81 @@ async function loadProductsFromCSV() {
     }
 
     const products = [];
+    const headers = [];
+
     await new Promise((resolve, reject) => {
         fs.createReadStream(csvPath)
             .pipe(csv({ headers: true }))
+            .on('headers', (headerList) => {
+                headers.push(...headerList);
+                logger.info(`📋 CSV Headers: ${headers.join(', ')}`);
+            })
             .on('data', (row) => {
-                // Map CSV columns to product fields
-                const part = (row['Material'] || '').trim();
+                // Auto-detect all fields
+                const part = getStringValue(row, ['Material', 'Part', 'Part No', 'PartNo', 'Part Number']);
                 if (!part) return; // Skip empty rows
                 
                 const product = {
                     part: part,
-                    description: (row['Material2'] || 'Auto Spare Part').trim(),
-                    list_value: parseFloat(row['LIST PRICE'] || 0) || 0,
-                    mrp: parseFloat(row['MRP PRICE'] || 0) || 0,
-                    billing_price: parseFloat(row['billing price'] || 0) || 0,
-                    stock: parseInt(row['STOCK'] || 0) || 0,
-                    box_qty: parseInt(row['Box Qty'] || 0) || 0,
-                    carton_qty: parseInt(row['Carton'] || 0) || 0,
-                    brand: (row['brand'] || 'Unknown').trim(),
-                    make: (row['Make'] || 'Unknown').trim(),
-                    type: (row['TYPE'] || '').trim(),
-                    finish: (row['FINISH'] || '').trim(),
-                    gst: CONFIG.defaultGST
+                    description: getStringValue(row, [
+                        'Material2', 'Description', 'Desc', 'Descriptions', 
+                        'Part Description', 'Item Description'
+                    ], 'Auto Spare Part'),
+                    
+                    brand: getStringValue(row, [
+                        'brand', 'Brand', 'BRAND', 'Make', 'Manufacturer'
+                    ], 'Unknown'),
+                    
+                    make: getStringValue(row, [
+                        'Make', 'make', 'MAKE', 'Manufacturer', 'Company'
+                    ], 'Unknown'),
+                    
+                    type: getStringValue(row, [
+                        'TYPE', 'Type', 'type', 'Category', 'Category Type'
+                    ], ''),
+                    
+                    finish: getStringValue(row, [
+                        'FINISH', 'Finish', 'finish', 'Surface', 'Coating'
+                    ], ''),
+                    
+                    list_value: getNumericValue(row, [
+                        'LIST PRICE', 'List Price', 'List', 'LIST', 'list',
+                        'List Price', 'LIST_PRICE', 'list_price', 'List Value'
+                    ], 0),
+                    
+                    mrp: getNumericValue(row, [
+                        'MRP PRICE', 'MRP Price', 'MRP', 'mrp', 'M.R.P',
+                        'MRP_PRICE', 'mrp_price', 'Max Retail Price'
+                    ], 0),
+                    
+                    billing_price: getNumericValue(row, [
+                        'billing price', 'Billing Price', 'Billing', 'billing',
+                        'BILLING PRICE', 'billing_price', 'BillingPrice'
+                    ], 0),
+                    
+                    stock: getNumericValue(row, [
+                        'STOCK', 'Stock', 'stock', 'Quantity', 'Qty', 'Available'
+                    ], 0),
+                    
+                    box_qty: getNumericValue(row, [
+                        'Box Qty', 'BoxQty', 'box_qty', 'Box', 'box',
+                        'BOX QTY', 'Box Quantity'
+                    ], 0),
+                    
+                    carton: getNumericValue(row, [
+                        'Carton', 'carton', 'CARTON', 'Carton Qty', 'carton_qty',
+                        'Carton Quantity'
+                    ], 0),
+                    
+                    gst: getNumericValue(row, [
+                        'GST', 'Gst', 'gst', 'GST%', 'GST Rate', 'Tax'
+                    ], CONFIG.defaultGST)
                 };
+                
+                // If billing_price is not set, use list_value or mrp as fallback
+                if (product.billing_price === 0) {
+                    product.billing_price = product.list_value || product.mrp || 0;
+                }
                 
                 products.push(product);
             })
@@ -390,33 +459,31 @@ async function loadProductsFromCSV() {
                 `($${idx * 14 + 1}, $${idx * 14 + 2}, $${idx * 14 + 3}, $${idx * 14 + 4}, $${idx * 14 + 5}, $${idx * 14 + 6}, $${idx * 14 + 7}, $${idx * 14 + 8}, $${idx * 14 + 9}, $${idx * 14 + 10}, $${idx * 14 + 11}, $${idx * 14 + 12}, $${idx * 14 + 13}, $${idx * 14 + 14})`
             ).join(',');
             const params = batch.flatMap(p => [
-                p.part, p.description, p.brand, 
-                p.list_value, p.mrp, p.billing_price,
-                p.stock, p.box_qty, p.carton_qty,
-                p.make, p.type, p.finish,
+                p.part, p.description, p.brand, p.make, 
+                p.type, p.finish, p.list_value, p.mrp, 
+                p.billing_price, p.stock, p.box_qty, p.carton,
                 p.gst
             ]);
             
             await client.query(
                 `INSERT INTO products (
-                    part, description, brand, 
-                    list_value, mrp, billing_price,
-                    stock, box_qty, carton_qty,
-                    make, type, finish,
+                    part, description, brand, make,
+                    type, finish, list_value, mrp,
+                    billing_price, stock, box_qty, carton,
                     gst
                  ) VALUES ${values}
                  ON CONFLICT (part) DO UPDATE SET
                  description = EXCLUDED.description,
                  brand = EXCLUDED.brand,
+                 make = EXCLUDED.make,
+                 type = EXCLUDED.type,
+                 finish = EXCLUDED.finish,
                  list_value = EXCLUDED.list_value,
                  mrp = EXCLUDED.mrp,
                  billing_price = EXCLUDED.billing_price,
                  stock = EXCLUDED.stock,
                  box_qty = EXCLUDED.box_qty,
-                 carton_qty = EXCLUDED.carton_qty,
-                 make = EXCLUDED.make,
-                 type = EXCLUDED.type,
-                 finish = EXCLUDED.finish,
+                 carton = EXCLUDED.carton,
                  gst = EXCLUDED.gst,
                  updated_at = CURRENT_TIMESTAMP`,
                 params
@@ -425,7 +492,16 @@ async function loadProductsFromCSV() {
         
         await client.query('COMMIT');
         logger.info(`✅ Loaded ${products.length} products`);
-        logger.info(`📊 Sample: ${products[0]?.part} | LIST: ${products[0]?.list_value} | MRP: ${products[0]?.mrp} | Billing: ${products[0]?.billing_price}`);
+        
+        // Log sample for verification
+        if (products.length > 0) {
+            const sample = products[0];
+            logger.info(`📊 Sample: ${sample.part}`);
+            logger.info(`   Description: ${sample.description}`);
+            logger.info(`   Brand: ${sample.brand}, Make: ${sample.make}`);
+            logger.info(`   LIST: ${sample.list_value}, MRP: ${sample.mrp}, Billing: ${sample.billing_price}`);
+            logger.info(`   Stock: ${sample.stock}, Box: ${sample.box_qty}, Carton: ${sample.carton}`);
+        }
     } catch (error) {
         await client.query('ROLLBACK');
         logger.error('❌ Product load error:', error);
@@ -436,7 +512,7 @@ async function loadProductsFromCSV() {
 }
 
 // ============================================================
-// 📋 PRODUCT DATA (for aiSearch)
+// 📋 PRODUCT DATA
 // ============================================================
 
 let allProducts = [];
@@ -447,7 +523,6 @@ let productMap = new Map();
 // ============================================================
 
 function calculatePrices(product, qty = 1) {
-    // Use billing_price, fallback to list_value if billing_price not available
     const billingPrice = product.billing_price || product.list_value || 0;
     const mrp = product.mrp || 0;
     const listValue = product.list_value || 0;
@@ -476,7 +551,7 @@ function calculatePrices(product, qty = 1) {
 }
 
 // ============================================================
-// 🔍 SEARCH PRODUCTS - WITH FULL DETAILS
+// 🔍 SEARCH PRODUCTS
 // ============================================================
 
 async function searchProducts(query) {
@@ -587,7 +662,7 @@ async function searchProducts(query) {
 }
 
 // ============================================================
-// 📋 FORMAT SEARCH RESULTS - WITH FULL DETAILS
+// 📋 FORMAT SEARCH RESULTS
 // ============================================================
 
 function formatSearchResults(products, query) {
@@ -608,11 +683,11 @@ function formatSearchResults(products, query) {
         reply += `\n`;
         
         // Description
-        if (product.description) {
+        if (product.description && product.description !== 'Auto Spare Part') {
             reply += `📝 ${product.description}\n`;
         }
         
-        // Brand
+        // Brand & Make
         if (product.brand && product.brand !== 'Unknown') {
             reply += `🏷️ Brand: ${product.brand}`;
             if (product.make && product.make !== 'Unknown') {
@@ -643,14 +718,14 @@ function formatSearchResults(products, query) {
             reply += `💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}\n`;
         }
         
-        // Stock
+        // Stock & Packaging
         if (product.stock > 0) {
             reply += `📦 ✅ ${product.stock} pcs in stock`;
             if (product.box_qty > 0) {
                 reply += ` | Box: ${product.box_qty}`;
             }
-            if (product.carton_qty > 0) {
-                reply += ` | Carton: ${product.carton_qty}`;
+            if (product.carton > 0) {
+                reply += ` | Carton: ${product.carton}`;
             }
             reply += `\n`;
         } else {
@@ -672,7 +747,7 @@ function formatSearchResults(products, query) {
 }
 
 // ============================================================
-// 🔍 AI SEARCH - WITH MRP & LIST (Legacy support)
+// 🔍 AI SEARCH (Legacy support)
 // ============================================================
 
 function aiSearch(query) {
@@ -695,7 +770,7 @@ function aiSearch(query) {
 }
 
 // ============================================================
-// 📋 FORMAT PRODUCT LINE - WITH MRP, LIST & GST on Billing Price
+// 📋 FORMAT PRODUCT LINE
 // ============================================================
 
 function formatProductLine(product, qty, confidence, original = null) {
@@ -707,12 +782,13 @@ function formatProductLine(product, qty, confidence, original = null) {
         line += `\n   📝 OCR read: ${original}`;
     }
     line += `\n📝 ${product.description || 'N/A'}`;
-    if (product.brand) line += `\n🏷️ Brand: ${product.brand}`;
-    if (product.make) line += `\n🏭 Make: ${product.make}`;
+    if (product.brand && product.brand !== 'Unknown') line += `\n🏷️ Brand: ${product.brand}`;
+    if (product.make && product.make !== 'Unknown') line += `\n🏭 Make: ${product.make}`;
     if (product.type) line += `\n📊 Type: ${product.type}`;
+    if (product.finish) line += `\n🎨 Finish: ${product.finish}`;
     line += `\n📦 Qty: ${qty}`;
     
-    // ✅ SHOW LIST PRICE, MRP, and Billing Price
+    // ✅ SHOW ALL PRICES
     if (prices.listValue > 0) {
         line += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
     }
@@ -727,8 +803,8 @@ function formatProductLine(product, qty, confidence, original = null) {
     if (product.box_qty > 0) {
         line += `\n📦 Box Qty: ${product.box_qty}`;
     }
-    if (product.carton_qty > 0) {
-        line += `\n📦 Carton Qty: ${product.carton_qty}`;
+    if (product.carton > 0) {
+        line += `\n📦 Carton Qty: ${product.carton}`;
     }
     line += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
     
@@ -1253,7 +1329,7 @@ async function clearCartDB(phone) {
 }
 
 // ============================================================
-// 📦 ORDER PROCESSING - WITH MRP, LIST & GST on Billing Price
+// 📦 ORDER PROCESSING
 // ============================================================
 
 async function processOrder(text, from) {
@@ -1293,7 +1369,7 @@ async function processOrder(text, from) {
         list_value: r.product.list_value,
         billing_price: r.product.billing_price,
         box_qty: r.product.box_qty,
-        carton_qty: r.product.carton_qty,
+        carton: r.product.carton,
         gst: r.product.gst || CONFIG.defaultGST,
         confidence: r.confidence
     }));
@@ -1321,8 +1397,9 @@ async function processOrder(text, from) {
         if (r.confidence < 0.95) reply += ` (${Math.round(r.confidence * 100)}%)`;
         if (r.original) reply += `\n   📝 OCR read: ${r.original}`;
         reply += `\n📝 ${p.description}`;
-        if (p.brand) reply += `\n🏷️ Brand: ${p.brand}`;
-        if (p.make) reply += `\n🏭 Make: ${p.make}`;
+        if (p.brand && p.brand !== 'Unknown') reply += `\n🏷️ Brand: ${p.brand}`;
+        if (p.make && p.make !== 'Unknown') reply += `\n🏭 Make: ${p.make}`;
+        if (p.type) reply += `\n📊 Type: ${p.type}`;
         reply += `\n📦 Qty: ${r.qty}`;
         
         // ✅ SHOW ALL PRICES WITH GST ON BILLING PRICE
@@ -1340,8 +1417,8 @@ async function processOrder(text, from) {
         if (p.box_qty > 0) {
             reply += `\n📦 Box Qty: ${p.box_qty}`;
         }
-        if (p.carton_qty > 0) {
-            reply += `\n📦 Carton Qty: ${p.carton_qty}`;
+        if (p.carton > 0) {
+            reply += `\n📦 Carton Qty: ${p.carton}`;
         }
         reply += `\n📦 Stock: ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
     }
@@ -1803,7 +1880,7 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-    res.json({ status: "ok", version: "V12.2" });
+    res.json({ status: "ok", version: "V13" });
 });
 
 app.get("/webhook", (req, res) => {
@@ -1907,7 +1984,7 @@ async function handleMessage(message, from, type) {
                 await sendWhatsAppMessage(from, 
                     `📸 *Photo Received!*\n\n` +
                     `I couldn't read any part numbers from the image${caption ? ' or caption' : ''}.\n\n` +
-                    `💡 Please send the part number directly.\n📝 Example: "0108FAW00360N 2"\n\n` +
+                    `💡 Please send the part number directly.\n📝 Example: "0801BA0285N 2"\n\n` +
                     `📞 Call: ${CONFIG.businessPhone}`
                 );
             } catch (error) {
@@ -1956,7 +2033,7 @@ async function handleMessage(message, from, type) {
         if (msgLower === "get quote" || msgLower === "quotation") {
             const cart = await getCartDB(from);
             if (!cart || cart.items.length === 0) {
-                await sendWhatsAppMessage(from, "📄 Your cart is empty.\n\nSend part numbers like: \"0108FAW00360N 2\"");
+                await sendWhatsAppMessage(from, "📄 Your cart is empty.\n\nSend part numbers like: \"0801BA0285N 2\"");
                 return;
             }
             const quotationNo = `Q-${Date.now().toString().slice(-6)}`;
@@ -1969,7 +2046,7 @@ async function handleMessage(message, from, type) {
         
         if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start") {
             await sendWhatsAppMessage(from, 
-                `👋 *Smart Order Engine V12.2*\n\n` +
+                `👋 *Smart Order Engine V13*\n\n` +
                 `🔍 Search: Send part number or brand\n` +
                 `📸 Send photo of order\n` +
                 `📝 Send text with part numbers\n` +
@@ -2035,8 +2112,11 @@ async function startServer() {
             const sample = allProducts[0];
             const prices = calculatePrices(sample);
             logger.info(`📊 Sample product: ${sample.part}`);
-            logger.info(`📊 LIST PRICE: ${sample.list_value}, MRP: ${sample.mrp}, Billing: ${sample.billing_price}`);
-            logger.info(`📊 GST: ${prices.gstRate}%, GST Amount: ${prices.gstAmount}, Price incl. GST: ${prices.priceWithGST}`);
+            logger.info(`   Description: ${sample.description}`);
+            logger.info(`   Brand: ${sample.brand}, Make: ${sample.make}`);
+            logger.info(`   LIST: ${sample.list_value}, MRP: ${sample.mrp}, Billing: ${sample.billing_price}`);
+            logger.info(`   Stock: ${sample.stock}, Box: ${sample.box_qty}, Carton: ${sample.carton}`);
+            logger.info(`   GST: ${prices.gstRate}%, GST Amount: ${prices.gstAmount}, Price incl. GST: ${prices.priceWithGST}`);
         }
         
         const PORT = process.env.PORT || 10000;
@@ -2050,6 +2130,7 @@ async function startServer() {
             logger.info(`🗄️ Database: ${CONFIG.databaseUrl ? '✅' : '❌'}`);
             logger.info(`📦 Products loaded: ${allProducts.length}`);
             logger.info(`🧾 Default GST: ${CONFIG.defaultGST}% on Billing Price`);
+            logger.info(`✨ Auto Column Detection: Enabled`);
         });
     } catch (error) {
         logger.error(`❌ Startup error: ${error.message}`);
