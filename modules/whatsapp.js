@@ -191,4 +191,154 @@ async function handleWhatsAppMessage(message, from, type) {
                     if (product) {
                         let reply = `📦 *Stock: ${product.part}*\n\n`;
                         reply += `📝 ${product.description}\n`;
-                        reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '
+                        reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
+                        if (product.box_qty > 0) reply += ` | Box: ${product.box_qty}`;
+                        if (product.carton > 0) reply += ` | Carton: ${product.carton}`;
+                        await sendWhatsAppMessage(from, reply);
+                        return;
+                    }
+                }
+            }
+            
+            // ============================================================
+            // ORDER COMMAND
+            // ============================================================
+            if (msgLower.includes('order') || msgLower.includes('buy')) {
+                const partMatch = text.match(/(\d+)?\s*([A-Z0-9]{5,})/i);
+                if (partMatch) {
+                    const qty = parseInt(partMatch[1]) || 1;
+                    const partNumber = partMatch[2].toUpperCase();
+                    const product = await db.getProduct(partNumber);
+                    if (product) {
+                        const billingPrice = product.billing_price || product.list_price || 0;
+                        const priceWithGST = billingPrice * 1.18;
+                        const total = priceWithGST * qty;
+                        
+                        let reply = `🛒 *Order: ${product.part} x${qty}*\n\n`;
+                        reply += `📝 ${product.description}\n`;
+                        reply += `💰 ₹${priceWithGST.toFixed(2)} × ${qty} = ₹${total.toFixed(2)} (incl. GST)\n`;
+                        reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}\n\n`;
+                        if (product.stock > 0) {
+                            reply += `✅ *Confirm order?* Reply "Confirm Order"`;
+                        } else {
+                            reply += `🔔 *We'll notify you when back in stock!*`;
+                        }
+                        await sendWhatsAppMessage(from, reply);
+                        return;
+                    }
+                }
+            }
+            
+            // ============================================================
+            // CONFIRM ORDER
+            // ============================================================
+            if (msgLower === 'confirm order' || msgLower === 'confirm') {
+                const cart = await db.getCart(from);
+                if (cart && cart.items) {
+                    const items = JSON.parse(cart.items);
+                    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+                    await db.saveOrder(orderId, from, items, cart.total);
+                    await db.clearCart(from);
+                    
+                    let reply = `✅ *ORDER CONFIRMED!*\n\n`;
+                    reply += `📦 Order ID: ${orderId}\n`;
+                    reply += `💰 Total: ₹${cart.total.toFixed(2)}\n`;
+                    reply += `📞 *Call:* ${process.env.BUSINESS_PHONE || '9830300193'}\n`;
+                    reply += `🛒 *Shop:* https://autosparessolution.com`;
+                    await sendWhatsAppMessage(from, reply);
+                    return;
+                } else {
+                    await sendWhatsAppMessage(from, '🛒 Your cart is empty. Add items first!');
+                    return;
+                }
+            }
+            
+            // ============================================================
+            // CLEAR CART
+            // ============================================================
+            if (msgLower === 'clear cart' || msgLower === 'clear') {
+                await db.clearCart(from);
+                await sendWhatsAppMessage(from, '🗑️ Cart cleared!');
+                return;
+            }
+            
+            // ============================================================
+            // SEARCH PRODUCTS
+            // ============================================================
+            const results = await db.searchProducts(text, 5);
+            
+            if (results.length > 0) {
+                let reply = `🔍 Found ${results.length} result(s)\n\n`;
+                
+                results.forEach((p, i) => {
+                    reply += formatProductForWhatsApp(p, i);
+                    reply += `\n`;
+                });
+                
+                reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+                reply += `🛒 To order: Send part number with quantity\n`;
+                reply += `📝 Example: "${results[0]?.part} 2"\n`;
+                reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+                reply += `🛒 Order: https://autosparessolution.com\n`;
+                reply += `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`;
+                
+                await sendWhatsAppMessage(from, reply);
+            } else {
+                await sendWhatsAppMessage(from, 
+                    `🔍 No results found for "${text}"\n\n` +
+                    `💡 Try sending a part number like:\n` +
+                    `"0801BA0285N"\n\n` +
+                    `💡 Or send "Help" for options\n\n` +
+                    `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`
+                );
+            }
+        }
+        
+        // ============================================================
+        // IMAGE HANDLING
+        // ============================================================
+        if (type === 'image') {
+            await sendWhatsAppMessage(from, 
+                `📸 *Photo Received!*\n\n` +
+                `💡 Please send the part number directly.\n` +
+                `📝 Example: "0801BA0285N 2"\n\n` +
+                `💡 Or send "Help" for options\n\n` +
+                `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`
+            );
+            return;
+        }
+        
+        // ============================================================
+        // AUDIO HANDLING
+        // ============================================================
+        if (type === 'audio') {
+            await sendWhatsAppMessage(from, 
+                `🎤 *Voice Received!*\n\n` +
+                `💡 Please send text or images.\n\n` +
+                `💡 Or send "Help" for options\n\n` +
+                `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`
+            );
+            return;
+        }
+        
+        // ============================================================
+        // OTHER TYPES
+        // ============================================================
+        await sendWhatsAppMessage(from, 
+            `📩 Received your ${type} message.\n\n` +
+            `💡 Please send text with part numbers.\n` +
+            `💡 Or send "Help" for options\n\n` +
+            `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`
+        );
+        
+    } catch (error) {
+        console.error(`❌ Message handler error: ${error.message}`);
+        await sendWhatsAppMessage(from, '⚠️ Sorry, something went wrong. Please try again.');
+    }
+}
+
+module.exports = {
+    sendWhatsAppMessage,
+    handleWhatsAppMessage,
+    formatProductForWhatsApp
+};
