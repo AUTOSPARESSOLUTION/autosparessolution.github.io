@@ -1,6 +1,6 @@
 // ============================================================
-// 📱 SMART ORDER ENGINE V13 - FULLY FIXED
-// Complete Price Display with GST on Billing Price
+// 📱 SMART ORDER ENGINE V13 - COMPLETE FIXED
+// Full CSV Support + Billing Price Logic
 // ============================================================
 
 const express = require("express");
@@ -83,7 +83,7 @@ for (const key of required) {
     }
 }
 
-logger.info('🚀 SMART ORDER ENGINE V13 Started');
+logger.info('🚀 SMART ORDER ENGINE V13 - COMPLETE FIXED Started');
 
 // ============================================================
 // ⏱️ FETCH WITH TIMEOUT & RETRY
@@ -178,7 +178,7 @@ async function initDatabase() {
     try {
         await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
 
-        // Updated products table with all fields
+        // ✅ COMPLETE products table with all fields from CSV
         await pool.query(`
             CREATE TABLE IF NOT EXISTS products (
                 id SERIAL PRIMARY KEY,
@@ -199,6 +199,26 @@ async function initDatabase() {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        // ✅ Add missing columns if they don't exist
+        const columnsToAdd = [
+            'make VARCHAR(50)',
+            'type VARCHAR(50)',
+            'finish VARCHAR(50)',
+            'billing_price DECIMAL(12,2) DEFAULT 0',
+            'box_qty INTEGER DEFAULT 0',
+            'carton INTEGER DEFAULT 0'
+        ];
+        
+        for (const col of columnsToAdd) {
+            const colName = col.split(' ')[0];
+            try {
+                await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS ${col}`);
+                logger.info(`✅ Added column: ${colName}`);
+            } catch (e) {
+                // Column might already exist
+            }
+        }
 
         await pool.query(`
             CREATE TABLE IF NOT EXISTS customers (
@@ -309,41 +329,7 @@ async function initDatabase() {
 }
 
 // ============================================================
-// 🔍 AUTO COLUMN DETECTION
-// ============================================================
-
-function getColumnValue(row, variations) {
-    for (const variation of variations) {
-        // Try exact match
-        if (row[variation] !== undefined && row[variation] !== null && row[variation] !== '') {
-            return row[variation];
-        }
-        // Try case-insensitive
-        const lowerKey = variation.toLowerCase();
-        for (const key of Object.keys(row)) {
-            if (key.toLowerCase() === lowerKey) {
-                return row[key];
-            }
-        }
-    }
-    return null;
-}
-
-function getNumericValue(row, variations, defaultValue = 0) {
-    const value = getColumnValue(row, variations);
-    if (value === null || value === undefined || value === '') return defaultValue;
-    const num = parseFloat(String(value).replace(/,/g, ''));
-    return isNaN(num) ? defaultValue : num;
-}
-
-function getStringValue(row, variations, defaultValue = '') {
-    const value = getColumnValue(row, variations);
-    if (value === null || value === undefined || value === '') return defaultValue;
-    return String(value).trim();
-}
-
-// ============================================================
-// 📦 PRODUCT LOADING - AUTO COLUMN DETECTION
+// 📦 PRODUCT LOADING - CORRECT CSV MAPPING
 // ============================================================
 
 async function loadProductsFromCSV() {
@@ -354,82 +340,49 @@ async function loadProductsFromCSV() {
     }
 
     const products = [];
-    const headers = [];
+    let headers = [];
 
     await new Promise((resolve, reject) => {
         fs.createReadStream(csvPath)
             .pipe(csv({ headers: true }))
             .on('headers', (headerList) => {
-                headers.push(...headerList);
+                headers = headerList;
                 logger.info(`📋 CSV Headers: ${headers.join(', ')}`);
             })
             .on('data', (row) => {
-                // Auto-detect all fields
-                const part = getStringValue(row, ['Material', 'Part', 'Part No', 'PartNo', 'Part Number']);
+                // ✅ CORRECT CSV COLUMN MAPPING
+                const part = (row['Material'] || row['material'] || row['PART'] || '').trim();
                 if (!part) return; // Skip empty rows
+
+                const description = (row['Material2'] || row['Description'] || row['DESCRIPTION'] || 'Auto Spare Part').trim();
                 
+                const listValue = parseFloat(row['LIST PRICE'] || row['List Price'] || row['LIST'] || 0);
+                const mrp = parseFloat(row['MRP PRICE'] || row['MRP Price'] || row['MRP'] || 0);
+                const billing = parseFloat(row['billing price'] || row['Billing Price'] || row['BILLING PRICE'] || listValue || 0);
+                const stock = parseInt(row['STOCK'] || row['Stock'] || 0);
+                const boxQty = parseInt(row['Box Qty'] || row['box_qty'] || 0);
+                const carton = parseInt(row['Carton'] || row['carton'] || 0);
+                const brand = (row['brand'] || row['Brand'] || 'Unknown').trim();
+                const make = (row['Make'] || row['make'] || '').trim();
+                const type = (row['TYPE'] || row['Type'] || row['type'] || '').trim();
+                const finish = (row['FINISH'] || row['Finish'] || row['finish'] || '').trim();
+
                 const product = {
                     part: part,
-                    description: getStringValue(row, [
-                        'Material2', 'Description', 'Desc', 'Descriptions', 
-                        'Part Description', 'Item Description'
-                    ], 'Auto Spare Part'),
-                    
-                    brand: getStringValue(row, [
-                        'brand', 'Brand', 'BRAND', 'Make', 'Manufacturer'
-                    ], 'Unknown'),
-                    
-                    make: getStringValue(row, [
-                        'Make', 'make', 'MAKE', 'Manufacturer', 'Company'
-                    ], 'Unknown'),
-                    
-                    type: getStringValue(row, [
-                        'TYPE', 'Type', 'type', 'Category', 'Category Type'
-                    ], ''),
-                    
-                    finish: getStringValue(row, [
-                        'FINISH', 'Finish', 'finish', 'Surface', 'Coating'
-                    ], ''),
-                    
-                    list_value: getNumericValue(row, [
-                        'LIST PRICE', 'List Price', 'List', 'LIST', 'list',
-                        'List Price', 'LIST_PRICE', 'list_price', 'List Value'
-                    ], 0),
-                    
-                    mrp: getNumericValue(row, [
-                        'MRP PRICE', 'MRP Price', 'MRP', 'mrp', 'M.R.P',
-                        'MRP_PRICE', 'mrp_price', 'Max Retail Price'
-                    ], 0),
-                    
-                    billing_price: getNumericValue(row, [
-                        'billing price', 'Billing Price', 'Billing', 'billing',
-                        'BILLING PRICE', 'billing_price', 'BillingPrice'
-                    ], 0),
-                    
-                    stock: getNumericValue(row, [
-                        'STOCK', 'Stock', 'stock', 'Quantity', 'Qty', 'Available'
-                    ], 0),
-                    
-                    box_qty: getNumericValue(row, [
-                        'Box Qty', 'BoxQty', 'box_qty', 'Box', 'box',
-                        'BOX QTY', 'Box Quantity'
-                    ], 0),
-                    
-                    carton: getNumericValue(row, [
-                        'Carton', 'carton', 'CARTON', 'Carton Qty', 'carton_qty',
-                        'Carton Quantity'
-                    ], 0),
-                    
-                    gst: getNumericValue(row, [
-                        'GST', 'Gst', 'gst', 'GST%', 'GST Rate', 'Tax'
-                    ], CONFIG.defaultGST)
+                    description: description,
+                    brand: brand,
+                    make: make,
+                    type: type,
+                    finish: finish,
+                    list_value: listValue,
+                    mrp: mrp,
+                    billing_price: billing > 0 ? billing : listValue, // Fallback to list_value if billing not set
+                    stock: stock,
+                    box_qty: boxQty,
+                    carton: carton,
+                    gst: CONFIG.defaultGST
                 };
-                
-                // If billing_price is not set, use list_value or mrp as fallback
-                if (product.billing_price === 0) {
-                    product.billing_price = product.list_value || product.mrp || 0;
-                }
-                
+
                 products.push(product);
             })
             .on('end', resolve)
@@ -523,6 +476,7 @@ let productMap = new Map();
 // ============================================================
 
 function calculatePrices(product, qty = 1) {
+    // ✅ Use billing_price as base for calculations
     const billingPrice = product.billing_price || product.list_value || 0;
     const mrp = product.mrp || 0;
     const listValue = product.list_value || 0;
@@ -705,51 +659,32 @@ function formatSearchResults(products, query) {
             reply += `\n`;
         }
         
-        // ============================================================
-        // ✅ FULL PRICE BREAKDOWN - SHOW ALL PRICES
-        // ============================================================
-        
-        // LIST PRICE
+        // ✅ FULL PRICE BREAKDOWN
         if (prices.listValue > 0) {
             reply += `💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}\n`;
         }
-        
-        // MRP PRICE
         if (prices.mrp > 0) {
             reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
         }
-        
-        // Billing Price with GST breakdown
         if (prices.billingPrice > 0) {
             reply += `💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}\n`;
             reply += `🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}\n`;
             reply += `💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}\n`;
         }
         
-        // ============================================================
-        // 📦 PACKAGING & STOCK DETAILS
-        // ============================================================
-        
+        // Stock & Packaging
         let stockInfo = [];
-        
-        // Stock status
         if (product.stock > 0) {
             stockInfo.push(`✅ ${product.stock} pcs`);
         } else {
             stockInfo.push(`❌ Out of Stock`);
         }
-        
-        // Box quantity
         if (product.box_qty > 0) {
             stockInfo.push(`Box: ${product.box_qty}`);
         }
-        
-        // Carton quantity
         if (product.carton > 0) {
             stockInfo.push(`Carton: ${product.carton}`);
         }
-        
-        // Show packaging info
         if (stockInfo.length > 0) {
             reply += `📦 ${stockInfo.join(' | ')}\n`;
         }
@@ -819,7 +754,7 @@ async function searchProduct(partNumber) {
 }
 
 // ============================================================
-// 📋 FORMAT PRODUCT LINE - UPDATED WITH FULL DETAILS
+// 📋 FORMAT PRODUCT LINE - WITH FULL DETAILS
 // ============================================================
 
 function formatProductLine(product, qty, confidence, original = null) {
@@ -840,9 +775,7 @@ function formatProductLine(product, qty, confidence, original = null) {
     if (prices.listValue > 0) {
         line += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
     }
-    if (prices.mrp > 0 && prices.mrp !== prices.listValue) {
-        line += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
-    } else if (prices.mrp > 0) {
+    if (prices.mrp > 0) {
         line += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
     }
     if (prices.billingPrice > 0) {
@@ -851,12 +784,13 @@ function formatProductLine(product, qty, confidence, original = null) {
         line += `\n💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}`;
     }
     
-    line += `\n📦 Qty: ${qty}`;
-    line += ` x ₹${prices.priceWithGST.toFixed(2)} = ₹${(prices.priceWithGST * qty).toFixed(2)}`;
+    line += `\n📦 ${qty} x ₹${prices.priceWithGST.toFixed(2)} = ₹${(prices.priceWithGST * qty).toFixed(2)}`;
     
     // Stock & Packaging
-    if (product.stock > 0) {
+    if (product.stock > 0 && product.stock >= qty) {
         line += `\n📦 ✅ ${product.stock} pcs available`;
+    } else if (product.stock > 0 && product.stock < qty) {
+        line += `\n📦 ⚠️ Only ${product.stock} pcs available (requested ${qty})`;
     } else {
         line += `\n📦 ❌ OUT OF STOCK`;
     }
@@ -1338,7 +1272,7 @@ async function clearCartDB(phone) {
 }
 
 // ============================================================
-// 📦 ORDER PROCESSING - UPDATED WITH FULL DETAILS
+// 📦 ORDER PROCESSING - FULL DETAILS
 // ============================================================
 
 async function processOrder(text, from) {
@@ -1380,22 +1314,27 @@ async function processOrder(text, from) {
         box_qty: r.product.box_qty,
         carton: r.product.carton,
         gst: r.product.gst || CONFIG.defaultGST,
-        confidence: r.confidence
+        confidence: r.confidence,
+        stock: r.product.stock
     }));
     
-    // Calculate totals based on BILLING PRICE + GST
+    // ✅ Calculate totals based on BILLING PRICE + GST
     let subtotal = 0;
     let totalGST = 0;
     let grandTotal = 0;
     let outOfStockItems = [];
+    let partialStockItems = [];
     
     for (const item of cartItems) {
         const prices = calculatePrices(item, item.qty);
         subtotal += prices.totalBilling;
         totalGST += prices.totalGST;
         grandTotal += prices.totalWithGST;
-        if (item.stock === 0 || item.stock < item.qty) {
+        
+        if (item.stock === 0) {
             outOfStockItems.push(item.part);
+        } else if (item.stock < item.qty) {
+            partialStockItems.push({ part: item.part, available: item.stock, requested: item.qty });
         }
     }
     
@@ -1416,13 +1355,11 @@ async function processOrder(text, from) {
         if (p.type) reply += `\n📊 Type: ${p.type}`;
         if (p.finish) reply += `\n🎨 Finish: ${p.finish}`;
         
-        // ✅ SHOW FULL PRICE BREAKDOWN
+        // ✅ FULL PRICE BREAKDOWN
         if (prices.listValue > 0) {
             reply += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
         }
-        if (prices.mrp > 0 && prices.mrp !== prices.listValue) {
-            reply += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
-        } else if (prices.mrp > 0) {
+        if (prices.mrp > 0) {
             reply += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
         }
         if (prices.billingPrice > 0) {
@@ -1431,7 +1368,6 @@ async function processOrder(text, from) {
             reply += `\n💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}`;
         }
         
-        // Show line total with qty
         reply += `\n📦 ${r.qty} x ₹${prices.priceWithGST.toFixed(2)} = ₹${(prices.priceWithGST * r.qty).toFixed(2)}`;
         
         // Stock status
@@ -1464,6 +1400,13 @@ async function processOrder(text, from) {
     if (outOfStockItems.length > 0) {
         reply += `⚠️ Out of Stock: ${outOfStockItems.join(', ')}\n`;
         reply += `🔔 We'll notify you when available.\n\n`;
+    }
+    
+    if (partialStockItems.length > 0) {
+        for (const item of partialStockItems) {
+            reply += `⚠️ ${item.part}: Only ${item.available} available (requested ${item.requested})\n`;
+        }
+        reply += `\n`;
     }
     
     reply += `*What would you like to do?*\n`;
