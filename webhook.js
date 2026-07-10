@@ -819,7 +819,7 @@ async function searchProduct(partNumber) {
 }
 
 // ============================================================
-// 📋 FORMAT PRODUCT LINE - For Order Display
+// 📋 FORMAT PRODUCT LINE - UPDATED WITH FULL DETAILS
 // ============================================================
 
 function formatProductLine(product, qty, confidence, original = null) {
@@ -835,13 +835,14 @@ function formatProductLine(product, qty, confidence, original = null) {
     if (product.make && product.make !== 'Unknown') line += `\n🏭 Make: ${product.make}`;
     if (product.type) line += `\n📊 Type: ${product.type}`;
     if (product.finish) line += `\n🎨 Finish: ${product.finish}`;
-    line += `\n📦 Qty: ${qty}`;
     
-    // ✅ SHOW ALL PRICES
+    // ✅ SHOW FULL PRICE BREAKDOWN
     if (prices.listValue > 0) {
         line += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
     }
-    if (prices.mrp > 0) {
+    if (prices.mrp > 0 && prices.mrp !== prices.listValue) {
+        line += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
+    } else if (prices.mrp > 0) {
         line += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
     }
     if (prices.billingPrice > 0) {
@@ -849,13 +850,22 @@ function formatProductLine(product, qty, confidence, original = null) {
         line += `\n🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}`;
         line += `\n💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}`;
     }
+    
+    line += `\n📦 Qty: ${qty}`;
+    line += ` x ₹${prices.priceWithGST.toFixed(2)} = ₹${(prices.priceWithGST * qty).toFixed(2)}`;
+    
+    // Stock & Packaging
+    if (product.stock > 0) {
+        line += `\n📦 ✅ ${product.stock} pcs available`;
+    } else {
+        line += `\n📦 ❌ OUT OF STOCK`;
+    }
     if (product.box_qty > 0) {
-        line += `\n📦 Box Qty: ${product.box_qty}`;
+        line += ` | Box: ${product.box_qty}`;
     }
     if (product.carton > 0) {
-        line += `\n📦 Carton Qty: ${product.carton}`;
+        line += ` | Carton: ${product.carton}`;
     }
-    line += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
     
     return line;
 }
@@ -1328,7 +1338,7 @@ async function clearCartDB(phone) {
 }
 
 // ============================================================
-// 📦 ORDER PROCESSING
+// 📦 ORDER PROCESSING - UPDATED WITH FULL DETAILS
 // ============================================================
 
 async function processOrder(text, from) {
@@ -1377,17 +1387,22 @@ async function processOrder(text, from) {
     let subtotal = 0;
     let totalGST = 0;
     let grandTotal = 0;
+    let outOfStockItems = [];
     
     for (const item of cartItems) {
         const prices = calculatePrices(item, item.qty);
         subtotal += prices.totalBilling;
         totalGST += prices.totalGST;
         grandTotal += prices.totalWithGST;
+        if (item.stock === 0 || item.stock < item.qty) {
+            outOfStockItems.push(item.part);
+        }
     }
     
     await saveCartDB(from, cartItems, subtotal, grandTotal);
     
-    let reply = `📋 *ORDER EXTRACTED*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+    let reply = `📋 *MULTI-PRODUCT ENQUIRY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
     for (const r of results) {
         const p = r.product;
         const prices = calculatePrices(p, r.qty);
@@ -1400,13 +1415,14 @@ async function processOrder(text, from) {
         if (p.make && p.make !== 'Unknown') reply += `\n🏭 Make: ${p.make}`;
         if (p.type) reply += `\n📊 Type: ${p.type}`;
         if (p.finish) reply += `\n🎨 Finish: ${p.finish}`;
-        reply += `\n📦 Qty: ${r.qty}`;
         
-        // ✅ SHOW ALL PRICES WITH GST ON BILLING PRICE
+        // ✅ SHOW FULL PRICE BREAKDOWN
         if (prices.listValue > 0) {
             reply += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
         }
-        if (prices.mrp > 0) {
+        if (prices.mrp > 0 && prices.mrp !== prices.listValue) {
+            reply += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
+        } else if (prices.mrp > 0) {
             reply += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
         }
         if (prices.billingPrice > 0) {
@@ -1414,22 +1430,43 @@ async function processOrder(text, from) {
             reply += `\n🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}`;
             reply += `\n💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}`;
         }
+        
+        // Show line total with qty
+        reply += `\n📦 ${r.qty} x ₹${prices.priceWithGST.toFixed(2)} = ₹${(prices.priceWithGST * r.qty).toFixed(2)}`;
+        
+        // Stock status
+        if (p.stock > 0 && p.stock >= r.qty) {
+            reply += `\n📦 ✅ ${p.stock} pcs available`;
+        } else if (p.stock > 0 && p.stock < r.qty) {
+            reply += `\n📦 ⚠️ Only ${p.stock} pcs available (requested ${r.qty})`;
+        } else {
+            reply += `\n📦 ❌ OUT OF STOCK`;
+        }
+        
         if (p.box_qty > 0) {
-            reply += `\n📦 Box Qty: ${p.box_qty}`;
+            reply += ` | Box: ${p.box_qty}`;
         }
         if (p.carton > 0) {
-            reply += `\n📦 Carton Qty: ${p.carton}`;
+            reply += ` | Carton: ${p.carton}`;
         }
-        reply += `\n📦 Stock: ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
+        reply += `\n\n`;
     }
     
-    reply += `━━━━━━━━━━━━━━━━━━━━\n📊 *Summary*\n`;
+    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    reply += `📊 *Summary*\n`;
     reply += `📦 Items: ${cartItems.length}\n`;
     reply += `📦 Qty: ${cartItems.reduce((s, i) => s + i.qty, 0)}\n`;
     reply += `💰 Subtotal (Billing): ₹${subtotal.toFixed(2)}\n`;
-    reply += `🧾 Total GST (${CONFIG.defaultGST}%): ₹${totalGST.toFixed(2)}\n`;
+    reply += `🧾 GST (${CONFIG.defaultGST}%): ₹${totalGST.toFixed(2)}\n`;
     reply += `💳 *Grand Total: ₹${grandTotal.toFixed(2)}*\n`;
-    reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    
+    if (outOfStockItems.length > 0) {
+        reply += `⚠️ Out of Stock: ${outOfStockItems.join(', ')}\n`;
+        reply += `🔔 We'll notify you when available.\n\n`;
+    }
+    
+    reply += `*What would you like to do?*\n`;
     reply += `🛒 "Confirm Order" - Place order\n`;
     reply += `📄 "Get Quote" - Generate quotation\n`;
     reply += `🗑️ "Clear Cart" - Start fresh\n\n`;
@@ -1984,7 +2021,7 @@ async function handleMessage(message, from, type) {
                 await sendWhatsAppMessage(from, 
                     `📸 *Photo Received!*\n\n` +
                     `I couldn't read any part numbers from the image${caption ? ' or caption' : ''}.\n\n` +
-                    `💡 Please send the part number directly.\n📝 Example: "0303BC0071N 2"\n\n` +
+                    `💡 Please send the part number directly.\n📝 Example: "0801BA0285N 2"\n\n` +
                     `📞 Call: ${CONFIG.businessPhone}`
                 );
             } catch (error) {
@@ -2033,7 +2070,7 @@ async function handleMessage(message, from, type) {
         if (msgLower === "get quote" || msgLower === "quotation") {
             const cart = await getCartDB(from);
             if (!cart || cart.items.length === 0) {
-                await sendWhatsAppMessage(from, "📄 Your cart is empty.\n\nSend part numbers like: \"0303BC0071N 2\"");
+                await sendWhatsAppMessage(from, "📄 Your cart is empty.\n\nSend part numbers like: \"0801BA0285N 2\"");
                 return;
             }
             const quotationNo = `Q-${Date.now().toString().slice(-6)}`;
@@ -2056,7 +2093,7 @@ async function handleMessage(message, from, type) {
                 `"Get Quote" - Generate quotation PDF\n` +
                 `"Clear Cart" - Start fresh\n\n` +
                 `*Example:*\n` +
-                `"0303BC0071N 2" - Add to cart`
+                `"0801BA0285N 2" - Add to cart`
             );
             return;
         }
@@ -2077,7 +2114,7 @@ async function handleMessage(message, from, type) {
         if (aiReply) {
             await sendWhatsAppMessage(from, `🤖 *AI Assistant*\n\n${aiReply}\n\n📞 Call: ${CONFIG.businessPhone}`);
         } else {
-            await sendWhatsAppMessage(from, `🔍 I couldn't find "${text}" in our inventory.\n\n💡 Try: "0303BC0071N 2"\n📞 Call: ${CONFIG.businessPhone}`);
+            await sendWhatsAppMessage(from, `🔍 I couldn't find "${text}" in our inventory.\n\n💡 Try: "0801BA0285N 2"\n📞 Call: ${CONFIG.businessPhone}`);
         }
     } catch (error) {
         logger.error(`❌ Message handler error: ${error.message}`);
