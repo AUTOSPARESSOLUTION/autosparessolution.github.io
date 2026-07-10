@@ -1,6 +1,5 @@
 // ============================================================
-// 📱 SMART ORDER ENGINE V10 - COMPLETE FIXED
-// OCR + Real-World Formats + Database + Payments
+// 📱 SMART ORDER ENGINE V12 - PRODUCTION-READY
 // ============================================================
 
 const express = require("express");
@@ -17,6 +16,8 @@ const rateLimit = require('express-rate-limit');
 const PDFDocument = require('pdfkit');
 const Razorpay = require('razorpay');
 const Tesseract = require('tesseract.js');
+const { FormData } = require('node-fetch');
+const sharp = require('sharp');
 
 const app = express();
 app.use(helmet());
@@ -66,7 +67,9 @@ const CONFIG = {
     maxImageSize: parseInt(process.env.MAX_IMAGE_SIZE) || 10 * 1024 * 1024,
     aiTimeout: parseInt(process.env.AI_TIMEOUT) || 15000,
     retryAttempts: parseInt(process.env.RETRY_ATTEMPTS) || 3,
-    retryDelay: parseInt(process.env.RETRY_DELAY) || 1000
+    retryDelay: parseInt(process.env.RETRY_DELAY) || 1000,
+    circuitBreakerThreshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD) || 5,
+    circuitBreakerTimeout: parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT) || 60000
 };
 
 // Validate required config
@@ -78,7 +81,7 @@ for (const key of required) {
     }
 }
 
-logger.info('🚀 SMART ORDER ENGINE V10 Started');
+logger.info('🚀 SMART ORDER ENGINE V12 Started');
 
 // ============================================================
 // ⏱️ FETCH WITH TIMEOUT & RETRY
@@ -131,7 +134,7 @@ function verifyWhatsAppSignature(req) {
 }
 
 // ============================================================
-// 🛡️ RATE LIMITING
+// 🛡️ RATE LIMITING & DUPLICATE DETECTION
 // ============================================================
 
 const limiter = rateLimit({
@@ -140,6 +143,24 @@ const limiter = rateLimit({
     message: 'Too many requests, please try again later.'
 });
 app.use('/webhook', limiter);
+
+// ✅ FIX 1: Duplicate webhook protection using Map
+const processedMessageIds = new Map();
+const MESSAGE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function isMessageProcessed(messageId) {
+    // Clean expired entries
+    const now = Date.now();
+    for (const [id, timestamp] of processedMessageIds.entries()) {
+        if (now - timestamp > MESSAGE_EXPIRY_MS) {
+            processedMessageIds.delete(id);
+        }
+    }
+    
+    if (processedMessageIds.has(messageId)) return true;
+    processedMessageIds.set(messageId, now);
+    return false;
+}
 
 // ============================================================
 // 🗄️ DATABASE
@@ -157,7 +178,6 @@ async function initDatabase() {
     try {
         await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
 
-        // Create tables
         await pool.query(`
             CREATE TABLE IF NOT EXISTS customers (
                 id SERIAL PRIMARY KEY,
@@ -245,7 +265,7 @@ async function initDatabase() {
             CREATE TABLE IF NOT EXISTS payments (
                 id SERIAL PRIMARY KEY,
                 order_id VARCHAR(50) NOT NULL,
-                razorpay_payment_id VARCHAR(50),
+                razorpay_payment_id VARCHAR(50) UNIQUE,
                 razorpay_order_id VARCHAR(50),
                 amount DECIMAL(12,2),
                 status VARCHAR(20) DEFAULT 'pending',
@@ -253,18 +273,19 @@ async function initDatabase() {
             )
         `);
 
-        // Indexes
+        // ✅ FIX 5: Better indexes for search
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_part_trgm ON products USING gin (part gin_trgm_ops)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_mrp ON products(mrp)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_customers_lastcontact ON customers(last_contact)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_phone)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_carts_phone ON carts(phone)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id)`);
 
-        // Cart cleanup
         await pool.query(`
             DELETE FROM carts
             WHERE updated_at < NOW() - INTERVAL '7 days'
@@ -281,6 +302,7 @@ async function initDatabase() {
 // 📦 PRODUCT MANAGEMENT
 // ============================================================
 
+// ✅ FIX: CSV loading with flexible column headers
 async function loadProductsFromCSV() {
     const csvPath = path.join(__dirname, 'prices.csv');
     if (!fs.existsSync(csvPath)) {
@@ -293,14 +315,23 @@ async function loadProductsFromCSV() {
         fs.createReadStream(csvPath)
             .pipe(csv())
             .on('data', (row) => {
+                // Try multiple header variations
+                const part = row['Part No'] || row['part'] || row['PART'] || '';
+                const description = row['Description'] || row['desc'] || row['DESC'] || row['DESCRIPTION'] || 'Auto Spare Part';
+                const brand = row['Brand'] || row['brand'] || row['BRAND'] || 'Unknown';
+                const listValue = parseFloat(row['List'] || row['List Value'] || row['list'] || row['LIST'] || row['LIST_VALUE'] || 0);
+                const mrp = parseFloat(row['MRP'] || row['mrp'] || 0);
+                const stock = parseInt(row['Stock'] || row['stock'] || row['STOCK'] || 0);
+                const gst = parseFloat(row['GST'] || row['gst'] || 18);
+                
                 const product = {
-                    part: (row['Part No'] || row['part'] || '').trim(),
-                    description: (row['Description'] || row['desc'] || 'Auto Spare Part').trim(),
-                    brand: (row['Brand'] || row['brand'] || 'Unknown').trim(),
-                    list_value: parseFloat(row['List Value'] || row['listValue'] || 0),
-                    mrp: parseFloat(row['MRP'] || row['mrp'] || 0),
-                    stock: parseInt(row['Stock'] || row['stock'] || 0),
-                    gst: parseFloat(row['GST'] || row['gst'] || 18)
+                    part: part.trim(),
+                    description: description.trim(),
+                    brand: brand.trim(),
+                    list_value: listValue,
+                    mrp: mrp,
+                    stock: stock,
+                    gst: gst
                 };
                 if (product.part) products.push(product);
             })
@@ -308,15 +339,26 @@ async function loadProductsFromCSV() {
             .on('error', reject);
     });
 
-    if (products.length === 0) return;
+    if (products.length === 0) {
+        logger.warn('⚠️ No products found in CSV');
+        return;
+    }
 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        for (const p of products) {
+        
+        const batchSize = 1000;
+        for (let i = 0; i < products.length; i += batchSize) {
+            const batch = products.slice(i, i + batchSize);
+            const values = batch.map((_, idx) => 
+                `($${idx * 7 + 1}, $${idx * 7 + 2}, $${idx * 7 + 3}, $${idx * 7 + 4}, $${idx * 7 + 5}, $${idx * 7 + 6}, $${idx * 7 + 7})`
+            ).join(',');
+            const params = batch.flatMap(p => [p.part, p.description, p.brand, p.list_value, p.mrp, p.stock, p.gst]);
+            
             await client.query(
                 `INSERT INTO products (part, description, brand, list_value, mrp, stock, gst)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 VALUES ${values}
                  ON CONFLICT (part) DO UPDATE SET
                  description = EXCLUDED.description,
                  brand = EXCLUDED.brand,
@@ -325,9 +367,10 @@ async function loadProductsFromCSV() {
                  stock = EXCLUDED.stock,
                  gst = EXCLUDED.gst,
                  updated_at = CURRENT_TIMESTAMP`,
-                [p.part, p.description, p.brand, p.list_value, p.mrp, p.stock, p.gst]
+                params
             );
         }
+        
         await client.query('COMMIT');
         logger.info(`✅ Loaded ${products.length} products`);
     } catch (error) {
@@ -343,26 +386,34 @@ async function loadProductsFromCSV() {
 // 🔍 FUZZY SEARCH
 // ============================================================
 
+// ✅ FIX 5: Optimized search with index prioritization
 async function searchProduct(partNumber) {
     const clean = partNumber.toUpperCase().trim();
     if (!clean || clean.length < 3) return null;
 
-    // Exact match
+    // 1. Exact match (fastest)
     let result = await pool.query('SELECT * FROM products WHERE part = $1', [clean]);
     if (result.rows.length > 0) {
         return { product: result.rows[0], confidence: 1.0, method: 'exact' };
     }
 
-    // Normalized match
-    const normalized = normalizeOCRText(clean);
-    if (normalized !== clean) {
-        result = await pool.query('SELECT * FROM products WHERE part = $1', [normalized]);
-        if (result.rows.length > 0) {
-            return { product: result.rows[0], confidence: 0.99, method: 'normalized', original: clean };
+    // 2. Prefix match (fast)
+    const prefix = clean.substring(0, Math.min(6, clean.length));
+    result = await pool.query(
+        'SELECT * FROM products WHERE part LIKE $1 LIMIT 5',
+        [prefix + '%']
+    );
+    if (result.rows.length > 0) {
+        const best = result.rows[0];
+        const similarity = best.part.length >= clean.length ? 
+            clean.length / best.part.length : 
+            best.part.length / clean.length;
+        if (similarity >= CONFIG.autoCorrectThreshold) {
+            return { product: best, confidence: similarity, method: 'prefix' };
         }
     }
 
-    // PostgreSQL fuzzy search
+    // 3. PostgreSQL trigram similarity (slower but more accurate)
     result = await pool.query(
         `SELECT *, similarity(part, $1) as sim
          FROM products
@@ -385,14 +436,15 @@ async function searchProduct(partNumber) {
     return null;
 }
 
-function normalizeOCRText(text) {
+// ✅ FIX 6: Safer OCR normalization
+function normalizeOCRTextSafe(text) {
     if (!text) return text;
     let normalized = text.toUpperCase().trim();
     
     const safeCorrections = {
-        'O': '0', 'o': '0', 'I': '1', 'i': '1', 'l': '1',
-        'B': '8', 'b': '8', 'G': '6', 'g': '6', 'Z': '2', 'z': '2',
-        'T': '7', 't': '7', 'D': '0', 'd': '0', 'L': '1', 'Q': '0', 'q': '0'
+        'O': '0', 'I': '1', 'l': '1',
+        'B': '8', 'G': '6', 'Z': '2',
+        'T': '7', 'D': '0', 'L': '1', 'Q': '0'
     };
     
     for (const [from, to] of Object.entries(safeCorrections)) {
@@ -406,8 +458,45 @@ function normalizeOCRText(text) {
 }
 
 // ============================================================
-// 🧠 AI FALLBACK
+// 🧠 AI FALLBACK WITH CIRCUIT BREAKER
 // ============================================================
+
+// ✅ FIX 9: Circuit breaker for AI
+const circuitBreakers = {
+    gemini: { failures: 0, lastFailure: 0, open: false },
+    chatgpt: { failures: 0, lastFailure: 0, open: false },
+    deepseek: { failures: 0, lastFailure: 0, open: false }
+};
+
+function isCircuitOpen(service) {
+    const cb = circuitBreakers[service];
+    if (!cb) return false;
+    if (!cb.open) return false;
+    if (Date.now() - cb.lastFailure > CONFIG.circuitBreakerTimeout) {
+        cb.open = false;
+        cb.failures = 0;
+        return false;
+    }
+    return true;
+}
+
+function recordFailure(service) {
+    const cb = circuitBreakers[service];
+    if (!cb) return;
+    cb.failures++;
+    cb.lastFailure = Date.now();
+    if (cb.failures >= CONFIG.circuitBreakerThreshold) {
+        cb.open = true;
+        logger.warn(`⚠️ Circuit breaker opened for ${service}`);
+    }
+}
+
+function recordSuccess(service) {
+    const cb = circuitBreakers[service];
+    if (!cb) return;
+    cb.failures = 0;
+    cb.open = false;
+}
 
 function detectIntent(message) {
     const msgLower = message.toLowerCase().trim();
@@ -432,8 +521,8 @@ async function getAIResponse(message) {
 
     logger.info(`🧠 Getting AI response...`);
     
-    // Gemini Flash
-    if (CONFIG.geminiKey) {
+    // Gemini
+    if (CONFIG.geminiKey && !isCircuitOpen('gemini')) {
         try {
             const response = await fetchWithTimeout(
                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.geminiKey}`,
@@ -452,15 +541,19 @@ async function getAIResponse(message) {
             );
             const data = await response.json();
             if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                recordSuccess('gemini');
                 return data.candidates[0].content.parts[0].text;
+            } else {
+                recordFailure('gemini');
             }
         } catch (error) {
             logger.error(`❌ Gemini failed: ${error.message}`);
+            recordFailure('gemini');
         }
     }
     
     // ChatGPT
-    if (CONFIG.chatgptKey) {
+    if (CONFIG.chatgptKey && !isCircuitOpen('chatgpt')) {
         try {
             const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
@@ -480,15 +573,19 @@ async function getAIResponse(message) {
             }, 12000);
             const data = await response.json();
             if (response.ok && data.choices?.[0]?.message?.content) {
+                recordSuccess('chatgpt');
                 return data.choices[0].message.content;
+            } else {
+                recordFailure('chatgpt');
             }
         } catch (error) {
             logger.error(`❌ ChatGPT failed: ${error.message}`);
+            recordFailure('chatgpt');
         }
     }
     
     // DeepSeek
-    if (CONFIG.deepseekKey) {
+    if (CONFIG.deepseekKey && !isCircuitOpen('deepseek')) {
         try {
             const response = await fetchWithTimeout('https://api.deepseek.com/chat/completions', {
                 method: 'POST',
@@ -508,10 +605,14 @@ async function getAIResponse(message) {
             }, 10000);
             const data = await response.json();
             if (response.ok && data.choices?.[0]?.message?.content) {
+                recordSuccess('deepseek');
                 return data.choices[0].message.content;
+            } else {
+                recordFailure('deepseek');
             }
         } catch (error) {
             logger.error(`❌ DeepSeek failed: ${error.message}`);
+            recordFailure('deepseek');
         }
     }
     
@@ -526,85 +627,63 @@ function extractItemsFromTextUltimate(text) {
     const items = [];
     let processed = text.replace(/\s+/g, ' ').trim();
     
-    // Cleanup
     processed = processed
         .replace(/[^\w\s\-\.\=\(\)\[\]\{\}\|\:\,\;\*×xX\n]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     
-    // ============================================================
-    // PATTERN 1: PART-QTY (dash, equals, colon, slash, pipe)
-    // Example: 0304ААВО14В0н-1, 1103АССООО8н-4
-    // ============================================================
-    let match = processed.match(/\b([A-Z0-9А-Я\-]{5,30})\s*[=\-:|\/]\s*(\d+)\b/i);
-    if (match) {
-        items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
-        return items;
-    }
+    // ✅ FIX 2: Process ALL lines using split
+    const lines = processed.split(/[,;\n]/).map(l => l.trim()).filter(l => l.length > 0);
     
-    // ============================================================
-    // PATTERN 2: QTY with @ symbol before part
-    // Example: 1@ 0108FAW00400r, 1P 410r
-    // ============================================================
-    const atMatches = processed.match(/(\d+)\s*[@Pp]\s*([A-Z0-9\-]{5,30})/gi);
-    if (atMatches && atMatches.length > 0) {
-        for (const atm of atMatches) {
-            const innerMatch = atm.match(/(\d+)\s*[@Pp]\s*([A-Z0-9\-]{5,30})/i);
-            if (innerMatch) {
-                items.push({ part: innerMatch[2].toUpperCase(), qty: parseInt(innerMatch[1]) });
-            }
+    for (const line of lines) {
+        // Pattern 1: PART-QTY (dash, equals, colon, slash, pipe)
+        let match = line.match(/\b([A-Z0-9А-Я\-]{5,30})\s*[=\-:|\/]\s*(\d+)\b/i);
+        if (match) {
+            items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
+            continue;
         }
-        if (items.length > 0) return items;
-    }
-    
-    // ============================================================
-    // PATTERN 3: PART-QTY with X (multiply)
-    // Example: 0401FAAD1180r-2X
-    // ============================================================
-    match = processed.match(/\b([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*[Xx]/i);
-    if (match) {
-        items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
-        return items;
-    }
-    
-    // ============================================================
-    // PATTERN 4: QTY before part
-    // Example: 2 0304ААВО14В0н, 4 1103АССООО8н
-    // ============================================================
-    match = processed.match(/(\d+)\s+([A-Z0-9А-Я\-]{5,30})\b/i);
-    if (match) {
-        items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) });
-        return items;
-    }
-    
-    // ============================================================
-    // PATTERN 5: Part-QTY with NOS/PCS
-    // Example: 0108FAW00360N-2 NOS
-    // ============================================================
-    match = processed.match(/\b([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*NOS/i);
-    if (match) {
-        items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) });
-        return items;
-    }
-    
-    // ============================================================
-    // PATTERN 6: QTY with PCS before part
-    // Example: 2 PCS 0108FAW00360N
-    // ============================================================
-    match = processed.match(/(\d+)\s*(?:PCS|NOS|PC|NO)\s+([A-Z0-9\-]{5,30})\b/i);
-    if (match) {
-        items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) });
-        return items;
-    }
-    
-    // ============================================================
-    // PATTERN 7: Product code only
-    // Example: 29370818JA, 18250119
-    // ============================================================
-    match = processed.match(/\b([A-Z0-9А-Я\-]{5,30})\b/i);
-    if (match) {
-        items.push({ part: match[1].toUpperCase(), qty: 1 });
-        return items;
+        
+        // Pattern 2: QTY with @ symbol
+        match = line.match(/(\d+)\s*[@Pp]\s*([A-Z0-9\-]{5,30})/i);
+        if (match) {
+            items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
+            continue;
+        }
+        
+        // Pattern 3: PART-QTY with X
+        match = line.match(/\b([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*[Xx]/i);
+        if (match) {
+            items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
+            continue;
+        }
+        
+        // Pattern 4: QTY before part
+        match = line.match(/(\d+)\s+([A-Z0-9А-Я\-]{5,30})\b/i);
+        if (match) {
+            items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
+            continue;
+        }
+        
+        // Pattern 5: Part-QTY with NOS/PCS
+        match = line.match(/\b([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*NOS/i);
+        if (match) {
+            items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
+            continue;
+        }
+        
+        // Pattern 6: QTY with PCS before part
+        match = line.match(/(\d+)\s*(?:PCS|NOS|PC|NO)\s+([A-Z0-9\-]{5,30})\b/i);
+        if (match) {
+            items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
+            continue;
+        }
+        
+        // Pattern 7: Just part number
+        match = line.match(/\b([A-Z0-9А-Я\-]{5,30})\b/i);
+        if (match) {
+            items.push({ part: match[1].toUpperCase(), qty: 1 });
+            continue;
+        }
     }
     
     return items;
@@ -614,23 +693,40 @@ function extractItemsFromTextUltimate(text) {
 // 🖼️ OCR & ORDER EXTRACTION
 // ============================================================
 
+// ✅ FIX 6: OCR preprocessing with sharp
+async function preprocessImageForOCR(imageBuffer) {
+    try {
+        return await sharp(imageBuffer)
+            .resize(2000, null, { withoutEnlargement: true })
+            .grayscale()
+            .sharpen()
+            .normalize()
+            .toBuffer();
+    } catch (error) {
+        logger.warn(`⚠️ Image preprocessing failed: ${error.message}`);
+        return imageBuffer;
+    }
+}
+
 async function extractOrderFromImage(imageBuffer, mimeType) {
     logger.info('🖼️ Extracting order from image...');
     
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    // ✅ FIX 8: More image types supported
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/tiff'];
     if (!allowedTypes.includes(mimeType)) {
-        throw new Error('Unsupported image format');
+        throw new Error('Unsupported image format. Please use JPEG, PNG, WebP, HEIC, or TIFF.');
     }
     if (imageBuffer.length > CONFIG.maxImageSize) {
-        throw new Error('Image too large');
+        throw new Error('Image too large. Max size: 10MB');
     }
 
-    // Try Gemini Vision first
+    // ✅ FIX 6: Preprocess image for better OCR
+    const processedImage = await preprocessImageForOCR(imageBuffer);
+
+    // Gemini Vision
     if (CONFIG.geminiKey) {
         try {
-            const base64Image = imageBuffer.toString('base64');
-            logger.info('📸 Sending to Gemini Vision...');
-            
+            const base64Image = processedImage.toString('base64');
             const response = await fetchWithTimeout(
                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.geminiKey}`,
                 {
@@ -647,28 +743,23 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
                 },
                 CONFIG.aiTimeout
             );
-            
             const data = await response.json();
-            logger.info(`📸 Gemini Status: ${response.status}`);
-            
             if (response.ok) {
                 const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                logger.info(`📸 Gemini Content: ${content}`);
-                return parseOCRResponse(content);
-            } else {
-                logger.error(`📸 Gemini Error: ${JSON.stringify(data)}`);
+                const result = parseOCRResponse(content);
+                if (result.items && result.items.length > 0) {
+                    return result;
+                }
             }
         } catch (error) {
             logger.error(`❌ Gemini OCR failed: ${error.message}`);
         }
     }
     
-    // Try ChatGPT Vision
+    // ChatGPT Vision
     if (CONFIG.chatgptKey) {
         try {
-            const base64Image = imageBuffer.toString('base64');
-            logger.info('📸 Sending to ChatGPT Vision...');
-            
+            const base64Image = processedImage.toString('base64');
             const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -694,29 +785,24 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
                     temperature: 0
                 })
             }, CONFIG.aiTimeout);
-            
             const data = await response.json();
-            logger.info(`📸 ChatGPT Status: ${response.status}`);
-            
             if (response.ok) {
                 const content = data.choices?.[0]?.message?.content || '';
-                logger.info(`📸 ChatGPT Content: ${content}`);
-                return parseOCRResponse(content);
-            } else {
-                logger.error(`📸 ChatGPT Error: ${JSON.stringify(data)}`);
+                const result = parseOCRResponse(content);
+                if (result.items && result.items.length > 0) {
+                    return result;
+                }
             }
         } catch (error) {
             logger.error(`❌ ChatGPT OCR failed: ${error.message}`);
         }
     }
     
-    // Fallback to Tesseract
+    // Tesseract fallback
     try {
-        logger.info('📸 Falling back to Tesseract...');
-        const result = await Tesseract.recognize(imageBuffer, 'eng', {
+        const result = await Tesseract.recognize(processedImage, 'eng', {
             logger: m => logger.debug(m.status)
         });
-        logger.info(`📸 Tesseract Result: ${result.data.text}`);
         return parseOCRText(result.data.text);
     } catch (error) {
         logger.error(`❌ Tesseract OCR failed: ${error.message}`);
@@ -741,32 +827,26 @@ function parseOCRText(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const items = [];
     const patterns = [
-        /^([A-Z0-9А-Я\-]{5,30})\s*[=\-:|\/]\s*(\d+)$/i,
-        /^(\d+)\s*[@Pp]\s*([A-Z0-9\-]{5,30})$/i,
-        /^([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*[Xx]$/i,
-        /^(\d+)\s+([A-Z0-9А-Я\-]{5,30})$/i,
-        /^([A-Z0-9\-]{5,30})$/i
+        { regex: /^([A-Z0-9А-Я\-]{5,30})\s*[=\-:|\/]\s*(\d+)$/i, hasQty: true },
+        { regex: /^(\d+)\s*[@Pp]\s*([A-Z0-9\-]{5,30})$/i, hasQty: true },
+        { regex: /^([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*[Xx]$/i, hasQty: true },
+        { regex: /^(\d+)\s+([A-Z0-9А-Я\-]{5,30})$/i, hasQty: true },
+        { regex: /^([A-Z0-9\-]{5,30})$/i, hasQty: false }
     ];
     
     for (const line of lines) {
-        let matched = false;
         for (const pattern of patterns) {
-            const match = line.match(pattern);
+            const match = line.match(pattern.regex);
             if (match) {
-                const qty = parseInt(match[2]);
-                if (!isNaN(qty) && qty > 0 && qty < 1000000) {
-                    items.push({ part: match[1].toUpperCase(), qty });
+                if (pattern.hasQty) {
+                    const qty = parseInt(match[2]) || 1;
+                    if (qty > 0 && qty < 1000000) {
+                        items.push({ part: match[1].toUpperCase(), qty });
+                    }
                 } else {
                     items.push({ part: match[1].toUpperCase(), qty: 1 });
                 }
-                matched = true;
                 break;
-            }
-        }
-        if (!matched) {
-            const singleMatch = line.match(/^([A-Z0-9А-Я\-]{5,30})$/i);
-            if (singleMatch) {
-                items.push({ part: singleMatch[1].toUpperCase(), qty: 1 });
             }
         }
     }
@@ -787,6 +867,7 @@ function normalizePhone(phone) {
 
 async function getOrCreateCustomer(phone, name = 'Customer') {
     const normalizedPhone = normalizePhone(phone);
+    
     let result = await pool.query('SELECT * FROM customers WHERE phone = $1', [normalizedPhone]);
     if (result.rows.length > 0) {
         await pool.query('UPDATE customers SET last_contact = CURRENT_TIMESTAMP WHERE phone = $1', [normalizedPhone]);
@@ -801,29 +882,54 @@ async function getOrCreateCustomer(phone, name = 'Customer') {
     }
     const customerCode = `CUST-${new Date().getFullYear()}-${nextNum.toString().padStart(4, '0')}`;
     
-    const insertResult = await pool.query(
-        `INSERT INTO customers (phone, name, customer_code, created_at, last_contact)
-         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-         RETURNING *`,
-        [normalizedPhone, name, customerCode]
-    );
-    logger.info(`👤 New customer: ${name} (${customerCode})`);
-    return insertResult.rows[0];
+    try {
+        const insertResult = await pool.query(
+            `INSERT INTO customers (phone, name, customer_code, created_at, last_contact)
+             VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             ON CONFLICT (phone) DO NOTHING
+             RETURNING *`,
+            [normalizedPhone, name, customerCode]
+        );
+        
+        if (insertResult.rows.length > 0) {
+            logger.info(`👤 New customer: ${name} (${customerCode})`);
+            return insertResult.rows[0];
+        }
+        
+        result = await pool.query('SELECT * FROM customers WHERE phone = $1', [normalizedPhone]);
+        return result.rows[0];
+    } catch (error) {
+        logger.error(`❌ Customer creation error: ${error.message}`);
+        result = await pool.query('SELECT * FROM customers WHERE phone = $1', [normalizedPhone]);
+        return result.rows[0];
+    }
 }
 
 // ============================================================
 // 🛒 CART FUNCTIONS
 // ============================================================
 
+// ✅ FIX 4: Transaction for cart operations
 async function saveCartDB(phone, items, subtotal, grandTotal) {
     const normalizedPhone = normalizePhone(phone);
-    await pool.query(
-        `INSERT INTO carts (phone, items, subtotal, grand_total, updated_at)
-         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-         ON CONFLICT (phone) DO UPDATE 
-         SET items = $2, subtotal = $3, grand_total = $4, updated_at = CURRENT_TIMESTAMP`,
-        [normalizedPhone, JSON.stringify(items), subtotal, grandTotal]
-    );
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query(
+            `INSERT INTO carts (phone, items, subtotal, grand_total, updated_at)
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+             ON CONFLICT (phone) DO UPDATE 
+             SET items = $2, subtotal = $3, grand_total = $4, updated_at = CURRENT_TIMESTAMP`,
+            [normalizedPhone, JSON.stringify(items), subtotal, grandTotal]
+        );
+        await client.query('COMMIT');
+    } catch (error) {
+        await client.query('ROLLBACK');
+        logger.error(`❌ Cart save error: ${error.message}`);
+        throw error;
+    } finally {
+        client.release();
+    }
 }
 
 async function getCartDB(phone) {
@@ -853,7 +959,7 @@ async function processOrder(text, from) {
     
     const items = extractItemsFromTextUltimate(text);
     if (items.length === 0) {
-        return `🔍 Could not find any valid part numbers.\n\n💡 Please send part numbers like:\n- "0108FAW00360N-2"\n- "2 NOS 0108FAW00360N"\n- "0108FAW00360N x2"\n\n📞 Call: ${CONFIG.businessPhone}`;
+        return null;
     }
     
     const results = [];
@@ -899,7 +1005,7 @@ async function processOrder(text, from) {
         if (r.original) reply += `\n   📝 OCR read: ${r.original}`;
         reply += `\n📝 ${p.description}\n🏷️ Brand: ${p.brand}\n📦 Qty: ${r.qty}`;
         if (isMM) reply += `\n💰 MRP: ₹${p.mrp.toFixed(2)}`;
-        else reply += `\n💰 List: ₹${p.list_value.toFixed(2)}\n💰 MRP: ₹${p.mrp.toFixed(2)}`;
+        else reply += `\n💰 LIST: ₹${p.list_value.toFixed(2)}\n💰 MRP: ₹${p.mrp.toFixed(2)}`;
         reply += ` (incl. GST: ₹${priceGST.toFixed(2)})\n📦 Stock: ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
     }
     
@@ -922,6 +1028,7 @@ async function processOrder(text, from) {
 // 📦 ORDER CONFIRMATION
 // ============================================================
 
+// ✅ FIX 3: Atomic stock update with RETURNING
 async function confirmOrder(phone) {
     const normalizedPhone = normalizePhone(phone);
     const cart = await getCartDB(normalizedPhone);
@@ -933,7 +1040,6 @@ async function confirmOrder(phone) {
     try {
         await client.query('BEGIN');
         
-        // Lock customer
         const customerResult = await client.query(
             'SELECT * FROM customers WHERE phone = $1 FOR UPDATE',
             [normalizedPhone]
@@ -954,26 +1060,25 @@ async function confirmOrder(phone) {
             };
         }
         
-        // Lock and update stock
+        // ✅ FIX 3: Atomic stock update
         for (const item of cart.items) {
-            const productResult = await client.query(
-                'SELECT * FROM products WHERE part = $1 FOR UPDATE',
-                [item.part]
-            );
-            if (productResult.rows.length === 0) {
-                throw new Error(`Product ${item.part} not found`);
-            }
-            const product = productResult.rows[0];
-            if (product.stock < item.qty) {
-                throw new Error(`Insufficient stock for ${item.part}. Available: ${product.stock}`);
-            }
-            await client.query(
-                'UPDATE products SET stock = stock - $1 WHERE part = $2',
+            const result = await client.query(
+                `UPDATE products 
+                 SET stock = stock - $1 
+                 WHERE part = $2 AND stock >= $1
+                 RETURNING *`,
                 [item.qty, item.part]
             );
+            if (result.rows.length === 0) {
+                const currentStock = await client.query(
+                    'SELECT stock FROM products WHERE part = $1',
+                    [item.part]
+                );
+                const available = currentStock.rows.length > 0 ? currentStock.rows[0].stock : 0;
+                throw new Error(`Insufficient stock for ${item.part}. Available: ${available}`);
+            }
         }
         
-        // Create order
         const orderId = `ORD-${Date.now().toString().slice(-6)}`;
         await client.query(
             `INSERT INTO orders (order_id, customer_phone, items, total, order_status)
@@ -981,7 +1086,6 @@ async function confirmOrder(phone) {
             [orderId, normalizedPhone, JSON.stringify(cart.items), cart.grandTotal]
         );
         
-        // Update customer
         await client.query(
             'UPDATE customers SET total_orders = total_orders + 1, total_spent = total_spent + $1, outstanding = outstanding + $1 WHERE phone = $2',
             [cart.grandTotal, normalizedPhone]
@@ -1049,7 +1153,6 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     const stream = fs.createWriteStream(filepath);
     doc.pipe(stream);
     
-    // Header
     doc.fontSize(20).text('AUTO SPARES SOLUTION', { align: 'center' });
     doc.fontSize(10).text('101, 1st floor, 57/5, Q Road, Howrah, WB 711108', { align: 'center' });
     doc.text('GST: 19ANOPD3300R1ZO', { align: 'center' });
@@ -1115,6 +1218,17 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     });
 }
 
+async function cleanupPDF(filepath) {
+    try {
+        if (fs.existsSync(filepath)) {
+            fs.unlinkSync(filepath);
+            logger.info(`🗑️ Cleaned up PDF: ${filepath}`);
+        }
+    } catch (error) {
+        logger.error(`❌ PDF cleanup error: ${error.message}`);
+    }
+}
+
 // ============================================================
 // 📤 WHATSAPP SEND WITH RATE LIMITING
 // ============================================================
@@ -1161,7 +1275,6 @@ async function sendWhatsAppPDF(to, filepath, caption) {
     const url = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/media`;
     
     try {
-        // Upload to WhatsApp
         const formData = new FormData();
         formData.append('messaging_product', 'whatsapp');
         formData.append('file', fs.createReadStream(filepath));
@@ -1181,7 +1294,6 @@ async function sendWhatsAppPDF(to, filepath, caption) {
             return null;
         }
         
-        // Send document
         const messageUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
         const response = await fetchWithTimeout(messageUrl, {
             method: 'POST',
@@ -1203,6 +1315,7 @@ async function sendWhatsAppPDF(to, filepath, caption) {
         const result = await response.json();
         if (result.messages?.[0]?.id) {
             logger.info(`✅ PDF sent to ${normalizedPhone}`);
+            await cleanupPDF(filepath);
             return result;
         }
         logger.error(`❌ PDF send error: ${JSON.stringify(result)}`);
@@ -1214,7 +1327,7 @@ async function sendWhatsAppPDF(to, filepath, caption) {
 }
 
 // ============================================================
-// 💳 RAZORPAY WEBHOOK
+// 💳 RAZORPAY WEBHOOK - IDEMPOTENT
 // ============================================================
 
 app.post('/razorpay/webhook', async (req, res) => {
@@ -1239,6 +1352,18 @@ app.post('/razorpay/webhook', async (req, res) => {
         if (event.event === 'payment.captured') {
             const payment = event.payload.payment.entity;
             const orderId = payment.order_id;
+            const paymentId = payment.id;
+            
+            const existingPayment = await client.query(
+                'SELECT id FROM payments WHERE razorpay_payment_id = $1',
+                [paymentId]
+            );
+            
+            if (existingPayment.rows.length > 0) {
+                logger.info(`⏩ Payment ${paymentId} already processed, skipping`);
+                await client.query('COMMIT');
+                return res.sendStatus(200);
+            }
             
             await client.query(
                 `UPDATE orders SET payment_status = 'paid' WHERE razorpay_order_id = $1`,
@@ -1261,7 +1386,7 @@ app.post('/razorpay/webhook', async (req, res) => {
             await client.query(
                 `INSERT INTO payments (order_id, razorpay_payment_id, razorpay_order_id, amount, status)
                  VALUES ($1, $2, $3, $4, 'completed')`,
-                [orderId, payment.id, orderId, payment.amount / 100]
+                [orderId, paymentId, orderId, payment.amount / 100]
             );
         }
         
@@ -1304,17 +1429,11 @@ async function downloadMedia(mediaUrl) {
 // ============================================================
 
 app.get("/health", (req, res) => {
-    res.json({ status: "healthy", timestamp: new Date().toISOString() });
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 app.get("/", (req, res) => {
-    res.json({
-        status: "running",
-        version: "V10",
-        phone: CONFIG.businessPhone,
-        database: CONFIG.databaseUrl ? "connected" : "not configured",
-        time: new Date()
-    });
+    res.json({ status: "ok", version: "V12" });
 });
 
 app.get("/webhook", (req, res) => {
@@ -1329,7 +1448,7 @@ app.get("/webhook", (req, res) => {
 });
 
 // ============================================================
-// 📩 RECEIVE MESSAGE - COMPLETE FIXED
+// 📩 RECEIVE MESSAGE
 // ============================================================
 
 app.post("/webhook", async (req, res) => {
@@ -1337,178 +1456,162 @@ app.post("/webhook", async (req, res) => {
         return res.status(403).send('Invalid signature');
     }
     
-    logger.info("📨 Incoming Webhook");
+    // ✅ FIX 10: Immediate response, process asynchronously
+    const message = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+    if (message) {
+        const from = message.from;
+        const type = message.type || 'text';
+        const messageId = message.id;
+        
+        // Check duplicate
+        if (isMessageProcessed(messageId)) {
+            logger.info(`⏩ Duplicate message ${messageId} ignored`);
+            res.sendStatus(200);
+            return;
+        }
+        
+        // Process asynchronously
+        setImmediate(async () => {
+            try {
+                await handleMessage(message, from, type);
+            } catch (error) {
+                logger.error(`❌ Async message error: ${error.message}`);
+            }
+        });
+        
+        res.sendStatus(200);
+        return;
+    }
+    
+    res.sendStatus(200);
+});
+
+// ============================================================
+// 📩 MESSAGE HANDLER
+// ============================================================
+
+async function handleMessage(message, from, type) {
     try {
-        if (req.body.entry?.[0]?.changes?.[0]?.value?.messages) {
-            const message = req.body.entry[0].changes[0].value.messages[0];
-            const from = message.from;
-            const type = message.type || 'text';
+        await getOrCreateCustomer(from);
+        
+        if (type === 'image') {
+            const mediaId = message.image.id;
+            const caption = message.image.caption || "";
+            const mimeType = message.image.mime_type || 'image/jpeg';
             
-            await getOrCreateCustomer(from);
+            logger.info(`🖼️ Image from: ${from} | Caption: "${caption}"`);
             
-            // ============================================================
-            // 🖼️ IMAGE MESSAGE
-            // ============================================================
-            if (type === 'image') {
-                const mediaId = message.image.id;
-                const caption = message.image.caption || "";
-                const mimeType = message.image.mime_type || 'image/jpeg';
+            try {
+                const mediaUrl = await getMediaURL(mediaId);
+                const imageBuffer = await downloadMedia(mediaUrl);
                 
-                logger.info(`🖼️ Image from: ${from} | Caption: "${caption}" | MIME: ${mimeType}`);
+                let extractedItems = [];
+                let source = 'none';
                 
                 try {
-                    // Download the image
-                    const mediaUrl = await getMediaURL(mediaId);
-                    logger.info(`📸 Media URL: ${mediaUrl}`);
-                    
-                    const imageBuffer = await downloadMedia(mediaUrl);
-                    logger.info(`📸 Image size: ${imageBuffer.length} bytes`);
-                    
-                    let extractedItems = [];
-                    let source = 'none';
-                    
-                    // STEP 1: Try OCR on the image
-                    try {
-                        const ocrResult = await extractOrderFromImage(imageBuffer, mimeType);
-                        if (ocrResult.items && ocrResult.items.length > 0) {
-                            extractedItems = ocrResult.items;
-                            source = 'ocr';
-                            logger.info(`✅ OCR extracted ${extractedItems.length} items: ${JSON.stringify(extractedItems)}`);
-                        }
-                    } catch (ocrError) {
-                        logger.error(`❌ OCR error: ${ocrError.message}`);
+                    const ocrResult = await extractOrderFromImage(imageBuffer, mimeType);
+                    if (ocrResult.items && ocrResult.items.length > 0) {
+                        extractedItems = ocrResult.items;
+                        source = 'ocr';
+                        logger.info(`✅ OCR extracted ${extractedItems.length} items`);
                     }
-                    
-                    // STEP 2: If OCR found nothing, try the caption
-                    if (extractedItems.length === 0 && caption && caption.trim().length > 0) {
-                        const captionItems = extractItemsFromTextUltimate(caption);
-                        if (captionItems && captionItems.length > 0) {
-                            extractedItems = captionItems;
-                            source = 'caption';
-                            logger.info(`✅ Caption extracted ${extractedItems.length} items: ${JSON.stringify(extractedItems)}`);
-                        }
-                    }
-                    
-                    // STEP 3: If still nothing, try manual parsing
-                    if (extractedItems.length === 0 && caption && caption.trim().length > 0) {
-                        const manualMatches = caption.match(/\b([A-Z0-9А-Я\-]{5,30})\b/gi);
-                        if (manualMatches && manualMatches.length > 0) {
-                            extractedItems = manualMatches.map(p => ({
-                                part: p.toUpperCase(),
-                                qty: 1
-                            }));
-                            source = 'manual';
-                            logger.info(`✅ Manual extracted ${extractedItems.length} items: ${JSON.stringify(extractedItems)}`);
-                        }
-                    }
-                    
-                    // STEP 4: Process the extracted items
-                    if (extractedItems.length > 0) {
-                        const orderText = extractedItems.map(i => `${i.part} ${i.qty || 1}`).join('\n');
-                        logger.info(`📝 Order text (source: ${source}): ${orderText}`);
-                        
-                        const reply = await processOrder(orderText, from);
-                        if (reply) {
-                            await sendWhatsAppMessage(from, reply);
-                            res.sendStatus(200);
-                            return;
-                        }
-                    }
-                    
-                    // STEP 5: Final fallback
-                    await sendWhatsAppMessage(from, 
-                        `📸 *Photo Received!*\n\n` +
-                        `I couldn't read any part numbers from the image${caption ? ' or caption' : ''}.\n\n` +
-                        `💡 Please:\n` +
-                        `1️⃣ Send the part number directly\n` +
-                        `2️⃣ Or add it in the caption\n` +
-                        `📝 Example: "0108FAW00360N"\n\n` +
-                        `📞 Call: ${CONFIG.businessPhone}`
-                    );
-                    
-                } catch (error) {
-                    logger.error(`❌ Image error: ${error.message}`);
-                    await sendWhatsAppMessage(from, `📸 Sorry, I couldn't process your image. Please try again.\n\n📞 Call: ${CONFIG.businessPhone}`);
+                } catch (ocrError) {
+                    logger.error(`❌ OCR error: ${ocrError.message}`);
                 }
                 
-                res.sendStatus(200);
-                return;
-            }
-            
-            // ============================================================
-            // 🎤 VOICE MESSAGE
-            // ============================================================
-            if (type === 'audio') {
-                await sendWhatsAppMessage(from, `🎤 *Voice Received!*\n\nPlease send text or images.\n\n📞 Call: ${CONFIG.businessPhone}`);
-                res.sendStatus(200);
-                return;
-            }
-            
-            // ============================================================
-            // 📝 TEXT MESSAGE
-            // ============================================================
-            const text = message.text?.body || "";
-            logger.info(`💬 From: ${from} | Text: ${text.substring(0, 50)}...`);
-            
-            const msgLower = text.toLowerCase().trim();
-            
-            if (msgLower === "confirm order" || msgLower === "place order") {
-                const result = await confirmOrder(from);
-                await sendWhatsAppMessage(from, result.message);
-                res.sendStatus(200);
-                return;
-            }
-            
-            if (msgLower === "clear cart" || msgLower === "clear") {
-                await clearCartDB(from);
-                await sendWhatsAppMessage(from, "🗑️ Cart cleared!");
-                res.sendStatus(200);
-                return;
-            }
-            
-            if (msgLower === "get quote" || msgLower === "quotation") {
-                const cart = await getCartDB(from);
-                if (!cart || cart.items.length === 0) {
-                    await sendWhatsAppMessage(from, "📄 Your cart is empty.\n\nSend part numbers like: \"0108FAW00360N 2\"");
-                    res.sendStatus(200);
-                    return;
+                if (extractedItems.length === 0 && caption && caption.trim().length > 0) {
+                    const captionItems = extractItemsFromTextUltimate(caption);
+                    if (captionItems && captionItems.length > 0) {
+                        extractedItems = captionItems;
+                        source = 'caption';
+                        logger.info(`✅ Caption extracted ${extractedItems.length} items`);
+                    }
                 }
-                const quotationNo = `Q-${Date.now().toString().slice(-6)}`;
-                const customer = await getOrCreateCustomer(from);
-                const filepath = await generateQuotationPDF(quotationNo, customer, cart.items, cart.grandTotal);
-                await sendWhatsAppPDF(from, filepath, `Quotation ${quotationNo}`);
-                await sendWhatsAppMessage(from, `📄 *Quotation ${quotationNo} sent*\n\n📞 Call: ${CONFIG.businessPhone} to confirm`);
-                res.sendStatus(200);
+                
+                if (extractedItems.length > 0) {
+                    const orderText = extractedItems.map(i => `${i.part} ${i.qty || 1}`).join('\n');
+                    const reply = await processOrder(orderText, from);
+                    if (reply) {
+                        await sendWhatsAppMessage(from, reply);
+                        return;
+                    }
+                }
+                
+                await sendWhatsAppMessage(from, 
+                    `📸 *Photo Received!*\n\n` +
+                    `I couldn't read any part numbers from the image${caption ? ' or caption' : ''}.\n\n` +
+                    `💡 Please send the part number directly.\n📝 Example: "0108FAW00360N"\n\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
+            } catch (error) {
+                logger.error(`❌ Image error: ${error.message}`);
+                await sendWhatsAppMessage(from, `📸 Sorry, I couldn't process your image. Please try again.\n\n📞 Call: ${CONFIG.businessPhone}`);
+            }
+            return;
+        }
+        
+        if (type === 'audio') {
+            await sendWhatsAppMessage(from, `🎤 *Voice Received!*\n\nPlease send text or images.\n\n📞 Call: ${CONFIG.businessPhone}`);
+            return;
+        }
+        
+        const text = message.text?.body || "";
+        logger.info(`💬 From: ${from} | Text: ${text.substring(0, 50)}...`);
+        
+        const msgLower = text.toLowerCase().trim();
+        
+        if (msgLower === "confirm order" || msgLower === "place order") {
+            const result = await confirmOrder(from);
+            await sendWhatsAppMessage(from, result.message);
+            return;
+        }
+        
+        if (msgLower === "clear cart" || msgLower === "clear") {
+            await clearCartDB(from);
+            await sendWhatsAppMessage(from, "🗑️ Cart cleared!");
+            return;
+        }
+        
+        if (msgLower === "get quote" || msgLower === "quotation") {
+            const cart = await getCartDB(from);
+            if (!cart || cart.items.length === 0) {
+                await sendWhatsAppMessage(from, "📄 Your cart is empty.\n\nSend part numbers like: \"0108FAW00360N 2\"");
                 return;
             }
-            
-            if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start") {
-                await sendWhatsAppMessage(from, `👋 *Smart Order Engine V10*\n\n📸 Send photo of order\n📝 Send text with part numbers\n📞 Call: ${CONFIG.businessPhone}\n\n*Commands:*\n"Confirm Order" - Place order\n"Get Quote" - Generate quotation PDF\n"Clear Cart" - Start fresh`);
-                res.sendStatus(200);
-                return;
-            }
-            
+            const quotationNo = `Q-${Date.now().toString().slice(-6)}`;
+            const customer = await getOrCreateCustomer(from);
+            const filepath = await generateQuotationPDF(quotationNo, customer, cart.items, cart.grandTotal);
+            await sendWhatsAppPDF(from, filepath, `Quotation ${quotationNo}`);
+            await sendWhatsAppMessage(from, `📄 *Quotation ${quotationNo} sent*\n\n📞 Call: ${CONFIG.businessPhone} to confirm`);
+            return;
+        }
+        
+        if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start") {
+            await sendWhatsAppMessage(from, `👋 *Smart Order Engine V12*\n\n📸 Send photo of order\n📝 Send text with part numbers\n📞 Call: ${CONFIG.businessPhone}\n\n*Commands:*\n"Confirm Order" - Place order\n"Get Quote" - Generate quotation PDF\n"Clear Cart" - Start fresh`);
+            return;
+        }
+        
+        const hasPartNumber = /\b([A-Z0-9А-Я\-]{5,30})\b/i.test(text);
+        
+        if (hasPartNumber) {
             const reply = await processOrder(text, from);
             if (reply) {
                 await sendWhatsAppMessage(from, reply);
-            } else {
-                const aiReply = await getAIResponse(text);
-                if (aiReply) {
-                    await sendWhatsAppMessage(from, `🤖 *AI Assistant*\n\n${aiReply}\n\n📞 Call: ${CONFIG.businessPhone}`);
-                } else {
-                    await sendWhatsAppMessage(from, `🔍 I couldn't find "${text}" in our inventory.\n\n💡 Try: "0108FAW00360N 2"\n📞 Call: ${CONFIG.businessPhone}`);
-                }
+                return;
             }
         }
-    } catch (error) {
-        logger.error(`❌ Webhook error: ${error.message}`);
-        const from = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from;
-        if (from) {
-            await sendWhatsAppMessage(from, "⚠️ Sorry, something went wrong. Please try again.");
+        
+        const aiReply = await getAIResponse(text);
+        if (aiReply) {
+            await sendWhatsAppMessage(from, `🤖 *AI Assistant*\n\n${aiReply}\n\n📞 Call: ${CONFIG.businessPhone}`);
+        } else {
+            await sendWhatsAppMessage(from, `🔍 I couldn't find "${text}" in our inventory.\n\n💡 Try: "0108FAW00360N 2"\n📞 Call: ${CONFIG.businessPhone}`);
         }
+    } catch (error) {
+        logger.error(`❌ Message handler error: ${error.message}`);
+        await sendWhatsAppMessage(from, "⚠️ Sorry, something went wrong. Please try again.");
     }
-    res.sendStatus(200);
-});
+}
 
 // ============================================================
 // 🚀 START SERVER
