@@ -48,22 +48,33 @@ const logger = createLogger({
 });
 
 // ============================================================
-// 🔧 CONFIG
+// 🔧 CONFIGURATION
 // ============================================================
 
 const CONFIG = {
+    // WhatsApp Configuration
     phoneNumberId: process.env.ID,
     accessToken: process.env.TOKEN,
     verifyToken: process.env.VERIFY || "assist123",
     businessPhone: process.env.PHONE,
+    
+    // AI API Keys
     chatgptKey: process.env.CHATGPT_API_KEY,
     deepseekKey: process.env.DEEPSEEK_API_KEY,
     geminiKey: process.env.GEMINI_API_KEY,
+    
+    // Database
     databaseUrl: process.env.DATABASE_URL,
+    
+    // Razorpay
     razorpayKeyId: process.env.RAZORPAY_KEY_ID,
     razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
     razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+    
+    // Security
     appSecret: process.env.APP_SECRET || "your_app_secret",
+    
+    // Business Rules
     autoCorrectThreshold: parseFloat(process.env.AUTO_CORRECT_THRESHOLD) || 0.85,
     maxImageSize: parseInt(process.env.MAX_IMAGE_SIZE) || 10 * 1024 * 1024,
     aiTimeout: parseInt(process.env.AI_TIMEOUT) || 15000,
@@ -74,11 +85,11 @@ const CONFIG = {
     defaultGST: parseFloat(process.env.DEFAULT_GST) || 18
 };
 
-// Validate required config
-const required = ['phoneNumberId', 'accessToken', 'businessPhone', 'databaseUrl'];
-for (const key of required) {
+// Validate required configuration
+const requiredConfig = ['phoneNumberId', 'accessToken', 'businessPhone', 'databaseUrl'];
+for (const key of requiredConfig) {
     if (!CONFIG[key]) {
-        logger.error(`❌ ${key} not set`);
+        logger.error(`❌ ${key} not set in environment variables`);
         process.exit(1);
     }
 }
@@ -151,6 +162,8 @@ const MESSAGE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 function isMessageProcessed(messageId) {
     const now = Date.now();
+    
+    // Clean up expired entries
     for (const [id, timestamp] of processedMessageIds.entries()) {
         if (now - timestamp > MESSAGE_EXPIRY_MS) {
             processedMessageIds.delete(id);
@@ -174,11 +187,16 @@ const pool = new Pool({
     connectionTimeoutMillis: 2000
 });
 
+// ============================================================
+// 📦 PRODUCTS TABLE SCHEMA
+// ============================================================
+
 async function initDatabase() {
     try {
+        // Enable trigram similarity for fuzzy search
         await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
 
-        // ✅ COMPLETE products table with all fields from CSV
+        // Create products table with ALL fields from CSV
         await pool.query(`
             CREATE TABLE IF NOT EXISTS products (
                 id SERIAL PRIMARY KEY,
@@ -200,7 +218,7 @@ async function initDatabase() {
             )
         `);
 
-        // ✅ Add missing columns if they don't exist
+        // Add missing columns if they don't exist
         const columnsToAdd = [
             'make VARCHAR(50)',
             'type VARCHAR(50)',
@@ -215,11 +233,13 @@ async function initDatabase() {
             try {
                 await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS ${col}`);
                 logger.info(`✅ Added column: ${colName}`);
-            } catch (e) {
-                // Column might already exist
+            } catch (error) {
+                // Column might already exist, ignore error
+                logger.debug(`Column ${colName} already exists or error: ${error.message}`);
             }
         }
 
+        // Create customers table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS customers (
                 id SERIAL PRIMARY KEY,
@@ -238,6 +258,7 @@ async function initDatabase() {
             )
         `);
 
+        // Create carts table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS carts (
                 id SERIAL PRIMARY KEY,
@@ -250,6 +271,7 @@ async function initDatabase() {
             )
         `);
 
+        // Create orders table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS orders (
                 id SERIAL PRIMARY KEY,
@@ -264,6 +286,7 @@ async function initDatabase() {
             )
         `);
 
+        // Create quotations table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS quotations (
                 id SERIAL PRIMARY KEY,
@@ -276,6 +299,7 @@ async function initDatabase() {
             )
         `);
 
+        // Create enquiries table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS enquiries (
                 id SERIAL PRIMARY KEY,
@@ -288,6 +312,7 @@ async function initDatabase() {
             )
         `);
 
+        // Create payments table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS payments (
                 id SERIAL PRIMARY KEY,
@@ -300,7 +325,7 @@ async function initDatabase() {
             )
         `);
 
-        // Create indexes
+        // Create indexes for performance
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
@@ -315,15 +340,15 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_carts_phone ON carts(phone)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id)`);
 
-        // Clean old carts
+        // Clean old carts (older than 7 days)
         await pool.query(`
             DELETE FROM carts
             WHERE updated_at < NOW() - INTERVAL '7 days'
         `);
 
-        logger.info('✅ Database ready');
+        logger.info('✅ Database initialized successfully');
     } catch (error) {
-        logger.error('❌ Database init error:', error);
+        logger.error('❌ Database initialization error:', error);
         throw error;
     }
 }
@@ -334,14 +359,17 @@ async function initDatabase() {
 
 async function loadProductsFromCSV() {
     const csvPath = path.join(__dirname, 'prices.csv');
+    
+    // Check if CSV file exists
     if (!fs.existsSync(csvPath)) {
-        logger.warn('⚠️ prices.csv not found');
+        logger.warn('⚠️ prices.csv not found in current directory');
         return;
     }
 
     const products = [];
     let headers = [];
 
+    // Read and parse CSV file
     await new Promise((resolve, reject) => {
         fs.createReadStream(csvPath)
             .pipe(csv({ headers: true }))
@@ -350,23 +378,48 @@ async function loadProductsFromCSV() {
                 logger.info(`📋 CSV Headers: ${headers.join(', ')}`);
             })
             .on('data', (row) => {
+                // ============================================================
                 // ✅ CORRECT CSV COLUMN MAPPING
+                // ============================================================
+                
+                // Part Number - Column A: Material
                 const part = (row['Material'] || row['material'] || row['PART'] || '').trim();
                 if (!part) return; // Skip empty rows
 
+                // Description - Column B: Material2
                 const description = (row['Material2'] || row['Description'] || row['DESCRIPTION'] || 'Auto Spare Part').trim();
                 
+                // LIST PRICE - Column C: LIST PRICE
                 const listValue = parseFloat(row['LIST PRICE'] || row['List Price'] || row['LIST'] || 0);
+                
+                // MRP PRICE - Column D: MRP PRICE
                 const mrp = parseFloat(row['MRP PRICE'] || row['MRP Price'] || row['MRP'] || 0);
+                
+                // billing price - Column G: billing price
                 const billing = parseFloat(row['billing price'] || row['Billing Price'] || row['BILLING PRICE'] || listValue || 0);
+                
+                // STOCK - Column H: STOCK
                 const stock = parseInt(row['STOCK'] || row['Stock'] || 0);
+                
+                // Box Qty - Column I: Box Qty
                 const boxQty = parseInt(row['Box Qty'] || row['box_qty'] || 0);
+                
+                // Carton - Column J: Carton
                 const carton = parseInt(row['Carton'] || row['carton'] || 0);
+                
+                // brand - Column K: brand
                 const brand = (row['brand'] || row['Brand'] || 'Unknown').trim();
+                
+                // Make - Column L: Make
                 const make = (row['Make'] || row['make'] || '').trim();
+                
+                // TYPE - Column E: TYPE
                 const type = (row['TYPE'] || row['Type'] || row['type'] || '').trim();
+                
+                // FINISH - Column F: FINISH
                 const finish = (row['FINISH'] || row['Finish'] || row['finish'] || '').trim();
 
+                // Create product object
                 const product = {
                     part: part,
                     description: description,
@@ -390,7 +443,7 @@ async function loadProductsFromCSV() {
     });
 
     if (products.length === 0) {
-        logger.warn('⚠️ No products found in CSV');
+        logger.warn('⚠️ No products found in CSV file');
         return;
     }
 
@@ -401,6 +454,7 @@ async function loadProductsFromCSV() {
         productMap.set(p.part.toUpperCase(), p);
     });
 
+    // Insert products into database
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -444,15 +498,15 @@ async function loadProductsFromCSV() {
         }
         
         await client.query('COMMIT');
-        logger.info(`✅ Loaded ${products.length} products`);
+        logger.info(`✅ Loaded ${products.length} products into database`);
         
         // Log sample for verification
         if (products.length > 0) {
             const sample = products[0];
-            logger.info(`📊 Sample: ${sample.part}`);
+            logger.info(`📊 Sample Product: ${sample.part}`);
             logger.info(`   Description: ${sample.description}`);
             logger.info(`   Brand: ${sample.brand}, Make: ${sample.make}`);
-            logger.info(`   LIST: ${sample.list_value}, MRP: ${sample.mrp}, Billing: ${sample.billing_price}`);
+            logger.info(`   LIST PRICE: ${sample.list_value}, MRP: ${sample.mrp}, Billing: ${sample.billing_price}`);
             logger.info(`   Stock: ${sample.stock}, Box: ${sample.box_qty}, Carton: ${sample.carton}`);
         }
     } catch (error) {
@@ -476,13 +530,13 @@ let productMap = new Map();
 // ============================================================
 
 function calculatePrices(product, qty = 1) {
-    // ✅ Use billing_price as base for calculations
+    // Get base prices
     const billingPrice = product.billing_price || product.list_value || 0;
     const mrp = product.mrp || 0;
     const listValue = product.list_value || 0;
     const gstRate = product.gst || CONFIG.defaultGST || 18;
     
-    // GST is calculated on BILLING PRICE
+    // GST is calculated on BILLING PRICE (not MRP)
     const gstAmount = billingPrice * (gstRate / 100);
     const priceWithGST = billingPrice + gstAmount;
     
@@ -492,15 +546,15 @@ function calculatePrices(product, qty = 1) {
     const totalWithGST = priceWithGST * qty;
     
     return {
-        billingPrice,
-        mrp,
-        listValue,
-        gstRate,
-        gstAmount,
-        priceWithGST,
-        totalBilling,
-        totalGST,
-        totalWithGST
+        billingPrice: billingPrice,
+        mrp: mrp,
+        listValue: listValue,
+        gstRate: gstRate,
+        gstAmount: gstAmount,
+        priceWithGST: priceWithGST,
+        totalBilling: totalBilling,
+        totalGST: totalGST,
+        totalWithGST: totalWithGST
     };
 }
 
@@ -516,13 +570,13 @@ async function searchProducts(query) {
     const clean = query.trim().toUpperCase();
     const results = [];
     
-    // 1. EXACT MATCH
+    // 1. EXACT MATCH - Highest priority
     let result = await pool.query('SELECT * FROM products WHERE part = $1', [clean]);
     if (result.rows.length > 0) {
         results.push(...result.rows.map(p => ({ ...p, matchType: 'exact', confidence: 1.0 })));
     }
     
-    // 2. PREFIX MATCH
+    // 2. PREFIX MATCH - Next priority
     if (results.length < 10) {
         const prefix = clean.substring(0, Math.min(6, clean.length));
         result = await pool.query(
@@ -541,7 +595,7 @@ async function searchProducts(query) {
         }
     }
     
-    // 3. FUZZY MATCH
+    // 3. FUZZY MATCH - Using trigram similarity
     if (results.length < 10) {
         result = await pool.query(
             `SELECT *, similarity(part, $1) as sim
@@ -601,7 +655,7 @@ async function searchProducts(query) {
         }
     }
     
-    // Remove duplicates and limit
+    // Remove duplicates and limit to 10 results
     const uniqueResults = [];
     const seen = new Set();
     for (const r of results) {
@@ -630,6 +684,7 @@ function formatSearchResults(products, query) {
     for (const product of products) {
         const prices = calculatePrices(product);
         
+        // Part number with match type indicator
         reply += `${index}. *${product.part}*`;
         if (product.matchType && product.matchType !== 'exact') {
             reply += ` (${product.matchType})`;
@@ -659,32 +714,51 @@ function formatSearchResults(products, query) {
             reply += `\n`;
         }
         
+        // ============================================================
         // ✅ FULL PRICE BREAKDOWN
+        // ============================================================
+        
+        // LIST PRICE
         if (prices.listValue > 0) {
             reply += `💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}\n`;
         }
+        
+        // MRP PRICE
         if (prices.mrp > 0) {
             reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
         }
+        
+        // Billing Price with GST breakdown
         if (prices.billingPrice > 0) {
             reply += `💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}\n`;
             reply += `🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}\n`;
             reply += `💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}\n`;
         }
         
-        // Stock & Packaging
+        // ============================================================
+        // 📦 PACKAGING & STOCK DETAILS
+        // ============================================================
+        
         let stockInfo = [];
+        
+        // Stock status
         if (product.stock > 0) {
             stockInfo.push(`✅ ${product.stock} pcs`);
         } else {
             stockInfo.push(`❌ Out of Stock`);
         }
+        
+        // Box quantity
         if (product.box_qty > 0) {
             stockInfo.push(`Box: ${product.box_qty}`);
         }
+        
+        // Carton quantity
         if (product.carton > 0) {
             stockInfo.push(`Carton: ${product.carton}`);
         }
+        
+        // Show packaging info
         if (stockInfo.length > 0) {
             reply += `📦 ${stockInfo.join(' | ')}\n`;
         }
@@ -711,11 +785,13 @@ async function searchProduct(partNumber) {
     const clean = partNumber.toUpperCase().trim();
     if (!clean || clean.length < 3) return null;
 
+    // 1. EXACT MATCH
     let result = await pool.query('SELECT * FROM products WHERE part = $1', [clean]);
     if (result.rows.length > 0) {
         return { product: result.rows[0], confidence: 1.0, method: 'exact' };
     }
 
+    // 2. PREFIX MATCH
     const prefix = clean.substring(0, Math.min(6, clean.length));
     result = await pool.query(
         'SELECT * FROM products WHERE part LIKE $1 LIMIT 5',
@@ -731,6 +807,7 @@ async function searchProduct(partNumber) {
         }
     }
 
+    // 3. FUZZY MATCH
     result = await pool.query(
         `SELECT *, similarity(part, $1) as sim
          FROM products
@@ -805,7 +882,7 @@ function formatProductLine(product, qty, confidence, original = null) {
 }
 
 // ============================================================
-// 🧠 AI FALLBACK
+// 🧠 AI FALLBACK - Multiple AI Providers
 // ============================================================
 
 const circuitBreakers = {
@@ -867,6 +944,7 @@ async function getAIResponse(message) {
 
     logger.info(`🧠 Getting AI response...`);
     
+    // Try Gemini first
     if (CONFIG.geminiKey && !isCircuitOpen('gemini')) {
         try {
             const response = await fetchWithTimeout(
@@ -897,6 +975,7 @@ async function getAIResponse(message) {
         }
     }
     
+    // Try ChatGPT second
     if (CONFIG.chatgptKey && !isCircuitOpen('chatgpt')) {
         try {
             const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
@@ -928,6 +1007,7 @@ async function getAIResponse(message) {
         }
     }
     
+    // Try DeepSeek third
     if (CONFIG.deepseekKey && !isCircuitOpen('deepseek')) {
         try {
             const response = await fetchWithTimeout('https://api.deepseek.com/chat/completions', {
@@ -971,42 +1051,49 @@ function extractItemsFromTextUltimate(text) {
     const lines = text.split(/[,;\n]/).map(l => l.trim()).filter(l => l.length > 0);
     
     for (const line of lines) {
+        // Pattern: PART123 = 2 or PART123: 2
         let match = line.match(/\b([A-Z0-9А-Я\-]{5,30})\s*[=\-:|\/]\s*(\d+)\b/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
+        // Pattern: 2 @ PART123
         match = line.match(/(\d+)\s*[@Pp]\s*([A-Z0-9\-]{5,30})/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
             continue;
         }
         
+        // Pattern: PART123 = 2X
         match = line.match(/\b([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*[Xx]/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
+        // Pattern: 2 PART123
         match = line.match(/(\d+)\s+([A-Z0-9А-Я\-]{5,30})\b/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
             continue;
         }
         
+        // Pattern: PART123 = 2 NOS
         match = line.match(/\b([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*NOS/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
+        // Pattern: 2 PCS PART123
         match = line.match(/(\d+)\s*(?:PCS|NOS|PC|NO)\s+([A-Z0-9\-]{5,30})\b/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
             continue;
         }
         
+        // Pattern: PART123 (quantity = 1)
         match = line.match(/\b([A-Z0-9А-Я\-]{5,30})\b/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: 1 });
@@ -1048,6 +1135,7 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
 
     const processedImage = await preprocessImageForOCR(imageBuffer);
 
+    // Try Gemini OCR first
     if (CONFIG.geminiKey) {
         try {
             const base64Image = processedImage.toString('base64');
@@ -1080,6 +1168,7 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
         }
     }
     
+    // Try ChatGPT OCR second
     if (CONFIG.chatgptKey) {
         try {
             const base64Image = processedImage.toString('base64');
@@ -1121,6 +1210,7 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
         }
     }
     
+    // Fallback to Tesseract OCR
     try {
         const result = await Tesseract.recognize(processedImage, 'eng', {
             logger: m => logger.debug(m.status)
@@ -1190,12 +1280,15 @@ function normalizePhone(phone) {
 async function getOrCreateCustomer(phone, name = 'Customer') {
     const normalizedPhone = normalizePhone(phone);
     
+    // Check if customer exists
     let result = await pool.query('SELECT * FROM customers WHERE phone = $1', [normalizedPhone]);
     if (result.rows.length > 0) {
+        // Update last contact
         await pool.query('UPDATE customers SET last_contact = CURRENT_TIMESTAMP WHERE phone = $1', [normalizedPhone]);
         return result.rows[0];
     }
     
+    // Generate customer code
     const codeResult = await pool.query("SELECT customer_code FROM customers WHERE customer_code LIKE 'CUST-%' ORDER BY customer_code DESC LIMIT 1");
     let nextNum = 1;
     if (codeResult.rows.length > 0) {
@@ -1204,6 +1297,7 @@ async function getOrCreateCustomer(phone, name = 'Customer') {
     }
     const customerCode = `CUST-${new Date().getFullYear()}-${nextNum.toString().padStart(4, '0')}`;
     
+    // Create new customer
     try {
         const insertResult = await pool.query(
             `INSERT INTO customers (phone, name, customer_code, created_at, last_contact)
@@ -1218,6 +1312,7 @@ async function getOrCreateCustomer(phone, name = 'Customer') {
             return insertResult.rows[0];
         }
         
+        // If conflict, fetch existing
         result = await pool.query('SELECT * FROM customers WHERE phone = $1', [normalizedPhone]);
         return result.rows[0];
     } catch (error) {
@@ -1278,11 +1373,13 @@ async function clearCartDB(phone) {
 async function processOrder(text, from) {
     logger.info(`📝 Processing order from ${from}: "${text.substring(0, 50)}..."`);
     
+    // Extract items from text
     const items = extractItemsFromTextUltimate(text);
     if (items.length === 0) {
         return null;
     }
     
+    // Search for each item
     const results = [];
     for (const item of items) {
         const searchResult = await searchProduct(item.part);
@@ -1300,6 +1397,7 @@ async function processOrder(text, from) {
         return `❌ Parts not found: ${notFound}\n\n💡 Please check the part numbers.\n📞 Call: ${CONFIG.businessPhone}`;
     }
     
+    // Build cart items
     const cartItems = results.map(r => ({
         part: r.product.part,
         description: r.product.description,
@@ -1318,7 +1416,7 @@ async function processOrder(text, from) {
         stock: r.product.stock
     }));
     
-    // ✅ Calculate totals based on BILLING PRICE + GST
+    // Calculate totals based on BILLING PRICE + GST
     let subtotal = 0;
     let totalGST = 0;
     let grandTotal = 0;
@@ -1338,8 +1436,10 @@ async function processOrder(text, from) {
         }
     }
     
+    // Save to database
     await saveCartDB(from, cartItems, subtotal, grandTotal);
     
+    // Build response
     let reply = `📋 *MULTI-PRODUCT ENQUIRY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     for (const r of results) {
@@ -1355,7 +1455,7 @@ async function processOrder(text, from) {
         if (p.type) reply += `\n📊 Type: ${p.type}`;
         if (p.finish) reply += `\n🎨 Finish: ${p.finish}`;
         
-        // ✅ FULL PRICE BREAKDOWN
+        // FULL PRICE BREAKDOWN
         if (prices.listValue > 0) {
             reply += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
         }
@@ -1433,6 +1533,7 @@ async function confirmOrder(phone) {
     try {
         await client.query('BEGIN');
         
+        // Get customer with lock
         const customerResult = await client.query(
             'SELECT * FROM customers WHERE phone = $1 FOR UPDATE',
             [normalizedPhone]
@@ -1444,6 +1545,7 @@ async function confirmOrder(phone) {
             await client.query('SELECT * FROM customers WHERE phone = $1 FOR UPDATE', [normalizedPhone]);
         }
         
+        // Check credit limit
         const total = cart.grandTotal;
         if (customer.outstanding + total > customer.credit_limit) {
             await client.query('ROLLBACK');
@@ -1453,6 +1555,7 @@ async function confirmOrder(phone) {
             };
         }
         
+        // Reduce stock
         for (const item of cart.items) {
             const result = await client.query(
                 `UPDATE products 
@@ -1471,6 +1574,7 @@ async function confirmOrder(phone) {
             }
         }
         
+        // Create order
         const orderId = `ORD-${Date.now().toString().slice(-6)}`;
         await client.query(
             `INSERT INTO orders (order_id, customer_phone, items, total, order_status)
@@ -1478,6 +1582,7 @@ async function confirmOrder(phone) {
             [orderId, normalizedPhone, JSON.stringify(cart.items), cart.grandTotal]
         );
         
+        // Update customer
         await client.query(
             'UPDATE customers SET total_orders = total_orders + 1, total_spent = total_spent + $1, outstanding = outstanding + $1 WHERE phone = $2',
             [cart.grandTotal, normalizedPhone]
@@ -1497,6 +1602,7 @@ async function confirmOrder(phone) {
     
     await clearCartDB(normalizedPhone);
     
+    // Generate payment link
     let paymentLink = 'https://razorpay.me/@autosparessolution';
     if (CONFIG.razorpayKeyId && CONFIG.razorpayKeySecret) {
         try {
@@ -1520,6 +1626,7 @@ async function confirmOrder(phone) {
         }
     }
     
+    // Build response
     let reply = `✅ *ORDER CONFIRMED*\n\n━━━━━━━━━━━━━━━━━━━━\n`;
     for (const item of cart.items) {
         const prices = calculatePrices(item, item.qty);
@@ -1551,6 +1658,7 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     const filename = `quotation-${quotationNo}.pdf`;
     const filepath = path.join(__dirname, 'uploads', filename);
     
+    // Create uploads directory if it doesn't exist
     if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
         fs.mkdirSync(path.join(__dirname, 'uploads'));
     }
@@ -1558,19 +1666,23 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     const stream = fs.createWriteStream(filepath);
     doc.pipe(stream);
     
+    // Header
     doc.fontSize(20).text('AUTO SPARES SOLUTION', { align: 'center' });
     doc.fontSize(10).text('101, 1st floor, 57/5, Q Road, Howrah, WB 711108', { align: 'center' });
     doc.text('GST: 19ANOPD3300R1ZO', { align: 'center' });
     doc.moveDown();
     
+    // Quotation Title
     doc.fontSize(14).text(`QUOTATION ${quotationNo}`, { align: 'center' });
     doc.moveDown();
     
+    // Customer Details
     doc.fontSize(10).text(`Customer: ${customer.name}`);
     doc.text(`Phone: ${customer.phone}`);
     if (customer.gstin) doc.text(`GSTIN: ${customer.gstin}`);
     doc.moveDown();
     
+    // Items Table Header
     doc.text('Items:', { underline: true });
     doc.moveDown();
     
@@ -1578,7 +1690,6 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     doc.fontSize(8);
     const col1 = 30, col2 = 90, col3 = 200, col4 = 280, col5 = 340, col6 = 400, col7 = 460, col8 = 520;
     
-    // Headers
     doc.text('S.No', col1, y);
     doc.text('Part No', col2, y);
     doc.text('Description', col3, y);
@@ -1591,6 +1702,7 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     y += 20;
     doc.moveTo(30, y - 5).lineTo(550, y - 5).stroke();
     
+    // Items Table Body
     let index = 1;
     let subtotal = 0;
     let totalGST = 0;
@@ -1615,6 +1727,7 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     doc.moveTo(30, y + 5).lineTo(550, y + 5).stroke();
     y += 20;
     
+    // Totals
     const grandTotal = subtotal + totalGST;
     
     doc.fontSize(9);
@@ -1625,6 +1738,7 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     doc.fontSize(11).text(`Grand Total: ₹${grandTotal.toFixed(2)}`, 400, y);
     y += 30;
     
+    // Terms
     doc.fontSize(9);
     doc.text('Terms:');
     doc.text('1. Valid for 15 days');
@@ -1633,6 +1747,7 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     doc.text(`4. GST @ ${CONFIG.defaultGST}% on Billing Price`);
     doc.moveDown();
     
+    // Signatures
     doc.text('Customer Signature: _________________', 50, doc.y + 20);
     doc.text('Authorized Signatory: _________________', 350, doc.y + 20);
     
@@ -1665,9 +1780,12 @@ const messageQueue = new PQueue({ concurrency: 5, interval: 1000, intervalCap: 1
 async function sendWhatsAppMessage(to, message) {
     return messageQueue.add(async () => {
         const normalizedPhone = normalizePhone(to);
+        
+        // Truncate if too long
         if (message.length > 4000) {
             message = message.substring(0, 3950) + "\n\n... (truncated)";
         }
+        
         const url = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
         try {
             const response = await fetchWithTimeout(url, {
@@ -1702,6 +1820,7 @@ async function sendWhatsAppPDF(to, filepath, caption) {
     const url = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/media`;
     
     try {
+        // Upload PDF
         const formData = new FormData();
         formData.append('messaging_product', 'whatsapp');
         formData.append('file', fs.createReadStream(filepath));
@@ -1721,6 +1840,7 @@ async function sendWhatsAppPDF(to, filepath, caption) {
             return null;
         }
         
+        // Send PDF
         const messageUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
         const response = await fetchWithTimeout(messageUrl, {
             method: 'POST',
@@ -1758,6 +1878,7 @@ async function sendWhatsAppPDF(to, filepath, caption) {
 // ============================================================
 
 app.post('/razorpay/webhook', async (req, res) => {
+    // Verify signature
     const signature = req.headers['x-razorpay-signature'];
     const body = JSON.stringify(req.body);
     
@@ -1781,6 +1902,7 @@ app.post('/razorpay/webhook', async (req, res) => {
             const orderId = payment.order_id;
             const paymentId = payment.id;
             
+            // Check if payment already processed
             const existingPayment = await client.query(
                 'SELECT id FROM payments WHERE razorpay_payment_id = $1',
                 [paymentId]
@@ -1792,11 +1914,13 @@ app.post('/razorpay/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
             
+            // Update order
             await client.query(
                 `UPDATE orders SET payment_status = 'paid' WHERE razorpay_order_id = $1`,
                 [orderId]
             );
             
+            // Update customer outstanding
             const orderResult = await client.query(
                 'SELECT customer_phone, total FROM orders WHERE razorpay_order_id = $1',
                 [orderId]
@@ -1810,6 +1934,7 @@ app.post('/razorpay/webhook', async (req, res) => {
                 );
             }
             
+            // Record payment
             await client.query(
                 `INSERT INTO payments (order_id, razorpay_payment_id, razorpay_order_id, amount, status)
                  VALUES ($1, $2, $3, $4, 'completed')`,
@@ -1856,11 +1981,20 @@ async function downloadMedia(mediaUrl) {
 // ============================================================
 
 app.get("/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    res.json({ 
+        status: "ok", 
+        timestamp: new Date().toISOString(),
+        version: "V13",
+        productsLoaded: allProducts.length
+    });
 });
 
 app.get("/", (req, res) => {
-    res.json({ status: "ok", version: "V13" });
+    res.json({ 
+        status: "ok", 
+        version: "V13",
+        message: "Smart Order Engine is running"
+    });
 });
 
 app.get("/webhook", (req, res) => {
@@ -1879,6 +2013,7 @@ app.get("/webhook", (req, res) => {
 // ============================================================
 
 app.post("/webhook", async (req, res) => {
+    // Verify signature
     if (!verifyWhatsAppSignature(req)) {
         return res.status(403).send('Invalid signature');
     }
@@ -1889,12 +2024,14 @@ app.post("/webhook", async (req, res) => {
         const type = message.type || 'text';
         const messageId = message.id;
         
+        // Check for duplicate
         if (isMessageProcessed(messageId)) {
             logger.info(`⏩ Duplicate message ${messageId} ignored`);
             res.sendStatus(200);
             return;
         }
         
+        // Process asynchronously
         setImmediate(async () => {
             try {
                 await handleMessage(message, from, type);
@@ -1916,8 +2053,10 @@ app.post("/webhook", async (req, res) => {
 
 async function handleMessage(message, from, type) {
     try {
+        // Get or create customer
         await getOrCreateCustomer(from);
         
+        // Handle image messages
         if (type === 'image') {
             const mediaId = message.image.id;
             const caption = message.image.caption || "";
@@ -1930,28 +2069,28 @@ async function handleMessage(message, from, type) {
                 const imageBuffer = await downloadMedia(mediaUrl);
                 
                 let extractedItems = [];
-                let source = 'none';
                 
+                // Try OCR
                 try {
                     const ocrResult = await extractOrderFromImage(imageBuffer, mimeType);
                     if (ocrResult.items && ocrResult.items.length > 0) {
                         extractedItems = ocrResult.items;
-                        source = 'ocr';
                         logger.info(`✅ OCR extracted ${extractedItems.length} items`);
                     }
                 } catch (ocrError) {
                     logger.error(`❌ OCR error: ${ocrError.message}`);
                 }
                 
+                // Try caption if OCR failed
                 if (extractedItems.length === 0 && caption && caption.trim().length > 0) {
                     const captionItems = extractItemsFromTextUltimate(caption);
                     if (captionItems && captionItems.length > 0) {
                         extractedItems = captionItems;
-                        source = 'caption';
                         logger.info(`✅ Caption extracted ${extractedItems.length} items`);
                     }
                 }
                 
+                // Process extracted items
                 if (extractedItems.length > 0) {
                     const orderText = extractedItems.map(i => `${i.part} ${i.qty || 1}`).join('\n');
                     const reply = await processOrder(orderText, from);
@@ -1961,6 +2100,7 @@ async function handleMessage(message, from, type) {
                     }
                 }
                 
+                // No items found
                 await sendWhatsAppMessage(from, 
                     `📸 *Photo Received!*\n\n` +
                     `I couldn't read any part numbers from the image${caption ? ' or caption' : ''}.\n\n` +
@@ -1974,11 +2114,13 @@ async function handleMessage(message, from, type) {
             return;
         }
         
+        // Handle audio messages
         if (type === 'audio') {
             await sendWhatsAppMessage(from, `🎤 *Voice Received!*\n\nPlease send text or images.\n\n📞 Call: ${CONFIG.businessPhone}`);
             return;
         }
         
+        // Handle text messages
         const text = message.text?.body || "";
         logger.info(`💬 From: ${from} | Text: ${text.substring(0, 50)}...`);
         
@@ -2071,12 +2213,14 @@ async function handleMessage(message, from, type) {
 
 async function startServer() {
     try {
+        // Initialize database
         await initDatabase();
         
-        // Reset products table to ensure clean import with new columns
+        // Reset products table for clean import
         await pool.query('TRUNCATE TABLE products RESTART IDENTITY CASCADE');
         logger.info('🗑️ Cleared existing products table');
         
+        // Load products from CSV
         await loadProductsFromCSV();
         
         // Build in-memory cache from database
@@ -2087,18 +2231,19 @@ async function startServer() {
             productMap.set(p.part.toUpperCase(), p);
         });
         
-        // Log sample product to verify data
+        // Log sample product for verification
         if (allProducts.length > 0) {
             const sample = allProducts[0];
             const prices = calculatePrices(sample);
-            logger.info(`📊 Sample product: ${sample.part}`);
+            logger.info(`📊 Sample Product: ${sample.part}`);
             logger.info(`   Description: ${sample.description}`);
             logger.info(`   Brand: ${sample.brand}, Make: ${sample.make}`);
-            logger.info(`   LIST: ${sample.list_value}, MRP: ${sample.mrp}, Billing: ${sample.billing_price}`);
+            logger.info(`   LIST PRICE: ${sample.list_value}, MRP: ${sample.mrp}, Billing: ${sample.billing_price}`);
             logger.info(`   Stock: ${sample.stock}, Box: ${sample.box_qty}, Carton: ${sample.carton}`);
             logger.info(`   GST: ${prices.gstRate}%, GST Amount: ${prices.gstAmount}, Price incl. GST: ${prices.priceWithGST}`);
         }
         
+        // Start server
         const PORT = process.env.PORT || 10000;
         app.listen(PORT, () => {
             logger.info(`🚀 Server Running On Port ${PORT}`);
