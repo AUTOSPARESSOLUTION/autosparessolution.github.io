@@ -1,5 +1,6 @@
 // ============================================================
 // 📱 SMART ORDER ENGINE V12 - COMPLETE FIXED
+// MRP + LIST Display for ALL Outputs
 // ============================================================
 
 const express = require("express");
@@ -271,7 +272,6 @@ async function initDatabase() {
             )
         `);
 
-        // Indexes
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
@@ -335,6 +335,13 @@ async function loadProductsFromCSV() {
         return;
     }
 
+    // Build in-memory cache
+    allProducts = products;
+    productMap.clear();
+    products.forEach(p => {
+        productMap.set(p.part.toUpperCase(), p);
+    });
+
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -371,6 +378,65 @@ async function loadProductsFromCSV() {
     } finally {
         client.release();
     }
+}
+
+// ============================================================
+// 📋 PRODUCT DATA (for aiSearch)
+// ============================================================
+
+let allProducts = [];
+let productMap = new Map();
+
+// ============================================================
+// 🔍 AI SEARCH - WITH MRP & LIST
+// ============================================================
+
+function aiSearch(query) {
+    if (!query) return [];
+    const q = query.toLowerCase().trim();
+    const results = allProducts.filter(p => {
+        const part = (p.part || '').toLowerCase();
+        const desc = (p.description || p.desc || '').toLowerCase();
+        const brand = (p.brand || '').toLowerCase();
+        return part.includes(q) || desc.includes(q) || brand.includes(q);
+    });
+    results.sort((a, b) => {
+        const aExact = (a.part || '').toLowerCase() === q;
+        const bExact = (b.part || '').toLowerCase() === q;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        return (b.stock || 0) - (a.stock || 0);
+    });
+    return results.slice(0, 10);
+}
+
+// ============================================================
+// 📋 FORMAT PRODUCT LINE - WITH MRP & LIST
+// ============================================================
+
+function formatProductLine(product, qty, confidence, original = null) {
+    const price = product.mrp || product.price || 0;
+    const listValue = product.list_value || 0;
+    const priceGST = price * (1 + (product.gst || 18) / 100);
+    const confidenceStr = confidence < 1 ? ` (${Math.round(confidence * 100)}%)` : '';
+    
+    let line = `*${product.part}*${confidenceStr}`;
+    if (original && original !== product.part) {
+        line += `\n   📝 OCR read: ${original}`;
+    }
+    line += `\n📝 ${product.description || 'N/A'}`;
+    line += `\n🏷️ Brand: ${product.brand || 'N/A'}`;
+    line += `\n📦 Qty: ${qty}`;
+    
+    // ✅ SHOW BOTH MRP AND LIST FOR ALL BRANDS
+    if (listValue > 0) {
+        line += `\n💰 LIST: ₹${listValue.toFixed(2)}`;
+    }
+    line += `\n💰 MRP: ₹${price.toFixed(2)}`;
+    line += ` (incl. GST: ₹${priceGST.toFixed(2)})`;
+    line += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
+    
+    return line;
 }
 
 // ============================================================
@@ -421,35 +487,6 @@ async function searchProduct(partNumber) {
     }
 
     return null;
-}
-
-// ============================================================
-// 📋 FORMAT PRODUCT LINE - WITH MRP & LIST
-// ============================================================
-
-function formatProductLine(product, qty, confidence, original = null) {
-    const price = product.mrp || product.price || 0;
-    const listValue = product.list_value || 0;
-    const priceGST = price * (1 + (product.gst || 18) / 100);
-    const confidenceStr = confidence < 1 ? ` (${Math.round(confidence * 100)}%)` : '';
-    
-    let line = `*${product.part}*${confidenceStr}`;
-    if (original && original !== product.part) {
-        line += `\n   📝 OCR read: ${original}`;
-    }
-    line += `\n📝 ${product.description || 'N/A'}`;
-    line += `\n🏷️ Brand: ${product.brand || 'N/A'}`;
-    line += `\n📦 Qty: ${qty}`;
-    
-    // ✅ SHOW BOTH MRP AND LIST FOR ALL BRANDS
-    if (listValue > 0) {
-        line += `\n💰 LIST: ₹${listValue.toFixed(2)}`;
-    }
-    line += `\n💰 MRP: ₹${price.toFixed(2)}`;
-    line += ` (incl. GST: ₹${priceGST.toFixed(2)})`;
-    line += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
-    
-    return line;
 }
 
 // ============================================================
@@ -1460,6 +1497,7 @@ app.post("/webhook", async (req, res) => {
 // 📩 MESSAGE HANDLER
 // ============================================================
 
+// This function is called asynchronously
 async function handleMessage(message, from, type) {
     try {
         await getOrCreateCustomer(from);
@@ -1592,6 +1630,14 @@ async function startServer() {
         await initDatabase();
         await loadProductsFromCSV();
         
+        // Build in-memory cache from database
+        const dbProducts = await pool.query('SELECT * FROM products');
+        allProducts = dbProducts.rows;
+        productMap.clear();
+        allProducts.forEach(p => {
+            productMap.set(p.part.toUpperCase(), p);
+        });
+        
         const PORT = process.env.PORT || 10000;
         app.listen(PORT, () => {
             logger.info(`🚀 Server Running On Port ${PORT}`);
@@ -1601,6 +1647,7 @@ async function startServer() {
             logger.info(`🧠 DeepSeek: ${CONFIG.deepseekKey ? '✅' : '❌'}`);
             logger.info(`💳 Razorpay: ${CONFIG.razorpayKeyId ? '✅' : '❌'}`);
             logger.info(`🗄️ Database: ${CONFIG.databaseUrl ? '✅' : '❌'}`);
+            logger.info(`📦 Products loaded: ${allProducts.length}`);
         });
     } catch (error) {
         logger.error(`❌ Startup error: ${error.message}`);
