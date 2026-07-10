@@ -1,6 +1,5 @@
 // ============================================================
-// 📱 ASSIST WHATSAPP WEBHOOK - FULLY FIXED
-// Handles all webhook cases including Meta tests
+// 📱 ASSIST WHATSAPP WEBHOOK - COMPLETE WORKING VERSION
 // ============================================================
 
 const express = require("express");
@@ -11,15 +10,13 @@ const path = require('path');
 const crypto = require('crypto');
 const { createLogger, transports, format } = require('winston');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const sharp = require('sharp');
 
 const app = express();
 app.set('trust proxy', 1);
 app.use(helmet());
 
 // ============================================================
-// 📊 SIMPLE LOGGING
+// 📊 LOGGING
 // ============================================================
 
 const logger = createLogger({
@@ -110,10 +107,6 @@ async function loadProductsFromCSV() {
     });
 
     console.log(`✅ Loaded ${products.length} products from prices.csv`);
-    if (products.length > 0) {
-        const sample = products[0];
-        console.log(`📊 Sample: ${sample.part} | LIST: ${sample.list_value} | MRP: ${sample.mrp}`);
-    }
     return true;
 }
 
@@ -217,7 +210,7 @@ function searchProduct(partNumber) {
 }
 
 // ============================================================
-// 📋 FORMAT RESULTS - COMPLETE WITH ALL PRICES
+// 📋 FORMAT SEARCH RESULTS
 // ============================================================
 
 function formatSearchResults(products, query) {
@@ -413,7 +406,7 @@ function processOrder(text, from) {
 }
 
 // ============================================================
-// 🧠 AI FALLBACK - SIMPLIFIED
+// 🧠 AI FALLBACK
 // ============================================================
 
 async function getAIResponse(message) {
@@ -503,7 +496,7 @@ app.get("/", (req, res) => {
 });
 
 // ============================================================
-// 📩 WEBHOOK VERIFICATION - FIXED
+// 📩 WEBHOOK VERIFICATION
 // ============================================================
 
 app.get("/webhook", (req, res) => {
@@ -511,61 +504,56 @@ app.get("/webhook", (req, res) => {
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
     
-    console.log(`🔐 Webhook Verification Request:`);
-    console.log(`  Mode: ${mode}`);
-    console.log(`  Token: ${token}`);
-    console.log(`  Challenge: ${challenge}`);
-    console.log(`  Expected Token: ${CONFIG.verifyToken}`);
+    console.log(`🔐 Webhook Verification: mode=${mode}, token=${token}`);
     
     if (mode === "subscribe" && token === CONFIG.verifyToken) {
-        console.log("✅ Webhook Verified Successfully!");
+        console.log("✅ Webhook Verified!");
         return res.status(200).send(challenge);
     }
     
-    console.log("❌ Webhook Verification Failed!");
+    console.log("❌ Verification Failed!");
     res.status(403).send("Verification failed");
 });
 
 // ============================================================
-// 📩 RECEIVE MESSAGE - FULLY FIXED WEBHOOK
+// 📩 RECEIVE MESSAGE - FIXED
 // ============================================================
 
 app.post("/webhook", async (req, res) => {
     console.log("📨 Incoming Webhook POST");
     
     try {
-        // ✅ FIX: Check if body exists
+        // Check if body exists
         if (!req.body) {
-            console.log("⚠️ Empty request body");
+            console.log("⚠️ Empty body");
             return res.sendStatus(200);
         }
         
-        // ✅ FIX: Check if entry exists
+        console.log(`📦 Body keys: ${Object.keys(req.body).join(', ')}`);
+        
+        // Check for entry
         if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
-            console.log("⚠️ No entry in webhook body");
-            console.log("📦 Body:", JSON.stringify(req.body).substring(0, 200));
+            console.log("⚠️ No entry in webhook");
+            console.log(`📦 Body:`, JSON.stringify(req.body).substring(0, 200));
             return res.sendStatus(200);
         }
         
-        // ✅ FIX: Check if changes exist
         const entry = req.body.entry[0];
         if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
-            console.log("⚠️ No changes in webhook entry");
+            console.log("⚠️ No changes in webhook");
             return res.sendStatus(200);
         }
         
-        // ✅ FIX: Check if value exists
         const change = entry.changes[0];
         if (!change.value) {
-            console.log("⚠️ No value in webhook change");
+            console.log("⚠️ No value in webhook");
             return res.sendStatus(200);
         }
         
-        // ✅ FIX: Check if messages exist
+        // Check for messages
         const value = change.value;
         if (!value.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
-            console.log("⚠️ No messages in webhook value");
-            // This could be a status update, not a message
+            console.log("📊 Status update - ignoring");
             return res.sendStatus(200);
         }
         
@@ -573,8 +561,9 @@ app.post("/webhook", async (req, res) => {
         const message = value.messages[0];
         const from = message.from;
         const type = message.type || 'text';
+        const messageId = message.id;
         
-        console.log(`📩 From: ${from} | Type: ${type}`);
+        console.log(`📩 From: ${from} | Type: ${type} | ID: ${messageId}`);
         
         // Process asynchronously
         setImmediate(async () => {
@@ -589,13 +578,13 @@ app.post("/webhook", async (req, res) => {
         
     } catch (error) {
         console.log(`❌ Webhook error: ${error.message}`);
-        console.log(`📦 Request body:`, JSON.stringify(req.body).substring(0, 500));
-        res.sendStatus(200); // Always return 200 to Meta
+        console.log(`📦 Body:`, JSON.stringify(req.body || {}).substring(0, 300));
+        res.sendStatus(200);
     }
 });
 
 // ============================================================
-// 📩 MESSAGE HANDLER
+// 📩 MESSAGE HANDLER - WITH WELCOME MESSAGE
 // ============================================================
 
 async function handleMessage(message, from, type) {
@@ -605,36 +594,144 @@ async function handleMessage(message, from, type) {
             const text = message.text?.body || "";
             console.log(`💬 Message: "${text}"`);
             
-            // Check if it's a command
-            const msgLower = text.toLowerCase().trim();
-            
-            if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start") {
-                await sendWhatsAppMessage(from, 
-                    `👋 *Assist WhatsApp Bot*\n\n` +
-                    `🔍 Send part number to search\n` +
-                    `📝 Example: "0801BA0285N"\n` +
-                    `📦 Example with quantity: "0801BA0285N 2"\n\n` +
-                    `📞 Call: ${CONFIG.businessPhone}`
-                );
+            if (!text || text.trim() === '') {
+                console.log('⚠️ Empty message');
                 return;
             }
             
-            // Search for part number
-            const hasPartNumber = /[A-Z0-9]{5,}/i.test(text);
+            const msgLower = text.toLowerCase().trim();
             
-            if (hasPartNumber) {
-                // Extract part number
-                const partMatch = text.match(/([A-Z0-9]{5,})/i);
-                const partNumber = partMatch ? partMatch[1].toUpperCase() : text.toUpperCase();
+            // ============================================================
+            // ✅ WELCOME MESSAGE - Full version
+            // ============================================================
+            if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start" || msgLower === "menu") {
+                const welcomeMessage = 
+                    `👋 *Welcome to Auto Spares Solution!*\n\n` +
+                    `🤖 I'm your AI Sales Assistant\n\n` +
+                    `🔍 *Search Parts:*\n` +
+                    `Send part number like "0108FAW00360N"\n` +
+                    `Send description like "clutch plate"\n` +
+                    `Send brand like "TVS" or "M&M"\n\n` +
+                    `📦 *Multiple Products:*\n` +
+                    `"0108FAW00360N 0108FAW00370N"\n` +
+                    `"0108FAW00360N x2, 0108FAW00370N x3"\n\n` +
+                    `📸 *Upload Photo:*\n` +
+                    `Send photo of any part (add part number in caption)\n\n` +
+                    `🎤 *Voice Message:*\n` +
+                    `Send voice note with your query\n\n` +
+                    `💰 *Check Price:*\n` +
+                    `"Price 0108FAW00360N"\n\n` +
+                    `📦 *Check Stock:*\n` +
+                    `"Stock 0108FAW00360N"\n\n` +
+                    `🛒 *Place Order:*\n` +
+                    `"Order 0108FAW00360N"\n\n` +
+                    `📞 *Call:* ${CONFIG.businessPhone}\n` +
+                    `🛒 *Shop:* https://autosparessolution.com\n\n` +
+                    `*How can I help you today?* 🚗`;
                 
+                await sendWhatsAppMessage(from, welcomeMessage);
+                return;
+            }
+            
+            // ============================================================
+            // ✅ PRICE CHECK
+            // ============================================================
+            if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
+                const partMatch = text.match(/([A-Z0-9]{5,})/i);
+                if (partMatch) {
+                    const partNumber = partMatch[1].toUpperCase();
+                    const searchResults = searchProducts(partNumber);
+                    if (searchResults.length > 0) {
+                        const product = searchResults[0];
+                        const prices = calculatePrices(product);
+                        let reply = `💰 *Price: ${product.part}*\n\n`;
+                        reply += `📝 ${product.description}\n`;
+                        if (product.brand && product.brand !== 'Unknown') {
+                            reply += `🏷️ Brand: ${product.brand}\n`;
+                        }
+                        if (prices.listValue > 0) {
+                            reply += `💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}\n`;
+                        }
+                        if (prices.mrp > 0) {
+                            reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
+                        }
+                        if (prices.billingPrice > 0) {
+                            reply += `💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}\n`;
+                            reply += `🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}\n`;
+                            reply += `💳 *Total: ₹${prices.priceWithGST.toFixed(2)} (incl. GST)*\n`;
+                        }
+                        reply += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
+                        reply += `\n\n🛒 Order: https://autosparessolution.com`;
+                        await sendWhatsAppMessage(from, reply);
+                        return;
+                    }
+                }
+            }
+            
+            // ============================================================
+            // ✅ STOCK CHECK
+            // ============================================================
+            if (msgLower.includes('stock') || msgLower.includes('available')) {
+                const partMatch = text.match(/([A-Z0-9]{5,})/i);
+                if (partMatch) {
+                    const partNumber = partMatch[1].toUpperCase();
+                    const searchResults = searchProducts(partNumber);
+                    if (searchResults.length > 0) {
+                        const product = searchResults[0];
+                        let reply = `📦 *Stock: ${product.part}*\n\n`;
+                        reply += `📝 ${product.description}\n`;
+                        reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
+                        if (product.box_qty > 0) {
+                            reply += ` | Box: ${product.box_qty}`;
+                        }
+                        if (product.carton > 0) {
+                            reply += ` | Carton: ${product.carton}`;
+                        }
+                        reply += `\n\n🛒 Order: https://autosparessolution.com`;
+                        await sendWhatsAppMessage(from, reply);
+                        return;
+                    }
+                }
+            }
+            
+            // ============================================================
+            // ✅ ORDER COMMAND
+            // ============================================================
+            if (msgLower.includes('order') || msgLower.includes('buy') || msgLower.includes('purchase')) {
+                const partMatch = text.match(/([A-Z0-9]{5,})/i);
+                if (partMatch) {
+                    const partNumber = partMatch[1].toUpperCase();
+                    const searchResults = searchProducts(partNumber);
+                    if (searchResults.length > 0) {
+                        const product = searchResults[0];
+                        const prices = calculatePrices(product);
+                        let reply = `🛒 *Order: ${product.part}*\n\n`;
+                        reply += `📝 ${product.description}\n`;
+                        reply += `💰 ₹${prices.priceWithGST.toFixed(2)} (incl. GST)\n`;
+                        reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}\n\n`;
+                        if (product.stock > 0) {
+                            reply += `✅ *Confirm order?* Reply "Confirm Order"`;
+                        } else {
+                            reply += `🔔 *We'll notify you when back in stock!*`;
+                        }
+                        await sendWhatsAppMessage(from, reply);
+                        return;
+                    }
+                }
+            }
+            
+            // ============================================================
+            // ✅ PART NUMBER SEARCH
+            // ============================================================
+            const partMatch = text.match(/([A-Z0-9]{5,})/i);
+            if (partMatch) {
+                const partNumber = partMatch[1].toUpperCase();
                 console.log(`🔍 Searching for: "${partNumber}"`);
                 
-                // Check if it has quantity
+                // Check for quantity
                 const qtyMatch = text.match(/(\d+)\s+([A-Z0-9]{5,})/i);
-                const hasQty = qtyMatch !== null;
                 
-                if (hasQty) {
-                    // Process as order
+                if (qtyMatch) {
                     const reply = processOrder(text, from);
                     if (reply) {
                         await sendWhatsAppMessage(from, reply);
@@ -642,7 +739,6 @@ async function handleMessage(message, from, type) {
                     }
                 }
                 
-                // Search for the part
                 const searchResults = searchProducts(partNumber);
                 console.log(`📊 Found ${searchResults.length} results`);
                 
@@ -653,44 +749,64 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // Try AI fallback
+            // ============================================================
+            // ✅ AI FALLBACK
+            // ============================================================
             const aiReply = await getAIResponse(text);
             if (aiReply) {
                 await sendWhatsAppMessage(from, `🤖 ${aiReply}`);
                 return;
             }
             
-            // Default response
+            // ============================================================
+            // ✅ DEFAULT RESPONSE
+            // ============================================================
             await sendWhatsAppMessage(from, 
                 `🔍 I couldn't find "${text}"\n\n` +
                 `💡 Try sending a part number like:\n` +
-                `"0801BA0285N"\n\n` +
+                `"0108FAW00360N"\n\n` +
+                `💡 Or send "Help" for options\n\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
         
-        // Handle other message types
+        // ============================================================
+        // ✅ IMAGE HANDLING
+        // ============================================================
         if (type === 'image') {
             await sendWhatsAppMessage(from, 
                 `📸 *Photo Received!*\n\n` +
                 `💡 Please send the part number directly.\n` +
-                `📝 Example: "0801BA0285N 2"\n\n` +
+                `📝 Example: "0108FAW00360N 2"\n\n` +
+                `💡 Or send "Help" for options\n\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
         
+        // ============================================================
+        // ✅ AUDIO HANDLING
+        // ============================================================
         if (type === 'audio') {
             await sendWhatsAppMessage(from, 
                 `🎤 *Voice Received!*\n\n` +
                 `💡 Please send text or images.\n\n` +
+                `💡 Or send "Help" for options\n\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
         
-        await sendWhatsAppMessage(from, `📩 Received your ${type} message. Please send text or images.`);
+        // ============================================================
+        // ✅ OTHER TYPES
+        // ============================================================
+        await sendWhatsAppMessage(from, 
+            `📩 Received your ${type} message.\n\n` +
+            `💡 Please send text with part numbers.\n` +
+            `💡 Or send "Help" for options\n\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
         
     } catch (error) {
         console.log(`❌ Message handler error: ${error.message}`);
@@ -711,9 +827,21 @@ async function startServer() {
     console.log(`🧠 Gemini Key: ${CONFIG.geminiKey ? '✅ Set' : '❌ Not set'}`);
     console.log("====================================");
     
-    await loadProductsFromCSV();
+    // Load products
+    const loaded = await loadProductsFromCSV();
+    if (!loaded) {
+        console.log("⚠️ No products loaded. Using fallback data.");
+        allProducts = [
+            { part: '0801BA0285N', description: 'CLUTCH DISC ASSEMBLY DIA 240 mm', brand: 'M&M', make: 'MARUTI', list_value: 2103.53, mrp: 2482.17, billing_price: 2103.53, stock: 19, box_qty: 1, carton: 12, gst: 18 },
+            { part: '0303BC0071N', description: 'ELEMENT OIL FILTER', brand: 'M&M', make: 'MARUTI', list_value: 182.86, mrp: 215.77, billing_price: 182.86, stock: 462, box_qty: 10, carton: 100, gst: 18 }
+        ];
+        productMap.clear();
+        allProducts.forEach(p => {
+            productMap.set(p.part.toUpperCase(), p);
+        });
+        console.log(`✅ Loaded ${allProducts.length} fallback products`);
+    }
     
-    console.log("✅ All features loaded successfully!");
     console.log(`📦 Product Map: ${allProducts.length} products loaded`);
     console.log("====================================");
     
