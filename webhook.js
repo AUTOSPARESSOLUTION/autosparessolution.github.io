@@ -1,5 +1,5 @@
 // ============================================================
-// 📱 ASSIST WHATSAPP WEBHOOK - COMPLETE WORKING VERSION
+// 📱 ASSIST WHATSAPP WEBHOOK - FULLY WORKING
 // ============================================================
 
 const express = require("express");
@@ -12,6 +12,18 @@ const { createLogger, transports, format } = require('winston');
 const helmet = require('helmet');
 
 const app = express();
+
+// ✅ FIX 1: Parse JSON BEFORE any middleware
+app.use(express.json({
+    verify: (req, res, buf) => {
+        // Store raw body for signature verification
+        req.rawBody = buf;
+    }
+}));
+
+// ✅ FIX 2: Parse URL-encoded data
+app.use(express.urlencoded({ extended: true }));
+
 app.set('trust proxy', 1);
 app.use(helmet());
 
@@ -145,11 +157,9 @@ function searchProducts(query) {
     const clean = query.trim().toUpperCase();
     const results = [];
     
-    // 1. EXACT MATCH
     const exactMatches = allProducts.filter(p => p.part.toUpperCase() === clean);
     results.push(...exactMatches.map(p => ({ ...p, matchType: 'exact', confidence: 1.0 })));
     
-    // 2. PARTIAL MATCH
     if (results.length < 10) {
         const partialMatches = allProducts.filter(p => 
             p.part.toUpperCase().includes(clean) && 
@@ -158,7 +168,6 @@ function searchProducts(query) {
         results.push(...partialMatches.slice(0, 10).map(p => ({ ...p, matchType: 'partial', confidence: 0.7 })));
     }
     
-    // 3. DESCRIPTION SEARCH
     if (results.length < 10) {
         const descMatches = allProducts.filter(p => 
             (p.description || '').toUpperCase().includes(clean) && 
@@ -167,7 +176,6 @@ function searchProducts(query) {
         results.push(...descMatches.slice(0, 5).map(p => ({ ...p, matchType: 'description', confidence: 0.5 })));
     }
     
-    // 4. BRAND SEARCH
     if (results.length < 10) {
         const brandMatches = allProducts.filter(p => 
             (p.brand || '').toUpperCase().includes(clean) && 
@@ -250,7 +258,6 @@ function formatSearchResults(products, query) {
             reply += `\n`;
         }
         
-        // ✅ FULL PRICE BREAKDOWN
         if (prices.listValue > 0) {
             reply += `💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}\n`;
         }
@@ -302,28 +309,24 @@ function extractItemsFromTextUltimate(text) {
     const lines = text.split(/[,;\n]/).map(l => l.trim()).filter(l => l.length > 0);
     
     for (const line of lines) {
-        // Pattern: 2 PART123 or PART123 2
         let match = line.match(/(\d+)\s+([A-Z0-9]{5,30})/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
             continue;
         }
         
-        // Pattern: PART123 2
         match = line.match(/([A-Z0-9]{5,30})\s+(\d+)/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
-        // Pattern: PART123 = 2
         match = line.match(/([A-Z0-9]{5,30})\s*[=\-:]\s*(\d+)/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
-        // Pattern: PART123 (no quantity)
         match = line.match(/\b([A-Z0-9]{5,30})\b/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: 1 });
@@ -496,7 +499,7 @@ app.get("/", (req, res) => {
 });
 
 // ============================================================
-// 📩 WEBHOOK VERIFICATION
+// 📩 WEBHOOK VERIFICATION - FIXED
 // ============================================================
 
 app.get("/webhook", (req, res) => {
@@ -504,7 +507,10 @@ app.get("/webhook", (req, res) => {
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
     
-    console.log(`🔐 Webhook Verification: mode=${mode}, token=${token}`);
+    console.log(`🔐 Webhook Verification:`);
+    console.log(`  Mode: ${mode}`);
+    console.log(`  Token: ${token}`);
+    console.log(`  Expected: ${CONFIG.verifyToken}`);
     
     if (mode === "subscribe" && token === CONFIG.verifyToken) {
         console.log("✅ Webhook Verified!");
@@ -516,64 +522,68 @@ app.get("/webhook", (req, res) => {
 });
 
 // ============================================================
-// 📩 RECEIVE MESSAGE - FIXED
+// 📩 RECEIVE MESSAGE - FIXED FOR EMPTY BODY
 // ============================================================
 
 app.post("/webhook", async (req, res) => {
-    console.log("📨 Incoming Webhook POST");
+    console.log("📨 Webhook POST received");
+    
+    // ✅ Log the request headers and body for debugging
+    console.log(`📋 Content-Type: ${req.headers['content-type']}`);
+    console.log(`📋 Content-Length: ${req.headers['content-length']}`);
+    
+    // ✅ Check if body exists and is not empty
+    if (!req.body || Object.keys(req.body).length === 0) {
+        console.log("⚠️ Empty body received");
+        console.log("📦 This might be a test from Meta or a malformed request");
+        // Still return 200 to keep Meta happy
+        return res.sendStatus(200);
+    }
+    
+    console.log(`📦 Body keys: ${Object.keys(req.body).join(', ')}`);
     
     try {
-        // Check if body exists
-        if (!req.body) {
-            console.log("⚠️ Empty body");
-            return res.sendStatus(200);
-        }
-        
-        console.log(`📦 Body keys: ${Object.keys(req.body).join(', ')}`);
-        
-        // Check for entry
-        if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
-            console.log("⚠️ No entry in webhook");
-            console.log(`📦 Body:`, JSON.stringify(req.body).substring(0, 200));
-            return res.sendStatus(200);
-        }
-        
-        const entry = req.body.entry[0];
-        if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
-            console.log("⚠️ No changes in webhook");
-            return res.sendStatus(200);
-        }
-        
-        const change = entry.changes[0];
-        if (!change.value) {
-            console.log("⚠️ No value in webhook");
-            return res.sendStatus(200);
-        }
-        
-        // Check for messages
-        const value = change.value;
-        if (!value.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
-            console.log("📊 Status update - ignoring");
-            return res.sendStatus(200);
-        }
-        
-        // ✅ We have a valid message!
-        const message = value.messages[0];
-        const from = message.from;
-        const type = message.type || 'text';
-        const messageId = message.id;
-        
-        console.log(`📩 From: ${from} | Type: ${type} | ID: ${messageId}`);
-        
-        // Process asynchronously
-        setImmediate(async () => {
-            try {
-                await handleMessage(message, from, type);
-            } catch (error) {
-                console.log(`❌ Async error: ${error.message}`);
+        // ✅ Handle standard WhatsApp webhook format
+        if (req.body.entry && Array.isArray(req.body.entry) && req.body.entry.length > 0) {
+            const entry = req.body.entry[0];
+            
+            if (entry.changes && Array.isArray(entry.changes) && entry.changes.length > 0) {
+                const change = entry.changes[0];
+                
+                if (change.value) {
+                    // ✅ Check for messages
+                    if (change.value.messages && Array.isArray(change.value.messages) && change.value.messages.length > 0) {
+                        const message = change.value.messages[0];
+                        const from = message.from;
+                        const type = message.type || 'text';
+                        const messageId = message.id;
+                        
+                        console.log(`📩 From: ${from} | Type: ${type} | ID: ${messageId}`);
+                        
+                        // Process asynchronously
+                        setImmediate(async () => {
+                            try {
+                                await handleMessage(message, from, type);
+                            } catch (error) {
+                                console.log(`❌ Async error: ${error.message}`);
+                            }
+                        });
+                        
+                        return res.sendStatus(200);
+                    }
+                    
+                    // ✅ Check for status updates (ignore)
+                    if (change.value.statuses) {
+                        console.log("📊 Status update received - ignoring");
+                        return res.sendStatus(200);
+                    }
+                }
             }
-        });
+        }
         
+        // ✅ Unknown webhook format - log and ignore
+        console.log(`⚠️ Unknown webhook format`);
+        console.log(`📦 Body:`, JSON.stringify(req.body).substring(0, 500));
         res.sendStatus(200);
         
     } catch (error) {
@@ -584,12 +594,11 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ============================================================
-// 📩 MESSAGE HANDLER - WITH WELCOME MESSAGE
+// 📩 MESSAGE HANDLER - WITH WELCOME
 // ============================================================
 
 async function handleMessage(message, from, type) {
     try {
-        // Handle text messages
         if (type === 'text') {
             const text = message.text?.body || "";
             console.log(`💬 Message: "${text}"`);
@@ -601,9 +610,7 @@ async function handleMessage(message, from, type) {
             
             const msgLower = text.toLowerCase().trim();
             
-            // ============================================================
-            // ✅ WELCOME MESSAGE - Full version
-            // ============================================================
+            // ✅ WELCOME MESSAGE
             if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start" || msgLower === "menu") {
                 const welcomeMessage = 
                     `👋 *Welcome to Auto Spares Solution!*\n\n` +
@@ -633,9 +640,7 @@ async function handleMessage(message, from, type) {
                 return;
             }
             
-            // ============================================================
             // ✅ PRICE CHECK
-            // ============================================================
             if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
                 const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
@@ -668,9 +673,7 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // ============================================================
             // ✅ STOCK CHECK
-            // ============================================================
             if (msgLower.includes('stock') || msgLower.includes('available')) {
                 const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
@@ -694,9 +697,7 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // ============================================================
             // ✅ ORDER COMMAND
-            // ============================================================
             if (msgLower.includes('order') || msgLower.includes('buy') || msgLower.includes('purchase')) {
                 const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
@@ -720,15 +721,12 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // ============================================================
             // ✅ PART NUMBER SEARCH
-            // ============================================================
             const partMatch = text.match(/([A-Z0-9]{5,})/i);
             if (partMatch) {
                 const partNumber = partMatch[1].toUpperCase();
                 console.log(`🔍 Searching for: "${partNumber}"`);
                 
-                // Check for quantity
                 const qtyMatch = text.match(/(\d+)\s+([A-Z0-9]{5,})/i);
                 
                 if (qtyMatch) {
@@ -749,18 +747,14 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // ============================================================
             // ✅ AI FALLBACK
-            // ============================================================
             const aiReply = await getAIResponse(text);
             if (aiReply) {
                 await sendWhatsAppMessage(from, `🤖 ${aiReply}`);
                 return;
             }
             
-            // ============================================================
             // ✅ DEFAULT RESPONSE
-            // ============================================================
             await sendWhatsAppMessage(from, 
                 `🔍 I couldn't find "${text}"\n\n` +
                 `💡 Try sending a part number like:\n` +
@@ -771,9 +765,7 @@ async function handleMessage(message, from, type) {
             return;
         }
         
-        // ============================================================
         // ✅ IMAGE HANDLING
-        // ============================================================
         if (type === 'image') {
             await sendWhatsAppMessage(from, 
                 `📸 *Photo Received!*\n\n` +
@@ -785,9 +777,7 @@ async function handleMessage(message, from, type) {
             return;
         }
         
-        // ============================================================
         // ✅ AUDIO HANDLING
-        // ============================================================
         if (type === 'audio') {
             await sendWhatsAppMessage(from, 
                 `🎤 *Voice Received!*\n\n` +
@@ -798,9 +788,6 @@ async function handleMessage(message, from, type) {
             return;
         }
         
-        // ============================================================
-        // ✅ OTHER TYPES
-        // ============================================================
         await sendWhatsAppMessage(from, 
             `📩 Received your ${type} message.\n\n` +
             `💡 Please send text with part numbers.\n` +
@@ -827,7 +814,6 @@ async function startServer() {
     console.log(`🧠 Gemini Key: ${CONFIG.geminiKey ? '✅ Set' : '❌ Not set'}`);
     console.log("====================================");
     
-    // Load products
     const loaded = await loadProductsFromCSV();
     if (!loaded) {
         console.log("⚠️ No products loaded. Using fallback data.");
