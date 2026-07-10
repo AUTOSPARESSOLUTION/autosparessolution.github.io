@@ -1,6 +1,6 @@
 // ============================================================
-// 📱 SMART ORDER ENGINE V12 - COMPLETE FIXED
-// MRP + LIST Display for ALL Outputs
+// 📱 SMART ORDER ENGINE V12.2 - COMPLETE FIXED
+// MRP + LIST + GST on Billing Price + Search Results
 // ============================================================
 
 const express = require("express");
@@ -70,7 +70,8 @@ const CONFIG = {
     retryAttempts: parseInt(process.env.RETRY_ATTEMPTS) || 3,
     retryDelay: parseInt(process.env.RETRY_DELAY) || 1000,
     circuitBreakerThreshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD) || 5,
-    circuitBreakerTimeout: parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT) || 60000
+    circuitBreakerTimeout: parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT) || 60000,
+    defaultGST: parseFloat(process.env.DEFAULT_GST) || 18
 };
 
 // Validate required config
@@ -82,7 +83,7 @@ for (const key of required) {
     }
 }
 
-logger.info('🚀 SMART ORDER ENGINE V12 Started');
+logger.info('🚀 SMART ORDER ENGINE V12.2 Started');
 
 // ============================================================
 // ⏱️ FETCH WITH TIMEOUT & RETRY
@@ -203,12 +204,38 @@ async function initDatabase() {
                 brand VARCHAR(50),
                 list_value DECIMAL(12,2),
                 mrp DECIMAL(12,2),
+                billing_price DECIMAL(12,2),
                 stock INTEGER DEFAULT 0,
+                box_qty INTEGER DEFAULT 0,
+                carton_qty INTEGER DEFAULT 0,
+                make VARCHAR(50),
+                type VARCHAR(50),
+                finish VARCHAR(50),
                 gst DECIMAL(5,2) DEFAULT 18,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        // Add new columns if they don't exist
+        const columns = [
+            'billing_price DECIMAL(12,2)',
+            'box_qty INTEGER DEFAULT 0',
+            'carton_qty INTEGER DEFAULT 0',
+            'make VARCHAR(50)',
+            'type VARCHAR(50)',
+            'finish VARCHAR(50)'
+        ];
+        
+        for (const col of columns) {
+            const colName = col.split(' ')[0];
+            try {
+                await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS ${col}`);
+                logger.info(`✅ Added column: ${colName}`);
+            } catch (e) {
+                // Column might already exist
+            }
+        }
 
         await pool.query(`
             CREATE TABLE IF NOT EXISTS carts (
@@ -277,6 +304,8 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_part_trgm ON products USING gin (part gin_trgm_ops)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_mrp ON products(mrp)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_list_value ON products(list_value)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_billing_price ON products(billing_price)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_customers_lastcontact ON customers(last_contact)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)`);
@@ -297,7 +326,7 @@ async function initDatabase() {
 }
 
 // ============================================================
-// 📦 PRODUCT LOADING - MATCHES YOUR CSV STRUCTURE
+// 📦 PRODUCT LOADING - UPDATED FOR NEW CSV STRUCTURE
 // ============================================================
 
 async function loadProductsFromCSV() {
@@ -310,21 +339,29 @@ async function loadProductsFromCSV() {
     const products = [];
     await new Promise((resolve, reject) => {
         fs.createReadStream(csvPath)
-            .pipe(csv({ headers: false }))
+            .pipe(csv({ headers: true }))
             .on('data', (row) => {
-                const cols = Object.values(row);
+                // Map CSV columns to product fields
+                const part = (row['Material'] || '').trim();
+                if (!part) return; // Skip empty rows
                 
                 const product = {
-                    part: (cols[0] || '').trim(),
-                    description: (cols[1] || 'Auto Spare Part').trim(),
-                    list_value: parseFloat(cols[2]) || 0,
-                    mrp: parseFloat(cols[3]) || 0,
-                    price: parseFloat(cols[6]) || 0,
-                    stock: parseInt(cols[7]) || 0,
-                    brand: (cols[10] || 'Unknown').trim(),
-                    gst: 18
+                    part: part,
+                    description: (row['Material2'] || 'Auto Spare Part').trim(),
+                    list_value: parseFloat(row['LIST PRICE'] || 0) || 0,
+                    mrp: parseFloat(row['MRP PRICE'] || 0) || 0,
+                    billing_price: parseFloat(row['billing price'] || 0) || 0,
+                    stock: parseInt(row['STOCK'] || 0) || 0,
+                    box_qty: parseInt(row['Box Qty'] || 0) || 0,
+                    carton_qty: parseInt(row['Carton'] || 0) || 0,
+                    brand: (row['brand'] || 'Unknown').trim(),
+                    make: (row['Make'] || 'Unknown').trim(),
+                    type: (row['TYPE'] || '').trim(),
+                    finish: (row['FINISH'] || '').trim(),
+                    gst: CONFIG.defaultGST
                 };
-                if (product.part) products.push(product);
+                
+                products.push(product);
             })
             .on('end', resolve)
             .on('error', reject);
@@ -350,19 +387,36 @@ async function loadProductsFromCSV() {
         for (let i = 0; i < products.length; i += batchSize) {
             const batch = products.slice(i, i + batchSize);
             const values = batch.map((_, idx) => 
-                `($${idx * 7 + 1}, $${idx * 7 + 2}, $${idx * 7 + 3}, $${idx * 7 + 4}, $${idx * 7 + 5}, $${idx * 7 + 6}, $${idx * 7 + 7})`
+                `($${idx * 14 + 1}, $${idx * 14 + 2}, $${idx * 14 + 3}, $${idx * 14 + 4}, $${idx * 14 + 5}, $${idx * 14 + 6}, $${idx * 14 + 7}, $${idx * 14 + 8}, $${idx * 14 + 9}, $${idx * 14 + 10}, $${idx * 14 + 11}, $${idx * 14 + 12}, $${idx * 14 + 13}, $${idx * 14 + 14})`
             ).join(',');
-            const params = batch.flatMap(p => [p.part, p.description, p.brand, p.list_value, p.mrp, p.stock, p.gst]);
+            const params = batch.flatMap(p => [
+                p.part, p.description, p.brand, 
+                p.list_value, p.mrp, p.billing_price,
+                p.stock, p.box_qty, p.carton_qty,
+                p.make, p.type, p.finish,
+                p.gst
+            ]);
             
             await client.query(
-                `INSERT INTO products (part, description, brand, list_value, mrp, stock, gst)
-                 VALUES ${values}
+                `INSERT INTO products (
+                    part, description, brand, 
+                    list_value, mrp, billing_price,
+                    stock, box_qty, carton_qty,
+                    make, type, finish,
+                    gst
+                 ) VALUES ${values}
                  ON CONFLICT (part) DO UPDATE SET
                  description = EXCLUDED.description,
                  brand = EXCLUDED.brand,
                  list_value = EXCLUDED.list_value,
                  mrp = EXCLUDED.mrp,
+                 billing_price = EXCLUDED.billing_price,
                  stock = EXCLUDED.stock,
+                 box_qty = EXCLUDED.box_qty,
+                 carton_qty = EXCLUDED.carton_qty,
+                 make = EXCLUDED.make,
+                 type = EXCLUDED.type,
+                 finish = EXCLUDED.finish,
                  gst = EXCLUDED.gst,
                  updated_at = CURRENT_TIMESTAMP`,
                 params
@@ -371,6 +425,7 @@ async function loadProductsFromCSV() {
         
         await client.query('COMMIT');
         logger.info(`✅ Loaded ${products.length} products`);
+        logger.info(`📊 Sample: ${products[0]?.part} | LIST: ${products[0]?.list_value} | MRP: ${products[0]?.mrp} | Billing: ${products[0]?.billing_price}`);
     } catch (error) {
         await client.query('ROLLBACK');
         logger.error('❌ Product load error:', error);
@@ -388,7 +443,236 @@ let allProducts = [];
 let productMap = new Map();
 
 // ============================================================
-// 🔍 AI SEARCH - WITH MRP & LIST
+// 💰 PRICE CALCULATIONS - GST on Billing Price
+// ============================================================
+
+function calculatePrices(product, qty = 1) {
+    // Use billing_price, fallback to list_value if billing_price not available
+    const billingPrice = product.billing_price || product.list_value || 0;
+    const mrp = product.mrp || 0;
+    const listValue = product.list_value || 0;
+    const gstRate = product.gst || CONFIG.defaultGST || 18;
+    
+    // GST is calculated on BILLING PRICE
+    const gstAmount = billingPrice * (gstRate / 100);
+    const priceWithGST = billingPrice + gstAmount;
+    
+    // Total for quantity
+    const totalBilling = billingPrice * qty;
+    const totalGST = gstAmount * qty;
+    const totalWithGST = priceWithGST * qty;
+    
+    return {
+        billingPrice,
+        mrp,
+        listValue,
+        gstRate,
+        gstAmount,
+        priceWithGST,
+        totalBilling,
+        totalGST,
+        totalWithGST
+    };
+}
+
+// ============================================================
+// 🔍 SEARCH PRODUCTS - WITH FULL DETAILS
+// ============================================================
+
+async function searchProducts(query) {
+    if (!query || query.trim().length < 2) {
+        return [];
+    }
+    
+    const clean = query.trim().toUpperCase();
+    const results = [];
+    
+    // 1. EXACT MATCH
+    let result = await pool.query('SELECT * FROM products WHERE part = $1', [clean]);
+    if (result.rows.length > 0) {
+        results.push(...result.rows.map(p => ({ ...p, matchType: 'exact', confidence: 1.0 })));
+    }
+    
+    // 2. PREFIX MATCH
+    if (results.length < 10) {
+        const prefix = clean.substring(0, Math.min(6, clean.length));
+        result = await pool.query(
+            `SELECT * FROM products 
+             WHERE part LIKE $1 
+             AND part != $2
+             LIMIT 10`,
+            [prefix + '%', clean]
+        );
+        if (result.rows.length > 0) {
+            results.push(...result.rows.map(p => ({ 
+                ...p, 
+                matchType: 'prefix', 
+                confidence: 0.85 
+            })));
+        }
+    }
+    
+    // 3. FUZZY MATCH
+    if (results.length < 10) {
+        result = await pool.query(
+            `SELECT *, similarity(part, $1) as sim
+             FROM products
+             WHERE part % $1
+             AND part NOT IN (SELECT part FROM products WHERE part = $1)
+             ORDER BY sim DESC
+             LIMIT 10`,
+            [clean]
+        );
+        if (result.rows.length > 0) {
+            results.push(...result.rows.map(p => ({ 
+                ...p, 
+                matchType: 'fuzzy', 
+                confidence: p.sim 
+            })));
+        }
+    }
+    
+    // 4. DESCRIPTION SEARCH
+    if (results.length < 10) {
+        const words = clean.split(' ').filter(w => w.length > 2);
+        for (const word of words) {
+            result = await pool.query(
+                `SELECT * FROM products 
+                 WHERE description ILIKE $1 
+                 AND part NOT IN (SELECT part FROM products WHERE part = $1)
+                 LIMIT 5`,
+                [`%${word}%`]
+            );
+            if (result.rows.length > 0) {
+                results.push(...result.rows.map(p => ({ 
+                    ...p, 
+                    matchType: 'description', 
+                    confidence: 0.5 
+                })));
+                break;
+            }
+        }
+    }
+    
+    // 5. BRAND SEARCH
+    if (results.length < 10) {
+        result = await pool.query(
+            `SELECT * FROM products 
+             WHERE brand ILIKE $1 
+             AND part NOT IN (SELECT part FROM products WHERE part = $1)
+             LIMIT 5`,
+            [`%${clean}%`]
+        );
+        if (result.rows.length > 0) {
+            results.push(...result.rows.map(p => ({ 
+                ...p, 
+                matchType: 'brand', 
+                confidence: 0.4 
+            })));
+        }
+    }
+    
+    // Remove duplicates and limit
+    const uniqueResults = [];
+    const seen = new Set();
+    for (const r of results) {
+        if (!seen.has(r.part)) {
+            seen.add(r.part);
+            uniqueResults.push(r);
+        }
+        if (uniqueResults.length >= 10) break;
+    }
+    
+    return uniqueResults;
+}
+
+// ============================================================
+// 📋 FORMAT SEARCH RESULTS - WITH FULL DETAILS
+// ============================================================
+
+function formatSearchResults(products, query) {
+    if (!products || products.length === 0) {
+        return `🔍 No results found for "${query}"\n\n💡 Try:\n• Check the spelling\n• Use part number\n• Search by brand\n\n📞 Call: ${CONFIG.businessPhone}`;
+    }
+    
+    let reply = `🔍 Found ${products.length} result(s)\n\n`;
+    
+    let index = 1;
+    for (const product of products) {
+        const prices = calculatePrices(product);
+        
+        reply += `${index}. *${product.part}*`;
+        if (product.matchType && product.matchType !== 'exact') {
+            reply += ` (${product.matchType})`;
+        }
+        reply += `\n`;
+        
+        // Description
+        if (product.description) {
+            reply += `📝 ${product.description}\n`;
+        }
+        
+        // Brand
+        if (product.brand && product.brand !== 'Unknown') {
+            reply += `🏷️ Brand: ${product.brand}`;
+            if (product.make && product.make !== 'Unknown') {
+                reply += ` | Make: ${product.make}`;
+            }
+            reply += `\n`;
+        }
+        
+        // Type and Finish
+        if (product.type) {
+            reply += `📊 Type: ${product.type}`;
+            if (product.finish) {
+                reply += ` | Finish: ${product.finish}`;
+            }
+            reply += `\n`;
+        }
+        
+        // PRICES - Complete breakdown
+        if (prices.listValue > 0) {
+            reply += `💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}\n`;
+        }
+        if (prices.mrp > 0) {
+            reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
+        }
+        if (prices.billingPrice > 0) {
+            reply += `💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}\n`;
+            reply += `🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}\n`;
+            reply += `💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}\n`;
+        }
+        
+        // Stock
+        if (product.stock > 0) {
+            reply += `📦 ✅ ${product.stock} pcs in stock`;
+            if (product.box_qty > 0) {
+                reply += ` | Box: ${product.box_qty}`;
+            }
+            if (product.carton_qty > 0) {
+                reply += ` | Carton: ${product.carton_qty}`;
+            }
+            reply += `\n`;
+        } else {
+            reply += `📦 ❌ Out of Stock\n`;
+        }
+        
+        reply += `\n`;
+        index++;
+    }
+    
+    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    reply += `🛒 To order: Send part number with quantity\n`;
+    reply += `📝 Example: "${products[0]?.part} 2"\n`;
+    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    reply += `🛒 Order: https://autosparessolution.com\n`;
+    reply += `📞 Call: ${CONFIG.businessPhone}`;
+    
+    return reply;
+}
+
+// ============================================================
+// 🔍 AI SEARCH - WITH MRP & LIST (Legacy support)
 // ============================================================
 
 function aiSearch(query) {
@@ -396,7 +680,7 @@ function aiSearch(query) {
     const q = query.toLowerCase().trim();
     const results = allProducts.filter(p => {
         const part = (p.part || '').toLowerCase();
-        const desc = (p.description || p.desc || '').toLowerCase();
+        const desc = (p.description || '').toLowerCase();
         const brand = (p.brand || '').toLowerCase();
         return part.includes(q) || desc.includes(q) || brand.includes(q);
     });
@@ -411,13 +695,11 @@ function aiSearch(query) {
 }
 
 // ============================================================
-// 📋 FORMAT PRODUCT LINE - WITH MRP & LIST
+// 📋 FORMAT PRODUCT LINE - WITH MRP, LIST & GST on Billing Price
 // ============================================================
 
 function formatProductLine(product, qty, confidence, original = null) {
-    const price = product.mrp || product.price || 0;
-    const listValue = product.list_value || 0;
-    const priceGST = price * (1 + (product.gst || 18) / 100);
+    const prices = calculatePrices(product, qty);
     const confidenceStr = confidence < 1 ? ` (${Math.round(confidence * 100)}%)` : '';
     
     let line = `*${product.part}*${confidenceStr}`;
@@ -425,22 +707,36 @@ function formatProductLine(product, qty, confidence, original = null) {
         line += `\n   📝 OCR read: ${original}`;
     }
     line += `\n📝 ${product.description || 'N/A'}`;
-    line += `\n🏷️ Brand: ${product.brand || 'N/A'}`;
+    if (product.brand) line += `\n🏷️ Brand: ${product.brand}`;
+    if (product.make) line += `\n🏭 Make: ${product.make}`;
+    if (product.type) line += `\n📊 Type: ${product.type}`;
     line += `\n📦 Qty: ${qty}`;
     
-    // ✅ SHOW BOTH MRP AND LIST FOR ALL BRANDS
-    if (listValue > 0) {
-        line += `\n💰 LIST: ₹${listValue.toFixed(2)}`;
+    // ✅ SHOW LIST PRICE, MRP, and Billing Price
+    if (prices.listValue > 0) {
+        line += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
     }
-    line += `\n💰 MRP: ₹${price.toFixed(2)}`;
-    line += ` (incl. GST: ₹${priceGST.toFixed(2)})`;
+    if (prices.mrp > 0) {
+        line += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
+    }
+    if (prices.billingPrice > 0) {
+        line += `\n💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}`;
+        line += `\n🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}`;
+        line += `\n💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}`;
+    }
+    if (product.box_qty > 0) {
+        line += `\n📦 Box Qty: ${product.box_qty}`;
+    }
+    if (product.carton_qty > 0) {
+        line += `\n📦 Carton Qty: ${product.carton_qty}`;
+    }
     line += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
     
     return line;
 }
 
 // ============================================================
-// 🔍 SEARCH PRODUCT
+// 🔍 SEARCH PRODUCT (Single)
 // ============================================================
 
 async function searchProduct(partNumber) {
@@ -532,7 +828,7 @@ function recordSuccess(service) {
 function detectIntent(message) {
     const msgLower = message.toLowerCase().trim();
     const intents = {
-        price: ['price', 'cost', 'rate', 'how much'],
+        price: ['price', 'cost', 'rate', 'how much', 'mrp', 'list'],
         stock: ['stock', 'available', 'have', 'quantity'],
         help: ['help', 'support', 'how to'],
         order: ['order', 'buy', 'purchase', 'want', 'need']
@@ -957,7 +1253,7 @@ async function clearCartDB(phone) {
 }
 
 // ============================================================
-// 📦 ORDER PROCESSING - WITH MRP & LIST
+// 📦 ORDER PROCESSING - WITH MRP, LIST & GST on Billing Price
 // ============================================================
 
 async function processOrder(text, from) {
@@ -989,43 +1285,72 @@ async function processOrder(text, from) {
         part: r.product.part,
         description: r.product.description,
         brand: r.product.brand,
+        make: r.product.make,
+        type: r.product.type,
+        finish: r.product.finish,
         qty: r.qty,
         mrp: r.product.mrp,
         list_value: r.product.list_value,
+        billing_price: r.product.billing_price,
+        box_qty: r.product.box_qty,
+        carton_qty: r.product.carton_qty,
+        gst: r.product.gst || CONFIG.defaultGST,
         confidence: r.confidence
     }));
     
-    const subtotal = cartItems.reduce((sum, i) => sum + i.mrp * i.qty, 0);
-    const gstAmount = subtotal * 0.18;
-    const grandTotal = subtotal + gstAmount;
+    // Calculate totals based on BILLING PRICE + GST
+    let subtotal = 0;
+    let totalGST = 0;
+    let grandTotal = 0;
+    
+    for (const item of cartItems) {
+        const prices = calculatePrices(item, item.qty);
+        subtotal += prices.totalBilling;
+        totalGST += prices.totalGST;
+        grandTotal += prices.totalWithGST;
+    }
     
     await saveCartDB(from, cartItems, subtotal, grandTotal);
     
     let reply = `📋 *ORDER EXTRACTED*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
     for (const r of results) {
         const p = r.product;
-        const priceGST = p.mrp * 1.18;
-        const listValue = p.list_value || 0;
+        const prices = calculatePrices(p, r.qty);
         
         reply += `*${p.part}*`;
         if (r.confidence < 0.95) reply += ` (${Math.round(r.confidence * 100)}%)`;
         if (r.original) reply += `\n   📝 OCR read: ${r.original}`;
-        reply += `\n📝 ${p.description}\n🏷️ Brand: ${p.brand}\n📦 Qty: ${r.qty}`;
+        reply += `\n📝 ${p.description}`;
+        if (p.brand) reply += `\n🏷️ Brand: ${p.brand}`;
+        if (p.make) reply += `\n🏭 Make: ${p.make}`;
+        reply += `\n📦 Qty: ${r.qty}`;
         
-        // ✅ SHOW BOTH MRP AND LIST
-        if (listValue > 0) {
-            reply += `\n💰 LIST: ₹${listValue.toFixed(2)}`;
+        // ✅ SHOW ALL PRICES WITH GST ON BILLING PRICE
+        if (prices.listValue > 0) {
+            reply += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
         }
-        reply += `\n💰 MRP: ₹${p.mrp.toFixed(2)}`;
-        reply += ` (incl. GST: ₹${priceGST.toFixed(2)})`;
+        if (prices.mrp > 0) {
+            reply += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
+        }
+        if (prices.billingPrice > 0) {
+            reply += `\n💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}`;
+            reply += `\n🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}`;
+            reply += `\n💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}`;
+        }
+        if (p.box_qty > 0) {
+            reply += `\n📦 Box Qty: ${p.box_qty}`;
+        }
+        if (p.carton_qty > 0) {
+            reply += `\n📦 Carton Qty: ${p.carton_qty}`;
+        }
         reply += `\n📦 Stock: ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
     }
     
     reply += `━━━━━━━━━━━━━━━━━━━━\n📊 *Summary*\n`;
     reply += `📦 Items: ${cartItems.length}\n`;
     reply += `📦 Qty: ${cartItems.reduce((s, i) => s + i.qty, 0)}\n`;
-    reply += `💰 Subtotal: ₹${subtotal.toFixed(2)}\n`;
-    reply += `🧾 GST (18%): ₹${gstAmount.toFixed(2)}\n`;
+    reply += `💰 Subtotal (Billing): ₹${subtotal.toFixed(2)}\n`;
+    reply += `🧾 Total GST (${CONFIG.defaultGST}%): ₹${totalGST.toFixed(2)}\n`;
     reply += `💳 *Grand Total: ₹${grandTotal.toFixed(2)}*\n`;
     reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
     reply += `🛒 "Confirm Order" - Place order\n`;
@@ -1140,9 +1465,22 @@ async function confirmOrder(phone) {
     
     let reply = `✅ *ORDER CONFIRMED*\n\n━━━━━━━━━━━━━━━━━━━━\n`;
     for (const item of cart.items) {
-        reply += `📦 ${item.part} x${item.qty}\n`;
+        const prices = calculatePrices(item, item.qty);
+        reply += `📦 ${item.part} x${item.qty}`;
+        if (prices.mrp > 0) {
+            reply += ` @ MRP ₹${prices.mrp.toFixed(2)}`;
+        }
+        if (prices.billingPrice > 0) {
+            reply += `\n   💳 Billing: ₹${prices.billingPrice.toFixed(2)} + GST ₹${prices.gstAmount.toFixed(2)} = ₹${prices.priceWithGST.toFixed(2)}`;
+        }
+        reply += `\n`;
     }
-    reply += `━━━━━━━━━━━━━━━━━━━━\n💰 Total: ₹${cart.grandTotal.toFixed(2)}\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order ID: ${orderId}\n🚚 Delivery: 2-3 days\n💳 Pay: ${paymentLink}\n\n📞 Call: ${CONFIG.businessPhone}`;
+    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    reply += `💰 Subtotal (Billing): ₹${cart.subtotal.toFixed(2)}\n`;
+    reply += `🧾 Total GST: ₹${(cart.grandTotal - cart.subtotal).toFixed(2)}\n`;
+    reply += `💳 *Grand Total: ₹${cart.grandTotal.toFixed(2)}*\n`;
+    reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    reply += `📦 Order ID: ${orderId}\n🚚 Delivery: 2-3 days\n💳 Pay: ${paymentLink}\n\n📞 Call: ${CONFIG.businessPhone}`;
     
     return { success: true, message: reply };
 }
@@ -1180,40 +1518,62 @@ async function generateQuotationPDF(quotationNo, customer, items, total) {
     doc.moveDown();
     
     let y = doc.y;
-    doc.fontSize(9);
-    const col1 = 30, col2 = 100, col3 = 250, col4 = 350, col5 = 450;
+    doc.fontSize(8);
+    const col1 = 30, col2 = 90, col3 = 200, col4 = 280, col5 = 340, col6 = 400, col7 = 460, col8 = 520;
     
+    // Headers
     doc.text('S.No', col1, y);
     doc.text('Part No', col2, y);
     doc.text('Description', col3, y);
     doc.text('Qty', col4, y);
-    doc.text('Amount', col5, y);
+    doc.text('Billing', col5, y);
+    doc.text('GST%', col6, y);
+    doc.text('GST Amt', col7, y);
+    doc.text('Total', col8, y);
     
     y += 20;
     doc.moveTo(30, y - 5).lineTo(550, y - 5).stroke();
     
     let index = 1;
+    let subtotal = 0;
+    let totalGST = 0;
+    
     for (const item of items) {
+        const prices = calculatePrices(item, item.qty);
+        subtotal += prices.totalBilling;
+        totalGST += prices.totalGST;
+        
         doc.text(index.toString(), col1, y);
         doc.text(item.part, col2, y);
-        doc.text(item.description.substring(0, 30), col3, y);
+        doc.text((item.description || '').substring(0, 20), col3, y);
         doc.text(item.qty.toString(), col4, y);
-        doc.text(`₹${(item.mrp * item.qty).toFixed(2)}`, col5, y);
-        y += 20;
+        doc.text(`₹${prices.billingPrice.toFixed(2)}`, col5, y);
+        doc.text(`${prices.gstRate}%`, col6, y);
+        doc.text(`₹${prices.gstAmount.toFixed(2)}`, col7, y);
+        doc.text(`₹${prices.priceWithGST.toFixed(2)}`, col8, y);
+        y += 16;
         index++;
     }
     
     doc.moveTo(30, y + 5).lineTo(550, y + 5).stroke();
     y += 20;
     
-    doc.fontSize(12).text(`Total: ₹${total.toFixed(2)}`, 450, y);
+    const grandTotal = subtotal + totalGST;
+    
+    doc.fontSize(9);
+    doc.text(`Subtotal (Billing): ₹${subtotal.toFixed(2)}`, 400, y);
+    y += 15;
+    doc.text(`Total GST: ₹${totalGST.toFixed(2)}`, 400, y);
+    y += 15;
+    doc.fontSize(11).text(`Grand Total: ₹${grandTotal.toFixed(2)}`, 400, y);
     y += 30;
     
-    doc.fontSize(10);
+    doc.fontSize(9);
     doc.text('Terms:');
     doc.text('1. Valid for 15 days');
     doc.text('2. Subject to Howrah jurisdiction');
     doc.text('3. Payment: 50% advance, 50% on delivery');
+    doc.text(`4. GST @ ${CONFIG.defaultGST}% on Billing Price`);
     doc.moveDown();
     
     doc.text('Customer Signature: _________________', 50, doc.y + 20);
@@ -1443,7 +1803,7 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-    res.json({ status: "ok", version: "V12" });
+    res.json({ status: "ok", version: "V12.2" });
 });
 
 app.get("/webhook", (req, res) => {
@@ -1497,7 +1857,6 @@ app.post("/webhook", async (req, res) => {
 // 📩 MESSAGE HANDLER
 // ============================================================
 
-// This function is called asynchronously
 async function handleMessage(message, from, type) {
     try {
         await getOrCreateCustomer(from);
@@ -1548,7 +1907,7 @@ async function handleMessage(message, from, type) {
                 await sendWhatsAppMessage(from, 
                     `📸 *Photo Received!*\n\n` +
                     `I couldn't read any part numbers from the image${caption ? ' or caption' : ''}.\n\n` +
-                    `💡 Please send the part number directly.\n📝 Example: "0108FAW00360N"\n\n` +
+                    `💡 Please send the part number directly.\n📝 Example: "0108FAW00360N 2"\n\n` +
                     `📞 Call: ${CONFIG.businessPhone}`
                 );
             } catch (error) {
@@ -1568,6 +1927,20 @@ async function handleMessage(message, from, type) {
         
         const msgLower = text.toLowerCase().trim();
         
+        // Check if it's a search query (2+ characters, no quantity pattern)
+        const isSearch = !/\d/.test(text) && text.length >= 2 && text.length <= 20;
+        
+        if (isSearch && !msgLower.includes('order') && !msgLower.includes('confirm') && !msgLower.includes('clear')) {
+            // SEARCH MODE - Find and show all matching products
+            const searchResults = await searchProducts(text);
+            if (searchResults && searchResults.length > 0) {
+                const reply = formatSearchResults(searchResults, text);
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+        }
+        
+        // COMMANDS
         if (msgLower === "confirm order" || msgLower === "place order") {
             const result = await confirmOrder(from);
             await sendWhatsAppMessage(from, result.message);
@@ -1595,10 +1968,23 @@ async function handleMessage(message, from, type) {
         }
         
         if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start") {
-            await sendWhatsAppMessage(from, `👋 *Smart Order Engine V12*\n\n📸 Send photo of order\n📝 Send text with part numbers\n📞 Call: ${CONFIG.businessPhone}\n\n*Commands:*\n"Confirm Order" - Place order\n"Get Quote" - Generate quotation PDF\n"Clear Cart" - Start fresh`);
+            await sendWhatsAppMessage(from, 
+                `👋 *Smart Order Engine V12.2*\n\n` +
+                `🔍 Search: Send part number or brand\n` +
+                `📸 Send photo of order\n` +
+                `📝 Send text with part numbers\n` +
+                `📞 Call: ${CONFIG.businessPhone}\n\n` +
+                `*Commands:*\n` +
+                `"Confirm Order" - Place order\n` +
+                `"Get Quote" - Generate quotation PDF\n` +
+                `"Clear Cart" - Start fresh\n\n` +
+                `*Example:*\n` +
+                `"0801BA0285N 2" - Add to cart`
+            );
             return;
         }
         
+        // Check for part number with quantity (order mode)
         const hasPartNumber = /\b([A-Z0-9А-Я\-]{5,30})\b/i.test(text);
         
         if (hasPartNumber) {
@@ -1609,11 +1995,12 @@ async function handleMessage(message, from, type) {
             }
         }
         
+        // AI Fallback
         const aiReply = await getAIResponse(text);
         if (aiReply) {
             await sendWhatsAppMessage(from, `🤖 *AI Assistant*\n\n${aiReply}\n\n📞 Call: ${CONFIG.businessPhone}`);
         } else {
-            await sendWhatsAppMessage(from, `🔍 I couldn't find "${text}" in our inventory.\n\n💡 Try: "0108FAW00360N 2"\n📞 Call: ${CONFIG.businessPhone}`);
+            await sendWhatsAppMessage(from, `🔍 I couldn't find "${text}" in our inventory.\n\n💡 Try: "0801BA0285N 2"\n📞 Call: ${CONFIG.businessPhone}`);
         }
     } catch (error) {
         logger.error(`❌ Message handler error: ${error.message}`);
@@ -1628,6 +2015,11 @@ async function handleMessage(message, from, type) {
 async function startServer() {
     try {
         await initDatabase();
+        
+        // Reset products table to ensure clean import with new columns
+        await pool.query('TRUNCATE TABLE products RESTART IDENTITY CASCADE');
+        logger.info('🗑️ Cleared existing products table');
+        
         await loadProductsFromCSV();
         
         // Build in-memory cache from database
@@ -1637,6 +2029,15 @@ async function startServer() {
         allProducts.forEach(p => {
             productMap.set(p.part.toUpperCase(), p);
         });
+        
+        // Log sample product to verify data
+        if (allProducts.length > 0) {
+            const sample = allProducts[0];
+            const prices = calculatePrices(sample);
+            logger.info(`📊 Sample product: ${sample.part}`);
+            logger.info(`📊 LIST PRICE: ${sample.list_value}, MRP: ${sample.mrp}, Billing: ${sample.billing_price}`);
+            logger.info(`📊 GST: ${prices.gstRate}%, GST Amount: ${prices.gstAmount}, Price incl. GST: ${prices.priceWithGST}`);
+        }
         
         const PORT = process.env.PORT || 10000;
         app.listen(PORT, () => {
@@ -1648,6 +2049,7 @@ async function startServer() {
             logger.info(`💳 Razorpay: ${CONFIG.razorpayKeyId ? '✅' : '❌'}`);
             logger.info(`🗄️ Database: ${CONFIG.databaseUrl ? '✅' : '❌'}`);
             logger.info(`📦 Products loaded: ${allProducts.length}`);
+            logger.info(`🧾 Default GST: ${CONFIG.defaultGST}% on Billing Price`);
         });
     } catch (error) {
         logger.error(`❌ Startup error: ${error.message}`);
