@@ -1,5 +1,7 @@
 // ============================================================
-// 📱 ASSIST WHATSAPP WEBHOOK - COMPLETE WORKING
+// 📱 ASSIST WHATSAPP WEBHOOK - COMPLETE PRODUCT DETAILS
+// Fetches ALL fields: LIST PRICE, MRP PRICE, Billing Price, 
+// GST, Box Qty, Carton, Brand, Make, Type, Finish, Stock
 // ============================================================
 
 const express = require("express");
@@ -64,23 +66,213 @@ let allProducts = [];
 let productMap = new Map();
 
 // ============================================================
-// 📦 LOAD PRODUCTS FROM CSV - WITH FALLBACK
+// 📦 LOAD PRODUCTS FROM CSV - FULL DATA STRUCTURE
 // ============================================================
 
 async function loadProductsFromCSV() {
     const csvPath = path.join(__dirname, 'prices.csv');
     
-    // Fallback products for testing
+    // Extensive fallback products matching your HTML structure
     const fallbackProducts = [
-        { part: '0801BA0285N', description: 'CLUTCH DISC ASSEMBLY DIA 240 mm', brand: 'M&M', make: 'MARUTI', list_value: 2103.53, mrp: 2482.17, billing_price: 2103.53, stock: 19, box_qty: 1, carton: 12, gst: 18 },
-        { part: '0801BA0285NS', description: 'CLUTCH DISC ASSEMBLY_BOLERO', brand: 'M&M', make: 'MARUTI', list_value: 1228.14, mrp: 1449.21, billing_price: 1228.14, stock: 0, box_qty: 1, carton: 12, gst: 18 },
-        { part: 'MV0801CAA01741N', description: 'CLUTCH KIT_VF', brand: 'VF', make: 'MARUTI', list_value: 3294.83, mrp: 3887.90, billing_price: 3294.83, stock: 193, box_qty: 1, carton: 6, gst: 18 },
-        { part: '0303BC0071N', description: 'ELEMENT OIL FILTER', brand: 'M&M', make: 'MARUTI', list_value: 182.86, mrp: 215.77, billing_price: 182.86, stock: 462, box_qty: 10, carton: 100, gst: 18 },
-        { part: '0108FAW00360N', description: 'MUD FLAP FRONT RH', brand: 'M&M', make: 'MARUTI', list_value: 212.20, mrp: 250.40, billing_price: 212.20, stock: 2, box_qty: 10, carton: 50, gst: 18 },
-        { part: '0108FAW00400N', description: 'MUD FLAP FRONT RH', brand: 'M&M', make: 'MARUTI', list_value: 212.20, mrp: 250.40, billing_price: 212.20, stock: 2, box_qty: 10, carton: 50, gst: 18 },
-        { part: '0108FAW00410N', description: 'MUD FLAP FRONT LH', brand: 'M&M', make: 'MARUTI', list_value: 212.20, mrp: 250.40, billing_price: 212.20, stock: 0, box_qty: 10, carton: 50, gst: 18 },
-        { part: '0401EAA01180N', description: 'STAB BAR BUSHES- FRONT', brand: 'M&M', make: 'MARUTI', list_value: 103.71, mrp: 122.38, billing_price: 103.71, stock: 12, box_qty: 5, carton: 20, gst: 18 },
-        { part: '0802CAA08871N', description: 'CLUTCH RELEASE BEARING', brand: 'M&M', make: 'MARUTI', list_value: 425.00, mrp: 595.00, billing_price: 425.00, stock: 27, box_qty: 10, carton: 50, gst: 18 }
+        { 
+            part: '0801BA0285N', 
+            desc: 'CLUTCH DISC ASSEMBLY DIA 240 mm', 
+            brand: 'M&M', 
+            make: 'MARUTI',
+            type: 'CLUTCH',
+            finish: 'STANDARD',
+            List: 2103.53, 
+            Mrp: 2482.17, 
+            price: 2103.53, 
+            stock: 19, 
+            boxQty: 1, 
+            masterCarton: 12, 
+            gst: 18,
+            hsn: '87089300',
+            model: 'BOLERO',
+            year_start: '2010',
+            year_end: '2020',
+            segment: 'COMMERCIAL',
+            video: '',
+            mostSelling: true,
+            media: []
+        },
+        { 
+            part: '0801BA0285NS', 
+            desc: 'CLUTCH DISC ASSEMBLY_BOLERO', 
+            brand: 'M&M', 
+            make: 'MARUTI',
+            type: 'CLUTCH',
+            finish: 'STANDARD',
+            List: 1228.14, 
+            Mrp: 1449.21, 
+            price: 1228.14, 
+            stock: 0, 
+            boxQty: 1, 
+            masterCarton: 12, 
+            gst: 18,
+            hsn: '87089300',
+            model: 'BOLERO',
+            year_start: '2010',
+            year_end: '2020',
+            segment: 'COMMERCIAL',
+            mostSelling: false,
+            media: []
+        },
+        { 
+            part: 'MV0801CAA01741N', 
+            desc: 'CLUTCH KIT_VF (Cover - MV0801CA0032N + Disc - MV0801BA0285N)', 
+            brand: 'VF', 
+            make: 'MARUTI',
+            type: 'CLUTCH KIT',
+            finish: 'STANDARD',
+            List: 3294.83, 
+            Mrp: 3887.90, 
+            price: 3294.83, 
+            stock: 193, 
+            boxQty: 1, 
+            masterCarton: 6, 
+            gst: 18,
+            hsn: '87089300',
+            model: 'BOLERO',
+            year_start: '2010',
+            year_end: '2020',
+            segment: 'COMMERCIAL',
+            mostSelling: true,
+            media: []
+        },
+        { 
+            part: '0303BC0071N', 
+            desc: 'ELEMENT OIL FILTER', 
+            brand: 'M&M', 
+            make: 'MARUTI',
+            type: 'FILTER',
+            finish: 'STANDARD',
+            List: 182.86, 
+            Mrp: 215.77, 
+            price: 182.86, 
+            stock: 462, 
+            boxQty: 10, 
+            masterCarton: 100, 
+            gst: 18,
+            hsn: '84212300',
+            model: 'ALL',
+            year_start: '2000',
+            year_end: '2024',
+            segment: 'ALL',
+            mostSelling: true,
+            media: []
+        },
+        { 
+            part: '0108FAW00360N', 
+            desc: 'MUD FLAP FRONT RH', 
+            brand: 'M&M', 
+            make: 'MARUTI',
+            type: 'BODY',
+            finish: 'BLACK',
+            List: 212.20, 
+            Mrp: 250.40, 
+            price: 212.20, 
+            stock: 2, 
+            boxQty: 10, 
+            masterCarton: 50, 
+            gst: 18,
+            hsn: '87082900',
+            model: 'BOLERO',
+            year_start: '2010',
+            year_end: '2020',
+            segment: 'COMMERCIAL',
+            mostSelling: false,
+            media: []
+        },
+        { 
+            part: '0108FAW00400N', 
+            desc: 'MUD FLAP FRONT RH', 
+            brand: 'M&M', 
+            make: 'MARUTI',
+            type: 'BODY',
+            finish: 'BLACK',
+            List: 212.20, 
+            Mrp: 250.40, 
+            price: 212.20, 
+            stock: 2, 
+            boxQty: 10, 
+            masterCarton: 50, 
+            gst: 18,
+            hsn: '87082900',
+            model: 'BOLERO',
+            year_start: '2010',
+            year_end: '2020',
+            segment: 'COMMERCIAL',
+            mostSelling: false,
+            media: []
+        },
+        { 
+            part: '0108FAW00410N', 
+            desc: 'MUD FLAP FRONT LH', 
+            brand: 'M&M', 
+            make: 'MARUTI',
+            type: 'BODY',
+            finish: 'BLACK',
+            List: 212.20, 
+            Mrp: 250.40, 
+            price: 212.20, 
+            stock: 0, 
+            boxQty: 10, 
+            masterCarton: 50, 
+            gst: 18,
+            hsn: '87082900',
+            model: 'BOLERO',
+            year_start: '2010',
+            year_end: '2020',
+            segment: 'COMMERCIAL',
+            mostSelling: false,
+            media: []
+        },
+        { 
+            part: '0401EAA01180N', 
+            desc: 'STAB BAR BUSHES- FRONT', 
+            brand: 'M&M', 
+            make: 'MARUTI',
+            type: 'SUSPENSION',
+            finish: 'RUBBER',
+            List: 103.71, 
+            Mrp: 122.38, 
+            price: 103.71, 
+            stock: 12, 
+            boxQty: 5, 
+            masterCarton: 20, 
+            gst: 18,
+            hsn: '87088000',
+            model: 'BOLERO',
+            year_start: '2010',
+            year_end: '2020',
+            segment: 'COMMERCIAL',
+            mostSelling: false,
+            media: []
+        },
+        { 
+            part: '0802CAA08871N', 
+            desc: 'CLUTCH RELEASE BEARING', 
+            brand: 'M&M', 
+            make: 'MARUTI',
+            type: 'CLUTCH',
+            finish: 'STANDARD',
+            List: 425.00, 
+            Mrp: 595.00, 
+            price: 425.00, 
+            stock: 27, 
+            boxQty: 10, 
+            masterCarton: 50, 
+            gst: 18,
+            hsn: '87089300',
+            model: 'BOLERO',
+            year_start: '2010',
+            year_end: '2020',
+            segment: 'COMMERCIAL',
+            mostSelling: true,
+            media: []
+        }
     ];
     
     // Check if CSV exists
@@ -106,25 +298,33 @@ async function loadProductsFromCSV() {
 
                 products.push({
                     part: part,
-                    description: (row['Material2'] || row['Description'] || 'Auto Spare Part').trim(),
+                    desc: (row['Material2'] || row['Description'] || 'Auto Spare Part').trim(),
                     brand: (row['brand'] || row['Brand'] || 'Unknown').trim(),
                     make: (row['Make'] || '').trim(),
                     type: (row['TYPE'] || '').trim(),
                     finish: (row['FINISH'] || '').trim(),
-                    list_value: parseFloat(row['LIST PRICE'] || row['List Price'] || 0),
-                    mrp: parseFloat(row['MRP PRICE'] || row['MRP Price'] || 0),
-                    billing_price: parseFloat(row['billing price'] || row['Billing Price'] || 0),
+                    List: parseFloat(row['LIST PRICE'] || row['List Price'] || 0),
+                    Mrp: parseFloat(row['MRP PRICE'] || row['MRP Price'] || 0),
+                    price: parseFloat(row['billing price'] || row['Billing Price'] || 0),
                     stock: parseInt(row['STOCK'] || 0),
-                    box_qty: parseInt(row['Box Qty'] || 0),
-                    carton: parseInt(row['Carton'] || 0),
-                    gst: CONFIG.defaultGST
+                    boxQty: parseInt(row['Box Qty'] || 0),
+                    masterCarton: parseInt(row['Carton'] || 0),
+                    gst: CONFIG.defaultGST,
+                    hsn: row['HSN'] || row['hsn'] || '',
+                    model: row['Model'] || row['model'] || '',
+                    year_start: row['Year Start'] || row['year_start'] || '',
+                    year_end: row['Year End'] || row['year_end'] || '',
+                    segment: row['Segment'] || row['segment'] || '',
+                    video: row['Video'] || row['video'] || '',
+                    mostSelling: row['Most Selling'] === '1' || row['mostSelling'] === 'true',
+                    media: []
                 });
             })
             .on('end', resolve)
             .on('error', reject);
     });
 
-    // Merge CSV products with fallback
+    // Merge CSV products with fallback for common parts
     const allProductMap = new Map();
     [...fallbackProducts, ...products].forEach(p => {
         if (!allProductMap.has(p.part.toUpperCase())) {
@@ -143,19 +343,19 @@ async function loadProductsFromCSV() {
 }
 
 // ============================================================
-// 💰 PRICE CALCULATIONS
+// 💰 PRICE CALCULATIONS - GST on Billing Price
 // ============================================================
 
 function calculatePrices(product, qty = 1) {
-    const billingPrice = product.billing_price || product.list_value || 0;
+    const billingPrice = product.price || product.List || 0;
     const gstRate = product.gst || CONFIG.defaultGST || 18;
     const gstAmount = billingPrice * (gstRate / 100);
     const priceWithGST = billingPrice + gstAmount;
     
     return {
         billingPrice: billingPrice,
-        mrp: product.mrp || 0,
-        listValue: product.list_value || 0,
+        mrp: product.Mrp || 0,
+        listValue: product.List || 0,
         gstRate: gstRate,
         gstAmount: gstAmount,
         priceWithGST: priceWithGST,
@@ -166,7 +366,7 @@ function calculatePrices(product, qty = 1) {
 }
 
 // ============================================================
-// 🔍 SEARCH FUNCTIONS - UPDATED
+// 🔍 SEARCH FUNCTIONS - CASE INSENSITIVE
 // ============================================================
 
 function searchProducts(query) {
@@ -177,9 +377,11 @@ function searchProducts(query) {
     const clean = query.trim().toUpperCase();
     const results = [];
     
+    // 1. EXACT MATCH
     const exactMatches = allProducts.filter(p => p.part.toUpperCase() === clean);
     results.push(...exactMatches.map(p => ({ ...p, matchType: 'exact', confidence: 1.0 })));
     
+    // 2. PARTIAL MATCH (contains)
     if (results.length < 10) {
         const partialMatches = allProducts.filter(p => 
             p.part.toUpperCase().includes(clean) && 
@@ -188,20 +390,31 @@ function searchProducts(query) {
         results.push(...partialMatches.slice(0, 10).map(p => ({ ...p, matchType: 'partial', confidence: 0.7 })));
     }
     
+    // 3. DESCRIPTION SEARCH
     if (results.length < 10) {
         const descMatches = allProducts.filter(p => 
-            (p.description || '').toUpperCase().includes(clean) && 
+            (p.desc || '').toUpperCase().includes(clean) && 
             !results.some(r => r.part === p.part)
         );
         results.push(...descMatches.slice(0, 5).map(p => ({ ...p, matchType: 'description', confidence: 0.5 })));
     }
     
+    // 4. BRAND SEARCH
     if (results.length < 10) {
         const brandMatches = allProducts.filter(p => 
             (p.brand || '').toUpperCase().includes(clean) && 
             !results.some(r => r.part === p.part)
         );
         results.push(...brandMatches.slice(0, 5).map(p => ({ ...p, matchType: 'brand', confidence: 0.4 })));
+    }
+    
+    // 5. MAKE SEARCH
+    if (results.length < 10) {
+        const makeMatches = allProducts.filter(p => 
+            (p.make || '').toUpperCase().includes(clean) && 
+            !results.some(r => r.part === p.part)
+        );
+        results.push(...makeMatches.slice(0, 5).map(p => ({ ...p, matchType: 'make', confidence: 0.4 })));
     }
     
     const uniqueResults = [];
@@ -236,7 +449,7 @@ function searchProduct(partNumber) {
         return { product: best, confidence: 0.7, method: 'partial', original: clean };
     }
 
-    // 3. STRIP SUFFIX MATCH
+    // 3. STRIP SUFFIX MATCH (e.g., 0802CAA08871N -> 0802CAA08871)
     const cleanWithoutN = clean.replace(/N$/, '');
     if (cleanWithoutN.length > 3) {
         const strippedMatches = allProducts.filter(p => 
@@ -253,7 +466,7 @@ function searchProduct(partNumber) {
 }
 
 // ============================================================
-// 📋 FORMAT SEARCH RESULTS
+// 📋 FORMAT SEARCH RESULTS - FULL DETAILS
 // ============================================================
 
 function formatSearchResults(products, query) {
@@ -273,10 +486,12 @@ function formatSearchResults(products, query) {
         }
         reply += `\n`;
         
-        if (product.description && product.description !== 'Auto Spare Part') {
-            reply += `📝 ${product.description}\n`;
+        // Description
+        if (product.desc && product.desc !== 'Auto Spare Part') {
+            reply += `📝 ${product.desc}\n`;
         }
         
+        // Brand & Make
         if (product.brand && product.brand !== 'Unknown') {
             reply += `🏷️ Brand: ${product.brand}`;
             if (product.make && product.make !== 'Unknown' && product.make !== product.brand) {
@@ -285,6 +500,7 @@ function formatSearchResults(products, query) {
             reply += `\n`;
         }
         
+        // Type and Finish
         if (product.type) {
             reply += `📊 Type: ${product.type}`;
             if (product.finish) {
@@ -293,10 +509,27 @@ function formatSearchResults(products, query) {
             reply += `\n`;
         }
         
+        // Model and Segment
+        if (product.model) {
+            reply += `🚗 Model: ${product.model}`;
+            if (product.segment) {
+                reply += ` | Segment: ${product.segment}`;
+            }
+            reply += `\n`;
+        }
+        
+        // Year range
+        if (product.year_start && product.year_end) {
+            reply += `📅 Year: ${product.year_start} - ${product.year_end}\n`;
+        }
+        
+        // ✅ FULL PRICE BREAKDOWN
         if (prices.listValue > 0) {
             reply += `💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}\n`;
         }
-        if (prices.mrp > 0) {
+        if (prices.mrp > 0 && prices.mrp !== prices.listValue) {
+            reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
+        } else if (prices.mrp > 0) {
             reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
         }
         if (prices.billingPrice > 0) {
@@ -305,17 +538,26 @@ function formatSearchResults(products, query) {
             reply += `💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}\n`;
         }
         
+        // HSN Code
+        if (product.hsn) {
+            reply += `📋 HSN: ${product.hsn}\n`;
+        }
+        
+        // ✅ STOCK & PACKAGING
         let stockInfo = [];
         if (product.stock > 0) {
             stockInfo.push(`✅ ${product.stock} pcs`);
+            if (product.mostSelling) {
+                stockInfo.push(`⭐ Best Seller`);
+            }
         } else {
             stockInfo.push(`❌ Out of Stock`);
         }
-        if (product.box_qty > 0) {
-            stockInfo.push(`Box: ${product.box_qty}`);
+        if (product.boxQty > 0) {
+            stockInfo.push(`Box: ${product.boxQty}`);
         }
-        if (product.carton > 0) {
-            stockInfo.push(`Carton: ${product.carton}`);
+        if (product.masterCarton > 0) {
+            stockInfo.push(`Carton: ${product.masterCarton}`);
         }
         if (stockInfo.length > 0) {
             reply += `📦 ${stockInfo.join(' | ')}\n`;
@@ -336,6 +578,66 @@ function formatSearchResults(products, query) {
 }
 
 // ============================================================
+// 📋 FORMAT PRODUCT LINE - WITH FULL DETAILS
+// ============================================================
+
+function formatProductLine(product, qty, confidence, original = null) {
+    const prices = calculatePrices(product, qty);
+    const confidenceStr = confidence < 1 ? ` (${Math.round(confidence * 100)}%)` : '';
+    
+    let line = `*${product.part}*${confidenceStr}`;
+    if (original && original !== product.part) {
+        line += `\n   📝 OCR read: ${original}`;
+    }
+    line += `\n📝 ${product.desc || 'N/A'}`;
+    if (product.brand && product.brand !== 'Unknown') line += `\n🏷️ Brand: ${product.brand}`;
+    if (product.make && product.make !== 'Unknown') line += `\n🏭 Make: ${product.make}`;
+    if (product.type) line += `\n📊 Type: ${product.type}`;
+    if (product.finish) line += `\n🎨 Finish: ${product.finish}`;
+    if (product.model) line += `\n🚗 Model: ${product.model}`;
+    
+    // ✅ FULL PRICE BREAKDOWN
+    if (prices.listValue > 0) {
+        line += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
+    }
+    if (prices.mrp > 0 && prices.mrp !== prices.listValue) {
+        line += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
+    } else if (prices.mrp > 0) {
+        line += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
+    }
+    if (prices.billingPrice > 0) {
+        line += `\n💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}`;
+        line += `\n🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}`;
+        line += `\n💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}`;
+    }
+    
+    // Line total
+    line += `\n📦 ${qty} x ₹${prices.priceWithGST.toFixed(2)} = ₹${(prices.priceWithGST * qty).toFixed(2)}`;
+    
+    // Stock & Packaging
+    if (product.stock > 0 && product.stock >= qty) {
+        line += `\n📦 ✅ ${product.stock} pcs available`;
+    } else if (product.stock > 0 && product.stock < qty) {
+        line += `\n📦 ⚠️ Only ${product.stock} pcs available (requested ${qty})`;
+    } else {
+        line += `\n📦 ❌ OUT OF STOCK`;
+    }
+    if (product.boxQty > 0) {
+        line += ` | Box: ${product.boxQty}`;
+    }
+    if (product.masterCarton > 0) {
+        line += ` | Carton: ${product.masterCarton}`;
+    }
+    
+    // HSN if available
+    if (product.hsn) {
+        line += `\n📋 HSN: ${product.hsn}`;
+    }
+    
+    return line;
+}
+
+// ============================================================
 // 🔧 QUANTITY PARSER
 // ============================================================
 
@@ -344,24 +646,28 @@ function extractItemsFromTextUltimate(text) {
     const lines = text.split(/[,;\n]/).map(l => l.trim()).filter(l => l.length > 0);
     
     for (const line of lines) {
+        // Pattern: 2 PART123 or PART123 2
         let match = line.match(/(\d+)\s+([A-Z0-9]{5,30})/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
             continue;
         }
         
+        // Pattern: PART123 2
         match = line.match(/([A-Z0-9]{5,30})\s+(\d+)/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
+        // Pattern: PART123 = 2
         match = line.match(/([A-Z0-9]{5,30})\s*[=\-:]\s*(\d+)/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
+        // Pattern: PART123 (no quantity)
         match = line.match(/\b([A-Z0-9]{5,30})\b/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: 1 });
@@ -397,7 +703,23 @@ function processOrder(text, from) {
         return `❌ Parts not found: ${notFound}\n\n💡 Please check the part numbers.\n📞 Call: ${CONFIG.businessPhone}`;
     }
     
-    let reply = `📋 *ORDER EXTRACTED*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+    // Calculate totals
+    let subtotal = 0;
+    let totalGST = 0;
+    let grandTotal = 0;
+    let outOfStockItems = [];
+    
+    for (const r of results) {
+        const prices = calculatePrices(r.product, r.qty);
+        subtotal += prices.totalBilling;
+        totalGST += prices.totalGST;
+        grandTotal += prices.totalWithGST;
+        if (r.product.stock === 0 || r.product.stock < r.qty) {
+            outOfStockItems.push(r.product.part);
+        }
+    }
+    
+    let reply = `📋 *MULTI-PRODUCT ENQUIRY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     for (const r of results) {
         const p = r.product;
@@ -406,14 +728,19 @@ function processOrder(text, from) {
         reply += `*${p.part}*`;
         if (r.confidence < 1) reply += ` (${Math.round(r.confidence * 100)}%)`;
         if (r.original) reply += `\n   📝 OCR read: ${r.original}`;
-        reply += `\n📝 ${p.description}`;
+        reply += `\n📝 ${p.desc}`;
         if (p.brand && p.brand !== 'Unknown') reply += `\n🏷️ Brand: ${p.brand}`;
         if (p.make && p.make !== 'Unknown') reply += `\n🏭 Make: ${p.make}`;
+        if (p.type) reply += `\n📊 Type: ${p.type}`;
+        if (p.finish) reply += `\n🎨 Finish: ${p.finish}`;
+        if (p.model) reply += `\n🚗 Model: ${p.model}`;
         
         if (prices.listValue > 0) {
             reply += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
         }
-        if (prices.mrp > 0) {
+        if (prices.mrp > 0 && prices.mrp !== prices.listValue) {
+            reply += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
+        } else if (prices.mrp > 0) {
             reply += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
         }
         if (prices.billingPrice > 0) {
@@ -431,10 +758,33 @@ function processOrder(text, from) {
         } else {
             reply += `\n📦 ❌ OUT OF STOCK`;
         }
+        if (p.boxQty > 0) {
+            reply += ` | Box: ${p.boxQty}`;
+        }
+        if (p.masterCarton > 0) {
+            reply += ` | Carton: ${p.masterCarton}`;
+        }
+        if (p.hsn) {
+            reply += `\n📋 HSN: ${p.hsn}`;
+        }
         reply += `\n\n`;
     }
     
     reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    reply += `📊 *Summary*\n`;
+    reply += `📦 Items: ${results.length}\n`;
+    reply += `📦 Qty: ${results.reduce((s, r) => s + r.qty, 0)}\n`;
+    reply += `💰 Subtotal (Billing): ₹${subtotal.toFixed(2)}\n`;
+    reply += `🧾 GST (${CONFIG.defaultGST}%): ₹${totalGST.toFixed(2)}\n`;
+    reply += `💳 *Grand Total: ₹${grandTotal.toFixed(2)}*\n`;
+    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    
+    if (outOfStockItems.length > 0) {
+        reply += `⚠️ Out of Stock: ${outOfStockItems.join(', ')}\n`;
+        reply += `🔔 We'll notify you when available.\n\n`;
+    }
+    
+    reply += `*What would you like to do?*\n`;
     reply += `🛒 "Confirm Order" - Place order\n`;
     reply += `📄 "Get Quote" - Generate quotation\n`;
     reply += `🗑️ "Clear Cart" - Start fresh\n\n`;
@@ -528,18 +878,29 @@ app.get("/health", (req, res) => {
 app.get("/", (req, res) => {
     res.json({ 
         status: "ok", 
-        version: "WORKING",
-        message: "Assist WhatsApp Webhook is running"
+        version: "COMPLETE",
+        message: "Assist WhatsApp Webhook with Full Product Details"
     });
 });
 
 app.get("/debug/products", (req, res) => {
-    const sample = allProducts.slice(0, 10).map(p => p.part);
+    const sample = allProducts.slice(0, 10).map(p => ({
+        part: p.part,
+        desc: p.desc,
+        brand: p.brand,
+        make: p.make,
+        List: p.List,
+        Mrp: p.Mrp,
+        price: p.price,
+        stock: p.stock,
+        boxQty: p.boxQty,
+        masterCarton: p.masterCarton,
+        hsn: p.hsn
+    }));
     res.json({
         total: allProducts.length,
         sample: sample,
-        has0802CAA08871N: allProducts.some(p => p.part === '0802CAA08871N'),
-        startsWith0802: allProducts.filter(p => p.part.startsWith('0802')).map(p => p.part).slice(0, 10)
+        has0802CAA08871N: allProducts.some(p => p.part === '0802CAA08871N')
     });
 });
 
@@ -626,7 +987,7 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ============================================================
-// 📩 MESSAGE HANDLER
+// 📩 MESSAGE HANDLER - WITH WELCOME
 // ============================================================
 
 async function handleMessage(message, from, type) {
@@ -642,21 +1003,26 @@ async function handleMessage(message, from, type) {
             
             const msgLower = text.toLowerCase().trim();
             
-            // WELCOME MESSAGE
+            // ============================================================
+            // ✅ WELCOME MESSAGE - Full version
+            // ============================================================
             if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start" || msgLower === "menu") {
                 const welcomeMessage = 
                     `👋 *Welcome to Auto Spares Solution!*\n\n` +
                     `🤖 I'm your AI Sales Assistant\n\n` +
                     `🔍 *Search Parts:*\n` +
-                    `Send part number like "0108FAW00360N"\n` +
+                    `Send part number like "0801BA0285N"\n` +
                     `Send description like "clutch plate"\n` +
                     `Send brand like "TVS" or "M&M"\n\n` +
+                    `📦 *Multiple Products:*\n` +
+                    `"0801BA0285N 0801BA0285NS"\n` +
+                    `"0801BA0285N x2, 0801BA0285NS x3"\n\n` +
                     `💰 *Check Price:*\n` +
-                    `"Price 0108FAW00360N"\n\n` +
+                    `"Price 0801BA0285N"\n\n` +
                     `📦 *Check Stock:*\n` +
-                    `"Stock 0108FAW00360N"\n\n` +
+                    `"Stock 0801BA0285N"\n\n` +
                     `🛒 *Place Order:*\n` +
-                    `"Order 0108FAW00360N"\n\n` +
+                    `"Order 0801BA0285N"\n\n` +
                     `📞 *Call:* ${CONFIG.businessPhone}\n` +
                     `🛒 *Shop:* https://autosparessolution.com\n\n` +
                     `*How can I help you today?* 🚗`;
@@ -665,7 +1031,9 @@ async function handleMessage(message, from, type) {
                 return;
             }
             
-            // PRICE CHECK
+            // ============================================================
+            // ✅ PRICE CHECK
+            // ============================================================
             if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
                 const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
@@ -675,7 +1043,7 @@ async function handleMessage(message, from, type) {
                         const product = searchResults[0];
                         const prices = calculatePrices(product);
                         let reply = `💰 *Price: ${product.part}*\n\n`;
-                        reply += `📝 ${product.description}\n`;
+                        reply += `📝 ${product.desc}\n`;
                         if (product.brand && product.brand !== 'Unknown') {
                             reply += `🏷️ Brand: ${product.brand}\n`;
                         }
@@ -691,6 +1059,12 @@ async function handleMessage(message, from, type) {
                             reply += `💳 *Total: ₹${prices.priceWithGST.toFixed(2)} (incl. GST)*\n`;
                         }
                         reply += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
+                        if (product.boxQty > 0) {
+                            reply += ` | Box: ${product.boxQty}`;
+                        }
+                        if (product.masterCarton > 0) {
+                            reply += ` | Carton: ${product.masterCarton}`;
+                        }
                         reply += `\n\n🛒 Order: https://autosparessolution.com`;
                         await sendWhatsAppMessage(from, reply);
                         return;
@@ -698,7 +1072,9 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // STOCK CHECK
+            // ============================================================
+            // ✅ STOCK CHECK
+            // ============================================================
             if (msgLower.includes('stock') || msgLower.includes('available')) {
                 const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
@@ -707,13 +1083,13 @@ async function handleMessage(message, from, type) {
                     if (searchResults.length > 0) {
                         const product = searchResults[0];
                         let reply = `📦 *Stock: ${product.part}*\n\n`;
-                        reply += `📝 ${product.description}\n`;
+                        reply += `📝 ${product.desc}\n`;
                         reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
-                        if (product.box_qty > 0) {
-                            reply += ` | Box: ${product.box_qty}`;
+                        if (product.boxQty > 0) {
+                            reply += ` | Box: ${product.boxQty}`;
                         }
-                        if (product.carton > 0) {
-                            reply += ` | Carton: ${product.carton}`;
+                        if (product.masterCarton > 0) {
+                            reply += ` | Carton: ${product.masterCarton}`;
                         }
                         reply += `\n\n🛒 Order: https://autosparessolution.com`;
                         await sendWhatsAppMessage(from, reply);
@@ -722,7 +1098,9 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // ORDER COMMAND
+            // ============================================================
+            // ✅ ORDER COMMAND
+            // ============================================================
             if (msgLower.includes('order') || msgLower.includes('buy') || msgLower.includes('purchase')) {
                 const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
@@ -732,7 +1110,7 @@ async function handleMessage(message, from, type) {
                         const product = searchResults[0];
                         const prices = calculatePrices(product);
                         let reply = `🛒 *Order: ${product.part}*\n\n`;
-                        reply += `📝 ${product.description}\n`;
+                        reply += `📝 ${product.desc}\n`;
                         reply += `💰 ₹${prices.priceWithGST.toFixed(2)} (incl. GST)\n`;
                         reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}\n\n`;
                         if (product.stock > 0) {
@@ -746,13 +1124,16 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // PART NUMBER SEARCH
+            // ============================================================
+            // ✅ PART NUMBER SEARCH
+            // ============================================================
             const partMatch = text.match(/([A-Z0-9]{5,})/i);
             if (partMatch) {
                 const partNumber = partMatch[1].toUpperCase();
                 console.log(`🔍 Searching for: "${partNumber}"`);
                 
                 const qtyMatch = text.match(/(\d+)\s+([A-Z0-9]{5,})/i);
+                
                 if (qtyMatch) {
                     const reply = processOrder(text, from);
                     if (reply) {
@@ -771,45 +1152,62 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // AI FALLBACK
+            // ============================================================
+            // ✅ AI FALLBACK
+            // ============================================================
             const aiReply = await getAIResponse(text);
             if (aiReply) {
                 await sendWhatsAppMessage(from, `🤖 ${aiReply}`);
                 return;
             }
             
+            // ============================================================
+            // ✅ DEFAULT RESPONSE
+            // ============================================================
             await sendWhatsAppMessage(from, 
                 `🔍 I couldn't find "${text}"\n\n` +
                 `💡 Try sending a part number like:\n` +
-                `"0108FAW00360N"\n\n` +
+                `"0801BA0285N"\n\n` +
                 `💡 Or send "Help" for options\n\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
         
+        // ============================================================
+        // ✅ IMAGE HANDLING
+        // ============================================================
         if (type === 'image') {
             await sendWhatsAppMessage(from, 
                 `📸 *Photo Received!*\n\n` +
                 `💡 Please send the part number directly.\n` +
-                `📝 Example: "0108FAW00360N 2"\n\n` +
+                `📝 Example: "0801BA0285N 2"\n\n` +
+                `💡 Or send "Help" for options\n\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
         
+        // ============================================================
+        // ✅ AUDIO HANDLING
+        // ============================================================
         if (type === 'audio') {
             await sendWhatsAppMessage(from, 
                 `🎤 *Voice Received!*\n\n` +
                 `💡 Please send text or images.\n\n` +
+                `💡 Or send "Help" for options\n\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
         
+        // ============================================================
+        // ✅ OTHER TYPES
+        // ============================================================
         await sendWhatsAppMessage(from, 
             `📩 Received your ${type} message.\n\n` +
             `💡 Please send text with part numbers.\n` +
+            `💡 Or send "Help" for options\n\n` +
             `📞 Call: ${CONFIG.businessPhone}`
         );
         
@@ -825,7 +1223,7 @@ async function handleMessage(message, from, type) {
 
 async function startServer() {
     console.log("====================================");
-    console.log("🚀 ASSIST WhatsApp Started");
+    console.log("🚀 ASSIST WhatsApp - COMPLETE PRODUCT DETAILS");
     console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
     console.log(`🧠 ChatGPT Key: ${CONFIG.chatgptKey ? '✅ Set' : '❌ Not set'}`);
     console.log(`🧠 DeepSeek Key: ${CONFIG.deepseekKey ? '✅ Set' : '❌ Not set'}`);
