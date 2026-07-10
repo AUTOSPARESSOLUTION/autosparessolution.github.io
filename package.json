@@ -14,5 +14,6 @@
     "helmet": "^7.0.0",
     "express-rate-limit": "^6.7.0",
     "sharp": "^0.32.6"
+    "iconv-lite": "^0.6.3",
   }
 }
