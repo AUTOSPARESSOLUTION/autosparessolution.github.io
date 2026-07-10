@@ -1,6 +1,6 @@
 // ============================================================
-// 📱 SMART ORDER ENGINE V13 - AUTO COLUMN DETECTION
-// Complete CSV Support with GST on Billing Price
+// 📱 SMART ORDER ENGINE V13 - FULLY FIXED
+// Complete Price Display with GST on Billing Price
 // ============================================================
 
 const express = require("express");
@@ -662,7 +662,7 @@ async function searchProducts(query) {
 }
 
 // ============================================================
-// 📋 FORMAT SEARCH RESULTS
+// 📋 FORMAT SEARCH RESULTS - FULL DETAILS
 // ============================================================
 
 function formatSearchResults(products, query) {
@@ -690,7 +690,7 @@ function formatSearchResults(products, query) {
         // Brand & Make
         if (product.brand && product.brand !== 'Unknown') {
             reply += `🏷️ Brand: ${product.brand}`;
-            if (product.make && product.make !== 'Unknown') {
+            if (product.make && product.make !== 'Unknown' && product.make !== product.brand) {
                 reply += ` | Make: ${product.make}`;
             }
             reply += `\n`;
@@ -705,31 +705,53 @@ function formatSearchResults(products, query) {
             reply += `\n`;
         }
         
-        // PRICES - Complete breakdown
+        // ============================================================
+        // ✅ FULL PRICE BREAKDOWN - SHOW ALL PRICES
+        // ============================================================
+        
+        // LIST PRICE
         if (prices.listValue > 0) {
             reply += `💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}\n`;
         }
+        
+        // MRP PRICE
         if (prices.mrp > 0) {
             reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
         }
+        
+        // Billing Price with GST breakdown
         if (prices.billingPrice > 0) {
             reply += `💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}\n`;
             reply += `🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}\n`;
             reply += `💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}\n`;
         }
         
-        // Stock & Packaging
+        // ============================================================
+        // 📦 PACKAGING & STOCK DETAILS
+        // ============================================================
+        
+        let stockInfo = [];
+        
+        // Stock status
         if (product.stock > 0) {
-            reply += `📦 ✅ ${product.stock} pcs in stock`;
-            if (product.box_qty > 0) {
-                reply += ` | Box: ${product.box_qty}`;
-            }
-            if (product.carton > 0) {
-                reply += ` | Carton: ${product.carton}`;
-            }
-            reply += `\n`;
+            stockInfo.push(`✅ ${product.stock} pcs`);
         } else {
-            reply += `📦 ❌ Out of Stock\n`;
+            stockInfo.push(`❌ Out of Stock`);
+        }
+        
+        // Box quantity
+        if (product.box_qty > 0) {
+            stockInfo.push(`Box: ${product.box_qty}`);
+        }
+        
+        // Carton quantity
+        if (product.carton > 0) {
+            stockInfo.push(`Carton: ${product.carton}`);
+        }
+        
+        // Show packaging info
+        if (stockInfo.length > 0) {
+            reply += `📦 ${stockInfo.join(' | ')}\n`;
         }
         
         reply += `\n`;
@@ -747,72 +769,7 @@ function formatSearchResults(products, query) {
 }
 
 // ============================================================
-// 🔍 AI SEARCH (Legacy support)
-// ============================================================
-
-function aiSearch(query) {
-    if (!query) return [];
-    const q = query.toLowerCase().trim();
-    const results = allProducts.filter(p => {
-        const part = (p.part || '').toLowerCase();
-        const desc = (p.description || '').toLowerCase();
-        const brand = (p.brand || '').toLowerCase();
-        return part.includes(q) || desc.includes(q) || brand.includes(q);
-    });
-    results.sort((a, b) => {
-        const aExact = (a.part || '').toLowerCase() === q;
-        const bExact = (b.part || '').toLowerCase() === q;
-        if (aExact && !bExact) return -1;
-        if (!aExact && bExact) return 1;
-        return (b.stock || 0) - (a.stock || 0);
-    });
-    return results.slice(0, 10);
-}
-
-// ============================================================
-// 📋 FORMAT PRODUCT LINE
-// ============================================================
-
-function formatProductLine(product, qty, confidence, original = null) {
-    const prices = calculatePrices(product, qty);
-    const confidenceStr = confidence < 1 ? ` (${Math.round(confidence * 100)}%)` : '';
-    
-    let line = `*${product.part}*${confidenceStr}`;
-    if (original && original !== product.part) {
-        line += `\n   📝 OCR read: ${original}`;
-    }
-    line += `\n📝 ${product.description || 'N/A'}`;
-    if (product.brand && product.brand !== 'Unknown') line += `\n🏷️ Brand: ${product.brand}`;
-    if (product.make && product.make !== 'Unknown') line += `\n🏭 Make: ${product.make}`;
-    if (product.type) line += `\n📊 Type: ${product.type}`;
-    if (product.finish) line += `\n🎨 Finish: ${product.finish}`;
-    line += `\n📦 Qty: ${qty}`;
-    
-    // ✅ SHOW ALL PRICES
-    if (prices.listValue > 0) {
-        line += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
-    }
-    if (prices.mrp > 0) {
-        line += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
-    }
-    if (prices.billingPrice > 0) {
-        line += `\n💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}`;
-        line += `\n🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}`;
-        line += `\n💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}`;
-    }
-    if (product.box_qty > 0) {
-        line += `\n📦 Box Qty: ${product.box_qty}`;
-    }
-    if (product.carton > 0) {
-        line += `\n📦 Carton Qty: ${product.carton}`;
-    }
-    line += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
-    
-    return line;
-}
-
-// ============================================================
-// 🔍 SEARCH PRODUCT (Single)
+// 🔍 SEARCH PRODUCT (Single) - For Order Processing
 // ============================================================
 
 async function searchProduct(partNumber) {
@@ -859,6 +816,48 @@ async function searchProduct(partNumber) {
     }
 
     return null;
+}
+
+// ============================================================
+// 📋 FORMAT PRODUCT LINE - For Order Display
+// ============================================================
+
+function formatProductLine(product, qty, confidence, original = null) {
+    const prices = calculatePrices(product, qty);
+    const confidenceStr = confidence < 1 ? ` (${Math.round(confidence * 100)}%)` : '';
+    
+    let line = `*${product.part}*${confidenceStr}`;
+    if (original && original !== product.part) {
+        line += `\n   📝 OCR read: ${original}`;
+    }
+    line += `\n📝 ${product.description || 'N/A'}`;
+    if (product.brand && product.brand !== 'Unknown') line += `\n🏷️ Brand: ${product.brand}`;
+    if (product.make && product.make !== 'Unknown') line += `\n🏭 Make: ${product.make}`;
+    if (product.type) line += `\n📊 Type: ${product.type}`;
+    if (product.finish) line += `\n🎨 Finish: ${product.finish}`;
+    line += `\n📦 Qty: ${qty}`;
+    
+    // ✅ SHOW ALL PRICES
+    if (prices.listValue > 0) {
+        line += `\n💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}`;
+    }
+    if (prices.mrp > 0) {
+        line += `\n💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}`;
+    }
+    if (prices.billingPrice > 0) {
+        line += `\n💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}`;
+        line += `\n🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}`;
+        line += `\n💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}`;
+    }
+    if (product.box_qty > 0) {
+        line += `\n📦 Box Qty: ${product.box_qty}`;
+    }
+    if (product.carton > 0) {
+        line += `\n📦 Carton Qty: ${product.carton}`;
+    }
+    line += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
+    
+    return line;
 }
 
 // ============================================================
@@ -1400,6 +1399,7 @@ async function processOrder(text, from) {
         if (p.brand && p.brand !== 'Unknown') reply += `\n🏷️ Brand: ${p.brand}`;
         if (p.make && p.make !== 'Unknown') reply += `\n🏭 Make: ${p.make}`;
         if (p.type) reply += `\n📊 Type: ${p.type}`;
+        if (p.finish) reply += `\n🎨 Finish: ${p.finish}`;
         reply += `\n📦 Qty: ${r.qty}`;
         
         // ✅ SHOW ALL PRICES WITH GST ON BILLING PRICE
@@ -1984,7 +1984,7 @@ async function handleMessage(message, from, type) {
                 await sendWhatsAppMessage(from, 
                     `📸 *Photo Received!*\n\n` +
                     `I couldn't read any part numbers from the image${caption ? ' or caption' : ''}.\n\n` +
-                    `💡 Please send the part number directly.\n📝 Example: "0801BA0285N 2"\n\n` +
+                    `💡 Please send the part number directly.\n📝 Example: "0303BC0071N 2"\n\n` +
                     `📞 Call: ${CONFIG.businessPhone}`
                 );
             } catch (error) {
@@ -2033,7 +2033,7 @@ async function handleMessage(message, from, type) {
         if (msgLower === "get quote" || msgLower === "quotation") {
             const cart = await getCartDB(from);
             if (!cart || cart.items.length === 0) {
-                await sendWhatsAppMessage(from, "📄 Your cart is empty.\n\nSend part numbers like: \"0801BA0285N 2\"");
+                await sendWhatsAppMessage(from, "📄 Your cart is empty.\n\nSend part numbers like: \"0303BC0071N 2\"");
                 return;
             }
             const quotationNo = `Q-${Date.now().toString().slice(-6)}`;
@@ -2056,7 +2056,7 @@ async function handleMessage(message, from, type) {
                 `"Get Quote" - Generate quotation PDF\n` +
                 `"Clear Cart" - Start fresh\n\n` +
                 `*Example:*\n` +
-                `"0801BA0285N 2" - Add to cart`
+                `"0303BC0071N 2" - Add to cart`
             );
             return;
         }
@@ -2077,7 +2077,7 @@ async function handleMessage(message, from, type) {
         if (aiReply) {
             await sendWhatsAppMessage(from, `🤖 *AI Assistant*\n\n${aiReply}\n\n📞 Call: ${CONFIG.businessPhone}`);
         } else {
-            await sendWhatsAppMessage(from, `🔍 I couldn't find "${text}" in our inventory.\n\n💡 Try: "0801BA0285N 2"\n📞 Call: ${CONFIG.businessPhone}`);
+            await sendWhatsAppMessage(from, `🔍 I couldn't find "${text}" in our inventory.\n\n💡 Try: "0303BC0071N 2"\n📞 Call: ${CONFIG.businessPhone}`);
         }
     } catch (error) {
         logger.error(`❌ Message handler error: ${error.message}`);
