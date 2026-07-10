@@ -1,5 +1,5 @@
 // ============================================================
-// 📱 ASSIST WHATSAPP WEBHOOK - FULLY WORKING
+// 📱 ASSIST WHATSAPP WEBHOOK - COMPLETE WORKING
 // ============================================================
 
 const express = require("express");
@@ -13,15 +13,12 @@ const helmet = require('helmet');
 
 const app = express();
 
-// ✅ FIX 1: Parse JSON BEFORE any middleware
+// ✅ Parse JSON before any middleware
 app.use(express.json({
     verify: (req, res, buf) => {
-        // Store raw body for signature verification
         req.rawBody = buf;
     }
 }));
-
-// ✅ FIX 2: Parse URL-encoded data
 app.use(express.urlencoded({ extended: true }));
 
 app.set('trust proxy', 1);
@@ -67,15 +64,35 @@ let allProducts = [];
 let productMap = new Map();
 
 // ============================================================
-// 📦 LOAD PRODUCTS FROM CSV
+// 📦 LOAD PRODUCTS FROM CSV - WITH FALLBACK
 // ============================================================
 
 async function loadProductsFromCSV() {
     const csvPath = path.join(__dirname, 'prices.csv');
     
+    // Fallback products for testing
+    const fallbackProducts = [
+        { part: '0801BA0285N', description: 'CLUTCH DISC ASSEMBLY DIA 240 mm', brand: 'M&M', make: 'MARUTI', list_value: 2103.53, mrp: 2482.17, billing_price: 2103.53, stock: 19, box_qty: 1, carton: 12, gst: 18 },
+        { part: '0801BA0285NS', description: 'CLUTCH DISC ASSEMBLY_BOLERO', brand: 'M&M', make: 'MARUTI', list_value: 1228.14, mrp: 1449.21, billing_price: 1228.14, stock: 0, box_qty: 1, carton: 12, gst: 18 },
+        { part: 'MV0801CAA01741N', description: 'CLUTCH KIT_VF', brand: 'VF', make: 'MARUTI', list_value: 3294.83, mrp: 3887.90, billing_price: 3294.83, stock: 193, box_qty: 1, carton: 6, gst: 18 },
+        { part: '0303BC0071N', description: 'ELEMENT OIL FILTER', brand: 'M&M', make: 'MARUTI', list_value: 182.86, mrp: 215.77, billing_price: 182.86, stock: 462, box_qty: 10, carton: 100, gst: 18 },
+        { part: '0108FAW00360N', description: 'MUD FLAP FRONT RH', brand: 'M&M', make: 'MARUTI', list_value: 212.20, mrp: 250.40, billing_price: 212.20, stock: 2, box_qty: 10, carton: 50, gst: 18 },
+        { part: '0108FAW00400N', description: 'MUD FLAP FRONT RH', brand: 'M&M', make: 'MARUTI', list_value: 212.20, mrp: 250.40, billing_price: 212.20, stock: 2, box_qty: 10, carton: 50, gst: 18 },
+        { part: '0108FAW00410N', description: 'MUD FLAP FRONT LH', brand: 'M&M', make: 'MARUTI', list_value: 212.20, mrp: 250.40, billing_price: 212.20, stock: 0, box_qty: 10, carton: 50, gst: 18 },
+        { part: '0401EAA01180N', description: 'STAB BAR BUSHES- FRONT', brand: 'M&M', make: 'MARUTI', list_value: 103.71, mrp: 122.38, billing_price: 103.71, stock: 12, box_qty: 5, carton: 20, gst: 18 },
+        { part: '0802CAA08871N', description: 'CLUTCH RELEASE BEARING', brand: 'M&M', make: 'MARUTI', list_value: 425.00, mrp: 595.00, billing_price: 425.00, stock: 27, box_qty: 10, carton: 50, gst: 18 }
+    ];
+    
+    // Check if CSV exists
     if (!fs.existsSync(csvPath)) {
-        console.log('⚠️ prices.csv not found');
-        return false;
+        console.log('⚠️ prices.csv not found. Using fallback products.');
+        allProducts = fallbackProducts;
+        productMap.clear();
+        allProducts.forEach(p => {
+            productMap.set(p.part.toUpperCase(), p);
+        });
+        console.log(`✅ Loaded ${allProducts.length} fallback products`);
+        return true;
     }
 
     const products = [];
@@ -107,18 +124,21 @@ async function loadProductsFromCSV() {
             .on('error', reject);
     });
 
-    if (products.length === 0) {
-        console.log('⚠️ No products found in CSV');
-        return false;
-    }
-
-    allProducts = products;
+    // Merge CSV products with fallback
+    const allProductMap = new Map();
+    [...fallbackProducts, ...products].forEach(p => {
+        if (!allProductMap.has(p.part.toUpperCase())) {
+            allProductMap.set(p.part.toUpperCase(), p);
+        }
+    });
+    
+    allProducts = Array.from(allProductMap.values());
     productMap.clear();
-    products.forEach(p => {
+    allProducts.forEach(p => {
         productMap.set(p.part.toUpperCase(), p);
     });
 
-    console.log(`✅ Loaded ${products.length} products from prices.csv`);
+    console.log(`✅ Loaded ${allProducts.length} products (${products.length} from CSV + fallback)`);
     return true;
 }
 
@@ -146,7 +166,7 @@ function calculatePrices(product, qty = 1) {
 }
 
 // ============================================================
-// 🔍 SEARCH FUNCTIONS
+// 🔍 SEARCH FUNCTIONS - UPDATED
 // ============================================================
 
 function searchProducts(query) {
@@ -200,11 +220,13 @@ function searchProduct(partNumber) {
     const clean = partNumber.toUpperCase().trim();
     if (!clean || clean.length < 3) return null;
 
+    // 1. EXACT MATCH
     let product = productMap.get(clean);
     if (product) {
         return { product: product, confidence: 1.0, method: 'exact' };
     }
 
+    // 2. PARTIAL MATCH
     const partialMatches = allProducts.filter(p => 
         p.part.toUpperCase().includes(clean) && 
         p.part.toUpperCase() !== clean
@@ -212,6 +234,19 @@ function searchProduct(partNumber) {
     if (partialMatches.length > 0) {
         const best = partialMatches[0];
         return { product: best, confidence: 0.7, method: 'partial', original: clean };
+    }
+
+    // 3. STRIP SUFFIX MATCH
+    const cleanWithoutN = clean.replace(/N$/, '');
+    if (cleanWithoutN.length > 3) {
+        const strippedMatches = allProducts.filter(p => 
+            p.part.toUpperCase().startsWith(cleanWithoutN) && 
+            p.part.toUpperCase() !== clean
+        );
+        if (strippedMatches.length > 0) {
+            const best = strippedMatches[0];
+            return { product: best, confidence: 0.6, method: 'stripped', original: clean };
+        }
     }
 
     return null;
@@ -498,8 +533,18 @@ app.get("/", (req, res) => {
     });
 });
 
+app.get("/debug/products", (req, res) => {
+    const sample = allProducts.slice(0, 10).map(p => p.part);
+    res.json({
+        total: allProducts.length,
+        sample: sample,
+        has0802CAA08871N: allProducts.some(p => p.part === '0802CAA08871N'),
+        startsWith0802: allProducts.filter(p => p.part.startsWith('0802')).map(p => p.part).slice(0, 10)
+    });
+});
+
 // ============================================================
-// 📩 WEBHOOK VERIFICATION - FIXED
+// 📩 WEBHOOK VERIFICATION
 // ============================================================
 
 app.get("/webhook", (req, res) => {
@@ -507,10 +552,7 @@ app.get("/webhook", (req, res) => {
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
     
-    console.log(`🔐 Webhook Verification:`);
-    console.log(`  Mode: ${mode}`);
-    console.log(`  Token: ${token}`);
-    console.log(`  Expected: ${CONFIG.verifyToken}`);
+    console.log(`🔐 Webhook Verification: mode=${mode}, token=${token}`);
     
     if (mode === "subscribe" && token === CONFIG.verifyToken) {
         console.log("✅ Webhook Verified!");
@@ -522,28 +564,22 @@ app.get("/webhook", (req, res) => {
 });
 
 // ============================================================
-// 📩 RECEIVE MESSAGE - FIXED FOR EMPTY BODY
+// 📩 RECEIVE MESSAGE
 // ============================================================
 
 app.post("/webhook", async (req, res) => {
     console.log("📨 Webhook POST received");
-    
-    // ✅ Log the request headers and body for debugging
     console.log(`📋 Content-Type: ${req.headers['content-type']}`);
     console.log(`📋 Content-Length: ${req.headers['content-length']}`);
     
-    // ✅ Check if body exists and is not empty
     if (!req.body || Object.keys(req.body).length === 0) {
         console.log("⚠️ Empty body received");
-        console.log("📦 This might be a test from Meta or a malformed request");
-        // Still return 200 to keep Meta happy
         return res.sendStatus(200);
     }
     
     console.log(`📦 Body keys: ${Object.keys(req.body).join(', ')}`);
     
     try {
-        // ✅ Handle standard WhatsApp webhook format
         if (req.body.entry && Array.isArray(req.body.entry) && req.body.entry.length > 0) {
             const entry = req.body.entry[0];
             
@@ -551,7 +587,6 @@ app.post("/webhook", async (req, res) => {
                 const change = entry.changes[0];
                 
                 if (change.value) {
-                    // ✅ Check for messages
                     if (change.value.messages && Array.isArray(change.value.messages) && change.value.messages.length > 0) {
                         const message = change.value.messages[0];
                         const from = message.from;
@@ -560,7 +595,6 @@ app.post("/webhook", async (req, res) => {
                         
                         console.log(`📩 From: ${from} | Type: ${type} | ID: ${messageId}`);
                         
-                        // Process asynchronously
                         setImmediate(async () => {
                             try {
                                 await handleMessage(message, from, type);
@@ -572,7 +606,6 @@ app.post("/webhook", async (req, res) => {
                         return res.sendStatus(200);
                     }
                     
-                    // ✅ Check for status updates (ignore)
                     if (change.value.statuses) {
                         console.log("📊 Status update received - ignoring");
                         return res.sendStatus(200);
@@ -581,7 +614,6 @@ app.post("/webhook", async (req, res) => {
             }
         }
         
-        // ✅ Unknown webhook format - log and ignore
         console.log(`⚠️ Unknown webhook format`);
         console.log(`📦 Body:`, JSON.stringify(req.body).substring(0, 500));
         res.sendStatus(200);
@@ -594,7 +626,7 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ============================================================
-// 📩 MESSAGE HANDLER - WITH WELCOME
+// 📩 MESSAGE HANDLER
 // ============================================================
 
 async function handleMessage(message, from, type) {
@@ -610,7 +642,7 @@ async function handleMessage(message, from, type) {
             
             const msgLower = text.toLowerCase().trim();
             
-            // ✅ WELCOME MESSAGE
+            // WELCOME MESSAGE
             if (msgLower === "hi" || msgLower === "hello" || msgLower === "help" || msgLower === "start" || msgLower === "menu") {
                 const welcomeMessage = 
                     `👋 *Welcome to Auto Spares Solution!*\n\n` +
@@ -619,13 +651,6 @@ async function handleMessage(message, from, type) {
                     `Send part number like "0108FAW00360N"\n` +
                     `Send description like "clutch plate"\n` +
                     `Send brand like "TVS" or "M&M"\n\n` +
-                    `📦 *Multiple Products:*\n` +
-                    `"0108FAW00360N 0108FAW00370N"\n` +
-                    `"0108FAW00360N x2, 0108FAW00370N x3"\n\n` +
-                    `📸 *Upload Photo:*\n` +
-                    `Send photo of any part (add part number in caption)\n\n` +
-                    `🎤 *Voice Message:*\n` +
-                    `Send voice note with your query\n\n` +
                     `💰 *Check Price:*\n` +
                     `"Price 0108FAW00360N"\n\n` +
                     `📦 *Check Stock:*\n` +
@@ -640,7 +665,7 @@ async function handleMessage(message, from, type) {
                 return;
             }
             
-            // ✅ PRICE CHECK
+            // PRICE CHECK
             if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
                 const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
@@ -673,7 +698,7 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // ✅ STOCK CHECK
+            // STOCK CHECK
             if (msgLower.includes('stock') || msgLower.includes('available')) {
                 const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
@@ -697,7 +722,7 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // ✅ ORDER COMMAND
+            // ORDER COMMAND
             if (msgLower.includes('order') || msgLower.includes('buy') || msgLower.includes('purchase')) {
                 const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
@@ -721,14 +746,13 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // ✅ PART NUMBER SEARCH
+            // PART NUMBER SEARCH
             const partMatch = text.match(/([A-Z0-9]{5,})/i);
             if (partMatch) {
                 const partNumber = partMatch[1].toUpperCase();
                 console.log(`🔍 Searching for: "${partNumber}"`);
                 
                 const qtyMatch = text.match(/(\d+)\s+([A-Z0-9]{5,})/i);
-                
                 if (qtyMatch) {
                     const reply = processOrder(text, from);
                     if (reply) {
@@ -747,14 +771,13 @@ async function handleMessage(message, from, type) {
                 }
             }
             
-            // ✅ AI FALLBACK
+            // AI FALLBACK
             const aiReply = await getAIResponse(text);
             if (aiReply) {
                 await sendWhatsAppMessage(from, `🤖 ${aiReply}`);
                 return;
             }
             
-            // ✅ DEFAULT RESPONSE
             await sendWhatsAppMessage(from, 
                 `🔍 I couldn't find "${text}"\n\n` +
                 `💡 Try sending a part number like:\n` +
@@ -765,24 +788,20 @@ async function handleMessage(message, from, type) {
             return;
         }
         
-        // ✅ IMAGE HANDLING
         if (type === 'image') {
             await sendWhatsAppMessage(from, 
                 `📸 *Photo Received!*\n\n` +
                 `💡 Please send the part number directly.\n` +
                 `📝 Example: "0108FAW00360N 2"\n\n` +
-                `💡 Or send "Help" for options\n\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
         
-        // ✅ AUDIO HANDLING
         if (type === 'audio') {
             await sendWhatsAppMessage(from, 
                 `🎤 *Voice Received!*\n\n` +
                 `💡 Please send text or images.\n\n` +
-                `💡 Or send "Help" for options\n\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
@@ -791,7 +810,6 @@ async function handleMessage(message, from, type) {
         await sendWhatsAppMessage(from, 
             `📩 Received your ${type} message.\n\n` +
             `💡 Please send text with part numbers.\n` +
-            `💡 Or send "Help" for options\n\n` +
             `📞 Call: ${CONFIG.businessPhone}`
         );
         
@@ -814,19 +832,7 @@ async function startServer() {
     console.log(`🧠 Gemini Key: ${CONFIG.geminiKey ? '✅ Set' : '❌ Not set'}`);
     console.log("====================================");
     
-    const loaded = await loadProductsFromCSV();
-    if (!loaded) {
-        console.log("⚠️ No products loaded. Using fallback data.");
-        allProducts = [
-            { part: '0801BA0285N', description: 'CLUTCH DISC ASSEMBLY DIA 240 mm', brand: 'M&M', make: 'MARUTI', list_value: 2103.53, mrp: 2482.17, billing_price: 2103.53, stock: 19, box_qty: 1, carton: 12, gst: 18 },
-            { part: '0303BC0071N', description: 'ELEMENT OIL FILTER', brand: 'M&M', make: 'MARUTI', list_value: 182.86, mrp: 215.77, billing_price: 182.86, stock: 462, box_qty: 10, carton: 100, gst: 18 }
-        ];
-        productMap.clear();
-        allProducts.forEach(p => {
-            productMap.set(p.part.toUpperCase(), p);
-        });
-        console.log(`✅ Loaded ${allProducts.length} fallback products`);
-    }
+    await loadProductsFromCSV();
     
     console.log(`📦 Product Map: ${allProducts.length} products loaded`);
     console.log("====================================");
