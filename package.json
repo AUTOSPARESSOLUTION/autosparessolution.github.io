@@ -1,7 +1,7 @@
 {
-  "name": "smart-order-engine",
-  "version": "13.0.0",
-  "description": "WhatsApp Smart Order Engine with AI",
+  "name": "assist-whatsapp-webhook",
+  "version": "1.0.0",
+  "description": "WhatsApp Webhook for Auto Spares",
   "main": "webhook.js",
   "scripts": {
     "start": "node webhook.js"
@@ -11,16 +11,8 @@
     "node-fetch": "^2.6.9",
     "csv-parser": "^3.0.0",
     "winston": "^3.11.0",
-    "p-queue": "^6.6.2",
     "helmet": "^7.0.0",
     "express-rate-limit": "^6.7.0",
-    "pdfkit": "^0.13.0",
-    "razorpay": "^2.8.6",
-    "tesseract.js": "^4.1.1",
-    "sharp": "^0.32.6",
-    "crypto": "^1.0.1"
-  },
-  "engines": {
-    "node": ">=16.0.0"
+    "sharp": "^0.32.6"
   }
 }
