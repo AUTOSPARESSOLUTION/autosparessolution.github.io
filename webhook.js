@@ -1,6 +1,5 @@
 // ============================================================
 // 📱 SMART ORDER ENGINE V12 - COMPLETE FIXED
-// MRP + LIST Display for ALL Outputs
 // ============================================================
 
 const express = require("express");
@@ -272,6 +271,7 @@ async function initDatabase() {
             )
         `);
 
+        // Indexes
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
@@ -297,7 +297,7 @@ async function initDatabase() {
 }
 
 // ============================================================
-// 📦 PRODUCT MANAGEMENT
+// 📦 PRODUCT LOADING - MATCHES YOUR CSV STRUCTURE
 // ============================================================
 
 async function loadProductsFromCSV() {
@@ -310,24 +310,19 @@ async function loadProductsFromCSV() {
     const products = [];
     await new Promise((resolve, reject) => {
         fs.createReadStream(csvPath)
-            .pipe(csv())
+            .pipe(csv({ headers: false }))
             .on('data', (row) => {
-                const part = row['Part No'] || row['part'] || row['PART'] || '';
-                const description = row['Description'] || row['desc'] || row['DESC'] || row['DESCRIPTION'] || 'Auto Spare Part';
-                const brand = row['Brand'] || row['brand'] || row['BRAND'] || 'Unknown';
-                const listValue = parseFloat(row['List'] || row['List Value'] || row['list'] || row['LIST'] || row['LIST_VALUE'] || 0);
-                const mrp = parseFloat(row['MRP'] || row['mrp'] || 0);
-                const stock = parseInt(row['Stock'] || row['stock'] || row['STOCK'] || 0);
-                const gst = parseFloat(row['GST'] || row['gst'] || 18);
+                const cols = Object.values(row);
                 
                 const product = {
-                    part: part.trim(),
-                    description: description.trim(),
-                    brand: brand.trim(),
-                    list_value: listValue,
-                    mrp: mrp,
-                    stock: stock,
-                    gst: gst
+                    part: (cols[0] || '').trim(),
+                    description: (cols[1] || 'Auto Spare Part').trim(),
+                    list_value: parseFloat(cols[2]) || 0,
+                    mrp: parseFloat(cols[3]) || 0,
+                    price: parseFloat(cols[6]) || 0,
+                    stock: parseInt(cols[7]) || 0,
+                    brand: (cols[10] || 'Unknown').trim(),
+                    gst: 18
                 };
                 if (product.part) products.push(product);
             })
@@ -379,37 +374,53 @@ async function loadProductsFromCSV() {
 }
 
 // ============================================================
-// PRODUCT DATA STRUCTURE (for aiSearch)
+// 🔍 SEARCH PRODUCT
 // ============================================================
 
-let allProducts = [];
-let productMap = new Map();
+async function searchProduct(partNumber) {
+    const clean = partNumber.toUpperCase().trim();
+    if (!clean || clean.length < 3) return null;
 
-function buildProductCache() {
-    allProducts = [];
-    productMap.clear();
-    // Products are loaded from database via pool
-}
+    let result = await pool.query('SELECT * FROM products WHERE part = $1', [clean]);
+    if (result.rows.length > 0) {
+        return { product: result.rows[0], confidence: 1.0, method: 'exact' };
+    }
 
-// ============================================================
-// 🔍 AI SEARCH - WITH MRP & LIST
-// ============================================================
+    const prefix = clean.substring(0, Math.min(6, clean.length));
+    result = await pool.query(
+        'SELECT * FROM products WHERE part LIKE $1 LIMIT 5',
+        [prefix + '%']
+    );
+    if (result.rows.length > 0) {
+        const best = result.rows[0];
+        const similarity = best.part.length >= clean.length ? 
+            clean.length / best.part.length : 
+            best.part.length / clean.length;
+        if (similarity >= CONFIG.autoCorrectThreshold) {
+            return { product: best, confidence: similarity, method: 'prefix' };
+        }
+    }
 
-function aiSearch(query) {
-    if (!query) return [];
-    const q = query.toLowerCase().trim();
-    const results = [];
-    
-    // Search in memory cache or database
-    // For now, use allProducts from CSV load
-    
-    // This function should return products with list_value
-    return allProducts.filter(p => {
-        const part = (p.part || '').toLowerCase();
-        const desc = (p.desc || p.description || '').toLowerCase();
-        const brand = (p.brand || '').toLowerCase();
-        return part.includes(q) || desc.includes(q) || brand.includes(q);
-    }).slice(0, 10);
+    result = await pool.query(
+        `SELECT *, similarity(part, $1) as sim
+         FROM products
+         WHERE part % $1
+         ORDER BY sim DESC
+         LIMIT 5`,
+        [clean]
+    );
+
+    if (result.rows.length > 0) {
+        const best = result.rows[0];
+        if (best.sim >= CONFIG.autoCorrectThreshold) {
+            return { product: best, confidence: best.sim, method: 'fuzzy', original: clean };
+        }
+        if (best.sim >= 0.60) {
+            return { product: best, confidence: best.sim, method: 'fuzzy-low', original: clean, needsConfirmation: true };
+        }
+    }
+
+    return null;
 }
 
 // ============================================================
@@ -426,7 +437,7 @@ function formatProductLine(product, qty, confidence, original = null) {
     if (original && original !== product.part) {
         line += `\n   📝 OCR read: ${original}`;
     }
-    line += `\n📝 ${product.description || product.desc || 'N/A'}`;
+    line += `\n📝 ${product.description || 'N/A'}`;
     line += `\n🏷️ Brand: ${product.brand || 'N/A'}`;
     line += `\n📦 Qty: ${qty}`;
     
@@ -953,7 +964,6 @@ async function processOrder(text, from) {
     
     await saveCartDB(from, cartItems, subtotal, grandTotal);
     
-    // ✅ FORMAT REPLY WITH MRP + LIST
     let reply = `📋 *ORDER EXTRACTED*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
     for (const r of results) {
         const p = r.product;
@@ -987,56 +997,6 @@ async function processOrder(text, from) {
     reply += `📞 Call: ${CONFIG.businessPhone}`;
     
     return reply;
-}
-
-// ============================================================
-// 🔍 SEARCH PRODUCT
-// ============================================================
-
-async function searchProduct(partNumber) {
-    const clean = partNumber.toUpperCase().trim();
-    if (!clean || clean.length < 3) return null;
-
-    let result = await pool.query('SELECT * FROM products WHERE part = $1', [clean]);
-    if (result.rows.length > 0) {
-        return { product: result.rows[0], confidence: 1.0, method: 'exact' };
-    }
-
-    const prefix = clean.substring(0, Math.min(6, clean.length));
-    result = await pool.query(
-        'SELECT * FROM products WHERE part LIKE $1 LIMIT 5',
-        [prefix + '%']
-    );
-    if (result.rows.length > 0) {
-        const best = result.rows[0];
-        const similarity = best.part.length >= clean.length ? 
-            clean.length / best.part.length : 
-            best.part.length / clean.length;
-        if (similarity >= CONFIG.autoCorrectThreshold) {
-            return { product: best, confidence: similarity, method: 'prefix' };
-        }
-    }
-
-    result = await pool.query(
-        `SELECT *, similarity(part, $1) as sim
-         FROM products
-         WHERE part % $1
-         ORDER BY sim DESC
-         LIMIT 5`,
-        [clean]
-    );
-
-    if (result.rows.length > 0) {
-        const best = result.rows[0];
-        if (best.sim >= CONFIG.autoCorrectThreshold) {
-            return { product: best, confidence: best.sim, method: 'fuzzy', original: clean };
-        }
-        if (best.sim >= 0.60) {
-            return { product: best, confidence: best.sim, method: 'fuzzy-low', original: clean, needsConfirmation: true };
-        }
-    }
-
-    return null;
 }
 
 // ============================================================
@@ -1624,35 +1584,6 @@ async function handleMessage(message, from, type) {
 }
 
 // ============================================================
-// 📦 AI SEARCH FUNCTION (for product search)
-// ============================================================
-
-// This function is used for product search in text messages
-function searchProducts(query) {
-    if (!query) return [];
-    const q = query.toLowerCase().trim();
-    // In production, this should query the database
-    // For now, use the in-memory cache
-    const results = allProducts.filter(p => {
-        const part = (p.part || '').toLowerCase();
-        const desc = (p.desc || p.description || '').toLowerCase();
-        const brand = (p.brand || '').toLowerCase();
-        return part.includes(q) || desc.includes(q) || brand.includes(q);
-    });
-    results.sort((a, b) => {
-        const aExact = (a.part || '').toLowerCase() === q;
-        const bExact = (b.part || '').toLowerCase() === q;
-        if (aExact && !bExact) return -1;
-        if (!aExact && bExact) return 1;
-        return (b.stock || 0) - (a.stock || 0);
-    });
-    return results.slice(0, 10);
-}
-
-// Override the processMessage to use searchProducts with MRP & LIST
-const originalProcessMessage = processMessage;
-
-// ============================================================
 // 🚀 START SERVER
 // ============================================================
 
@@ -1660,10 +1591,6 @@ async function startServer() {
     try {
         await initDatabase();
         await loadProductsFromCSV();
-        
-        // Build in-memory cache from database
-        const dbProducts = await pool.query('SELECT * FROM products');
-        allProducts = dbProducts.rows;
         
         const PORT = process.env.PORT || 10000;
         app.listen(PORT, () => {
@@ -1674,7 +1601,6 @@ async function startServer() {
             logger.info(`🧠 DeepSeek: ${CONFIG.deepseekKey ? '✅' : '❌'}`);
             logger.info(`💳 Razorpay: ${CONFIG.razorpayKeyId ? '✅' : '❌'}`);
             logger.info(`🗄️ Database: ${CONFIG.databaseUrl ? '✅' : '❌'}`);
-            logger.info(`📦 Products loaded: ${allProducts.length}`);
         });
     } catch (error) {
         logger.error(`❌ Startup error: ${error.message}`);
