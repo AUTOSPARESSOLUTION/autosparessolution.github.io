@@ -1,6 +1,6 @@
 // ============================================================
-// 📱 ASSIST WHATSAPP WEBHOOK - WORKING VERSION
-// Minimal but Complete - Fixes All Issues
+// 📱 ASSIST WHATSAPP WEBHOOK - FULLY FIXED
+// Handles all webhook cases including Meta tests
 // ============================================================
 
 const express = require("express");
@@ -12,10 +12,6 @@ const crypto = require('crypto');
 const { createLogger, transports, format } = require('winston');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const PDFDocument = require('pdfkit');
-const Razorpay = require('razorpay');
-const Tesseract = require('tesseract.js');
-const { FormData } = require('node-fetch');
 const sharp = require('sharp');
 
 const app = express();
@@ -421,7 +417,6 @@ function processOrder(text, from) {
 // ============================================================
 
 async function getAIResponse(message) {
-    // If ChatGPT key exists, try it
     if (CONFIG.chatgptKey) {
         try {
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -452,7 +447,7 @@ async function getAIResponse(message) {
 }
 
 // ============================================================
-// 📤 WHATSAPP SEND - SIMPLE VERSION
+// 📤 WHATSAPP SEND
 // ============================================================
 
 async function sendWhatsAppMessage(to, message) {
@@ -508,7 +503,7 @@ app.get("/", (req, res) => {
 });
 
 // ============================================================
-// 📩 WEBHOOK VERIFICATION
+// 📩 WEBHOOK VERIFICATION - FIXED
 // ============================================================
 
 app.get("/webhook", (req, res) => {
@@ -516,7 +511,11 @@ app.get("/webhook", (req, res) => {
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
     
-    console.log(`🔐 Webhook Verification: mode=${mode}, token=${token}`);
+    console.log(`🔐 Webhook Verification Request:`);
+    console.log(`  Mode: ${mode}`);
+    console.log(`  Token: ${token}`);
+    console.log(`  Challenge: ${challenge}`);
+    console.log(`  Expected Token: ${CONFIG.verifyToken}`);
     
     if (mode === "subscribe" && token === CONFIG.verifyToken) {
         console.log("✅ Webhook Verified Successfully!");
@@ -528,44 +527,75 @@ app.get("/webhook", (req, res) => {
 });
 
 // ============================================================
-// 📩 RECEIVE MESSAGE - MAIN WEBHOOK
+// 📩 RECEIVE MESSAGE - FULLY FIXED WEBHOOK
 // ============================================================
 
 app.post("/webhook", async (req, res) => {
-    console.log("📨 Incoming Webhook");
+    console.log("📨 Incoming Webhook POST");
     
     try {
-        const message = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-        
-        if (message) {
-            const from = message.from;
-            const type = message.type || 'text';
-            
-            console.log(`📩 From: ${from} | Type: ${type}`);
-            
-            // Process asynchronously
-            setImmediate(async () => {
-                try {
-                    await handleMessage(message, from, type);
-                } catch (error) {
-                    console.log(`❌ Async error: ${error.message}`);
-                }
-            });
-            
-            res.sendStatus(200);
-            return;
+        // ✅ FIX: Check if body exists
+        if (!req.body) {
+            console.log("⚠️ Empty request body");
+            return res.sendStatus(200);
         }
         
-        console.log("📨 No message found in webhook");
+        // ✅ FIX: Check if entry exists
+        if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
+            console.log("⚠️ No entry in webhook body");
+            console.log("📦 Body:", JSON.stringify(req.body).substring(0, 200));
+            return res.sendStatus(200);
+        }
+        
+        // ✅ FIX: Check if changes exist
+        const entry = req.body.entry[0];
+        if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
+            console.log("⚠️ No changes in webhook entry");
+            return res.sendStatus(200);
+        }
+        
+        // ✅ FIX: Check if value exists
+        const change = entry.changes[0];
+        if (!change.value) {
+            console.log("⚠️ No value in webhook change");
+            return res.sendStatus(200);
+        }
+        
+        // ✅ FIX: Check if messages exist
+        const value = change.value;
+        if (!value.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
+            console.log("⚠️ No messages in webhook value");
+            // This could be a status update, not a message
+            return res.sendStatus(200);
+        }
+        
+        // ✅ We have a valid message!
+        const message = value.messages[0];
+        const from = message.from;
+        const type = message.type || 'text';
+        
+        console.log(`📩 From: ${from} | Type: ${type}`);
+        
+        // Process asynchronously
+        setImmediate(async () => {
+            try {
+                await handleMessage(message, from, type);
+            } catch (error) {
+                console.log(`❌ Async error: ${error.message}`);
+            }
+        });
+        
         res.sendStatus(200);
+        
     } catch (error) {
         console.log(`❌ Webhook error: ${error.message}`);
-        res.sendStatus(500);
+        console.log(`📦 Request body:`, JSON.stringify(req.body).substring(0, 500));
+        res.sendStatus(200); // Always return 200 to Meta
     }
 });
 
 // ============================================================
-// 📩 MESSAGE HANDLER - SIMPLIFIED
+// 📩 MESSAGE HANDLER
 // ============================================================
 
 async function handleMessage(message, from, type) {
