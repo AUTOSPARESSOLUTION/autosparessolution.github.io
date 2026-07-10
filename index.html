@@ -2692,70 +2692,8 @@ console.log('📦 Full product data loaded:', aiProductData.length, 'products');
 <!-- ============================================ -->
 <!-- END AI SALES ASSISTANT - UPDATED            -->
 <!-- ============================================ -->
-    <!-- ============================================ -->
-<!-- 📱 WHATSAPP AI AUTO-REPLY SYSTEM             -->
-<!-- ============================================ -->
-
-<script>
-// ===== WHATSAPP CONFIGURATION =====
-const WHATSAPP_CONFIG = {
-    phoneNumberId: 'YOUR_PHONE_NUMBER_ID',  // Get from Meta Developers
-    accessToken: 'YOUR_ACCESS_TOKEN',        // Get from Meta Developers
-    businessPhone: '919330102828'            // Your WhatsApp number
-};
-
-// ===== Webhook to receive WhatsApp messages =====
-// You'll need a server (free: Render.com / Vercel) to receive webhooks
-
-// ===== Function to send WhatsApp message =====
-async function sendWhatsAppMessage(toNumber, message) {
-    const url = `https://graph.facebook.com/v18.0/${WHATSAPP_CONFIG.phoneNumberId}/messages`;
-    
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${WHATSAPP_CONFIG.accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                messaging_product: 'whatsapp',
-                to: toNumber,
-                type: 'text',
-                text: { body: message }
-            })
-        });
-        const data = await response.json();
-        console.log('✅ WhatsApp message sent:', data);
-        return data;
-    } catch (error) {
-        console.error('❌ WhatsApp error:', error);
-    }
-}
-
-// ===== Process incoming message =====
-function processWhatsAppMessage(message) {
-    const query = message.toLowerCase().trim();
-    
-    // Search for part number
-    const results = aiSearch(query);
-    
-    if (results.length > 0) {
-        const p = results[0];
-        const priceGST = aiPriceWithGST(p.price, p.gst || 18);
-        const reply = `🔍 *Part Found!*\n\n` +
-                     `📝 *Part No:* ${p.part}\n` +
-                     `📋 *Description:* ${p.desc}\n` +
-                     `🏷️ *Brand:* ${p.brand || 'N/A'}\n` +
-                     `💰 *Price:* ₹${priceGST.toFixed(2)} (incl. GST)\n` +
-                     `📦 *Stock:* ${p.stock} pcs\n\n` +
-                     `🛒 *Order now:* https://autosparessolution.github.io\n` +
-                     `📞 *Call:* 9830300193`;
-        return reply;
-    } else {
-        // Use Gemini AI for intelligent reply
-<!-- ============================================ -->
-<!-- 📱 WHATSAPP AI AUTO-REPLY SYSTEM             -->
+   <!-- ============================================ -->
+<!-- 📱 WHATSAPP AI AUTO-REPLY SYSTEM - UPDATED   -->
 <!-- ============================================ -->
 
 <script>
@@ -2766,9 +2704,6 @@ const WHATSAPP_CONFIG = {
     businessPhone: '919330102828'  // ✅ Updated Business WhatsApp Number
 };
 
-// ===== Webhook to receive WhatsApp messages =====
-// You'll need a server (free: Render.com / Vercel) to receive webhooks
-
 // ===== Function to send WhatsApp message =====
 async function sendWhatsAppMessage(toNumber, message) {
     const url = `https://graph.facebook.com/v18.0/${WHATSAPP_CONFIG.phoneNumberId}/messages`;
@@ -2795,152 +2730,236 @@ async function sendWhatsAppMessage(toNumber, message) {
     }
 }
 
+// ===== Helper: Calculate Price with GST =====
+function aiPriceWithGST(product) {
+    const billingPrice = product.price || product.list_value || 0;
+    const gstRate = product.gst || 18;
+    const gstAmount = billingPrice * (gstRate / 100);
+    return {
+        billingPrice: billingPrice,
+        mrp: product.mrp || 0,
+        listValue: product.list_value || 0,
+        gstRate: gstRate,
+        gstAmount: gstAmount,
+        priceWithGST: billingPrice + gstAmount
+    };
+}
+
+// ===== Helper: Format Product for WhatsApp =====
+function formatWhatsAppProduct(product, index = 0) {
+    const prices = aiPriceWithGST(product);
+    const stockStatus = product.stock > 0 ? `✅ ${product.stock} pcs in stock` : '❌ Out of Stock';
+    
+    let reply = `${index + 1}. *${product.part}*\n`;
+    reply += `📝 ${product.desc || 'N/A'}\n`;
+    
+    if (product.brand && product.brand !== 'Unknown') {
+        reply += `🏷️ Brand: ${product.brand}`;
+        if (product.make && product.make !== 'Unknown' && product.make !== product.brand) {
+            reply += ` | Make: ${product.make}`;
+        }
+        reply += `\n`;
+    }
+    
+    if (product.type) {
+        reply += `📊 Type: ${product.type}`;
+        if (product.finish) {
+            reply += ` | Finish: ${product.finish}`;
+        }
+        reply += `\n`;
+    }
+    
+    // ✅ FULL PRICE BREAKDOWN
+    if (prices.listValue > 0) {
+        reply += `💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}\n`;
+    }
+    if (prices.mrp > 0 && prices.mrp !== prices.listValue) {
+        reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
+    } else if (prices.mrp > 0) {
+        reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
+    }
+    if (prices.billingPrice > 0) {
+        reply += `💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}\n`;
+        reply += `🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}\n`;
+        reply += `💳 Price incl. GST: ₹${prices.priceWithGST.toFixed(2)}\n`;
+    }
+    
+    // Stock & Packaging
+    reply += `📦 ${stockStatus}`;
+    if (product.box_qty > 0) {
+        reply += ` | Box: ${product.box_qty}`;
+    }
+    if (product.carton > 0) {
+        reply += ` | Carton: ${product.carton}`;
+    }
+    reply += `\n`;
+    
+    return reply;
+}
+
 // ===== Process incoming message with enhanced AI =====
 function processWhatsAppMessage(message) {
     const query = message.toLowerCase().trim();
     
     // Check if it's a help request
-    if (query === 'help' || query === 'hi' || query === 'hello') {
+    if (query === 'help' || query === 'hi' || query === 'hello' || query === 'start') {
         return `👋 *Welcome to Auto Spares Solution!*
 
 I'm your AI Sales Assistant. Here's what I can help with:
 
 🔍 *Search Parts*
-Send part number: "0357"
+Send part number: "0801BA0285N"
 Send description: "clutch plate"
 
 💰 *Check Price*
-"Price 0357"
+"Price 0801BA0285N"
 
 📦 *Check Stock*
-"Stock 0357"
+"Stock 0801BA0285N"
 
 🛒 *Place Order*
-"Order 0357"
+"Order 0801BA0285N 2"
+"0801BA0285N 2"
 
-📞 *Call:* ${WHATSAPP_CONFIG.businessPhone}
-🛒 *Shop:* https://autosparessolution.github.io
+📞 *Call:* 9830300193
+🛒 *Shop:* https://autosparessolution.com
 
 *How can I help you today?* 🚗`;
     }
     
-    // Search for part number
-    const results = aiSearch(query);
+    // Check if it's a price/stock/order command
+    const isPriceQuery = query.includes('price') || query.includes('cost') || query.includes('rate');
+    const isStockQuery = query.includes('stock') || query.includes('available') || query.includes('have');
+    const isOrderQuery = query.includes('order') || query.includes('buy') || query.includes('purchase');
     
-    if (results.length > 0) {
-        // Display all results (max 3)
-        let reply = `🔍 *Found ${results.length} result(s)*\n\n`;
-        
-        results.slice(0, 3).forEach((p, index) => {
-            const priceGST = aiPriceWithGST(p.price, p.gst || 18);
-            const stockStatus = p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock';
-            
-            reply += `*${index + 1}. ${p.part}*\n`;
-            reply += `📝 ${p.desc || 'N/A'}\n`;
-            reply += `🏷️ ${p.brand || 'N/A'}\n`;
-            reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
-            reply += `📦 ${stockStatus}\n\n`;
+    // Extract potential part number from query
+    let partQuery = query;
+    if (isPriceQuery || isStockQuery || isOrderQuery) {
+        const words = query.split(' ');
+        for (const word of words) {
+            if (word.length >= 4 && word.match(/^[A-Z0-9]{4,}/i)) {
+                partQuery = word;
+                break;
+            }
+        }
+    }
+    
+    // Search for products
+    let results = [];
+    if (window.allProducts && window.allProducts.length > 0) {
+        const searchTerm = partQuery.toLowerCase().trim();
+        results = window.allProducts.filter(p => {
+            const part = (p.part || '').toLowerCase();
+            const desc = (p.desc || '').toLowerCase();
+            const brand = (p.brand || '').toLowerCase();
+            const make = (p.make || '').toLowerCase();
+            return part.includes(searchTerm) || desc.includes(searchTerm) || 
+                   brand.includes(searchTerm) || make.includes(searchTerm);
         });
         
-        reply += `🛒 *Order now:* https://autosparessolution.github.io\n`;
-        reply += `📞 *Call:* ${WHATSAPP_CONFIG.businessPhone}\n\n`;
-        reply += `💬 *Quick Actions:*\n`;
-        reply += `- "Order {part}" → Place order\n`;
-        reply += `- "Price {part}" → Check price\n`;
-        reply += `- "Stock {part}" → Check availability`;
+        // Sort: exact matches first
+        results.sort((a, b) => {
+            const aPart = a.part.toLowerCase();
+            const bPart = b.part.toLowerCase();
+            if (aPart === partQuery && bPart !== partQuery) return -1;
+            if (bPart === partQuery && aPart !== partQuery) return 1;
+            return (b.stock || 0) - (a.stock || 0);
+        });
+    }
+    
+    // If we have results
+    if (results.length > 0) {
+        // If it's a specific command (price/stock/order), handle differently
+        if (isPriceQuery || isStockQuery || isOrderQuery) {
+            const product = results[0];
+            const prices = aiPriceWithGST(product);
+            
+            let reply = '';
+            if (isPriceQuery) {
+                reply = `💰 *Price: ${product.part}*\n\n`;
+                reply += `📝 ${product.desc || 'N/A'}\n`;
+                if (product.brand && product.brand !== 'Unknown') {
+                    reply += `🏷️ Brand: ${product.brand}\n`;
+                }
+                if (prices.listValue > 0) {
+                    reply += `💰 LIST PRICE: ₹${prices.listValue.toFixed(2)}\n`;
+                }
+                if (prices.mrp > 0) {
+                    reply += `💰 MRP PRICE: ₹${prices.mrp.toFixed(2)}\n`;
+                }
+                reply += `💳 Billing Price: ₹${prices.billingPrice.toFixed(2)}\n`;
+                reply += `🧾 GST (${prices.gstRate}%): ₹${prices.gstAmount.toFixed(2)}\n`;
+                reply += `💳 *Total: ₹${prices.priceWithGST.toFixed(2)} (incl. GST)*\n\n`;
+                reply += `🛒 Order: https://autosparessolution.com`;
+            } else if (isStockQuery) {
+                reply = `📦 *Stock: ${product.part}*\n\n`;
+                reply += `📝 ${product.desc || 'N/A'}\n`;
+                reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
+                if (product.box_qty > 0) {
+                    reply += ` | Box: ${product.box_qty}`;
+                }
+                if (product.carton > 0) {
+                    reply += ` | Carton: ${product.carton}`;
+                }
+                reply += `\n\n🛒 Order: https://autosparessolution.com`;
+            } else if (isOrderQuery) {
+                reply = `🛒 *Order: ${product.part}*\n\n`;
+                reply += `📝 ${product.desc || 'N/A'}\n`;
+                const prices2 = aiPriceWithGST(product);
+                reply += `💰 ₹${prices2.priceWithGST.toFixed(2)} (incl. GST)\n`;
+                reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}\n\n`;
+                if (product.stock > 0) {
+                    reply += `✅ *Confirm order?* Click: https://autosparessolution.com`;
+                } else {
+                    reply += `🔔 *We'll notify you when back in stock!*`;
+                }
+            }
+            return reply;
+        }
+        
+        // General search - Show all results with full details
+        let reply = `🔍 *Found ${results.length} result(s)*\n\n`;
+        
+        const display = results.slice(0, 5);
+        display.forEach((p, index) => {
+            reply += formatWhatsAppProduct(p, index);
+            reply += `\n`;
+        });
+        
+        if (results.length > 5) {
+            reply += `_+ ${results.length - 5} more results_\n\n`;
+        }
+        
+        reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+        reply += `🛒 *To order:* Send part number with quantity\n`;
+        reply += `📝 *Example:* "${results[0]?.part} 2"\n`;
+        reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+        reply += `🛒 *Order:* https://autosparessolution.com\n`;
+        reply += `📞 *Call:* 9830300193\n\n`;
+        reply += `💬 *Quick Commands:*\n`;
+        reply += `- "Price ${results[0]?.part}" → Check price\n`;
+        reply += `- "Stock ${results[0]?.part}" → Check availability`;
         
         return reply;
     } else {
-        // Check if it's a price/stock/order command
-        if (query.includes('price') || query.includes('stock') || query.includes('order')) {
-            // Extract potential part number
-            const words = query.split(' ');
-            const possiblePart = words.find(word => word.match(/^[A-Z0-9]{5,10}$/i));
-            
-            if (possiblePart) {
-                // Try to find the part
-                const partResult = aiSearch(possiblePart);
-                if (partResult.length > 0) {
-                    const p = partResult[0];
-                    const priceGST = aiPriceWithGST(p.price, p.gst || 18);
-                    
-                    let reply = '';
-                    if (query.includes('price')) {
-                        reply = `💰 *Price: ${p.part}*\n\n`;
-                        reply += `📝 ${p.desc || 'N/A'}\n`;
-                        reply += `💳 *Our Price:* ₹${p.price || 0}\n`;
-                        reply += `🧾 *GST:* ${p.gst || 18}%\n`;
-                        reply += `💰 *Total:* ₹${priceGST.toFixed(2)} (incl. GST)\n\n`;
-                        reply += `🛒 *Order:* https://autosparessolution.github.io`;
-                    } else if (query.includes('stock')) {
-                        reply = `📦 *Stock: ${p.part}*\n\n`;
-                        reply += `📝 ${p.desc || 'N/A'}\n`;
-                        reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs available` : '❌ Out of Stock'}\n\n`;
-                        reply += `🛒 *Order:* https://autosparessolution.github.io`;
-                    } else if (query.includes('order')) {
-                        reply = `🛒 *Order: ${p.part}*\n\n`;
-                        reply += `📝 ${p.desc || 'N/A'}\n`;
-                        reply += `💰 ₹${priceGST.toFixed(2)} (incl. GST)\n`;
-                        reply += `📦 ${p.stock > 0 ? `✅ ${p.stock} pcs available` : '❌ Out of Stock'}\n\n`;
-                        if (p.stock > 0) {
-                            reply += `✅ *Confirm order?* Click: https://autosparessolution.github.io`;
-                        } else {
-                            reply += `🔔 *We'll notify you when back in stock!*`;
-                        }
-                    }
-                    return reply;
-                }
-            }
-            
-            // If no part found with command
-            return `❌ *Could not find part number in your request.*
+        // No results - Try Gemini AI or fallback
+        let reply = `❌ *I couldn't find "${message}" in our inventory.*
 
-💡 *Please try:*
-"Price 0357"
-"Stock 0357"
-"Order 0357"
-
-📞 *Call:* ${WHATSAPP_CONFIG.businessPhone}`;
-        }
-        
-        // No results - use Gemini AI for intelligent reply
-        return `🔍 *I couldn't find "${message}" in our inventory.*
-
-💡 *Here's what you can try:*
-1️⃣ Send a part number like *0357*
+💡 *Try these options:*
+1️⃣ Send a part number like *0801BA0285N*
 2️⃣ Send a description like *clutch plate*
-3️⃣ Send a brand name like *TVS*
+3️⃣ Send a brand name like *M&M*
 
 📋 *Quick Commands:*
-- "Price 0357" → Check price
-- "Stock 0357" → Check availability
-- "Order 0357" → Place order
+- "Price 0801BA0285N" → Check price
+- "Stock 0801BA0285N" → Check availability
+- "0801BA0285N 2" → Add 2 to cart
 
-📞 *Call:* ${WHATSAPP_CONFIG.businessPhone}
-🛒 *Shop:* https://autosparessolution.github.io
-
-*We'll help you find the right part!* 🚗`;
+📞 *Call:* 9830300193
+🛒 *Shop:* https://autosparessolution.com`;
+        
+        return reply;
     }
-}
-
-// ===== Helper: AI Search (uses your product data) =====
-function aiSearch(query) {
-    if (!window.allProducts || window.allProducts.length === 0) {
-        return [];
-    }
-    
-    query = query.toLowerCase().trim();
-    return window.allProducts.filter(p => {
-        const part = (p.part || '').toLowerCase();
-        const desc = (p.desc || '').toLowerCase();
-        const brand = (p.brand || '').toLowerCase();
-        return part.includes(query) || desc.includes(query) || brand.includes(query);
-    }).slice(0, 5);
-}
-
-// ===== Helper: Calculate Price with GST =====
-function aiPriceWithGST(price, gst = 18) {
-    return price + (price * gst / 100);
 }
 
 // ===== Test function =====
@@ -2948,10 +2967,10 @@ async function testWhatsApp() {
     console.log('🧪 Testing WhatsApp AI...\n');
     
     const testScenarios = [
-        { message: '0357', description: 'Part search' },
-        { message: 'Price 0357', description: 'Price check' },
-        { message: 'Stock 0357', description: 'Stock check' },
-        { message: 'Order 0357', description: 'Order' },
+        { message: '0801BA0285N', description: 'Part search' },
+        { message: 'Price 0801BA0285N', description: 'Price check' },
+        { message: 'Stock 0801BA0285N', description: 'Stock check' },
+        { message: 'Order 0801BA0285N', description: 'Order' },
         { message: 'clutch plate', description: 'Description search' },
         { message: 'help', description: 'Help' }
     ];
@@ -2963,11 +2982,6 @@ async function testWhatsApp() {
         console.log(reply);
         console.log('━'.repeat(40));
     }
-    
-    // Send actual WhatsApp message (uncomment when ready)
-    // const testReply = processWhatsAppMessage('0357');
-    // await sendWhatsAppMessage('919038899962', testReply);
-    // console.log('\n📱 Test message sent to 919038899962');
 }
 
 // ===== Send a test WhatsApp message =====
@@ -2979,9 +2993,9 @@ async function sendTestWhatsApp() {
                         `🆔 Phone Number ID: ${WHATSAPP_CONFIG.phoneNumberId}\n\n` +
                         `🎉 Your AI Sales Assistant is now ready!\n\n` +
                         `💬 *Try these commands:*\n` +
-                        `📦 "Stock 0357"\n` +
-                        `💰 "Price 0357"\n` +
-                        `🛒 "Order 0357"`;
+                        `📦 "Stock 0801BA0285N"\n` +
+                        `💰 "Price 0801BA0285N"\n` +
+                        `🛒 "Order 0801BA0285N"`;
     
     await sendWhatsAppMessage('919038899962', testMessage);
 }
@@ -2991,7 +3005,7 @@ window.sendWhatsAppMessage = sendWhatsAppMessage;
 window.processWhatsAppMessage = processWhatsAppMessage;
 window.testWhatsApp = testWhatsApp;
 window.sendTestWhatsApp = sendTestWhatsApp;
-window.aiSearch = aiSearch;
+window.formatWhatsAppProduct = formatWhatsAppProduct;
 window.aiPriceWithGST = aiPriceWithGST;
 
 console.log('📱 WhatsApp AI Ready!');
@@ -3003,6 +3017,9 @@ console.log('  testWhatsApp() - Test all scenarios');
 console.log('  sendTestWhatsApp() - Send actual WhatsApp message');
 console.log('  processWhatsAppMessage("message") - Process a message');
 </script>
+<!-- ============================================ -->
+<!-- END WHATSAPP AI AUTO-REPLY SYSTEM           -->
+<!-- ============================================ -->
     <!-- ============================================ -->
 <!-- 🔒 HIDE ADMIN-ONLY MENUS                    -->
 <!-- ============================================ -->
