@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: assist-whatsapp-webhook
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        value: assist123
+      - key: BUSINESS_PHONE
+        value: 9830300193
+      - key: CHATGPT_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DB_PATH
+        value: ./db/products.db
+    disk:
+      name: assist-data
+      mountPath: /opt/render/project/src/db
+      sizeGB: 1
