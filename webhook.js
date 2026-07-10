@@ -1,5 +1,6 @@
 // ============================================================
-// 📱 SMART ORDER ENGINE V12 - PRODUCTION-READY
+// 📱 SMART ORDER ENGINE V12 - COMPLETE FIXED
+// MRP + LIST Display for All Brands
 // ============================================================
 
 const express = require("express");
@@ -144,12 +145,10 @@ const limiter = rateLimit({
 });
 app.use('/webhook', limiter);
 
-// ✅ FIX 1: Duplicate webhook protection using Map
 const processedMessageIds = new Map();
-const MESSAGE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MESSAGE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 function isMessageProcessed(messageId) {
-    // Clean expired entries
     const now = Date.now();
     for (const [id, timestamp] of processedMessageIds.entries()) {
         if (now - timestamp > MESSAGE_EXPIRY_MS) {
@@ -273,7 +272,7 @@ async function initDatabase() {
             )
         `);
 
-        // ✅ FIX 5: Better indexes for search
+        // Indexes
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
@@ -302,7 +301,6 @@ async function initDatabase() {
 // 📦 PRODUCT MANAGEMENT
 // ============================================================
 
-// ✅ FIX: CSV loading with flexible column headers
 async function loadProductsFromCSV() {
     const csvPath = path.join(__dirname, 'prices.csv');
     if (!fs.existsSync(csvPath)) {
@@ -315,7 +313,6 @@ async function loadProductsFromCSV() {
         fs.createReadStream(csvPath)
             .pipe(csv())
             .on('data', (row) => {
-                // Try multiple header variations
                 const part = row['Part No'] || row['part'] || row['PART'] || '';
                 const description = row['Description'] || row['desc'] || row['DESC'] || row['DESCRIPTION'] || 'Auto Spare Part';
                 const brand = row['Brand'] || row['brand'] || row['BRAND'] || 'Unknown';
@@ -386,18 +383,15 @@ async function loadProductsFromCSV() {
 // 🔍 FUZZY SEARCH
 // ============================================================
 
-// ✅ FIX 5: Optimized search with index prioritization
 async function searchProduct(partNumber) {
     const clean = partNumber.toUpperCase().trim();
     if (!clean || clean.length < 3) return null;
 
-    // 1. Exact match (fastest)
     let result = await pool.query('SELECT * FROM products WHERE part = $1', [clean]);
     if (result.rows.length > 0) {
         return { product: result.rows[0], confidence: 1.0, method: 'exact' };
     }
 
-    // 2. Prefix match (fast)
     const prefix = clean.substring(0, Math.min(6, clean.length));
     result = await pool.query(
         'SELECT * FROM products WHERE part LIKE $1 LIMIT 5',
@@ -413,7 +407,6 @@ async function searchProduct(partNumber) {
         }
     }
 
-    // 3. PostgreSQL trigram similarity (slower but more accurate)
     result = await pool.query(
         `SELECT *, similarity(part, $1) as sim
          FROM products
@@ -436,32 +429,10 @@ async function searchProduct(partNumber) {
     return null;
 }
 
-// ✅ FIX 6: Safer OCR normalization
-function normalizeOCRTextSafe(text) {
-    if (!text) return text;
-    let normalized = text.toUpperCase().trim();
-    
-    const safeCorrections = {
-        'O': '0', 'I': '1', 'l': '1',
-        'B': '8', 'G': '6', 'Z': '2',
-        'T': '7', 'D': '0', 'L': '1', 'Q': '0'
-    };
-    
-    for (const [from, to] of Object.entries(safeCorrections)) {
-        normalized = normalized.replace(new RegExp(`(?<=[0-9])${from}(?=[0-9])`, 'g'), to);
-        normalized = normalized.replace(new RegExp(`^${from}(?=[0-9])`, 'g'), to);
-        normalized = normalized.replace(new RegExp(`(?<=[0-9])${from}$`, 'g'), to);
-    }
-    
-    normalized = normalized.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()\s]/g, '');
-    return normalized;
-}
-
 // ============================================================
-// 🧠 AI FALLBACK WITH CIRCUIT BREAKER
+// 🧠 AI FALLBACK
 // ============================================================
 
-// ✅ FIX 9: Circuit breaker for AI
 const circuitBreakers = {
     gemini: { failures: 0, lastFailure: 0, open: false },
     chatgpt: { failures: 0, lastFailure: 0, open: false },
@@ -521,7 +492,6 @@ async function getAIResponse(message) {
 
     logger.info(`🧠 Getting AI response...`);
     
-    // Gemini
     if (CONFIG.geminiKey && !isCircuitOpen('gemini')) {
         try {
             const response = await fetchWithTimeout(
@@ -552,7 +522,6 @@ async function getAIResponse(message) {
         }
     }
     
-    // ChatGPT
     if (CONFIG.chatgptKey && !isCircuitOpen('chatgpt')) {
         try {
             const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
@@ -584,7 +553,6 @@ async function getAIResponse(message) {
         }
     }
     
-    // DeepSeek
     if (CONFIG.deepseekKey && !isCircuitOpen('deepseek')) {
         try {
             const response = await fetchWithTimeout('https://api.deepseek.com/chat/completions', {
@@ -620,65 +588,50 @@ async function getAIResponse(message) {
 }
 
 // ============================================================
-// 🔧 ULTIMATE QUANTITY PARSER - ALL REAL-WORLD FORMATS
+// 🔧 ULTIMATE QUANTITY PARSER
 // ============================================================
 
 function extractItemsFromTextUltimate(text) {
     const items = [];
-    let processed = text.replace(/\s+/g, ' ').trim();
-    
-    processed = processed
-        .replace(/[^\w\s\-\.\=\(\)\[\]\{\}\|\:\,\;\*×xX\n]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    
-    // ✅ FIX 2: Process ALL lines using split
-    const lines = processed.split(/[,;\n]/).map(l => l.trim()).filter(l => l.length > 0);
+    const lines = text.split(/[,;\n]/).map(l => l.trim()).filter(l => l.length > 0);
     
     for (const line of lines) {
-        // Pattern 1: PART-QTY (dash, equals, colon, slash, pipe)
         let match = line.match(/\b([A-Z0-9А-Я\-]{5,30})\s*[=\-:|\/]\s*(\d+)\b/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
-        // Pattern 2: QTY with @ symbol
         match = line.match(/(\d+)\s*[@Pp]\s*([A-Z0-9\-]{5,30})/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
             continue;
         }
         
-        // Pattern 3: PART-QTY with X
         match = line.match(/\b([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*[Xx]/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
-        // Pattern 4: QTY before part
         match = line.match(/(\d+)\s+([A-Z0-9А-Я\-]{5,30})\b/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
             continue;
         }
         
-        // Pattern 5: Part-QTY with NOS/PCS
         match = line.match(/\b([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*NOS/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
-        // Pattern 6: QTY with PCS before part
         match = line.match(/(\d+)\s*(?:PCS|NOS|PC|NO)\s+([A-Z0-9\-]{5,30})\b/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
             continue;
         }
         
-        // Pattern 7: Just part number
         match = line.match(/\b([A-Z0-9А-Я\-]{5,30})\b/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: 1 });
@@ -693,7 +646,6 @@ function extractItemsFromTextUltimate(text) {
 // 🖼️ OCR & ORDER EXTRACTION
 // ============================================================
 
-// ✅ FIX 6: OCR preprocessing with sharp
 async function preprocessImageForOCR(imageBuffer) {
     try {
         return await sharp(imageBuffer)
@@ -711,7 +663,6 @@ async function preprocessImageForOCR(imageBuffer) {
 async function extractOrderFromImage(imageBuffer, mimeType) {
     logger.info('🖼️ Extracting order from image...');
     
-    // ✅ FIX 8: More image types supported
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/tiff'];
     if (!allowedTypes.includes(mimeType)) {
         throw new Error('Unsupported image format. Please use JPEG, PNG, WebP, HEIC, or TIFF.');
@@ -720,10 +671,8 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
         throw new Error('Image too large. Max size: 10MB');
     }
 
-    // ✅ FIX 6: Preprocess image for better OCR
     const processedImage = await preprocessImageForOCR(imageBuffer);
 
-    // Gemini Vision
     if (CONFIG.geminiKey) {
         try {
             const base64Image = processedImage.toString('base64');
@@ -756,7 +705,6 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
         }
     }
     
-    // ChatGPT Vision
     if (CONFIG.chatgptKey) {
         try {
             const base64Image = processedImage.toString('base64');
@@ -798,7 +746,6 @@ async function extractOrderFromImage(imageBuffer, mimeType) {
         }
     }
     
-    // Tesseract fallback
     try {
         const result = await Tesseract.recognize(processedImage, 'eng', {
             logger: m => logger.debug(m.status)
@@ -909,7 +856,6 @@ async function getOrCreateCustomer(phone, name = 'Customer') {
 // 🛒 CART FUNCTIONS
 // ============================================================
 
-// ✅ FIX 4: Transaction for cart operations
 async function saveCartDB(phone, items, subtotal, grandTotal) {
     const normalizedPhone = normalizePhone(phone);
     const client = await pool.connect();
@@ -995,18 +941,25 @@ async function processOrder(text, from) {
     
     await saveCartDB(from, cartItems, subtotal, grandTotal);
     
+    // ✅ FORMAT REPLY WITH MRP + LIST
     let reply = `📋 *ORDER EXTRACTED*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
     for (const r of results) {
         const p = r.product;
-        const isMM = p.brand && p.brand.toUpperCase() === 'M&M';
         const priceGST = p.mrp * 1.18;
+        const listValue = p.list_value || 0;
+        
         reply += `*${p.part}*`;
         if (r.confidence < 0.95) reply += ` (${Math.round(r.confidence * 100)}%)`;
         if (r.original) reply += `\n   📝 OCR read: ${r.original}`;
         reply += `\n📝 ${p.description}\n🏷️ Brand: ${p.brand}\n📦 Qty: ${r.qty}`;
-        if (isMM) reply += `\n💰 MRP: ₹${p.mrp.toFixed(2)}`;
-        else reply += `\n💰 LIST: ₹${p.list_value.toFixed(2)}\n💰 MRP: ₹${p.mrp.toFixed(2)}`;
-        reply += ` (incl. GST: ₹${priceGST.toFixed(2)})\n📦 Stock: ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
+        
+        // ✅ SHOW BOTH MRP AND LIST
+        if (listValue > 0) {
+            reply += `\n💰 LIST: ₹${listValue.toFixed(2)}`;
+        }
+        reply += `\n💰 MRP: ₹${p.mrp.toFixed(2)}`;
+        reply += ` (incl. GST: ₹${priceGST.toFixed(2)})`;
+        reply += `\n📦 Stock: ${p.stock > 0 ? `✅ ${p.stock} pcs` : '❌ Out of Stock'}\n\n`;
     }
     
     reply += `━━━━━━━━━━━━━━━━━━━━\n📊 *Summary*\n`;
@@ -1028,7 +981,6 @@ async function processOrder(text, from) {
 // 📦 ORDER CONFIRMATION
 // ============================================================
 
-// ✅ FIX 3: Atomic stock update with RETURNING
 async function confirmOrder(phone) {
     const normalizedPhone = normalizePhone(phone);
     const cart = await getCartDB(normalizedPhone);
@@ -1060,7 +1012,6 @@ async function confirmOrder(phone) {
             };
         }
         
-        // ✅ FIX 3: Atomic stock update
         for (const item of cart.items) {
             const result = await client.query(
                 `UPDATE products 
@@ -1327,7 +1278,7 @@ async function sendWhatsAppPDF(to, filepath, caption) {
 }
 
 // ============================================================
-// 💳 RAZORPAY WEBHOOK - IDEMPOTENT
+// 💳 RAZORPAY WEBHOOK
 // ============================================================
 
 app.post('/razorpay/webhook', async (req, res) => {
@@ -1456,21 +1407,18 @@ app.post("/webhook", async (req, res) => {
         return res.status(403).send('Invalid signature');
     }
     
-    // ✅ FIX 10: Immediate response, process asynchronously
     const message = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
     if (message) {
         const from = message.from;
         const type = message.type || 'text';
         const messageId = message.id;
         
-        // Check duplicate
         if (isMessageProcessed(messageId)) {
             logger.info(`⏩ Duplicate message ${messageId} ignored`);
             res.sendStatus(200);
             return;
         }
         
-        // Process asynchronously
         setImmediate(async () => {
             try {
                 await handleMessage(message, from, type);
