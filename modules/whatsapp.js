@@ -1,5 +1,5 @@
 // ============================================================
-// 📤 WHATSAPP MODULE - FIXED WITH QUOTE HANDLING
+// 📤 WHATSAPP MODULE - FIXED STOCK & PRICE CHECK
 // ============================================================
 
 const fetch = require('node-fetch');
@@ -70,7 +70,7 @@ function cleanText(text) {
 }
 
 // ============================================================
-// 🔍 EXTRACT PART NUMBER - With quote handling
+// 🔍 EXTRACT PART NUMBER - IMPROVED
 // ============================================================
 
 function extractPartNumber(text) {
@@ -79,10 +79,33 @@ function extractPartNumber(text) {
     // Clean the text first
     const clean = cleanText(text);
     
-    // Try multiple patterns
+    // ============================================================
+    // IMPORTANT: Check for part number in the text
+    // Look for patterns like "Stock 0303BC0071N" → extract 0303BC0071N
+    // ============================================================
     
-    // Pattern 1: Part number with quotes removed
-    let match = clean.match(/\b([A-Z0-9]{5,20})\b/i);
+    // Pattern: Part number with hyphen (A15979020-0200)
+    let match = clean.match(/\b([A-Z0-9]{3,15}[-][A-Z0-9]{1,10})\b/i);
+    if (match) {
+        return match[1].toUpperCase();
+    }
+    
+    // Pattern: Part number with dot
+    match = clean.match(/\b([A-Z0-9]{3,15}\.[A-Z0-9]{1,10})\b/i);
+    if (match) {
+        return match[1].toUpperCase();
+    }
+    
+    // Pattern: Part number with slash
+    match = clean.match(/\b([A-Z0-9]{3,15}\/[A-Z0-9]{1,10})\b/i);
+    if (match) {
+        return match[1].toUpperCase();
+    }
+    
+    // ============================================================
+    // Pattern: Standard part number (5-20 characters, alphanumeric)
+    // ============================================================
+    match = clean.match(/\b([A-Z0-9]{5,20})\b/i);
     if (match) {
         const part = match[1].toUpperCase();
         // If it's all numbers and length is 1-4, it might be a quantity
@@ -92,20 +115,16 @@ function extractPartNumber(text) {
         return part;
     }
     
-    // Pattern 2: Part number with hyphen (A15979020-0200)
-    match = clean.match(/\b([A-Z0-9]{3,15}[-][A-Z0-9]{1,10})\b/i);
+    // Pattern: Part number with "N" suffix (common in your data)
+    match = clean.match(/\b([A-Z0-9]{4,15}N)\b/i);
     if (match) {
         return match[1].toUpperCase();
     }
     
-    // Pattern 3: Part number with dot
-    match = clean.match(/\b([A-Z0-9]{3,15}\.[A-Z0-9]{1,10})\b/i);
-    if (match) {
-        return match[1].toUpperCase();
-    }
-    
-    // Pattern 4: Part number with slash
-    match = clean.match(/\b([A-Z0-9]{3,15}\/[A-Z0-9]{1,10})\b/i);
+    // ============================================================
+    // Pattern: Part number with prefix (like "0303BC" then numbers)
+    // ============================================================
+    match = clean.match(/\b([A-Z0-9]{4,8}[A-Z][0-9]{2,8}[A-Z0-9]*)\b/i);
     if (match) {
         return match[1].toUpperCase();
     }
@@ -114,7 +133,7 @@ function extractPartNumber(text) {
 }
 
 // ============================================================
-// 🔍 EXTRACT QUANTITY - With quote handling
+// 🔍 EXTRACT QUANTITY
 // ============================================================
 
 function extractQuantity(text) {
@@ -156,7 +175,7 @@ function extractQuantity(text) {
 }
 
 // ============================================================
-// 🔍 PARSE ORDER - With quote handling
+// 📋 PARSE ORDER - With quote handling
 // ============================================================
 
 function parseOrder(text) {
@@ -310,7 +329,7 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📩 HANDLE WHATSAPP MESSAGE - FIXED WITH QUOTE HANDLING
+// 📩 HANDLE WHATSAPP MESSAGE - FIXED STOCK & PRICE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from, type) {
@@ -348,7 +367,7 @@ async function handleWhatsAppMessage(message, from, type) {
                     `💰 *Check Price:*\n` +
                     `"Price 0801BA0285N"\n\n` +
                     `📦 *Check Stock:*\n` +
-                    `"Stock 0801BA0285N"\n\n` +
+                    `"Stock 0303BC0071N"\n\n` +
                     `🛒 *Place Order:*\n` +
                     `"Order 0801BA0285N 2"\n\n` +
                     `📞 *Call:* ${CONFIG.businessPhone}\n` +
@@ -360,12 +379,14 @@ async function handleWhatsAppMessage(message, from, type) {
             }
             
             // ============================================================
-            // PRICE CHECK
+            // PRICE CHECK - FIXED: Extract EXACT part number from query
             // ============================================================
             if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
+                // ✅ Extract the exact part number from the query
                 const partNumber = extractPartNumber(cleaned);
+                console.log(`🔍 Price check for: ${partNumber}`);
+                
                 if (partNumber) {
-                    console.log(`🔍 Price check for: ${partNumber}`);
                     const product = await db.getProduct(partNumber);
                     if (product) {
                         const billingPrice = product.billing_price || product.list_price || 0;
@@ -387,17 +408,22 @@ async function handleWhatsAppMessage(message, from, type) {
                         
                         await sendWhatsAppMessage(from, reply);
                         return;
+                    } else {
+                        await sendWhatsAppMessage(from, `❌ Product "${partNumber}" not found. Please check the part number.`);
+                        return;
                     }
                 }
             }
             
             // ============================================================
-            // STOCK CHECK
+            // STOCK CHECK - FIXED: Extract EXACT part number from query
             // ============================================================
             if (msgLower.includes('stock') || msgLower.includes('available')) {
+                // ✅ Extract the exact part number from the query
                 const partNumber = extractPartNumber(cleaned);
+                console.log(`🔍 Stock check for: ${partNumber}`);
+                
                 if (partNumber) {
-                    console.log(`🔍 Stock check for: ${partNumber}`);
                     const product = await db.getProduct(partNumber);
                     if (product) {
                         let reply = `📦 *Stock: ${product.part}*\n\n`;
@@ -405,7 +431,11 @@ async function handleWhatsAppMessage(message, from, type) {
                         reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
                         if (product.box_qty > 0) reply += ` | Box: ${product.box_qty}`;
                         if (product.carton > 0) reply += ` | Carton: ${product.carton}`;
+                        if (product.most_selling) reply += `\n⭐ Best Seller`;
                         await sendWhatsAppMessage(from, reply);
+                        return;
+                    } else {
+                        await sendWhatsAppMessage(from, `❌ Product "${partNumber}" not found. Please check the part number.`);
                         return;
                     }
                 }
