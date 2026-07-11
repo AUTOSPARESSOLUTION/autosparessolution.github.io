@@ -1,7 +1,6 @@
 // ============================================================
-// 📤 WHATSAPP MODULE - COMPLETE FIXED WITH ORDER PARSER
-// Uses: ID, TOKEN, PHONE from Render environment
-// Supports ALL order formats
+// 📤 WHATSAPP MODULE - COMPLETE FIXED
+// Supports multi-line orders, multiple products
 // ============================================================
 
 const fetch = require('node-fetch');
@@ -13,9 +12,9 @@ const { parseOrder } = require('./order-parser');
 // ============================================================
 
 const CONFIG = {
-    phoneNumberId: process.env.ID,        // Your Render variable: ID
-    accessToken: process.env.TOKEN,       // Your Render variable: TOKEN
-    businessPhone: process.env.PHONE || '9830300193',  // Your Render variable: PHONE
+    phoneNumberId: process.env.ID,
+    accessToken: process.env.TOKEN,
+    businessPhone: process.env.PHONE || '9830300193',
 };
 
 // ============================================================
@@ -28,8 +27,6 @@ async function sendWhatsAppMessage(to, message) {
         const url = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
         
         console.log(`📤 Sending to: ${normalizedPhone}`);
-        console.log(`📤 Phone ID: ${CONFIG.phoneNumberId}`);
-        console.log(`📤 Token: ${CONFIG.accessToken ? '✅ Present' : '❌ Missing'}`);
         
         const response = await fetch(url, {
             method: 'POST',
@@ -66,67 +63,48 @@ async function sendWhatsAppMessage(to, message) {
 
 function formatProductForWhatsApp(product, index = 0) {
     const billingPrice = product.billing_price || product.list_price || 0;
-    const priceWithGST = billingPrice * 1.18;
-    const gstAmount = billingPrice * 0.18;
+    const gstRate = product.gst || 18;
+    const gstAmount = billingPrice * (gstRate / 100);
+    const priceWithGST = billingPrice + gstAmount;
     
     let reply = `${index + 1}. *${product.part}*\n`;
     reply += `📝 ${product.description || 'N/A'}\n`;
     
     if (product.brand && product.brand !== 'Unknown') {
         reply += `🏷️ Brand: ${product.brand}`;
-        if (product.make && product.make !== 'Unknown' && product.make !== product.brand) {
-            reply += ` | Make: ${product.make}`;
+        if (product.model) {
+            reply += `\n🚗 Model: ${product.model}`;
         }
         reply += `\n`;
+    } else if (product.model) {
+        reply += `🚗 Model: ${product.model}\n`;
     }
     
-    if (product.type) {
-        reply += `📊 Type: ${product.type}`;
-        if (product.finish) {
-            reply += ` | Finish: ${product.finish}`;
-        }
-        reply += `\n`;
-    }
-    
-    if (product.model) {
-        reply += `🚗 Model: ${product.model}`;
-        if (product.segment) {
-            reply += ` | Segment: ${product.segment}`;
-        }
-        reply += `\n`;
-    }
-    
-    // ✅ FULL PRICE BREAKDOWN
     if (product.list_price > 0) {
         reply += `💰 LIST PRICE: ₹${product.list_price.toFixed(2)}\n`;
     }
-    if (product.mrp > 0) {
+    if (product.mrp > 0 && product.mrp !== product.list_price) {
+        reply += `💰 MRP PRICE: ₹${product.mrp.toFixed(2)}\n`;
+    } else if (product.mrp > 0) {
         reply += `💰 MRP PRICE: ₹${product.mrp.toFixed(2)}\n`;
     }
     if (billingPrice > 0) {
         reply += `💳 Billing Price: ₹${billingPrice.toFixed(2)}\n`;
-        reply += `🧾 GST (18%): ₹${gstAmount.toFixed(2)}\n`;
+        reply += `🧾 GST (${gstRate}%): ₹${gstAmount.toFixed(2)}\n`;
         reply += `💳 Price incl. GST: ₹${priceWithGST.toFixed(2)}\n`;
     }
     
-    // Stock & Packaging
-    let stockInfo = [];
     if (product.stock > 0) {
-        stockInfo.push(`✅ ${product.stock} pcs`);
-        if (product.most_selling) {
-            stockInfo.push(`⭐ Best Seller`);
+        reply += `📦 ✅ ${product.stock} pcs`;
+        if (product.box_qty > 0) {
+            reply += ` | Box: ${product.box_qty}`;
         }
+        if (product.carton > 0) {
+            reply += ` | Carton: ${product.carton}`;
+        }
+        reply += `\n`;
     } else {
-        stockInfo.push(`❌ Out of Stock`);
-    }
-    if (product.box_qty > 0) {
-        stockInfo.push(`Box: ${product.box_qty}`);
-    }
-    if (product.carton > 0) {
-        stockInfo.push(`Carton: ${product.carton}`);
-    }
-    if (stockInfo.length > 0) {
-        reply += `📦 ${stockInfo.join(' | ')}\n`;
+        reply += `📦 ❌ Out of Stock\n`;
     }
     
     if (product.hsn) {
@@ -137,39 +115,21 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📩 HANDLE WHATSAPP MESSAGE - COMPLETE FIXED
+// 📩 HANDLE WHATSAPP MESSAGE - FIXED FOR MULTI-LINE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from, type) {
     try {
-        // ✅ DEBUG: Log the raw message
-        console.log("==================================");
-        console.log("📩 RAW MESSAGE:", JSON.stringify(message, null, 2));
-        console.log("==================================");
-        
         if (type === 'text') {
             const text = message.text?.body || '';
             
-            // ✅ DEBUG: Log everything
             console.log("==================================");
             console.log("FROM :", from);
-            console.log("TEXT :", JSON.stringify(text));
-            console.log("TYPE :", type);
+            console.log("TEXT :", text);
             console.log("==================================");
             
-            // ✅ DEBUG: Check database stats
             const stats = await db.getStats();
             console.log(`📊 Database has ${stats.total_products || 0} products`);
-            
-            // ✅ DEBUG: Search immediately
-            console.log(`🔍 Searching for: "${text}"`);
-            const results = await db.searchProducts(text, 5);
-            console.log(`📊 Found ${results.length} results`);
-            
-            if (results.length > 0) {
-                console.log("📦 First result:", JSON.stringify(results[0], null, 2));
-            }
-            console.log("==================================");
             
             const msgLower = text.toLowerCase().trim();
             
@@ -181,17 +141,17 @@ async function handleWhatsAppMessage(message, from, type) {
                     `👋 *Welcome to Auto Spares Solution!*\n\n` +
                     `🤖 I'm your AI Sales Assistant\n\n` +
                     `🔍 *Search Parts:*\n` +
-                    `Send part number like "0801BA0285N"\n` +
-                    `Send description like "clutch plate"\n` +
+                    `Send part number like "0603BAA0005KT"\n` +
+                    `Send description like "brake pad"\n` +
                     `Send brand like "M&M"\n\n` +
+                    `📦 *Multiple Products:*\n` +
+                    `"0802CAA08871N 2\n0801BA0285N 2"\n\n` +
                     `💰 *Check Price:*\n` +
-                    `"Price 0801BA0285N"\n\n` +
+                    `"Price 0603BAA0005KT"\n\n` +
                     `📦 *Check Stock:*\n` +
-                    `"Stock 0801BA0285N"\n\n` +
+                    `"Stock 0603BAA0005KT"\n\n` +
                     `🛒 *Place Order:*\n` +
-                    `"Order 0801BA0285N 2"\n` +
-                    `"0801BA0285N 2, 0303BC0071N 3"\n` +
-                    `"I need 2 0801BA0285N"\n\n` +
+                    `"Order 0603BAA0005KT 2"\n\n` +
                     `📞 *Call:* ${CONFIG.businessPhone}\n` +
                     `🛒 *Shop:* https://autosparessolution.com\n\n` +
                     `*How can I help you today?* 🚗`;
@@ -204,16 +164,16 @@ async function handleWhatsAppMessage(message, from, type) {
             // PRICE CHECK
             // ============================================================
             if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
-                const partMatch = text.toUpperCase().match(/[A-Z0-9]{8,20}/);
+                const partMatch = text.toUpperCase().match(/[A-Z0-9]{3,20}/);
                 if (partMatch) {
                     const partNumber = partMatch[0];
-                    console.log(`🔍 Looking up price for: ${partNumber}`);
+                    console.log(`🔍 Price check for: ${partNumber}`);
                     const product = await db.getProduct(partNumber);
                     if (product) {
-                        console.log(`✅ Found product: ${product.part}`);
                         const billingPrice = product.billing_price || product.list_price || 0;
-                        const priceWithGST = billingPrice * 1.18;
-                        const gstAmount = billingPrice * 0.18;
+                        const gstRate = product.gst || 18;
+                        const gstAmount = billingPrice * (gstRate / 100);
+                        const priceWithGST = billingPrice + gstAmount;
                         
                         let reply = `💰 *Price: ${product.part}*\n\n`;
                         reply += `📝 ${product.description}\n`;
@@ -221,17 +181,11 @@ async function handleWhatsAppMessage(message, from, type) {
                         if (product.list_price > 0) reply += `💰 LIST PRICE: ₹${product.list_price.toFixed(2)}\n`;
                         if (product.mrp > 0) reply += `💰 MRP PRICE: ₹${product.mrp.toFixed(2)}\n`;
                         reply += `💳 Billing Price: ₹${billingPrice.toFixed(2)}\n`;
-                        reply += `🧾 GST (18%): ₹${gstAmount.toFixed(2)}\n`;
+                        reply += `🧾 GST (${gstRate}%): ₹${gstAmount.toFixed(2)}\n`;
                         reply += `💳 *Total: ₹${priceWithGST.toFixed(2)} (incl. GST)*\n\n`;
                         reply += `📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
-                        if (product.box_qty > 0) reply += ` | Box: ${product.box_qty}`;
-                        if (product.carton > 0) reply += ` | Carton: ${product.carton}`;
                         
                         await sendWhatsAppMessage(from, reply);
-                        return;
-                    } else {
-                        console.log(`❌ No product found for: ${partNumber}`);
-                        await sendWhatsAppMessage(from, `❌ Product "${partNumber}" not found. Please check the part number.`);
                         return;
                     }
                 }
@@ -241,58 +195,55 @@ async function handleWhatsAppMessage(message, from, type) {
             // STOCK CHECK
             // ============================================================
             if (msgLower.includes('stock') || msgLower.includes('available')) {
-                const partMatch = text.toUpperCase().match(/[A-Z0-9]{8,20}/);
+                const partMatch = text.toUpperCase().match(/[A-Z0-9]{3,20}/);
                 if (partMatch) {
                     const partNumber = partMatch[0];
-                    console.log(`🔍 Looking up stock for: ${partNumber}`);
+                    console.log(`🔍 Stock check for: ${partNumber}`);
                     const product = await db.getProduct(partNumber);
                     if (product) {
-                        console.log(`✅ Found product: ${product.part}`);
                         let reply = `📦 *Stock: ${product.part}*\n\n`;
                         reply += `📝 ${product.description}\n`;
                         reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
-                        if (product.box_qty > 0) reply += ` | Box: ${product.box_qty}`;
-                        if (product.carton > 0) reply += ` | Carton: ${product.carton}`;
-                        if (product.most_selling) reply += `\n⭐ Best Seller`;
                         await sendWhatsAppMessage(from, reply);
-                        return;
-                    } else {
-                        console.log(`❌ No product found for: ${partNumber}`);
-                        await sendWhatsAppMessage(from, `❌ Product "${partNumber}" not found. Please check the part number.`);
                         return;
                     }
                 }
             }
             
             // ============================================================
-            // 🛒 ORDER - Using the Advanced Parser
+            // ✅ FIX: CHECK FOR MULTI-LINE OR MULTIPLE PRODUCTS FIRST
             // ============================================================
-            // Check if it's an order (contains part numbers)
-            const partNumbers = text.match(/[A-Z0-9]{8,20}/g);
             
-            if (partNumbers && partNumbers.length > 0) {
-                console.log(`🛒 Detected order with ${partNumbers.length} part numbers`);
+            // Check if text contains multiple lines or multiple part numbers
+            const lines = text.split('\n').filter(line => line.trim().length > 0);
+            const hasMultipleLines = lines.length > 1;
+            
+            // Extract all potential part numbers
+            const potentialParts = text.match(/[A-Z0-9]{3,20}/g);
+            const hasMultipleParts = potentialParts && potentialParts.length > 1;
+            
+            // If multiple lines OR multiple part numbers, treat as order
+            if (hasMultipleLines || hasMultipleParts) {
+                console.log(`🛒 Detected multiple products: ${potentialParts?.length || 0} parts, ${lines.length} lines`);
                 
-                // Parse the order using the advanced parser
+                // Parse the order
                 const { items, unparsed } = parseOrder(text);
                 console.log(`📦 Parsed ${items.length} items from order`);
                 
                 if (items.length > 0) {
-                    console.log(`🛒 Processing ${items.length} items`);
-                    
-                    // Process each item
                     let cartItems = [];
                     let total = 0;
-                    let outOfStock = [];
-                    let partialStock = [];
                     let notFound = [];
+                    let outOfStock = [];
                     
                     for (const item of items) {
                         const product = await db.getProduct(item.part);
                         if (product) {
-                            console.log(`✅ Found product: ${product.part}`);
+                            console.log(`✅ Found: ${product.part}`);
                             const billingPrice = product.billing_price || product.list_price || 0;
-                            const priceWithGST = billingPrice * 1.18;
+                            const gstRate = product.gst || 18;
+                            const gstAmount = billingPrice * (gstRate / 100);
+                            const priceWithGST = billingPrice + gstAmount;
                             const itemTotal = priceWithGST * item.qty;
                             
                             cartItems.push({
@@ -309,24 +260,25 @@ async function handleWhatsAppMessage(message, from, type) {
                             
                             if (product.stock === 0) {
                                 outOfStock.push(product.part);
-                            } else if (product.stock < item.qty) {
-                                partialStock.push({ part: product.part, available: product.stock, requested: item.qty });
                             }
                         } else {
-                            console.log(`❌ Product not found: ${item.part}`);
+                            console.log(`❌ Not found: ${item.part}`);
                             notFound.push(item.part);
                         }
                     }
                     
-                    // Check if any products were not found
                     if (notFound.length > 0) {
-                        await sendWhatsAppMessage(from, `❌ Products not found: ${notFound.join(', ')}\n\n💡 Please check the part numbers and try again.`);
+                        await sendWhatsAppMessage(from, 
+                            `❌ Products not found: ${notFound.join(', ')}\n\n` +
+                            `💡 Please check the part numbers and try again.`
+                        );
                         return;
                     }
                     
-                    // Check if cart has items
                     if (cartItems.length === 0) {
-                        await sendWhatsAppMessage(from, '❌ No valid products found in your order. Please check the part numbers.');
+                        await sendWhatsAppMessage(from, 
+                            `❌ No valid products found in your order. Please check the part numbers.`
+                        );
                         return;
                     }
                     
@@ -337,27 +289,14 @@ async function handleWhatsAppMessage(message, from, type) {
                     // Build response
                     let reply = `🛒 *ORDER SUMMARY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
                     
-                    cartItems.forEach((item, index) => {
+                    for (const item of cartItems) {
                         const itemTotal = item.price * item.qty;
-                        reply += `${index + 1}. *${item.part}* x${item.qty}\n`;
+                        reply += `*${item.part}* x${item.qty}\n`;
                         reply += `📝 ${item.description}\n`;
-                        if (item.list_price > 0) reply += `💰 LIST PRICE: ₹${item.list_price.toFixed(2)}\n`;
-                        if (item.mrp > 0) reply += `💰 MRP PRICE: ₹${item.mrp.toFixed(2)}\n`;
-                        reply += `💳 ₹${item.price.toFixed(2)} × ${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
-                        
-                        // Find stock for this item
-                        const product = await db.getProduct(item.part);
-                        if (product) {
-                            if (product.stock > 0 && product.stock >= item.qty) {
-                                reply += `📦 ✅ ${product.stock} pcs available\n`;
-                            } else if (product.stock > 0 && product.stock < item.qty) {
-                                reply += `📦 ⚠️ Only ${product.stock} pcs available\n`;
-                            } else {
-                                reply += `📦 ❌ OUT OF STOCK\n`;
-                            }
-                        }
-                        reply += `\n`;
-                    });
+                        if (item.list_price > 0) reply += `💰 LIST: ₹${item.list_price.toFixed(2)}\n`;
+                        if (item.mrp > 0) reply += `💰 MRP: ₹${item.mrp.toFixed(2)}\n`;
+                        reply += `💳 ₹${item.price.toFixed(2)} × ${item.qty} = ₹${itemTotal.toFixed(2)}\n\n`;
+                    }
                     
                     reply += `━━━━━━━━━━━━━━━━━━━━\n`;
                     reply += `💰 *Total: ₹${total.toFixed(2)}* (incl. GST)\n`;
@@ -366,13 +305,6 @@ async function handleWhatsAppMessage(message, from, type) {
                     if (outOfStock.length > 0) {
                         reply += `⚠️ Out of Stock: ${outOfStock.join(', ')}\n`;
                         reply += `🔔 We'll notify you when available.\n\n`;
-                    }
-                    
-                    if (partialStock.length > 0) {
-                        for (const p of partialStock) {
-                            reply += `⚠️ ${p.part}: Only ${p.available} available (requested ${p.requested})\n`;
-                        }
-                        reply += `\n`;
                     }
                     
                     reply += `✅ *Confirm order?* Reply "Confirm Order"\n`;
@@ -385,46 +317,14 @@ async function handleWhatsAppMessage(message, from, type) {
             }
             
             // ============================================================
-            // CONFIRM ORDER
+            // SINGLE PRODUCT SEARCH (if not multi-line)
             // ============================================================
-            if (msgLower === 'confirm order' || msgLower === 'confirm') {
-                console.log(`📋 Confirming order for ${from}`);
-                const cart = await db.getCart(from);
-                if (cart && cart.items) {
-                    const items = JSON.parse(cart.items);
-                    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
-                    await db.saveOrder(orderId, from, items, cart.total);
-                    await db.clearCart(from);
-                    
-                    let reply = `✅ *ORDER CONFIRMED!*\n\n`;
-                    reply += `📦 Order ID: ${orderId}\n`;
-                    reply += `📝 Items:\n`;
-                    items.forEach((item, index) => {
-                        reply += `   ${index + 1}. ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
-                    });
-                    reply += `💰 Total: ₹${cart.total.toFixed(2)}\n`;
-                    reply += `📞 *Call:* ${CONFIG.businessPhone}\n`;
-                    reply += `🛒 *Shop:* https://autosparessolution.com`;
-                    await sendWhatsAppMessage(from, reply);
-                    return;
-                } else {
-                    await sendWhatsAppMessage(from, '🛒 Your cart is empty. Add items first!');
-                    return;
-                }
-            }
             
-            // ============================================================
-            // CLEAR CART
-            // ============================================================
-            if (msgLower === 'clear cart' || msgLower === 'clear') {
-                await db.clearCart(from);
-                await sendWhatsAppMessage(from, '🗑️ Cart cleared!');
-                return;
-            }
+            // Search for single product
+            console.log(`🔍 Searching for: "${text}"`);
+            const results = await db.searchProducts(text, 5);
+            console.log(`📊 Found ${results.length} results`);
             
-            // ============================================================
-            // SEARCH PRODUCTS - Already searched above, use results
-            // ============================================================
             if (results.length > 0) {
                 let reply = `🔍 Found ${results.length} result(s)\n\n`;
                 
@@ -451,43 +351,6 @@ async function handleWhatsAppMessage(message, from, type) {
                 );
             }
         }
-        
-        // ============================================================
-        // IMAGE HANDLING
-        // ============================================================
-        if (type === 'image') {
-            await sendWhatsAppMessage(from, 
-                `📸 *Photo Received!*\n\n` +
-                `💡 Please send the part number directly.\n` +
-                `📝 Example: "0801BA0285N 2"\n\n` +
-                `💡 Or send "Help" for options\n\n` +
-                `📞 Call: ${CONFIG.businessPhone}`
-            );
-            return;
-        }
-        
-        // ============================================================
-        // AUDIO HANDLING
-        // ============================================================
-        if (type === 'audio') {
-            await sendWhatsAppMessage(from, 
-                `🎤 *Voice Received!*\n\n` +
-                `💡 Please send text or images.\n\n` +
-                `💡 Or send "Help" for options\n\n` +
-                `📞 Call: ${CONFIG.businessPhone}`
-            );
-            return;
-        }
-        
-        // ============================================================
-        // OTHER TYPES
-        // ============================================================
-        await sendWhatsAppMessage(from, 
-            `📩 Received your ${type} message.\n\n` +
-            `💡 Please send text with part numbers.\n` +
-            `💡 Or send "Help" for options\n\n` +
-            `📞 Call: ${CONFIG.businessPhone}`
-        );
         
     } catch (error) {
         console.error(`❌ Message handler error: ${error.message}`);
