@@ -1179,208 +1179,39 @@
         align-items: center;
         border-bottom: 2px solid #f1c40f;
     }
-    #aiChatHeader .ai-brand {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    #aiChatHeader .ai-brand i {
-        color: #f1c40f;
-        font-size: 1.3rem;
-    }
-    #aiChatHeader .ai-status {
-        font-size: 0.7rem;
-        color: #4ade80;
-        font-weight: 400;
-    }
-    #aiCloseChat {
-        background: none;
-        border: none;
-        color: #aaa;
-        font-size: 22px;
-        cursor: pointer;
-        padding: 0 6px;
-        transition: 0.2s;
-    }
-    #aiCloseChat:hover {
-        color: white;
-        transform: rotate(90deg);
-    }
-    #aiChatMessages {
-        padding: 14px;
-        overflow-y: auto;
-        max-height: 380px;
-        background: #16213e;
-        min-height: 200px;
-        flex: 1;
-    }
-    #aiChatMessages::-webkit-scrollbar {
-        width: 5px;
-    }
-    #aiChatMessages::-webkit-scrollbar-track {
-        background: #1a1a2e;
-    }
-    #aiChatMessages::-webkit-scrollbar-thumb {
-        background: #f1c40f;
-        border-radius: 10px;
-    }
-    .ai-msg {
-        margin-bottom: 12px;
-        padding: 10px 14px;
-        border-radius: 12px;
-        max-width: 88%;
-        word-wrap: break-word;
-        font-size: 0.95rem;
-        line-height: 1.5;
-        animation: fadeInUp 0.3s ease;
-    }
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    .ai-user-msg {
-        background: #0a7c71;
-        color: white;
-        margin-left: auto;
-        border-bottom-right-radius: 4px;
-    }
-    .ai-bot-msg {
-        background: #1e2a4a;
-        color: #e0e0e0;
-        border-bottom-left-radius: 4px;
-        border-left: 3px solid #f1c40f;
-    }
-    .ai-bot-msg .product-card-ai {
-        background: #0f1a30;
-        border-radius: 8px;
-        padding: 10px;
-        margin: 8px 0;
-        border: 1px solid #2a3a5a;
-    }
-    .ai-bot-msg .product-card-ai .p-price {
-        color: #f1c40f;
-        font-weight: bold;
-        font-size: 1.1rem;
-    }
-    .ai-bot-msg .product-card-ai .p-stock {
-        color: #4ade80;
-        font-size: 0.85rem;
-    }
-    .ai-bot-msg .product-card-ai .p-part {
-        color: #60a5fa;
-        font-weight: 600;
-    }
-    .ai-bot-msg .btn-ai-cart {
-        background: #0a7c71;
-        color: white;
-        border: none;
-        padding: 4px 14px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.8rem;
-        font-weight: 600;
-        transition: 0.2s;
-        margin-top: 4px;
-    }
-    .ai-bot-msg .btn-ai-cart:hover {
-        background: #09645a;
-        transform: scale(1.02);
-    }
-    .ai-quick-reply {
-        display: inline-block;
-        background: rgba(241, 194, 15, 0.15);
-        color: #f1c40f;
-        padding: 5px 14px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        cursor: pointer;
-        margin: 3px 4px 3px 0;
-        border: 1px solid rgba(241, 194, 15, 0.3);
-        transition: 0.2s;
-    }
-    .ai-quick-reply:hover {
-        background: rgba(241, 194, 15, 0.25);
-        transform: scale(1.02);
-    }
-    #aiChatInput {
-        display: flex;
-        border-top: 1px solid #2a3a5a;
-        padding: 10px 12px;
-        background: #0f1a30;
-        gap: 8px;
-    }
-    #aiChatInput input {
-        flex: 1;
-        border: none;
-        padding: 10px 14px;
-        outline: none;
-        border-radius: 25px;
-        font-size: 0.95rem;
-        background: #1e2a4a;
-        color: white;
-        border: 1px solid #2a3a5a;
-    }
-    #aiChatInput input::placeholder {
-        color: #8899bb;
-    }
-    #aiChatInput input:focus {
-        border-color: #f1c40f;
-    }
-    #aiChatInput button {
-        background: linear-gradient(135deg, #f1c40f, #f39c12);
-        color: #0f2027;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 25px;
-        cursor: pointer;
-        font-weight: 700;
-        transition: 0.2s;
-    }
-    #aiChatInput button:hover {
-        transform: scale(1.03);
-        box-shadow: 0 2px 12px rgba(241, 194, 15, 0.3);
-    }
-    .ai-typing {
-        display: none;
-        padding: 8px 14px;
-        background: #1e2a4a;
-        border-radius: 12px;
-        border-bottom-left-radius: 4px;
-        max-width: 50px;
-        margin-bottom: 10px;
-    }
-    .ai-typing span {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #8899bb;
-        margin: 0 2px;
-        animation: aiTyping 1.4s infinite both;
-    }
+    #aiChatHeader .ai-brand { display: flex; align-items: center; gap: 10px; }
+    #aiChatHeader .ai-brand i { color: #f1c40f; font-size: 1.3rem; }
+    #aiChatHeader .ai-status { font-size: 0.7rem; color: #4ade80; font-weight: 400; }
+    #aiCloseChat { background: none; border: none; color: #aaa; font-size: 22px; cursor: pointer; padding: 0 6px; transition: 0.2s; }
+    #aiCloseChat:hover { color: white; transform: rotate(90deg); }
+    #aiChatMessages { padding: 14px; overflow-y: auto; max-height: 380px; background: #16213e; min-height: 200px; flex: 1; }
+    #aiChatMessages::-webkit-scrollbar { width: 5px; }
+    #aiChatMessages::-webkit-scrollbar-track { background: #1a1a2e; }
+    #aiChatMessages::-webkit-scrollbar-thumb { background: #f1c40f; border-radius: 10px; }
+    .ai-msg { margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; max-width: 88%; word-wrap: break-word; font-size: 0.95rem; line-height: 1.5; animation: fadeInUp 0.3s ease; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .ai-user-msg { background: #0a7c71; color: white; margin-left: auto; border-bottom-right-radius: 4px; }
+    .ai-bot-msg { background: #1e2a4a; color: #e0e0e0; border-bottom-left-radius: 4px; border-left: 3px solid #f1c40f; }
+    .ai-bot-msg .product-card-ai { background: #0f1a30; border-radius: 8px; padding: 10px; margin: 8px 0; border: 1px solid #2a3a5a; }
+    .ai-bot-msg .product-card-ai .p-price { color: #f1c40f; font-weight: bold; font-size: 1.1rem; }
+    .ai-bot-msg .product-card-ai .p-stock { color: #4ade80; font-size: 0.85rem; }
+    .ai-bot-msg .product-card-ai .p-part { color: #60a5fa; font-weight: 600; }
+    .ai-bot-msg .btn-ai-cart { background: #0a7c71; color: white; border: none; padding: 4px 14px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: 0.2s; margin-top: 4px; }
+    .ai-bot-msg .btn-ai-cart:hover { background: #09645a; transform: scale(1.02); }
+    .ai-quick-reply { display: inline-block; background: rgba(241, 194, 15, 0.15); color: #f1c40f; padding: 5px 14px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; margin: 3px 4px 3px 0; border: 1px solid rgba(241, 194, 15, 0.3); transition: 0.2s; }
+    .ai-quick-reply:hover { background: rgba(241, 194, 15, 0.25); transform: scale(1.02); }
+    #aiChatInput { display: flex; border-top: 1px solid #2a3a5a; padding: 10px 12px; background: #0f1a30; gap: 8px; }
+    #aiChatInput input { flex: 1; border: none; padding: 10px 14px; outline: none; border-radius: 25px; font-size: 0.95rem; background: #1e2a4a; color: white; border: 1px solid #2a3a5a; }
+    #aiChatInput input::placeholder { color: #8899bb; }
+    #aiChatInput input:focus { border-color: #f1c40f; }
+    #aiChatInput button { background: linear-gradient(135deg, #f1c40f, #f39c12); color: #0f2027; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; font-weight: 700; transition: 0.2s; }
+    #aiChatInput button:hover { transform: scale(1.03); box-shadow: 0 2px 12px rgba(241, 194, 15, 0.3); }
+    .ai-typing { display: none; padding: 8px 14px; background: #1e2a4a; border-radius: 12px; border-bottom-left-radius: 4px; max-width: 50px; margin-bottom: 10px; }
+    .ai-typing span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #8899bb; margin: 0 2px; animation: aiTyping 1.4s infinite both; }
     .ai-typing span:nth-child(2) { animation-delay: 0.2s; }
     .ai-typing span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes aiTyping {
-        0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-        30% { transform: translateY(-8px); opacity: 1; }
-    }
-    @media (max-width: 480px) {
-        #aiChatWindow {
-            width: 94%;
-            right: 3%;
-            bottom: 130px;
-            max-height: 75vh;
-        }
-        #aiChatToggle {
-            padding: 10px 16px;
-            font-size: 13px;
-            bottom: 70px;
-            right: 15px;
-        }
-        #aiChatToggle span.btn-text {
-            display: none;
-        }
-    }
+    @keyframes aiTyping { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-8px); opacity: 1; } }
+    @media (max-width: 480px) { #aiChatWindow { width: 94%; right: 3%; bottom: 130px; max-height: 75vh; } #aiChatToggle { padding: 10px 16px; font-size: 13px; bottom: 70px; right: 15px; } #aiChatToggle span.btn-text { display: none; } }
 </style>
 
 <!-- AI Chat Toggle Button -->
@@ -1421,15 +1252,11 @@
 
 <script>
 // ============================================================
-// 🤖 AI SALES ASSISTANT - FIXED VERSION
+// 🤖 AI SALES ASSISTANT - FIXED
 // ============================================================
 
 let aiProductData = [];
 let aiCart = [];
-
-// ============================================================
-// LOAD PRODUCTS FROM EXISTING DATA
-// ============================================================
 
 function aiLoadProducts() {
     if (window.allProducts && window.allProducts.length > 0) {
@@ -1437,13 +1264,8 @@ function aiLoadProducts() {
         console.log('✅ AI: Loaded', aiProductData.length, 'products');
         return;
     }
-    // If products not loaded yet, try again later
     setTimeout(aiLoadProducts, 1000);
 }
-
-// ============================================================
-// SEARCH PRODUCTS
-// ============================================================
 
 function aiSearch(query) {
     if (!query || !aiProductData.length) return [];
@@ -1456,19 +1278,11 @@ function aiSearch(query) {
     });
 }
 
-// ============================================================
-// PRICE WITH GST
-// ============================================================
-
 function aiPriceWithGST(product) {
     const price = product.price || product.List || 0;
     const gst = product.gst || 18;
     return price + (price * gst / 100);
 }
-
-// ============================================================
-// FORMAT PRODUCT CARD
-// ============================================================
 
 function aiFormatProduct(product) {
     const priceGST = aiPriceWithGST(product);
@@ -1487,10 +1301,6 @@ function aiFormatProduct(product) {
     html += `</div>`;
     return html;
 }
-
-// ============================================================
-// SEND MESSAGE
-// ============================================================
 
 async function aiSendMessage() {
     const input = document.getElementById('aiUserInput');
@@ -1519,10 +1329,6 @@ async function aiSendMessage() {
     }
 }
 
-// ============================================================
-// ADD TO CART
-// ============================================================
-
 function aiAddToCart(partNo) {
     const product = aiProductData.find(p => p.part === partNo);
     if (!product) {
@@ -1533,7 +1339,6 @@ function aiAddToCart(partNo) {
     if (existing) existing.qty += 1;
     else aiCart.push({ part: partNo, desc: product.desc, price: product.price, qty: 1 });
     
-    // Add to main cart if function exists
     if (typeof addToCart === 'function') {
         addToCart(partNo, product.price);
     }
@@ -1541,7 +1346,6 @@ function aiAddToCart(partNo) {
     const count = aiCart.reduce((s, i) => s + i.qty, 0);
     aiAddMessage(`✅ Added ${partNo} to cart! (${count} items)`, 'ai-bot-msg');
     
-    // Update badge
     const toggle = document.getElementById('aiChatToggle');
     if (toggle) {
         toggle.innerHTML = `<span class="badge-dot"></span><i class="fas fa-shopping-cart"></i><span class="btn-text">Cart (${count})</span>`;
@@ -1550,10 +1354,6 @@ function aiAddToCart(partNo) {
         }, 3000);
     }
 }
-
-// ============================================================
-// UI HELPERS
-// ============================================================
 
 function aiAddMessage(text, className, isHTML = false) {
     const container = document.getElementById('aiChatMessages');
@@ -1587,15 +1387,9 @@ function aiQuickAsk(query) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ============================================================
-// INITIALIZE
-// ============================================================
-
+// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    // Load products from existing data
     setTimeout(aiLoadProducts, 500);
-    
-    // Auto-open on first visit
     if (!localStorage.getItem('aiWelcomeShown')) {
         setTimeout(() => {
             const chatWindow = document.getElementById('aiChatWindow');
@@ -1612,13 +1406,10 @@ window.aiSendMessage = aiSendMessage;
 window.aiAddToCart = aiAddToCart;
 window.aiQuickAsk = aiQuickAsk;
 window.toggleAIChat = toggleAIChat;
-
-console.log('🤖 AI Assistant Fixed!');
 </script>
 <!-- ============================================ -->
 <!-- END AI SALES ASSISTANT                       -->
 <!-- ============================================ -->
-
 
 // ===== Function to send WhatsApp message =====
 async function sendWhatsAppMessage(toNumber, message) {
