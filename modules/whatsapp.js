@@ -5,7 +5,7 @@
 
 const fetch = require('node-fetch');
 const db = require('./database');
-const { parseOrder } = require('./order-parser');
+const { parseOrder, extractPartNumber, extractQuantity } = require('./order-parser');
 
 // ============================================================
 // 🔧 CONFIG - Using your exact Render variable names
@@ -66,67 +66,6 @@ function cleanText(text) {
         .replace(/["']/g, '')
         .replace(/\s+/g, ' ')
         .trim();
-}
-
-// ============================================================
-// 🔍 EXTRACT PART NUMBER
-// ============================================================
-
-function extractPartNumber(text) {
-    if (!text) return null;
-    const clean = cleanText(text);
-    
-    // Pattern 1: Standard part number (5-20 chars)
-    let match = clean.match(/\b([A-Z0-9]{5,20})\b/i);
-    if (match) {
-        const part = match[1].toUpperCase();
-        if (/^\d{1,4}$/.test(part)) return null;
-        return part;
-    }
-    
-    // Pattern 2: Part with hyphen (A15979020-0200)
-    match = clean.match(/\b([A-Z0-9]{3,15}[-][A-Z0-9]{1,10})\b/i);
-    if (match) return match[1].toUpperCase();
-    
-    // Pattern 3: Part with N suffix
-    match = clean.match(/\b([A-Z0-9]{4,15}N)\b/i);
-    if (match) return match[1].toUpperCase();
-    
-    return null;
-}
-
-// ============================================================
-// 🔍 EXTRACT QUANTITY
-// ============================================================
-
-function extractQuantity(text) {
-    if (!text) return null;
-    const clean = cleanText(text);
-    
-    // Look for quantity patterns
-    const patterns = [
-        clean.match(/\b(\d{1,5})\s*(?:pcs|nos|pc|no|qty|piece|pieces)\b/i),
-        clean.match(/\b(\d{1,5})\s*[xX]\b/),
-        clean.match(/\b[pP][cC][sS]?\s*(\d{1,5})\b/),
-        clean.match(/\b(\d{1,5})\s*$/)  // Number at the end
-    ];
-    
-    for (const pattern of patterns) {
-        if (pattern) {
-            const qty = parseInt(pattern[1]);
-            if (qty > 0 && qty < 1000000) {
-                return qty;
-            }
-        }
-    }
-    
-    // If no quantity indicators, check for any number
-    const numbers = clean.match(/\b(\d{1,5})\b/g);
-    if (numbers && numbers.length > 0) {
-        return parseInt(numbers[numbers.length - 1]);
-    }
-    
-    return null;
 }
 
 // ============================================================
@@ -314,6 +253,7 @@ async function handleWhatsAppMessage(message, from, type) {
                     reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
                     if (product.box_qty > 0) reply += ` | Box: ${product.box_qty}`;
                     if (product.carton > 0) reply += ` | Carton: ${product.carton}`;
+                    if (product.most_selling) reply += `\n⭐ Best Seller`;
                     await sendWhatsAppMessage(from, reply);
                     return;
                 } else {
@@ -344,7 +284,7 @@ async function handleWhatsAppMessage(message, from, type) {
         if (hasMultipleProducts || hasNewLines || hasCommas || hasSemicolons) {
             console.log(`🛒 Processing multi-product order...`);
             
-            // Parse the order
+            // Parse the order using your existing order-parser
             const { items, unparsed } = parseOrder(text);
             console.log(`📦 Parsed ${items.length} items from order`);
             
@@ -586,7 +526,5 @@ module.exports = {
     sendWhatsAppMessage,
     handleWhatsAppMessage,
     formatProductForWhatsApp,
-    cleanText,
-    extractPartNumber,
-    extractQuantity
+    cleanText
 };
