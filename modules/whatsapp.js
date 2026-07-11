@@ -1,9 +1,22 @@
 // ============================================================
-// 📤 WHATSAPP MODULE - Send and Receive Messages
+// 📤 WHATSAPP MODULE - COMPLETE FIXED WITH ORDER PARSER
+// Uses: ID, TOKEN, PHONE from Render environment
+// Supports ALL order formats
 // ============================================================
 
 const fetch = require('node-fetch');
 const db = require('./database');
+const { parseOrder } = require('./order-parser');
+
+// ============================================================
+// 🔧 CONFIG - Using your exact Render variable names
+// ============================================================
+
+const CONFIG = {
+    phoneNumberId: process.env.ID,        // Your Render variable: ID
+    accessToken: process.env.TOKEN,       // Your Render variable: TOKEN
+    businessPhone: process.env.PHONE || '9830300193',  // Your Render variable: PHONE
+};
 
 // ============================================================
 // 📤 SEND WHATSAPP MESSAGE
@@ -12,12 +25,16 @@ const db = require('./database');
 async function sendWhatsAppMessage(to, message) {
     try {
         const normalizedPhone = to.replace(/\D/g, '');
-        const url = `https://graph.facebook.com/v23.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+        const url = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
+        
+        console.log(`📤 Sending to: ${normalizedPhone}`);
+        console.log(`📤 Phone ID: ${CONFIG.phoneNumberId}`);
+        console.log(`📤 Token: ${CONFIG.accessToken ? '✅ Present' : '❌ Missing'}`);
         
         const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                'Authorization': `Bearer ${CONFIG.accessToken}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -29,11 +46,13 @@ async function sendWhatsAppMessage(to, message) {
         });
         
         const result = await response.json();
+        
         if (result.messages?.[0]?.id) {
             console.log(`✅ Message sent to ${normalizedPhone}`);
             return result;
         }
-        console.error(`❌ WhatsApp error:`, result);
+        
+        console.error(`❌ WhatsApp error:`, JSON.stringify(result, null, 2));
         return result;
     } catch (error) {
         console.error(`❌ Send error: ${error.message}`);
@@ -94,6 +113,9 @@ function formatProductForWhatsApp(product, index = 0) {
     let stockInfo = [];
     if (product.stock > 0) {
         stockInfo.push(`✅ ${product.stock} pcs`);
+        if (product.most_selling) {
+            stockInfo.push(`⭐ Best Seller`);
+        }
     } else {
         stockInfo.push(`❌ Out of Stock`);
     }
@@ -115,14 +137,39 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📩 HANDLE WHATSAPP MESSAGE
+// 📩 HANDLE WHATSAPP MESSAGE - COMPLETE FIXED
 // ============================================================
 
 async function handleWhatsAppMessage(message, from, type) {
     try {
+        // ✅ DEBUG: Log the raw message
+        console.log("==================================");
+        console.log("📩 RAW MESSAGE:", JSON.stringify(message, null, 2));
+        console.log("==================================");
+        
         if (type === 'text') {
             const text = message.text?.body || '';
-            console.log(`💬 Message: "${text}"`);
+            
+            // ✅ DEBUG: Log everything
+            console.log("==================================");
+            console.log("FROM :", from);
+            console.log("TEXT :", JSON.stringify(text));
+            console.log("TYPE :", type);
+            console.log("==================================");
+            
+            // ✅ DEBUG: Check database stats
+            const stats = await db.getStats();
+            console.log(`📊 Database has ${stats.total_products || 0} products`);
+            
+            // ✅ DEBUG: Search immediately
+            console.log(`🔍 Searching for: "${text}"`);
+            const results = await db.searchProducts(text, 5);
+            console.log(`📊 Found ${results.length} results`);
+            
+            if (results.length > 0) {
+                console.log("📦 First result:", JSON.stringify(results[0], null, 2));
+            }
+            console.log("==================================");
             
             const msgLower = text.toLowerCase().trim();
             
@@ -142,8 +189,10 @@ async function handleWhatsAppMessage(message, from, type) {
                     `📦 *Check Stock:*\n` +
                     `"Stock 0801BA0285N"\n\n` +
                     `🛒 *Place Order:*\n` +
-                    `"Order 0801BA0285N 2"\n\n` +
-                    `📞 *Call:* ${process.env.BUSINESS_PHONE || '9830300193'}\n` +
+                    `"Order 0801BA0285N 2"\n` +
+                    `"0801BA0285N 2, 0303BC0071N 3"\n` +
+                    `"I need 2 0801BA0285N"\n\n` +
+                    `📞 *Call:* ${CONFIG.businessPhone}\n` +
                     `🛒 *Shop:* https://autosparessolution.com\n\n` +
                     `*How can I help you today?* 🚗`;
                 
@@ -155,10 +204,13 @@ async function handleWhatsAppMessage(message, from, type) {
             // PRICE CHECK
             // ============================================================
             if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
-                const partMatch = text.match(/([A-Z0-9]{5,})/i);
+                const partMatch = text.toUpperCase().match(/[A-Z0-9]{8,20}/);
                 if (partMatch) {
-                    const product = await db.getProduct(partMatch[1]);
+                    const partNumber = partMatch[0];
+                    console.log(`🔍 Looking up price for: ${partNumber}`);
+                    const product = await db.getProduct(partNumber);
                     if (product) {
+                        console.log(`✅ Found product: ${product.part}`);
                         const billingPrice = product.billing_price || product.list_price || 0;
                         const priceWithGST = billingPrice * 1.18;
                         const gstAmount = billingPrice * 0.18;
@@ -177,6 +229,10 @@ async function handleWhatsAppMessage(message, from, type) {
                         
                         await sendWhatsAppMessage(from, reply);
                         return;
+                    } else {
+                        console.log(`❌ No product found for: ${partNumber}`);
+                        await sendWhatsAppMessage(from, `❌ Product "${partNumber}" not found. Please check the part number.`);
+                        return;
                     }
                 }
             }
@@ -185,47 +241,146 @@ async function handleWhatsAppMessage(message, from, type) {
             // STOCK CHECK
             // ============================================================
             if (msgLower.includes('stock') || msgLower.includes('available')) {
-                const partMatch = text.match(/([A-Z0-9]{5,})/i);
+                const partMatch = text.toUpperCase().match(/[A-Z0-9]{8,20}/);
                 if (partMatch) {
-                    const product = await db.getProduct(partMatch[1]);
+                    const partNumber = partMatch[0];
+                    console.log(`🔍 Looking up stock for: ${partNumber}`);
+                    const product = await db.getProduct(partNumber);
                     if (product) {
+                        console.log(`✅ Found product: ${product.part}`);
                         let reply = `📦 *Stock: ${product.part}*\n\n`;
                         reply += `📝 ${product.description}\n`;
                         reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
                         if (product.box_qty > 0) reply += ` | Box: ${product.box_qty}`;
                         if (product.carton > 0) reply += ` | Carton: ${product.carton}`;
+                        if (product.most_selling) reply += `\n⭐ Best Seller`;
                         await sendWhatsAppMessage(from, reply);
+                        return;
+                    } else {
+                        console.log(`❌ No product found for: ${partNumber}`);
+                        await sendWhatsAppMessage(from, `❌ Product "${partNumber}" not found. Please check the part number.`);
                         return;
                     }
                 }
             }
             
             // ============================================================
-            // ORDER COMMAND
+            // 🛒 ORDER - Using the Advanced Parser
             // ============================================================
-            if (msgLower.includes('order') || msgLower.includes('buy')) {
-                const partMatch = text.match(/(\d+)?\s*([A-Z0-9]{5,})/i);
-                if (partMatch) {
-                    const qty = parseInt(partMatch[1]) || 1;
-                    const partNumber = partMatch[2].toUpperCase();
-                    const product = await db.getProduct(partNumber);
-                    if (product) {
-                        const billingPrice = product.billing_price || product.list_price || 0;
-                        const priceWithGST = billingPrice * 1.18;
-                        const total = priceWithGST * qty;
-                        
-                        let reply = `🛒 *Order: ${product.part} x${qty}*\n\n`;
-                        reply += `📝 ${product.description}\n`;
-                        reply += `💰 ₹${priceWithGST.toFixed(2)} × ${qty} = ₹${total.toFixed(2)} (incl. GST)\n`;
-                        reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}\n\n`;
-                        if (product.stock > 0) {
-                            reply += `✅ *Confirm order?* Reply "Confirm Order"`;
+            // Check if it's an order (contains part numbers)
+            const partNumbers = text.match(/[A-Z0-9]{8,20}/g);
+            
+            if (partNumbers && partNumbers.length > 0) {
+                console.log(`🛒 Detected order with ${partNumbers.length} part numbers`);
+                
+                // Parse the order using the advanced parser
+                const { items, unparsed } = parseOrder(text);
+                console.log(`📦 Parsed ${items.length} items from order`);
+                
+                if (items.length > 0) {
+                    console.log(`🛒 Processing ${items.length} items`);
+                    
+                    // Process each item
+                    let cartItems = [];
+                    let total = 0;
+                    let outOfStock = [];
+                    let partialStock = [];
+                    let notFound = [];
+                    
+                    for (const item of items) {
+                        const product = await db.getProduct(item.part);
+                        if (product) {
+                            console.log(`✅ Found product: ${product.part}`);
+                            const billingPrice = product.billing_price || product.list_price || 0;
+                            const priceWithGST = billingPrice * 1.18;
+                            const itemTotal = priceWithGST * item.qty;
+                            
+                            cartItems.push({
+                                part: product.part,
+                                description: product.description,
+                                qty: item.qty,
+                                price: priceWithGST,
+                                list_price: product.list_price,
+                                mrp: product.mrp,
+                                billing_price: billingPrice
+                            });
+                            
+                            total += itemTotal;
+                            
+                            if (product.stock === 0) {
+                                outOfStock.push(product.part);
+                            } else if (product.stock < item.qty) {
+                                partialStock.push({ part: product.part, available: product.stock, requested: item.qty });
+                            }
                         } else {
-                            reply += `🔔 *We'll notify you when back in stock!*`;
+                            console.log(`❌ Product not found: ${item.part}`);
+                            notFound.push(item.part);
                         }
-                        await sendWhatsAppMessage(from, reply);
+                    }
+                    
+                    // Check if any products were not found
+                    if (notFound.length > 0) {
+                        await sendWhatsAppMessage(from, `❌ Products not found: ${notFound.join(', ')}\n\n💡 Please check the part numbers and try again.`);
                         return;
                     }
+                    
+                    // Check if cart has items
+                    if (cartItems.length === 0) {
+                        await sendWhatsAppMessage(from, '❌ No valid products found in your order. Please check the part numbers.');
+                        return;
+                    }
+                    
+                    // Save cart
+                    await db.saveCart(from, cartItems, total, total);
+                    console.log(`✅ Cart saved: ${cartItems.length} items, total: ₹${total.toFixed(2)}`);
+                    
+                    // Build response
+                    let reply = `🛒 *ORDER SUMMARY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                    
+                    cartItems.forEach((item, index) => {
+                        const itemTotal = item.price * item.qty;
+                        reply += `${index + 1}. *${item.part}* x${item.qty}\n`;
+                        reply += `📝 ${item.description}\n`;
+                        if (item.list_price > 0) reply += `💰 LIST PRICE: ₹${item.list_price.toFixed(2)}\n`;
+                        if (item.mrp > 0) reply += `💰 MRP PRICE: ₹${item.mrp.toFixed(2)}\n`;
+                        reply += `💳 ₹${item.price.toFixed(2)} × ${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
+                        
+                        // Find stock for this item
+                        const product = await db.getProduct(item.part);
+                        if (product) {
+                            if (product.stock > 0 && product.stock >= item.qty) {
+                                reply += `📦 ✅ ${product.stock} pcs available\n`;
+                            } else if (product.stock > 0 && product.stock < item.qty) {
+                                reply += `📦 ⚠️ Only ${product.stock} pcs available\n`;
+                            } else {
+                                reply += `📦 ❌ OUT OF STOCK\n`;
+                            }
+                        }
+                        reply += `\n`;
+                    });
+                    
+                    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+                    reply += `💰 *Total: ₹${total.toFixed(2)}* (incl. GST)\n`;
+                    reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+                    
+                    if (outOfStock.length > 0) {
+                        reply += `⚠️ Out of Stock: ${outOfStock.join(', ')}\n`;
+                        reply += `🔔 We'll notify you when available.\n\n`;
+                    }
+                    
+                    if (partialStock.length > 0) {
+                        for (const p of partialStock) {
+                            reply += `⚠️ ${p.part}: Only ${p.available} available (requested ${p.requested})\n`;
+                        }
+                        reply += `\n`;
+                    }
+                    
+                    reply += `✅ *Confirm order?* Reply "Confirm Order"\n`;
+                    reply += `🗑️ *Clear Cart* - Start fresh\n\n`;
+                    reply += `📞 Call: ${CONFIG.businessPhone}`;
+                    
+                    await sendWhatsAppMessage(from, reply);
+                    return;
                 }
             }
             
@@ -233,6 +388,7 @@ async function handleWhatsAppMessage(message, from, type) {
             // CONFIRM ORDER
             // ============================================================
             if (msgLower === 'confirm order' || msgLower === 'confirm') {
+                console.log(`📋 Confirming order for ${from}`);
                 const cart = await db.getCart(from);
                 if (cart && cart.items) {
                     const items = JSON.parse(cart.items);
@@ -242,8 +398,12 @@ async function handleWhatsAppMessage(message, from, type) {
                     
                     let reply = `✅ *ORDER CONFIRMED!*\n\n`;
                     reply += `📦 Order ID: ${orderId}\n`;
+                    reply += `📝 Items:\n`;
+                    items.forEach((item, index) => {
+                        reply += `   ${index + 1}. ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
+                    });
                     reply += `💰 Total: ₹${cart.total.toFixed(2)}\n`;
-                    reply += `📞 *Call:* ${process.env.BUSINESS_PHONE || '9830300193'}\n`;
+                    reply += `📞 *Call:* ${CONFIG.businessPhone}\n`;
                     reply += `🛒 *Shop:* https://autosparessolution.com`;
                     await sendWhatsAppMessage(from, reply);
                     return;
@@ -263,10 +423,8 @@ async function handleWhatsAppMessage(message, from, type) {
             }
             
             // ============================================================
-            // SEARCH PRODUCTS
+            // SEARCH PRODUCTS - Already searched above, use results
             // ============================================================
-            const results = await db.searchProducts(text, 5);
-            
             if (results.length > 0) {
                 let reply = `🔍 Found ${results.length} result(s)\n\n`;
                 
@@ -280,7 +438,7 @@ async function handleWhatsAppMessage(message, from, type) {
                 reply += `📝 Example: "${results[0]?.part} 2"\n`;
                 reply += `━━━━━━━━━━━━━━━━━━━━\n`;
                 reply += `🛒 Order: https://autosparessolution.com\n`;
-                reply += `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`;
+                reply += `📞 Call: ${CONFIG.businessPhone}`;
                 
                 await sendWhatsAppMessage(from, reply);
             } else {
@@ -289,7 +447,7 @@ async function handleWhatsAppMessage(message, from, type) {
                     `💡 Try sending a part number like:\n` +
                     `"0801BA0285N"\n\n` +
                     `💡 Or send "Help" for options\n\n` +
-                    `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`
+                    `📞 Call: ${CONFIG.businessPhone}`
                 );
             }
         }
@@ -303,7 +461,7 @@ async function handleWhatsAppMessage(message, from, type) {
                 `💡 Please send the part number directly.\n` +
                 `📝 Example: "0801BA0285N 2"\n\n` +
                 `💡 Or send "Help" for options\n\n` +
-                `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`
+                `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
@@ -316,7 +474,7 @@ async function handleWhatsAppMessage(message, from, type) {
                 `🎤 *Voice Received!*\n\n` +
                 `💡 Please send text or images.\n\n` +
                 `💡 Or send "Help" for options\n\n` +
-                `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`
+                `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
@@ -328,11 +486,12 @@ async function handleWhatsAppMessage(message, from, type) {
             `📩 Received your ${type} message.\n\n` +
             `💡 Please send text with part numbers.\n` +
             `💡 Or send "Help" for options\n\n` +
-            `📞 Call: ${process.env.BUSINESS_PHONE || '9830300193'}`
+            `📞 Call: ${CONFIG.businessPhone}`
         );
         
     } catch (error) {
         console.error(`❌ Message handler error: ${error.message}`);
+        console.error(error.stack);
         await sendWhatsAppMessage(from, '⚠️ Sorry, something went wrong. Please try again.');
     }
 }
