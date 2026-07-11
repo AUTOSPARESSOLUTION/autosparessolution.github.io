@@ -1,6 +1,6 @@
 // ============================================================
-// 📦 DATABASE MODULE - SQLite (COMPLETE FIXED)
-// Handles part numbers with spaces, hyphens, dots, slashes
+// 📦 DATABASE MODULE - COMPLETE FIXED
+// Handles: spaces, hyphens, dots, slashes
 // ============================================================
 
 const sqlite3 = require('sqlite3').verbose();
@@ -216,22 +216,26 @@ function searchProducts(query, limit = 10) {
             return;
         }
 
-        // Clean the query (remove spaces, hyphens, dots, slashes)
+        // ✅ FIX: Clean the query (remove spaces, hyphens, dots, slashes)
         const cleanQuery = cleanPartNumber(clean);
         const searchPattern = `%${cleanQuery}%`;
         const originalPattern = `%${clean.toUpperCase()}%`;
         
         console.log(`🔍 Search: Original="${clean}", Cleaned="${cleanQuery}"`);
         
+        // ✅ FIX: Search BOTH cleaned and original versions
         const sql = `
             SELECT *,
-                   CASE WHEN UPPER(part) = UPPER(?) THEN 100 ELSE 0 END +
-                   CASE WHEN UPPER(part) = UPPER(?) THEN 100 ELSE 0 END +
-                   CASE WHEN UPPER(part) LIKE UPPER(?) THEN 50 ELSE 0 END +
-                   CASE WHEN UPPER(part) LIKE UPPER(?) THEN 30 ELSE 0 END +
-                   CASE WHEN UPPER(description) LIKE UPPER(?) THEN 20 ELSE 0 END +
-                   CASE WHEN UPPER(brand) LIKE UPPER(?) THEN 15 ELSE 0 END +
-                   CASE WHEN UPPER(make) LIKE UPPER(?) THEN 15 ELSE 0 END as relevance
+                   CASE 
+                       WHEN UPPER(part) = UPPER(?) THEN 100 
+                       WHEN UPPER(part) = UPPER(?) THEN 100 
+                       WHEN UPPER(part) LIKE UPPER(?) THEN 50 
+                       WHEN UPPER(part) LIKE UPPER(?) THEN 30 
+                       WHEN UPPER(description) LIKE UPPER(?) THEN 20 
+                       WHEN UPPER(brand) LIKE UPPER(?) THEN 15 
+                       WHEN UPPER(make) LIKE UPPER(?) THEN 15 
+                       ELSE 0 
+                   END as relevance
             FROM products
             WHERE UPPER(part) = UPPER(?)
                OR UPPER(part) = UPPER(?)
@@ -247,8 +251,8 @@ function searchProducts(query, limit = 10) {
         `;
         
         db.all(sql, [
-            clean,              // exact match (original)
-            cleanQuery,         // exact match (cleaned)
+            clean,              // exact match boost (original)
+            cleanQuery,         // exact match boost (cleaned)
             searchPattern,      // part contains (cleaned)
             originalPattern,    // part contains (original)
             originalPattern,    // description contains
@@ -289,11 +293,11 @@ function getProduct(part) {
             return;
         }
 
-        // Clean the part number
+        // ✅ FIX: Clean the part number
         const cleanPart = cleanPartNumber(clean);
         console.log(`🔍 GetProduct: Original="${clean}", Cleaned="${cleanPart}"`);
         
-        // Try multiple patterns
+        // ✅ FIX: Search multiple patterns
         db.get(
             `SELECT *
              FROM products
