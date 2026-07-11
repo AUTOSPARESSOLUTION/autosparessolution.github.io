@@ -1,5 +1,6 @@
 // ============================================================
-// 📦 DATABASE MODULE - SQLite (FIXED)
+// 📦 DATABASE MODULE - SQLite (COMPLETE FIXED)
+// Handles part numbers with spaces, hyphens, dots, slashes
 // ============================================================
 
 const sqlite3 = require('sqlite3').verbose();
@@ -20,6 +21,18 @@ const db = new sqlite3.Database(DB_PATH);
 // Enable WAL mode for better performance
 db.run('PRAGMA journal_mode = WAL');
 db.run('PRAGMA synchronous = NORMAL');
+db.run('PRAGMA temp_store = MEMORY');
+db.run('PRAGMA cache_size = 10000');
+
+// ============================================================
+// 🔧 CLEAN PART NUMBER (Remove spaces, hyphens, dots, slashes)
+// ============================================================
+
+function cleanPartNumber(part) {
+    if (!part) return '';
+    // Remove spaces, hyphens, dots, slashes
+    return part.replace(/[\s\-\.\/]/g, '').toUpperCase().trim();
+}
 
 // ============================================================
 // 📋 INITIALIZE DATABASE
@@ -70,6 +83,8 @@ function initDatabase() {
             db.run(`CREATE INDEX IF NOT EXISTS idx_products_make ON products(make)`);
             db.run(`CREATE INDEX IF NOT EXISTS idx_products_description ON products(description)`);
             db.run(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_products_model ON products(model)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_products_hsn ON products(hsn)`);
 
             // Import history
             db.run(`
@@ -189,7 +204,7 @@ function importProducts(products) {
 }
 
 // ============================================================
-// 🔍 FIXED: SEARCH PRODUCTS - CASE INSENSITIVE
+// 🔍 FIXED: SEARCH PRODUCTS - Handles spaces, hyphens, dots, slashes
 // ============================================================
 
 function searchProducts(query, limit = 10) {
@@ -201,17 +216,27 @@ function searchProducts(query, limit = 10) {
             return;
         }
 
-        // ✅ FIX: Case-insensitive search with UPPER()
-        const searchPattern = `%${clean.toUpperCase()}%`;
+        // Clean the query (remove spaces, hyphens, dots, slashes)
+        const cleanQuery = cleanPartNumber(clean);
+        const searchPattern = `%${cleanQuery}%`;
+        const originalPattern = `%${clean.toUpperCase()}%`;
+        
+        console.log(`🔍 Search: Original="${clean}", Cleaned="${cleanQuery}"`);
+        
         const sql = `
             SELECT *,
                    CASE WHEN UPPER(part) = UPPER(?) THEN 100 ELSE 0 END +
+                   CASE WHEN UPPER(part) = UPPER(?) THEN 100 ELSE 0 END +
                    CASE WHEN UPPER(part) LIKE UPPER(?) THEN 50 ELSE 0 END +
-                   CASE WHEN UPPER(description) LIKE UPPER(?) THEN 30 ELSE 0 END +
-                   CASE WHEN UPPER(brand) LIKE UPPER(?) THEN 20 ELSE 0 END +
-                   CASE WHEN UPPER(make) LIKE UPPER(?) THEN 20 ELSE 0 END as relevance
+                   CASE WHEN UPPER(part) LIKE UPPER(?) THEN 30 ELSE 0 END +
+                   CASE WHEN UPPER(description) LIKE UPPER(?) THEN 20 ELSE 0 END +
+                   CASE WHEN UPPER(brand) LIKE UPPER(?) THEN 15 ELSE 0 END +
+                   CASE WHEN UPPER(make) LIKE UPPER(?) THEN 15 ELSE 0 END as relevance
             FROM products
-            WHERE UPPER(part) LIKE UPPER(?)
+            WHERE UPPER(part) = UPPER(?)
+               OR UPPER(part) = UPPER(?)
+               OR UPPER(part) LIKE UPPER(?)
+               OR UPPER(part) LIKE UPPER(?)
                OR UPPER(description) LIKE UPPER(?)
                OR UPPER(brand) LIKE UPPER(?)
                OR UPPER(make) LIKE UPPER(?)
@@ -222,23 +247,29 @@ function searchProducts(query, limit = 10) {
         `;
         
         db.all(sql, [
-            clean,              // exact match boost
-            searchPattern,      // part contains
-            searchPattern,      // description contains
-            searchPattern,      // brand contains
-            searchPattern,      // make contains
-            searchPattern,      // part LIKE
-            searchPattern,      // description LIKE
-            searchPattern,      // brand LIKE
-            searchPattern,      // make LIKE
-            searchPattern,      // model LIKE
-            searchPattern,      // hsn LIKE
+            clean,              // exact match (original)
+            cleanQuery,         // exact match (cleaned)
+            searchPattern,      // part contains (cleaned)
+            originalPattern,    // part contains (original)
+            originalPattern,    // description contains
+            originalPattern,    // brand contains
+            originalPattern,    // make contains
+            clean,              // WHERE: original
+            cleanQuery,         // WHERE: cleaned
+            searchPattern,      // WHERE: part LIKE (cleaned)
+            originalPattern,    // WHERE: part LIKE (original)
+            originalPattern,    // WHERE: description LIKE
+            originalPattern,    // WHERE: brand LIKE
+            originalPattern,    // WHERE: make LIKE
+            originalPattern,    // WHERE: model LIKE
+            originalPattern,    // WHERE: hsn LIKE
             limit
         ], (err, rows) => {
             if (err) {
                 console.error('Search error:', err.message);
                 reject(err);
             } else {
+                console.log(`📊 Found ${rows?.length || 0} results for "${clean}"`);
                 resolve(rows || []);
             }
         });
@@ -246,7 +277,7 @@ function searchProducts(query, limit = 10) {
 }
 
 // ============================================================
-// 🔍 FIXED: GET PRODUCT BY PART NUMBER - CASE INSENSITIVE
+// 🔍 FIXED: GET PRODUCT - Handles spaces, hyphens, dots, slashes
 // ============================================================
 
 function getProduct(part) {
@@ -258,26 +289,76 @@ function getProduct(part) {
             return;
         }
 
-        // ✅ FIX: Case-insensitive search with UPPER()
+        // Clean the part number
+        const cleanPart = cleanPartNumber(clean);
+        console.log(`🔍 GetProduct: Original="${clean}", Cleaned="${cleanPart}"`);
+        
+        // Try multiple patterns
         db.get(
             `SELECT *
              FROM products
              WHERE UPPER(part) = UPPER(?)
+                OR UPPER(part) = UPPER(?)
+                OR UPPER(part) LIKE UPPER(?)
                 OR UPPER(part) LIKE UPPER(?)
              LIMIT 1`,
             [
-                clean,
-                `%${clean}%`
+                clean,          // Original with spaces/hyphens
+                cleanPart,      // Cleaned version
+                `%${cleanPart}%`, // Partial match (cleaned)
+                `%${clean}%`     // Partial match (original)
             ],
             (err, row) => {
                 if (err) {
                     console.error('Get product error:', err.message);
                     reject(err);
                 } else {
+                    if (row) {
+                        console.log(`✅ Found product: ${row.part}`);
+                    } else {
+                        console.log(`❌ No product found for: ${clean}`);
+                    }
                     resolve(row);
                 }
             }
         );
+    });
+}
+
+// ============================================================
+// 🔍 GET PRODUCTS BY MULTIPLE PART NUMBERS
+// ============================================================
+
+function getProducts(parts) {
+    return new Promise((resolve, reject) => {
+        if (!parts || parts.length === 0) {
+            resolve([]);
+            return;
+        }
+
+        // Clean all part numbers
+        const cleanedParts = parts.map(p => cleanPartNumber(p));
+        
+        // Build query with placeholders
+        const placeholders = cleanedParts.map(() => '?').join(',');
+        const sql = `
+            SELECT * FROM products 
+            WHERE UPPER(part) IN (${placeholders})
+               OR UPPER(part) IN (${placeholders.map(() => '?').join(',')})
+        `;
+        
+        // Combine both original and cleaned for matching
+        const params = [...cleanedParts, ...parts.map(p => p.toUpperCase())];
+        
+        db.all(sql, params, (err, rows) => {
+            if (err) {
+                console.error('Get products error:', err.message);
+                reject(err);
+            } else {
+                console.log(`✅ Found ${rows?.length || 0} products`);
+                resolve(rows || []);
+            }
+        });
     });
 }
 
@@ -294,15 +375,16 @@ function getStats() {
                 SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END) as out_of_stock,
                 SUM(stock) as total_stock,
                 AVG(stock) as avg_stock,
-                SUM(list_price * stock) as total_value
+                SUM(list_price * stock) as total_value,
+                SUM(CASE WHEN most_selling = 1 THEN 1 ELSE 0 END) as best_sellers
             FROM products
         `, (err, row) => {
             if (err) {
                 console.error('Stats error:', err.message);
                 reject(err);
             } else {
-                console.log('📊 Database Stats:', row || { total_products: 0 });
-                resolve(row || { total_products: 0, in_stock: 0, out_of_stock: 0, total_stock: 0, avg_stock: 0, total_value: 0 });
+                console.log(`📊 Database Stats: ${row?.total_products || 0} products, ${row?.in_stock || 0} in stock`);
+                resolve(row || { total_products: 0, in_stock: 0, out_of_stock: 0, total_stock: 0, avg_stock: 0, total_value: 0, best_sellers: 0 });
             }
         });
     });
@@ -344,7 +426,7 @@ function logImport(filename, total, imported, skipped, duplicates, errors) {
 }
 
 // ============================================================
-// 🛒 FIXED: CART OPERATIONS
+// 🛒 CART OPERATIONS
 // ============================================================
 
 function saveCart(phone, items, subtotal, total) {
@@ -402,6 +484,54 @@ function saveOrder(orderId, phone, items, total) {
     });
 }
 
+function getOrders(phone, limit = 10) {
+    return new Promise((resolve, reject) => {
+        db.all(`
+            SELECT * FROM orders 
+            WHERE phone = ? 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        `, [phone, limit], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows || []);
+        });
+    });
+}
+
+// ============================================================
+// 🔍 SUGGEST PRODUCTS (for "Did you mean?")
+// ============================================================
+
+function suggestProducts(query, limit = 5) {
+    return new Promise((resolve, reject) => {
+        const clean = query.trim();
+        if (clean.length < 2) {
+            resolve([]);
+            return;
+        }
+
+        const cleanQuery = cleanPartNumber(clean);
+        const searchPattern = `%${cleanQuery}%`;
+        
+        const sql = `
+            SELECT part, description, brand, stock
+            FROM products
+            WHERE UPPER(part) LIKE UPPER(?)
+               OR UPPER(description) LIKE UPPER(?)
+            ORDER BY 
+                CASE WHEN UPPER(part) = UPPER(?) THEN 1 ELSE 0 END,
+                stock DESC,
+                part ASC
+            LIMIT ?
+        `;
+        
+        db.all(sql, [searchPattern, searchPattern, cleanQuery, limit], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows || []);
+        });
+    });
+}
+
 // ============================================================
 // 🚪 CLOSE DATABASE
 // ============================================================
@@ -415,6 +545,10 @@ function closeDatabase() {
     });
 }
 
+// ============================================================
+// 🚀 EXPORT
+// ============================================================
+
 module.exports = {
     db,
     initDatabase,
@@ -422,6 +556,7 @@ module.exports = {
     importProducts,
     searchProducts,
     getProduct,
+    getProducts,
     getStats,
     getImportHistory,
     logImport,
@@ -429,5 +564,8 @@ module.exports = {
     getCart,
     clearCart,
     saveOrder,
+    getOrders,
+    suggestProducts,
+    cleanPartNumber,
     closeDatabase
 };
