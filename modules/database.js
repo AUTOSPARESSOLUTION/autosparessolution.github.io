@@ -1,6 +1,6 @@
 // ============================================================
-// 📦 DATABASE MODULE - COMPLETE FIXED
-// Handles: spaces, hyphens, dots, slashes
+// 📦 DATABASE MODULE - SQLite (COMPLETE FIXED)
+// Handles: Part numbers with and without separators
 // ============================================================
 
 const sqlite3 = require('sqlite3').verbose();
@@ -85,6 +85,7 @@ function initDatabase() {
             db.run(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
             db.run(`CREATE INDEX IF NOT EXISTS idx_products_model ON products(model)`);
             db.run(`CREATE INDEX IF NOT EXISTS idx_products_hsn ON products(hsn)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_products_clean_part ON products(part)`);
 
             // Import history
             db.run(`
@@ -204,7 +205,7 @@ function importProducts(products) {
 }
 
 // ============================================================
-// 🔍 FIXED: SEARCH PRODUCTS - Handles spaces, hyphens, dots, slashes
+// 🔍 SEARCH PRODUCTS - Handles all part number formats
 // ============================================================
 
 function searchProducts(query, limit = 10) {
@@ -216,14 +217,13 @@ function searchProducts(query, limit = 10) {
             return;
         }
 
-        // ✅ FIX: Clean the query (remove spaces, hyphens, dots, slashes)
+        // Clean the query - remove spaces, hyphens, dots, slashes
         const cleanQuery = cleanPartNumber(clean);
         const searchPattern = `%${cleanQuery}%`;
         const originalPattern = `%${clean.toUpperCase()}%`;
         
         console.log(`🔍 Search: Original="${clean}", Cleaned="${cleanQuery}"`);
         
-        // ✅ FIX: Search BOTH cleaned and original versions
         const sql = `
             SELECT *,
                    CASE 
@@ -281,7 +281,7 @@ function searchProducts(query, limit = 10) {
 }
 
 // ============================================================
-// 🔍 FIXED: GET PRODUCT - Handles spaces, hyphens, dots, slashes
+// 🔍 GET PRODUCT - Handles all part number formats
 // ============================================================
 
 function getProduct(part) {
@@ -293,11 +293,11 @@ function getProduct(part) {
             return;
         }
 
-        // ✅ FIX: Clean the part number
+        // Clean the part number - remove spaces, hyphens, dots, slashes
         const cleanPart = cleanPartNumber(clean);
         console.log(`🔍 GetProduct: Original="${clean}", Cleaned="${cleanPart}"`);
         
-        // ✅ FIX: Search multiple patterns
+        // Try multiple search patterns
         db.get(
             `SELECT *
              FROM products
@@ -305,12 +305,14 @@ function getProduct(part) {
                 OR UPPER(part) = UPPER(?)
                 OR UPPER(part) LIKE UPPER(?)
                 OR UPPER(part) LIKE UPPER(?)
+                OR UPPER(part) LIKE UPPER(?)
              LIMIT 1`,
             [
-                clean,          // Original with spaces/hyphens
-                cleanPart,      // Cleaned version
-                `%${cleanPart}%`, // Partial match (cleaned)
-                `%${clean}%`     // Partial match (original)
+                clean,              // Original with spaces/hyphens
+                cleanPart,          // Cleaned version
+                `%${cleanPart}%`,   // Partial match (cleaned)
+                `%${clean}%`,       // Partial match (original)
+                `%${cleanPart.slice(0, 6)}%` // Prefix match
             ],
             (err, row) => {
                 if (err) {
@@ -349,10 +351,17 @@ function getProducts(parts) {
             SELECT * FROM products 
             WHERE UPPER(part) IN (${placeholders})
                OR UPPER(part) IN (${placeholders.map(() => '?').join(',')})
+               OR UPPER(part) LIKE UPPER(?)
+               OR UPPER(part) LIKE UPPER(?)
         `;
         
         // Combine both original and cleaned for matching
-        const params = [...cleanedParts, ...parts.map(p => p.toUpperCase())];
+        const params = [
+            ...cleanedParts, 
+            ...parts.map(p => p.toUpperCase()),
+            `%${cleanedParts[0] || ''}%`,
+            `%${(parts[0] || '').toUpperCase()}%`
+        ];
         
         db.all(sql, params, (err, rows) => {
             if (err) {
@@ -367,7 +376,7 @@ function getProducts(parts) {
 }
 
 // ============================================================
-// 📊 GET STATS - WITH LOGGING
+// 📊 GET STATS
 // ============================================================
 
 function getStats() {
@@ -503,7 +512,7 @@ function getOrders(phone, limit = 10) {
 }
 
 // ============================================================
-// 🔍 SUGGEST PRODUCTS (for "Did you mean?")
+// 🔍 SUGGEST PRODUCTS
 // ============================================================
 
 function suggestProducts(query, limit = 5) {
