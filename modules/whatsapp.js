@@ -1,5 +1,5 @@
 // ============================================================
-// 📤 WHATSAPP MODULE - FIXED WITH CART SAVE
+// 📤 WHATSAPP MODULE - WITH FULL DEBUG LOGGING
 // ============================================================
 
 const fetch = require('node-fetch');
@@ -115,18 +115,39 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📩 HANDLE WHATSAPP MESSAGE - FIXED
+// 📩 HANDLE WHATSAPP MESSAGE - WITH FULL DEBUG LOGGING
 // ============================================================
 
 async function handleWhatsAppMessage(message, from, type) {
     try {
+        // ✅ DEBUG: Log the raw message
+        console.log("==================================");
+        console.log("📩 RAW MESSAGE:", JSON.stringify(message, null, 2));
+        console.log("==================================");
+        
         if (type === 'text') {
             const text = message.text?.body || '';
-            console.log(`💬 Message: "${text}"`);
+            
+            // ✅ DEBUG: Log everything
+            console.log("==================================");
+            console.log("FROM :", from);
+            console.log("TEXT :", JSON.stringify(text));
+            console.log("TYPE :", type);
+            console.log("==================================");
             
             // ✅ DEBUG: Check database stats
             const stats = await db.getStats();
             console.log(`📊 Database has ${stats.total_products || 0} products`);
+            
+            // ✅ DEBUG: Search immediately
+            console.log(`🔍 Searching for: "${text}"`);
+            const results = await db.searchProducts(text, 5);
+            console.log(`📊 Found ${results.length} results`);
+            
+            if (results.length > 0) {
+                console.log("📦 First result:", JSON.stringify(results[0], null, 2));
+            }
+            console.log("==================================");
             
             const msgLower = text.toLowerCase().trim();
             
@@ -156,13 +177,15 @@ async function handleWhatsAppMessage(message, from, type) {
             }
             
             // ============================================================
-            // PRICE CHECK
+            // PRICE CHECK - FIXED REGEX
             // ============================================================
             if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
-                const partMatch = text.match(/([A-Z0-9]{5,})/i);
+                // ✅ FIXED: Better regex for part number extraction
+                const partMatch = text.toUpperCase().match(/[A-Z0-9]{8,20}/);
                 if (partMatch) {
-                    console.log(`🔍 Looking up price for: ${partMatch[1]}`);
-                    const product = await db.getProduct(partMatch[1]);
+                    const partNumber = partMatch[0];
+                    console.log(`🔍 Looking up price for: ${partNumber}`);
+                    const product = await db.getProduct(partNumber);
                     if (product) {
                         console.log(`✅ Found product: ${product.part}`);
                         const billingPrice = product.billing_price || product.list_price || 0;
@@ -184,19 +207,21 @@ async function handleWhatsAppMessage(message, from, type) {
                         await sendWhatsAppMessage(from, reply);
                         return;
                     } else {
-                        console.log(`❌ No product found for: ${partMatch[1]}`);
+                        console.log(`❌ No product found for: ${partNumber}`);
                     }
                 }
             }
             
             // ============================================================
-            // STOCK CHECK
+            // STOCK CHECK - FIXED REGEX
             // ============================================================
             if (msgLower.includes('stock') || msgLower.includes('available')) {
-                const partMatch = text.match(/([A-Z0-9]{5,})/i);
+                // ✅ FIXED: Better regex for part number extraction
+                const partMatch = text.toUpperCase().match(/[A-Z0-9]{8,20}/);
                 if (partMatch) {
-                    console.log(`🔍 Looking up stock for: ${partMatch[1]}`);
-                    const product = await db.getProduct(partMatch[1]);
+                    const partNumber = partMatch[0];
+                    console.log(`🔍 Looking up stock for: ${partNumber}`);
+                    const product = await db.getProduct(partNumber);
                     if (product) {
                         console.log(`✅ Found product: ${product.part}`);
                         let reply = `📦 *Stock: ${product.part}*\n\n`;
@@ -207,19 +232,20 @@ async function handleWhatsAppMessage(message, from, type) {
                         await sendWhatsAppMessage(from, reply);
                         return;
                     } else {
-                        console.log(`❌ No product found for: ${partMatch[1]}`);
+                        console.log(`❌ No product found for: ${partNumber}`);
                     }
                 }
             }
             
             // ============================================================
-            // 🛒 FIXED: ORDER COMMAND - SAVE TO CART
+            // ORDER COMMAND - FIXED REGEX
             // ============================================================
             if (msgLower.includes('order') || msgLower.includes('buy')) {
-                const partMatch = text.match(/(\d+)?\s*([A-Z0-9]{5,})/i);
-                if (partMatch) {
-                    const qty = parseInt(partMatch[1]) || 1;
-                    const partNumber = partMatch[2].toUpperCase();
+                // ✅ FIXED: Better regex for part number extraction with quantity
+                const orderMatch = text.toUpperCase().match(/(\d+)?\s*([A-Z0-9]{8,20})/);
+                if (orderMatch) {
+                    const qty = parseInt(orderMatch[1]) || 1;
+                    const partNumber = orderMatch[2];
                     console.log(`🛒 Order: ${qty} x ${partNumber}`);
                     
                     const product = await db.getProduct(partNumber);
@@ -229,7 +255,6 @@ async function handleWhatsAppMessage(message, from, type) {
                         const priceWithGST = billingPrice * 1.18;
                         const total = priceWithGST * qty;
                         
-                        // ✅ FIX: Save to cart BEFORE asking for confirmation
                         const cartItems = [{
                             part: product.part,
                             description: product.description,
@@ -312,12 +337,8 @@ async function handleWhatsAppMessage(message, from, type) {
             }
             
             // ============================================================
-            // SEARCH PRODUCTS - WITH DEBUG LOGGING
+            // SEARCH PRODUCTS - Already searched above, use results
             // ============================================================
-            console.log(`🔍 Searching for: "${text}"`);
-            const results = await db.searchProducts(text, 5);
-            console.log(`📊 Found ${results.length} results`);
-            
             if (results.length > 0) {
                 let reply = `🔍 Found ${results.length} result(s)\n\n`;
                 
