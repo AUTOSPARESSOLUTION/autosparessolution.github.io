@@ -1,5 +1,5 @@
 // ============================================================
-// 📦 DATABASE MODULE - SQLite
+// 📦 DATABASE MODULE - SQLite (FIXED)
 // ============================================================
 
 const sqlite3 = require('sqlite3').verbose();
@@ -64,7 +64,7 @@ function initDatabase() {
                 }
             });
 
-            // Create indexes
+            // Create indexes for fast search
             db.run(`CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)`);
             db.run(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
             db.run(`CREATE INDEX IF NOT EXISTS idx_products_make ON products(make)`);
@@ -189,64 +189,100 @@ function importProducts(products) {
 }
 
 // ============================================================
-// 🔍 SEARCH PRODUCTS
+// 🔍 FIXED: SEARCH PRODUCTS - CASE INSENSITIVE
 // ============================================================
 
 function searchProducts(query, limit = 10) {
     return new Promise((resolve, reject) => {
-        const clean = query.trim().toUpperCase();
+        const clean = query.trim();
         
         if (clean.length < 2) {
             resolve([]);
             return;
         }
 
-        const searchPattern = `%${clean}%`;
+        // ✅ FIX: Case-insensitive search with UPPER()
+        const searchPattern = `%${clean.toUpperCase()}%`;
         const sql = `
             SELECT *,
-                   CASE WHEN part = ? THEN 100 ELSE 0 END +
-                   CASE WHEN part LIKE ? THEN 50 ELSE 0 END +
-                   CASE WHEN description LIKE ? THEN 30 ELSE 0 END +
-                   CASE WHEN brand LIKE ? THEN 20 ELSE 0 END +
-                   CASE WHEN make LIKE ? THEN 20 ELSE 0 END as relevance
+                   CASE WHEN UPPER(part) = UPPER(?) THEN 100 ELSE 0 END +
+                   CASE WHEN UPPER(part) LIKE UPPER(?) THEN 50 ELSE 0 END +
+                   CASE WHEN UPPER(description) LIKE UPPER(?) THEN 30 ELSE 0 END +
+                   CASE WHEN UPPER(brand) LIKE UPPER(?) THEN 20 ELSE 0 END +
+                   CASE WHEN UPPER(make) LIKE UPPER(?) THEN 20 ELSE 0 END as relevance
             FROM products
-            WHERE part LIKE ?
-               OR description LIKE ?
-               OR brand LIKE ?
-               OR make LIKE ?
-               OR model LIKE ?
-               OR hsn LIKE ?
+            WHERE UPPER(part) LIKE UPPER(?)
+               OR UPPER(description) LIKE UPPER(?)
+               OR UPPER(brand) LIKE UPPER(?)
+               OR UPPER(make) LIKE UPPER(?)
+               OR UPPER(model) LIKE UPPER(?)
+               OR UPPER(hsn) LIKE UPPER(?)
             ORDER BY relevance DESC, stock DESC
             LIMIT ?
         `;
         
         db.all(sql, [
-            clean, searchPattern, searchPattern, searchPattern, searchPattern,
-            searchPattern, searchPattern, searchPattern, searchPattern, searchPattern,
-            searchPattern, limit
+            clean,              // exact match boost
+            searchPattern,      // part contains
+            searchPattern,      // description contains
+            searchPattern,      // brand contains
+            searchPattern,      // make contains
+            searchPattern,      // part LIKE
+            searchPattern,      // description LIKE
+            searchPattern,      // brand LIKE
+            searchPattern,      // make LIKE
+            searchPattern,      // model LIKE
+            searchPattern,      // hsn LIKE
+            limit
         ], (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows || []);
+            if (err) {
+                console.error('Search error:', err.message);
+                reject(err);
+            } else {
+                resolve(rows || []);
+            }
         });
     });
 }
 
 // ============================================================
-// 🔍 GET PRODUCT BY PART NUMBER
+// 🔍 FIXED: GET PRODUCT BY PART NUMBER - CASE INSENSITIVE
 // ============================================================
 
 function getProduct(part) {
     return new Promise((resolve, reject) => {
-        const clean = part.trim().toUpperCase();
-        db.get('SELECT * FROM products WHERE part = ?', [clean], (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
+        const clean = part.trim();
+        
+        if (!clean || clean.length < 2) {
+            resolve(null);
+            return;
+        }
+
+        // ✅ FIX: Case-insensitive search with UPPER()
+        db.get(
+            `SELECT *
+             FROM products
+             WHERE UPPER(part) = UPPER(?)
+                OR UPPER(part) LIKE UPPER(?)
+             LIMIT 1`,
+            [
+                clean,
+                `%${clean}%`
+            ],
+            (err, row) => {
+                if (err) {
+                    console.error('Get product error:', err.message);
+                    reject(err);
+                } else {
+                    resolve(row);
+                }
+            }
+        );
     });
 }
 
 // ============================================================
-// 📊 GET STATS
+// 📊 GET STATS - WITH LOGGING
 // ============================================================
 
 function getStats() {
@@ -261,8 +297,13 @@ function getStats() {
                 SUM(list_price * stock) as total_value
             FROM products
         `, (err, row) => {
-            if (err) reject(err);
-            else resolve(row || { total_products: 0, in_stock: 0, out_of_stock: 0, total_stock: 0, avg_stock: 0, total_value: 0 });
+            if (err) {
+                console.error('Stats error:', err.message);
+                reject(err);
+            } else {
+                console.log('📊 Database Stats:', row || { total_products: 0 });
+                resolve(row || { total_products: 0, in_stock: 0, out_of_stock: 0, total_stock: 0, avg_stock: 0, total_value: 0 });
+            }
         });
     });
 }
@@ -303,7 +344,7 @@ function logImport(filename, total, imported, skipped, duplicates, errors) {
 }
 
 // ============================================================
-// 🛒 CART OPERATIONS
+// 🛒 FIXED: CART OPERATIONS
 // ============================================================
 
 function saveCart(phone, items, subtotal, total) {
@@ -312,8 +353,13 @@ function saveCart(phone, items, subtotal, total) {
             INSERT OR REPLACE INTO carts (phone, items, subtotal, total, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         `, [phone, JSON.stringify(items), subtotal, total], (err) => {
-            if (err) reject(err);
-            else resolve();
+            if (err) {
+                console.error('Save cart error:', err.message);
+                reject(err);
+            } else {
+                console.log(`✅ Cart saved for ${phone}: ${items.length} items, total: ₹${total.toFixed(2)}`);
+                resolve();
+            }
         });
     });
 }
@@ -321,8 +367,12 @@ function saveCart(phone, items, subtotal, total) {
 function getCart(phone) {
     return new Promise((resolve, reject) => {
         db.get('SELECT * FROM carts WHERE phone = ?', [phone], (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
+            if (err) {
+                console.error('Get cart error:', err.message);
+                reject(err);
+            } else {
+                resolve(row);
+            }
         });
     });
 }
