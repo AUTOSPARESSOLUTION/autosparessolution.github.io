@@ -1,5 +1,5 @@
 // ============================================================
-// 📤 WHATSAPP MODULE - WITH FULL DEBUG LOGGING
+// 📤 WHATSAPP MODULE - Send and Receive Messages
 // ============================================================
 
 const fetch = require('node-fetch');
@@ -115,39 +115,14 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📩 HANDLE WHATSAPP MESSAGE - WITH FULL DEBUG LOGGING
+// 📩 HANDLE WHATSAPP MESSAGE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from, type) {
     try {
-        // ✅ DEBUG: Log the raw message
-        console.log("==================================");
-        console.log("📩 RAW MESSAGE:", JSON.stringify(message, null, 2));
-        console.log("==================================");
-        
         if (type === 'text') {
             const text = message.text?.body || '';
-            
-            // ✅ DEBUG: Log everything
-            console.log("==================================");
-            console.log("FROM :", from);
-            console.log("TEXT :", JSON.stringify(text));
-            console.log("TYPE :", type);
-            console.log("==================================");
-            
-            // ✅ DEBUG: Check database stats
-            const stats = await db.getStats();
-            console.log(`📊 Database has ${stats.total_products || 0} products`);
-            
-            // ✅ DEBUG: Search immediately
-            console.log(`🔍 Searching for: "${text}"`);
-            const results = await db.searchProducts(text, 5);
-            console.log(`📊 Found ${results.length} results`);
-            
-            if (results.length > 0) {
-                console.log("📦 First result:", JSON.stringify(results[0], null, 2));
-            }
-            console.log("==================================");
+            console.log(`💬 Message: "${text}"`);
             
             const msgLower = text.toLowerCase().trim();
             
@@ -177,17 +152,13 @@ async function handleWhatsAppMessage(message, from, type) {
             }
             
             // ============================================================
-            // PRICE CHECK - FIXED REGEX
+            // PRICE CHECK
             // ============================================================
             if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
-                // ✅ FIXED: Better regex for part number extraction
-                const partMatch = text.toUpperCase().match(/[A-Z0-9]{8,20}/);
+                const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
-                    const partNumber = partMatch[0];
-                    console.log(`🔍 Looking up price for: ${partNumber}`);
-                    const product = await db.getProduct(partNumber);
+                    const product = await db.getProduct(partMatch[1]);
                     if (product) {
-                        console.log(`✅ Found product: ${product.part}`);
                         const billingPrice = product.billing_price || product.list_price || 0;
                         const priceWithGST = billingPrice * 1.18;
                         const gstAmount = billingPrice * 0.18;
@@ -206,24 +177,18 @@ async function handleWhatsAppMessage(message, from, type) {
                         
                         await sendWhatsAppMessage(from, reply);
                         return;
-                    } else {
-                        console.log(`❌ No product found for: ${partNumber}`);
                     }
                 }
             }
             
             // ============================================================
-            // STOCK CHECK - FIXED REGEX
+            // STOCK CHECK
             // ============================================================
             if (msgLower.includes('stock') || msgLower.includes('available')) {
-                // ✅ FIXED: Better regex for part number extraction
-                const partMatch = text.toUpperCase().match(/[A-Z0-9]{8,20}/);
+                const partMatch = text.match(/([A-Z0-9]{5,})/i);
                 if (partMatch) {
-                    const partNumber = partMatch[0];
-                    console.log(`🔍 Looking up stock for: ${partNumber}`);
-                    const product = await db.getProduct(partNumber);
+                    const product = await db.getProduct(partMatch[1]);
                     if (product) {
-                        console.log(`✅ Found product: ${product.part}`);
                         let reply = `📦 *Stock: ${product.part}*\n\n`;
                         reply += `📝 ${product.description}\n`;
                         reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
@@ -231,68 +196,34 @@ async function handleWhatsAppMessage(message, from, type) {
                         if (product.carton > 0) reply += ` | Carton: ${product.carton}`;
                         await sendWhatsAppMessage(from, reply);
                         return;
-                    } else {
-                        console.log(`❌ No product found for: ${partNumber}`);
                     }
                 }
             }
             
             // ============================================================
-            // ORDER COMMAND - FIXED REGEX
+            // ORDER COMMAND
             // ============================================================
             if (msgLower.includes('order') || msgLower.includes('buy')) {
-                // ✅ FIXED: Better regex for part number extraction with quantity
-                const orderMatch = text.toUpperCase().match(/(\d+)?\s*([A-Z0-9]{8,20})/);
-                if (orderMatch) {
-                    const qty = parseInt(orderMatch[1]) || 1;
-                    const partNumber = orderMatch[2];
-                    console.log(`🛒 Order: ${qty} x ${partNumber}`);
-                    
+                const partMatch = text.match(/(\d+)?\s*([A-Z0-9]{5,})/i);
+                if (partMatch) {
+                    const qty = parseInt(partMatch[1]) || 1;
+                    const partNumber = partMatch[2].toUpperCase();
                     const product = await db.getProduct(partNumber);
                     if (product) {
-                        console.log(`✅ Found product: ${product.part}`);
                         const billingPrice = product.billing_price || product.list_price || 0;
                         const priceWithGST = billingPrice * 1.18;
                         const total = priceWithGST * qty;
                         
-                        const cartItems = [{
-                            part: product.part,
-                            description: product.description,
-                            qty: qty,
-                            price: priceWithGST,
-                            list_price: product.list_price,
-                            mrp: product.mrp,
-                            billing_price: billingPrice
-                        }];
-                        
-                        await db.saveCart(from, cartItems, total, total);
-                        console.log(`✅ Cart saved for ${from}: ${qty} x ${product.part} = ₹${total.toFixed(2)}`);
-                        
                         let reply = `🛒 *Order: ${product.part} x${qty}*\n\n`;
                         reply += `📝 ${product.description}\n`;
-                        if (product.brand) reply += `🏷️ Brand: ${product.brand}\n`;
-                        if (product.list_price > 0) reply += `💰 LIST PRICE: ₹${product.list_price.toFixed(2)}\n`;
-                        if (product.mrp > 0) reply += `💰 MRP PRICE: ₹${product.mrp.toFixed(2)}\n`;
-                        reply += `💳 Billing Price: ₹${billingPrice.toFixed(2)}\n`;
-                        const gstAmount = billingPrice * 0.18;
-                        reply += `🧾 GST (18%): ₹${gstAmount.toFixed(2)}\n`;
-                        reply += `💳 ₹${priceWithGST.toFixed(2)} × ${qty} = ₹${total.toFixed(2)} (incl. GST)\n`;
+                        reply += `💰 ₹${priceWithGST.toFixed(2)} × ${qty} = ₹${total.toFixed(2)} (incl. GST)\n`;
                         reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}\n\n`;
-                        
-                        if (product.stock > 0 && product.stock >= qty) {
+                        if (product.stock > 0) {
                             reply += `✅ *Confirm order?* Reply "Confirm Order"`;
-                        } else if (product.stock > 0 && product.stock < qty) {
-                            reply += `⚠️ Only ${product.stock} pcs available (requested ${qty})\n\n`;
-                            reply += `✅ *Confirm partial order?* Reply "Confirm Order"`;
                         } else {
                             reply += `🔔 *We'll notify you when back in stock!*`;
                         }
-                        
                         await sendWhatsAppMessage(from, reply);
-                        return;
-                    } else {
-                        console.log(`❌ No product found for: ${partNumber}`);
-                        await sendWhatsAppMessage(from, `❌ Product "${partNumber}" not found. Please check the part number.`);
                         return;
                     }
                 }
@@ -302,7 +233,6 @@ async function handleWhatsAppMessage(message, from, type) {
             // CONFIRM ORDER
             // ============================================================
             if (msgLower === 'confirm order' || msgLower === 'confirm') {
-                console.log(`📋 Confirming order for ${from}`);
                 const cart = await db.getCart(from);
                 if (cart && cart.items) {
                     const items = JSON.parse(cart.items);
@@ -312,10 +242,6 @@ async function handleWhatsAppMessage(message, from, type) {
                     
                     let reply = `✅ *ORDER CONFIRMED!*\n\n`;
                     reply += `📦 Order ID: ${orderId}\n`;
-                    reply += `📝 Items:\n`;
-                    items.forEach(item => {
-                        reply += `   - ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
-                    });
                     reply += `💰 Total: ₹${cart.total.toFixed(2)}\n`;
                     reply += `📞 *Call:* ${process.env.BUSINESS_PHONE || '9830300193'}\n`;
                     reply += `🛒 *Shop:* https://autosparessolution.com`;
@@ -337,8 +263,10 @@ async function handleWhatsAppMessage(message, from, type) {
             }
             
             // ============================================================
-            // SEARCH PRODUCTS - Already searched above, use results
+            // SEARCH PRODUCTS
             // ============================================================
+            const results = await db.searchProducts(text, 5);
+            
             if (results.length > 0) {
                 let reply = `🔍 Found ${results.length} result(s)\n\n`;
                 
@@ -405,7 +333,6 @@ async function handleWhatsAppMessage(message, from, type) {
         
     } catch (error) {
         console.error(`❌ Message handler error: ${error.message}`);
-        console.error(error.stack);
         await sendWhatsAppMessage(from, '⚠️ Sorry, something went wrong. Please try again.');
     }
 }
