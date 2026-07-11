@@ -1,5 +1,5 @@
 // ============================================================
-// 🚀 ASSIST WhatsApp Webhook v3.0
+// 🚀 ASSIST WhatsApp Webhook v3.0 - FIXED
 // ============================================================
 
 const express = require('express');
@@ -213,12 +213,12 @@ app.post('/webhook', async (req, res) => {
 });
 
 // ============================================================
-// 🚀 START SERVER
+// 🚀 START SERVER - WITH DEBUG LOGGING
 // ============================================================
 
 async function startServer() {
     console.log('====================================');
-    console.log('🚀 ASSIST WhatsApp Webhook v3.0');
+    console.log('🚀 ASSIST WhatsApp Webhook v3.0 - FIXED');
     console.log(`📞 Business Phone: ${process.env.BUSINESS_PHONE || '9830300193'}`);
     console.log(`🗄️ Database: ${process.env.DB_PATH || './db/products.db'}`);
     console.log('====================================');
