@@ -1,15 +1,15 @@
 // ============================================================
 // 📦 ORDER PARSER - COMPLETE FIXED
-// Handles: Multi-line, multi-product, various formats
+// Handles: Multi-line, multi-product, ALL formats including:
+// "0802CAA08871N-2", "0802CAA08871N/2", "0802CAA08871Nx2", "0802CAA08871N 2"
 // ============================================================
 
 /**
  * Extract part numbers and quantities from ANY text format
  * IMPORTANT RULES:
- * 1. FIRST try to match the FULL part number with separators (A15979020-0200)
- * 2. If not found, try to match part number WITHOUT separators (A15979020)
- * 3. The quantity is the number AFTER the part number
- * 4. If part number has separator and number after it, that's PART of the part number
+ * 1. Quantity can be separated by: space, -, /, x, X, :, =
+ * 2. Part number is ALWAYS before the quantity
+ * 3. Support multiple formats: "PART-2", "PART/2", "PARTx2", "PART 2", "PART:2", "PART=2"
  */
 
 // ============================================================
@@ -26,151 +26,102 @@ function cleanText(text) {
 }
 
 // ============================================================
-// 🔍 EXTRACT PART NUMBER (Supports full part numbers with separators)
+// 🔍 EXTRACT PART NUMBER AND QUANTITY TOGETHER
 // ============================================================
 
-function extractPartNumber(text) {
+function extractPartAndQuantity(text) {
     if (!text) return null;
     
-    // Remove common quantity words first
-    let cleaned = text
-        .replace(/\b(pcs|nos|pc|no|qty|piece|pieces|units)\b/gi, '')
-        .replace(/\s*x\s*/gi, ' ')
-        .trim();
+    const trimmed = text.trim();
     
     // ============================================================
-    // STEP 1: Try to match FULL part number with separators
+    // PATTERN 1: PART-2 or PART/2 or PARTx2 or PARTX2
     // ============================================================
-    
-    // Pattern: Part with hyphen (A15979020-0200)
-    let match = cleaned.match(/\b([A-Z0-9]{1,15}[-][A-Z0-9]{1,10})\b/i);
+    let match = trimmed.match(/^([A-Z0-9]{3,20})\s*[-/xX:]\s*(\d+)\s*(?:pcs|nos|pc|no)?$/i);
     if (match) {
-        return match[1].toUpperCase();
+        return { part: match[1].toUpperCase(), qty: parseInt(match[2]) };
     }
     
-    // Pattern: Part with dot (A15979020.0200)
-    match = cleaned.match(/\b([A-Z0-9]{1,15}\.[A-Z0-9]{1,10})\b/i);
+    // ============================================================
+    // PATTERN 2: PART 2 (space separator)
+    // ============================================================
+    match = trimmed.match(/^([A-Z0-9]{3,20})\s+(\d+)\s*(?:pcs|nos|pc|no)?$/i);
     if (match) {
-        return match[1].toUpperCase();
+        return { part: match[1].toUpperCase(), qty: parseInt(match[2]) };
     }
     
-    // Pattern: Part with slash (A15979020/0200)
-    match = cleaned.match(/\b([A-Z0-9]{1,15}\/[A-Z0-9]{1,10})\b/i);
+    // ============================================================
+    // PATTERN 3: PART-2pcs or PART/2nos
+    // ============================================================
+    match = trimmed.match(/^([A-Z0-9]{3,20})\s*[-/xX:]\s*(\d+)\s*(pcs|nos|pc|no)$/i);
     if (match) {
-        return match[1].toUpperCase();
+        return { part: match[1].toUpperCase(), qty: parseInt(match[2]) };
     }
     
-    // Pattern: Part with space (A15979020 0200)
-    match = cleaned.match(/\b([A-Z0-9]{1,15})\s+([A-Z0-9]{1,10})\b/i);
+    // ============================================================
+    // PATTERN 4: PART (no quantity)
+    // ============================================================
+    match = trimmed.match(/^([A-Z0-9]{3,20})$/i);
     if (match) {
-        const firstPart = match[1].toUpperCase();
-        const secondPart = match[2].toUpperCase();
-        if (secondPart.length <= 5 || secondPart.startsWith('0')) {
-            return firstPart + secondPart;
+        return { part: match[1].toUpperCase(), qty: 1 };
+    }
+    
+    // ============================================================
+    // PATTERN 5: PART - 2 (space hyphen space)
+    // ============================================================
+    match = trimmed.match(/^([A-Z0-9]{3,20})\s+[-]\s+(\d+)$/i);
+    if (match) {
+        return { part: match[1].toUpperCase(), qty: parseInt(match[2]) };
+    }
+    
+    // ============================================================
+    // PATTERN 6: 2 PART (quantity first - rare but handle)
+    // ============================================================
+    match = trimmed.match(/^(\d+)\s+([A-Z0-9]{3,20})$/i);
+    if (match) {
+        return { part: match[2].toUpperCase(), qty: parseInt(match[1]) };
+    }
+    
+    // ============================================================
+    // PATTERN 7: PART (with hyphen in part number like A15979020-0200)
+    // ============================================================
+    match = trimmed.match(/^([A-Z0-9]{3,15}[-][A-Z0-9]{1,10})$/i);
+    if (match) {
+        return { part: match[1].toUpperCase(), qty: 1 };
+    }
+    
+    // ============================================================
+    // PATTERN 8: PART with separator and suffix (A15979020-0200-2)
+    // ============================================================
+    match = trimmed.match(/^([A-Z0-9]{3,15}[-][A-Z0-9]{1,10})\s*[-/xX:]\s*(\d+)$/i);
+    if (match) {
+        return { part: match[1].toUpperCase(), qty: parseInt(match[2]) };
+    }
+    
+    // ============================================================
+    // PATTERN 9: Extract part number from complex text
+    // ============================================================
+    const partMatch = trimmed.match(/\b([A-Z0-9]{5,20})\b/i);
+    if (partMatch) {
+        const part = partMatch[1].toUpperCase();
+        // Try to find quantity near the part
+        const qtyMatch = trimmed.match(new RegExp(part + '\\s*[-/xX:]\\s*(\\d+)', 'i'));
+        if (qtyMatch) {
+            return { part: part, qty: parseInt(qtyMatch[1]) };
         }
-        return firstPart;
-    }
-    
-    // ============================================================
-    // STEP 2: Try to match part number WITHOUT separators
-    // ============================================================
-    
-    // Pattern: Alphanumeric part number (A15979020)
-    match = cleaned.match(/\b([A-Z0-9]{3,15})\b/i);
-    if (match) {
-        const part = match[1].toUpperCase();
-        if (/^\d{1,4}$/.test(part)) {
-            return null;
+        // Try space separated
+        const spaceMatch = trimmed.match(new RegExp(part + '\\s+(\\d+)', 'i'));
+        if (spaceMatch) {
+            return { part: part, qty: parseInt(spaceMatch[1]) };
         }
-        return part;
+        return { part: part, qty: 1 };
     }
     
     return null;
 }
 
 // ============================================================
-// 🔍 EXTRACT QUANTITY (Number AFTER the part number)
-// ============================================================
-
-function extractQuantity(text, partNumber) {
-    if (!text) return null;
-    
-    let remaining = text;
-    if (partNumber) {
-        const escapedPart = partNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        remaining = text.replace(new RegExp(escapedPart, 'i'), '').trim();
-    }
-    
-    remaining = remaining
-        .replace(/\b(pcs|nos|pc|no|qty|piece|pieces|units|each)\b/gi, '')
-        .trim();
-    
-    const numbers = remaining.match(/\b(\d{1,6})\b/g);
-    if (numbers && numbers.length > 0) {
-        const qty = parseInt(numbers[0]);
-        if (qty > 0 && qty < 1000000) {
-            return qty;
-        }
-    }
-    
-    const qtyPatterns = [
-        text.match(/\b(\d{1,6})\s*(?:pcs|nos|pc|no|qty|piece|pieces)\b/i),
-        text.match(/\b(\d{1,6})\s*[xX]\b/),
-        text.match(/\b[pP][cC][sS]?\s*(\d{1,6})\b/),
-        text.match(/\b(\d{1,6})\s*$/)
-    ];
-    
-    for (const pattern of qtyPatterns) {
-        if (pattern) {
-            const qty = parseInt(pattern[1]);
-            if (qty > 0 && qty < 1000000) {
-                return qty;
-            }
-        }
-    }
-    
-    return null;
-}
-
-// ============================================================
-// 🔍 PARSE A SINGLE SEGMENT
-// ============================================================
-
-function parseSegment(segment) {
-    if (!segment || segment.trim() === '') return null;
-    
-    const trimmed = segment.trim();
-    console.log(`🔍 Parsing segment: "${trimmed}"`);
-    
-    const partNumber = extractPartNumber(trimmed);
-    console.log(`📦 Extracted part number: "${partNumber}"`);
-    
-    if (!partNumber) return null;
-    
-    let quantity = extractQuantity(trimmed, partNumber);
-    console.log(`📊 Extracted quantity: ${quantity}`);
-    
-    if (quantity === null || quantity === undefined) {
-        const numbers = trimmed.match(/\b(\d{1,6})\b/g);
-        if (numbers && numbers.length > 0) {
-            const lastNumber = parseInt(numbers[numbers.length - 1]);
-            if (lastNumber > 0 && lastNumber < 100000) {
-                quantity = lastNumber;
-                console.log(`📊 Using last number as quantity: ${quantity}`);
-            }
-        }
-    }
-    
-    if (quantity === null || quantity === undefined || quantity < 1) {
-        quantity = 1;
-    }
-    
-    console.log(`✅ Final: Part="${partNumber}", Qty=${quantity}`);
-    return { part: partNumber, qty: quantity };
-}
-
-// ============================================================
-// 📋 MAIN PARSE ORDER FUNCTION - FIXED FOR MULTI-LINE
+// 📋 MAIN PARSE ORDER FUNCTION - FIXED
 // ============================================================
 
 function parseOrder(text) {
@@ -185,8 +136,6 @@ function parseOrder(text) {
     // STEP 1: Split by new lines FIRST (for multi-line orders)
     // ============================================================
     let segments = [];
-    
-    // Split by new lines
     const lines = text.split(/\n/);
     if (lines.length > 1) {
         segments = lines.map(s => s.trim()).filter(s => s.length > 0);
@@ -204,30 +153,28 @@ function parseOrder(text) {
         console.log(`📝 Split by semicolons: ${segments.length} segments`);
     }
     
-    if (segments.length === 0) {
-        segments = text.split(/\s+and\s+/i).map(s => s.trim()).filter(s => s.length > 0);
-        console.log(`📝 Split by 'and': ${segments.length} segments`);
-    }
-    
-    if (segments.length === 0) {
-        segments = text.split('+').map(s => s.trim()).filter(s => s.length > 0);
-        console.log(`📝 Split by '+': ${segments.length} segments`);
-    }
-    
     // If still one segment, try to split by detecting multiple part numbers
     if (segments.length === 1 && segments[0].length > 15) {
-        // Look for pattern: "PART123 2 PART456 3"
-        const matches = segments[0].match(/\b([A-Z0-9]{5,20})\s*(\d+)\s*/gi);
+        const matches = segments[0].match(/\b([A-Z0-9]{5,20})\s*[-/xX:]?\s*\d*\s*/gi);
         if (matches && matches.length > 1) {
             segments = matches.map(s => s.trim());
             console.log(`📝 Split by multiple part patterns: ${segments.length} segments`);
         }
     }
     
+    // If still one segment, try to split by detecting multiple part numbers with separators
+    if (segments.length === 1 && segments[0].length > 15) {
+        const matches = segments[0].match(/[A-Z0-9]{5,20}(?:\s*[-/xX:]\s*\d+)?/gi);
+        if (matches && matches.length > 1) {
+            segments = matches.map(s => s.trim());
+            console.log(`📝 Split by regex patterns: ${segments.length} segments`);
+        }
+    }
+    
     console.log('📝 Segments:', segments);
     
     // ============================================================
-    // STEP 2: Parse each segment
+    // STEP 2: Parse each segment using the new extractor
     // ============================================================
     const items = [];
     const unparsed = [];
@@ -236,7 +183,9 @@ function parseOrder(text) {
     for (const segment of segments) {
         if (!segment || segment.trim() === '') continue;
         
-        const parsed = parseSegment(segment);
+        console.log(`🔍 Processing segment: "${segment}"`);
+        const parsed = extractPartAndQuantity(segment);
+        
         if (parsed && parsed.part) {
             if (!seenParts.has(parsed.part)) {
                 seenParts.add(parsed.part);
@@ -246,11 +195,15 @@ function parseOrder(text) {
                 console.log(`⚠️ Duplicate: ${parsed.part} - skipping`);
             }
         } else {
-            const partMatch = extractPartNumber(segment);
-            if (partMatch && !seenParts.has(partMatch)) {
-                seenParts.add(partMatch);
-                items.push({ part: partMatch, qty: 1 });
-                console.log(`✅ Extracted part only: ${partMatch} x1`);
+            // Try to extract part number without quantity
+            const partMatch = segment.match(/\b([A-Z0-9]{5,20})\b/i);
+            if (partMatch) {
+                const part = partMatch[1].toUpperCase();
+                if (!seenParts.has(part)) {
+                    seenParts.add(part);
+                    items.push({ part: part, qty: 1 });
+                    console.log(`✅ Extracted part only: ${part} x1`);
+                }
             } else {
                 unparsed.push(segment);
                 console.log(`⚠️ Unparsed: "${segment}"`);
@@ -265,15 +218,40 @@ function parseOrder(text) {
 }
 
 // ============================================================
+// 🔍 EXTRACT PART NUMBER (legacy support)
+// ============================================================
+
+function extractPartNumber(text) {
+    if (!text) return null;
+    const result = extractPartAndQuantity(text);
+    return result ? result.part : null;
+}
+
+// ============================================================
+// 🔍 EXTRACT QUANTITY (legacy support)
+// ============================================================
+
+function extractQuantity(text) {
+    if (!text) return null;
+    const result = extractPartAndQuantity(text);
+    return result ? result.qty : null;
+}
+
+// ============================================================
 // 🧪 TEST FUNCTION
 // ============================================================
 
 function testParser() {
     const testCases = [
+        { input: '0802CAA08871N-2\n0305HBF00031N-3', expected: [{ part: '0802CAA08871N', qty: 2 }, { part: '0305HBF00031N', qty: 3 }] },
+        { input: '0802CAA08871N/2\n0305HBF00031N/3', expected: [{ part: '0802CAA08871N', qty: 2 }, { part: '0305HBF00031N', qty: 3 }] },
+        { input: '0802CAA08871Nx2\n0305HBF00031Nx3', expected: [{ part: '0802CAA08871N', qty: 2 }, { part: '0305HBF00031N', qty: 3 }] },
         { input: '0802CAA08871N 2\n0305HBF00031N 3', expected: [{ part: '0802CAA08871N', qty: 2 }, { part: '0305HBF00031N', qty: 3 }] },
-        { input: '0801BA0285N\n0303BC0071N', expected: [{ part: '0801BA0285N', qty: 1 }, { part: '0303BC0071N', qty: 1 }] },
-        { input: '0801BA0285N 2, 0303BC0071N 3', expected: [{ part: '0801BA0285N', qty: 2 }, { part: '0303BC0071N', qty: 3 }] },
-        { input: '0801BA0285N 2\n0303BC0071N', expected: [{ part: '0801BA0285N', qty: 2 }, { part: '0303BC0071N', qty: 1 }] },
+        { input: '0802CAA08871N-2nos\n0305HBF00031N-3nos', expected: [{ part: '0802CAA08871N', qty: 2 }, { part: '0305HBF00031N', qty: 3 }] },
+        { input: '0802CAA08871N-2pc\n0305HBF00031N-3pc', expected: [{ part: '0802CAA08871N', qty: 2 }, { part: '0305HBF00031N', qty: 3 }] },
+        { input: '0802CAA08871N=2\n0305HBF00031N=3', expected: [{ part: '0802CAA08871N', qty: 2 }, { part: '0305HBF00031N', qty: 3 }] },
+        { input: '0802CAA08871N:2\n0305HBF00031N:3', expected: [{ part: '0802CAA08871N', qty: 2 }, { part: '0305HBF00031N', qty: 3 }] },
+        { input: '0802CAA08871N 2, 0305HBF00031N 3', expected: [{ part: '0802CAA08871N', qty: 2 }, { part: '0305HBF00031N', qty: 3 }] },
     ];
     
     console.log('🧪 Testing Order Parser...\n');
@@ -303,7 +281,7 @@ module.exports = {
     parseOrder,
     extractPartNumber,
     extractQuantity,
-    parseSegment,
+    extractPartAndQuantity,
     cleanText,
     testParser
 };
