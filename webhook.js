@@ -166,12 +166,14 @@ app.get('/api/test-gemini', async (req, res) => {
     const results = {
         gemini: {
             key: CONFIG.geminiKey ? '✅ Set' : '❌ Not set',
-            test: 'pending'
+            test: 'pending',
+            availableModels: []
         }
     };
     
     if (CONFIG.geminiKey) {
         try {
+            // Get available models
             const response = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models?key=${CONFIG.geminiKey}`
             );
@@ -180,9 +182,15 @@ app.get('/api/test-gemini', async (req, res) => {
             results.gemini.error = data.error?.message || null;
             
             if (response.ok && data.models) {
-                const hasVision = data.models.some(m => m.name.includes('flash') || m.name.includes('vision'));
-                results.gemini.hasVision = hasVision ? '✅' : '❌';
-                results.gemini.models = data.models.slice(0, 10).map(m => m.name);
+                // Filter models that support vision/generateContent
+                const visionModels = data.models.filter(m => 
+                    m.supportedGenerationMethods && 
+                    m.supportedGenerationMethods.includes('generateContent') &&
+                    (m.name.includes('flash') || m.name.includes('vision') || m.name.includes('pro'))
+                );
+                results.gemini.availableModels = visionModels.map(m => m.name);
+                results.gemini.hasVision = visionModels.length > 0 ? '✅' : '❌';
+                results.gemini.recommendedModel = visionModels.length > 0 ? visionModels[0].name : 'None';
             }
         } catch (error) {
             results.gemini.test = '❌ Error';
@@ -575,7 +583,7 @@ async function handleWhatsAppImage(message, from) {
 }
 
 // ============================================================
-// 🤖 GEMINI VISION - FIXED WITH AVAILABLE MODELS
+// 🤖 GEMINI VISION - UPDATED WITH LATEST AVAILABLE MODELS
 // ============================================================
 
 async function analyzeImageWithGemini(imageBuffer) {
@@ -610,8 +618,9 @@ async function analyzeImageWithGemini(imageBuffer) {
         const base64Image = buffer.toString('base64');
         console.log(`📸 Gemini Vision: Base64 length: ${base64Image.length}`);
         
-        // ✅ Use gemini-2.5-flash (available and supports vision)
-        const model = 'gemini-2.5-flash';
+        // ✅ Use gemini-3.5-flash (available from your model list)
+        // This model supports generateContent with images
+        const model = 'gemini-3.5-flash';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${CONFIG.geminiKey}`;
         console.log(`📸 Gemini Vision: Using model: ${model}`);
         
@@ -662,8 +671,12 @@ Return ONLY the JSON, no other text.`
             if (data.error.message && data.error.message.includes('quota')) {
                 console.log(`💡 Gemini quota exceeded. You may need to wait or upgrade.`);
             }
+            if (data.error.message && data.error.message.includes('no longer available')) {
+                console.log(`💡 Model no longer available. Trying fallback models...`);
+                return await analyzeImageWithGeminiFallback(imageBuffer);
+            }
             if (data.error.message && data.error.message.includes('not found')) {
-                console.log(`💡 Model not found. Trying fallback model...`);
+                console.log(`💡 Model not found. Trying fallback models...`);
                 return await analyzeImageWithGeminiFallback(imageBuffer);
             }
             return null;
@@ -686,16 +699,20 @@ Return ONLY the JSON, no other text.`
 }
 
 // ============================================================
-// 🤖 GEMINI VISION FALLBACK - Try alternative models
+// 🤖 GEMINI VISION FALLBACK - Try all available models
 // ============================================================
 
 async function analyzeImageWithGeminiFallback(imageBuffer) {
-    // Try multiple models in order of preference
+    // Try all available models from your list that support vision
     const fallbackModels = [
-        'gemini-2.0-flash',
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-3.0-flash',
         'gemini-2.0-flash-001',
         'gemini-flash-latest',
-        'gemini-2.5-flash'
+        'gemini-flash-lite-latest',
+        'gemini-2.0-flash-lite-001',
+        'gemini-3.1-flash-image'
     ];
     
     for (const model of fallbackModels) {
@@ -756,6 +773,15 @@ async function analyzeImageWithGeminiFallback(imageBuffer) {
             
             if (data.error) {
                 console.log(`❌ Gemini Vision Fallback Error for ${model}:`, data.error.message);
+                // If model no longer available, continue to next
+                if (data.error.message && data.error.message.includes('no longer available')) {
+                    console.log(`⏭️ Model ${model} no longer available, trying next...`);
+                    continue;
+                }
+                if (data.error.message && data.error.message.includes('not found')) {
+                    console.log(`⏭️ Model ${model} not found, trying next...`);
+                    continue;
+                }
             }
             
         } catch (error) {
@@ -964,7 +990,7 @@ async function getAIResponse(message, context = '') {
     if (CONFIG.geminiKey) {
         try {
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CONFIG.geminiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${CONFIG.geminiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1059,7 +1085,7 @@ Rules:
     if (CONFIG.geminiKey) {
         try {
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CONFIG.geminiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${CONFIG.geminiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
