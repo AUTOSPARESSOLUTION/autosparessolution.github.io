@@ -1,6 +1,6 @@
 // ============================================================
 // 🚀 ASSIST WhatsApp Webhook v3.0 - COMPLETE FIXED
-// Features: Multi-product first, AI order parsing, Full WhatsApp integration
+// Features: Exact match first, Multi-product, AI Vision, AI Order Parsing
 // Uses: ID, TOKEN, VERIFY, PHONE, CHATGPT_API_KEY, DEEPSEEK_API_KEY, GEMINI_KEY
 // ============================================================
 
@@ -474,7 +474,6 @@ async function getAIResponse(message, context = '') {
 async function aiParseOrder(text, detectedParts) {
     console.log(`🤖 AI Parsing order: "${text}"`);
     
-    // Prepare context for AI
     const context = `Customer sent: "${text}"
 Detected part numbers: ${detectedParts.join(', ')}
 
@@ -569,7 +568,6 @@ If quantity not specified, use 1.`
 
 function parseAIOrderResponse(content) {
     try {
-        // Try to find JSON in the response
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
@@ -582,6 +580,58 @@ function parseAIOrderResponse(content) {
         console.error('Parse AI order response error:', error.message);
         return null;
     }
+}
+
+// ============================================================
+// 🔍 CALCULATE SIMILARITY BETWEEN TWO STRINGS
+// ============================================================
+
+function calculateSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    
+    const s1 = str1.toUpperCase();
+    const s2 = str2.toUpperCase();
+    
+    // Exact match
+    if (s1 === s2) return 1.0;
+    
+    // Check if one contains the other
+    if (s1.includes(s2) || s2.includes(s1)) {
+        return 0.8;
+    }
+    
+    // Calculate Levenshtein distance
+    const longer = s1.length > s2.length ? s1 : s2;
+    const shorter = s1.length > s2.length ? s2 : s1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const distance = levenshteinDistance(longer, shorter);
+    return (longer.length - distance) / longer.length;
+}
+
+function levenshteinDistance(str1, str2) {
+    const m = str1.length;
+    const n = str2.length;
+    const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+    
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (str1[i - 1] === str2[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1];
+            } else {
+                dp[i][j] = Math.min(
+                    dp[i - 1][j] + 1,
+                    dp[i][j - 1] + 1,
+                    dp[i - 1][j - 1] + 1
+                );
+            }
+        }
+    }
+    return dp[m][n];
 }
 
 // ============================================================
@@ -840,7 +890,23 @@ async function processOrderFromText(text, from) {
     let outOfStock = [];
     
     for (const item of items) {
-        const product = await db.getProduct(item.part);
+        // ✅ Try EXACT match first
+        let product = await db.getProductExact(item.part);
+        
+        // If no exact match, try fuzzy
+        if (!product) {
+            console.log(`🔍 No exact match for ${item.part}, trying fuzzy...`);
+            const results = await db.searchProducts(item.part, 1);
+            if (results && results.length > 0) {
+                const firstResult = results[0];
+                const similarity = calculateSimilarity(item.part, firstResult.part);
+                if (similarity >= 0.7) {
+                    product = firstResult;
+                    console.log(`📦 Using fuzzy match: ${firstResult.part} (similarity: ${similarity})`);
+                }
+            }
+        }
+        
         if (product) {
             const billingPrice = product.billing_price || product.list_price || 0;
             const priceWithGST = billingPrice * 1.18;
@@ -848,6 +914,7 @@ async function processOrderFromText(text, from) {
             
             cartItems.push({
                 part: product.part,
+                requestedPart: item.part,
                 description: product.description,
                 qty: item.qty,
                 price: priceWithGST,
@@ -876,7 +943,11 @@ async function processOrderFromText(text, from) {
     
     for (const item of cartItems) {
         const itemTotal = item.price * item.qty;
-        reply += `*${item.part}* x${item.qty}\n`;
+        reply += `*${item.part}*`;
+        if (item.requestedPart && item.requestedPart !== item.part) {
+            reply += ` (matched: ${item.requestedPart})`;
+        }
+        reply += ` x${item.qty}\n`;
         reply += `📝 ${item.description}\n`;
         if (item.list_price > 0) reply += `💰 LIST: ₹${item.list_price.toFixed(2)}\n`;
         if (item.mrp > 0) reply += `💰 MRP: ₹${item.mrp.toFixed(2)}\n`;
@@ -1032,7 +1103,12 @@ async function handleWhatsAppMessage(message, from) {
         if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
             const partNumber = extractPartNumber(cleaned);
             if (partNumber) {
-                const product = await db.getProduct(partNumber);
+                // ✅ Try EXACT match first
+                let product = await db.getProductExact(partNumber);
+                if (!product) {
+                    product = await db.getProduct(partNumber);
+                }
+                
                 if (product) {
                     const billingPrice = product.billing_price || product.list_price || 0;
                     const priceWithGST = billingPrice * 1.18;
@@ -1065,7 +1141,12 @@ async function handleWhatsAppMessage(message, from) {
         if (msgLower.includes('stock') || msgLower.includes('available')) {
             const partNumber = extractPartNumber(cleaned);
             if (partNumber) {
-                const product = await db.getProduct(partNumber);
+                // ✅ Try EXACT match first
+                let product = await db.getProductExact(partNumber);
+                if (!product) {
+                    product = await db.getProduct(partNumber);
+                }
+                
                 if (product) {
                     let reply = `📦 *Stock: ${product.part}*\n\n`;
                     reply += `📝 ${product.description}\n`;
@@ -1139,7 +1220,7 @@ async function handleWhatsAppMessage(message, from) {
         console.log(`   Is multi-product: ${isMultiProduct}`);
         
         // ============================================================
-        // ✅ MULTI-PRODUCT PROCESSING
+        // ✅ MULTI-PRODUCT PROCESSING - WITH EXACT MATCH FIRST
         // ============================================================
         if (isMultiProduct) {
             console.log(`📋 Processing multi-product enquiry...`);
@@ -1156,7 +1237,6 @@ async function handleWhatsAppMessage(message, from) {
                     items = aiParsed;
                     console.log(`✅ AI parsed ${items.length} items:`, items);
                 } else {
-                    // Fallback: create items from unique parts
                     items = uniqueParts.map(part => ({ part, qty: 1 }));
                     console.log(`📦 Created ${items.length} items from part numbers`);
                 }
@@ -1168,13 +1248,30 @@ async function handleWhatsAppMessage(message, from) {
                 let outOfStock = [];
                 
                 for (const item of items) {
-                    const product = await db.getProduct(item.part);
+                    // ✅ Try EXACT match FIRST
+                    let product = await db.getProductExact(item.part);
+                    
+                    // If no exact match, try fuzzy search
+                    if (!product) {
+                        console.log(`🔍 No exact match for ${item.part}, trying fuzzy...`);
+                        const results = await db.searchProducts(item.part, 1);
+                        if (results && results.length > 0) {
+                            const firstResult = results[0];
+                            const similarity = calculateSimilarity(item.part, firstResult.part);
+                            if (similarity >= 0.7) {
+                                product = firstResult;
+                                console.log(`📦 Using fuzzy match: ${firstResult.part} (similarity: ${similarity})`);
+                            }
+                        }
+                    }
+                    
                     if (product) {
                         const billingPrice = product.billing_price || product.list_price || 0;
                         const priceWithGST = billingPrice * 1.18;
                         
                         foundItems.push({
                             part: product.part,
+                            requestedPart: item.part,
                             description: product.description,
                             qty: item.qty || 1,
                             price: priceWithGST,
@@ -1230,7 +1327,11 @@ async function handleWhatsAppMessage(message, from) {
                     let index = 1;
                     for (const item of foundItems) {
                         const itemTotal = item.price * item.qty;
+                        
                         reply += `${index}. *${item.part}*`;
+                        if (item.requestedPart && item.requestedPart !== item.part) {
+                            reply += ` (matched: ${item.requestedPart})`;
+                        }
                         if (item.qty > 1) reply += ` x${item.qty}`;
                         reply += `\n`;
                         reply += `📝 ${item.description}\n`;
@@ -1289,7 +1390,12 @@ async function handleWhatsAppMessage(message, from) {
         const quantity = extractQuantity(cleaned);
         
         if (partNumber && quantity && quantity > 0) {
-            const product = await db.getProduct(partNumber);
+            // ✅ Try EXACT match first
+            let product = await db.getProductExact(partNumber);
+            if (!product) {
+                product = await db.getProduct(partNumber);
+            }
+            
             if (product) {
                 const billingPrice = product.billing_price || product.list_price || 0;
                 const priceWithGST = billingPrice * 1.18;
@@ -1339,6 +1445,26 @@ async function handleWhatsAppMessage(message, from) {
         // STEP 8: SEARCH PRODUCTS (Single part number, no quantity)
         // ============================================================
         if (partNumber) {
+            // ✅ Try EXACT match first
+            let exactProduct = await db.getProductExact(partNumber);
+            
+            if (exactProduct) {
+                // Found exact match - show single product
+                let reply = `🔍 Found 1 result(s)\n\n`;
+                reply += formatProductForWhatsApp(exactProduct, 0);
+                reply += `\n`;
+                reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+                reply += `🛒 To order: Send part number with quantity\n`;
+                reply += `📝 Example: "${exactProduct.part} 2"\n`;
+                reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+                reply += `🛒 Order: https://autosparessolution.com\n`;
+                reply += `📞 Call: ${CONFIG.businessPhone}`;
+                
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+            
+            // No exact match - try fuzzy search
             const results = await db.searchProducts(partNumber, 5);
             if (results.length > 0) {
                 let reply = `🔍 Found ${results.length} result(s)\n\n`;
