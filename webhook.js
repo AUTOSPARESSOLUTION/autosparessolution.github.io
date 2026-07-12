@@ -635,7 +635,7 @@ function levenshteinDistance(str1, str2) {
 }
 
 // ============================================================
-// 🖼️ IMAGE HANDLING WITH AI VISION
+// 🖼️ COMPLETE FIXED IMAGE HANDLING
 // ============================================================
 
 async function handleWhatsAppImage(message, from) {
@@ -644,20 +644,41 @@ async function handleWhatsAppImage(message, from) {
         const caption = message.image.caption || "";
         const mimeType = message.image.mime_type || 'image/jpeg';
         
-        console.log(`📸 Processing image from: ${from}`);
+        console.log(`📸 ===== PROCESSING IMAGE =====`);
+        console.log(`📸 From: ${from}`);
         console.log(`📸 Media ID: ${mediaId}`);
+        console.log(`📸 MIME Type: ${mimeType}`);
         console.log(`📸 Caption: "${caption}"`);
+        console.log(`📸 AI Keys: ChatGPT=${CONFIG.chatgptKey ? '✅' : '❌'}, Gemini=${CONFIG.geminiKey ? '✅' : '❌'}`);
         
-        // Download image
-        const mediaUrl = await getMediaURL(mediaId);
-        console.log(`📸 Downloading from: ${mediaUrl}`);
-        const imageBuffer = await downloadMedia(mediaUrl);
-        console.log(`📸 Image size: ${imageBuffer.length} bytes`);
+        // ============================================================
+        // STEP 1: Download the image
+        // ============================================================
+        let imageBuffer;
+        try {
+            const mediaUrl = await getMediaURL(mediaId);
+            console.log(`📸 Downloading from: ${mediaUrl}`);
+            imageBuffer = await downloadMedia(mediaUrl);
+            console.log(`📸 Image size: ${imageBuffer.length} bytes`);
+        } catch (downloadError) {
+            console.error(`❌ Image download failed: ${downloadError.message}`);
+            await sendWhatsAppMessage(from, 
+                `📸 *Image Download Failed!*\n\n` +
+                `I couldn't download your image. Please try again.\n\n` +
+                `💡 Or send the part number directly.\n` +
+                `📝 Example: "0801BA0285N 2"\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
         
         let extractedItems = [];
         let source = 'none';
+        let errors = [];
         
-        // Try GPT-4o Vision
+        // ============================================================
+        // STEP 2: Try AI Vision (GPT-4o)
+        // ============================================================
         if (CONFIG.chatgptKey) {
             try {
                 console.log('🤖 Trying GPT-4o Vision...');
@@ -667,15 +688,27 @@ async function handleWhatsAppImage(message, from) {
                     if (parsed.items && parsed.items.length > 0) {
                         extractedItems = parsed.items;
                         source = 'gpt4o-vision';
-                        console.log(`✅ GPT-4o extracted ${extractedItems.length} items`);
+                        console.log(`✅ GPT-4o extracted ${extractedItems.length} items:`, extractedItems);
+                    } else {
+                        console.log(`⚠️ GPT-4o returned no items`);
+                        errors.push('GPT-4o: No items found');
                     }
+                } else {
+                    console.log(`⚠️ GPT-4o returned null`);
+                    errors.push('GPT-4o: No response');
                 }
             } catch (error) {
-                console.log('❌ GPT-4o Vision failed:', error.message);
+                console.log(`❌ GPT-4o Vision failed:`, error.message);
+                errors.push(`GPT-4o: ${error.message}`);
             }
+        } else {
+            console.log(`⚠️ ChatGPT key not set, skipping GPT-4o Vision`);
+            errors.push('GPT-4o: Key not set');
         }
         
-        // Try Gemini Vision
+        // ============================================================
+        // STEP 3: Try AI Vision (Gemini)
+        // ============================================================
         if (extractedItems.length === 0 && CONFIG.geminiKey) {
             try {
                 console.log('🤖 Trying Gemini Vision...');
@@ -685,28 +718,67 @@ async function handleWhatsAppImage(message, from) {
                     if (parsed.items && parsed.items.length > 0) {
                         extractedItems = parsed.items;
                         source = 'gemini-vision';
-                        console.log(`✅ Gemini extracted ${extractedItems.length} items`);
+                        console.log(`✅ Gemini extracted ${extractedItems.length} items:`, extractedItems);
+                    } else {
+                        console.log(`⚠️ Gemini returned no items`);
+                        errors.push('Gemini: No items found');
                     }
+                } else {
+                    console.log(`⚠️ Gemini returned null`);
+                    errors.push('Gemini: No response');
                 }
             } catch (error) {
-                console.log('❌ Gemini Vision failed:', error.message);
+                console.log(`❌ Gemini Vision failed:`, error.message);
+                errors.push(`Gemini: ${error.message}`);
+            }
+        } else if (!CONFIG.geminiKey) {
+            console.log(`⚠️ Gemini key not set, skipping Gemini Vision`);
+            errors.push('Gemini: Key not set');
+        }
+        
+        // ============================================================
+        // STEP 4: Try OCR (Tesseract) - Fallback
+        // ============================================================
+        if (extractedItems.length === 0) {
+            try {
+                console.log('🔍 Trying OCR (Tesseract)...');
+                const ocrResult = await extractOrderFromImage(imageBuffer, mimeType);
+                if (ocrResult.items && ocrResult.items.length > 0) {
+                    extractedItems = ocrResult.items;
+                    source = 'ocr';
+                    console.log(`✅ OCR extracted ${extractedItems.length} items:`, extractedItems);
+                } else {
+                    console.log(`⚠️ OCR returned no items`);
+                    errors.push('OCR: No items found');
+                }
+            } catch (error) {
+                console.log(`❌ OCR failed:`, error.message);
+                errors.push(`OCR: ${error.message}`);
             }
         }
         
-        // Try caption
+        // ============================================================
+        // STEP 5: Try caption if available
+        // ============================================================
         if (extractedItems.length === 0 && caption && caption.trim().length > 0) {
+            console.log(`🔍 Trying caption: "${caption}"`);
             const captionItems = extractItemsFromTextUltimate(caption);
             if (captionItems && captionItems.length > 0) {
                 extractedItems = captionItems;
                 source = 'caption';
-                console.log(`✅ Caption extracted ${extractedItems.length} items`);
+                console.log(`✅ Caption extracted ${extractedItems.length} items:`, extractedItems);
+            } else {
+                console.log(`⚠️ Caption returned no items`);
+                errors.push('Caption: No items found');
             }
         }
         
-        // Process items
+        // ============================================================
+        // STEP 6: Process extracted items
+        // ============================================================
         if (extractedItems.length > 0) {
+            console.log(`📝 Processing ${extractedItems.length} items from ${source}`);
             const orderText = extractedItems.map(i => `${i.part} ${i.qty || 1}`).join('\n');
-            console.log(`📝 Processing order from image: ${orderText}`);
             
             const reply = await processOrderFromText(orderText, from);
             if (reply) {
@@ -715,23 +787,58 @@ async function handleWhatsAppImage(message, from) {
             }
         }
         
+        // ============================================================
+        // STEP 7: No items found - send detailed error
+        // ============================================================
+        console.log(`❌ No items extracted. Errors:`, errors);
+        
+        let errorMessage = `📸 *Photo Received!*\n\n` +
+            `I couldn't read any part numbers from the image.\n\n`;
+        
+        // Show what we tried
+        errorMessage += `🔍 *Tried:*\n`;
+        if (CONFIG.chatgptKey) errorMessage += `• GPT-4o Vision ${errors.some(e => e.includes('GPT-4o')) ? '❌' : '✅'}\n`;
+        if (CONFIG.geminiKey) errorMessage += `• Gemini Vision ${errors.some(e => e.includes('Gemini')) ? '❌' : '✅'}\n`;
+        errorMessage += `• OCR (Tesseract) ${errors.some(e => e.includes('OCR')) ? '❌' : '✅'}\n`;
+        if (caption) errorMessage += `• Caption text ${errors.some(e => e.includes('Caption')) ? '❌' : '✅'}\n`;
+        
+        errorMessage += `\n💡 *Tips for better results:*\n` +
+            `• Take a clear photo with good lighting\n` +
+            `• Make sure part numbers are visible\n` +
+            `• Write part numbers clearly\n` +
+            `• Or send the part number directly:\n` +
+            `  📝 Example: "0801BA0285N 2"\n\n` +
+            `📞 Call: ${CONFIG.businessPhone}`;
+        
+        await sendWhatsAppMessage(from, errorMessage);
+        
+    } catch (error) {
+        console.error(`❌ Image handler error:`, error.message);
+        console.error(error.stack);
         await sendWhatsAppMessage(from, 
-            `📸 *Photo Received!*\n\n` +
-            `I couldn't read any part numbers from the image${caption ? ' or caption' : ''}.\n\n` +
+            `📸 *Sorry, I couldn't process your image.*\n\n` +
             `💡 Please send the part number directly.\n` +
             `📝 Example: "0801BA0285N 2"\n\n` +
             `📞 Call: ${CONFIG.businessPhone}`
         );
-        
-    } catch (error) {
-        console.error(`❌ Image error: ${error.message}`);
-        await sendWhatsAppMessage(from, `📸 Sorry, I couldn't process your image.\n\n📞 Call: ${CONFIG.businessPhone}`);
     }
 }
 
 async function analyzeImageWithGPT4o(imageBuffer) {
     try {
-        const base64Image = imageBuffer.toString('base64');
+        // Check image size and resize if needed
+        let buffer = imageBuffer;
+        if (buffer.length > 10 * 1024 * 1024) { // 10MB limit
+            console.log(`⚠️ Image too large: ${buffer.length} bytes, resizing...`);
+            const sharp = require('sharp');
+            buffer = await sharp(buffer)
+                .resize(1024, 1024, { fit: 'inside' })
+                .toBuffer();
+            console.log(`📸 Resized to: ${buffer.length} bytes`);
+        }
+        
+        const base64Image = buffer.toString('base64');
+        
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -747,8 +854,18 @@ async function analyzeImageWithGPT4o(imageBuffer) {
                             {
                                 type: 'text',
                                 text: `Extract all part numbers and quantities from this image.
-                                Return ONLY valid JSON: {"items":[{"part":"PART123","qty":2}]}
-                                If no quantities, set qty to 1.`
+
+INSTRUCTIONS:
+1. Look for part numbers (alphanumeric, 5-20 characters)
+2. Look for quantities (numbers after part numbers)
+3. Return ONLY valid JSON format
+4. If no quantities found, set qty to 1
+5. If multiple parts, list all of them
+
+Example response format:
+{"items":[{"part":"0801BA0285N","qty":2},{"part":"0303BC0071N","qty":1}]}
+
+Return ONLY the JSON, no other text.`
                             },
                             {
                                 type: 'image_url',
@@ -763,20 +880,36 @@ async function analyzeImageWithGPT4o(imageBuffer) {
                 temperature: 0
             })
         });
+        
         const data = await response.json();
         if (response.ok && data.choices?.[0]?.message?.content) {
+            console.log('✅ GPT-4o Vision response received');
             return data.choices[0].message.content;
         }
+        console.log('❌ GPT-4o Vision error:', data.error?.message || 'Unknown');
         return null;
+        
     } catch (error) {
-        console.error('GPT-4o Vision error:', error.message);
+        console.error('❌ GPT-4o Vision exception:', error.message);
         return null;
     }
 }
 
 async function analyzeImageWithGemini(imageBuffer) {
     try {
-        const base64Image = imageBuffer.toString('base64');
+        // Check image size and resize if needed
+        let buffer = imageBuffer;
+        if (buffer.length > 10 * 1024 * 1024) {
+            console.log(`⚠️ Image too large: ${buffer.length} bytes, resizing...`);
+            const sharp = require('sharp');
+            buffer = await sharp(buffer)
+                .resize(1024, 1024, { fit: 'inside' })
+                .toBuffer();
+            console.log(`📸 Resized to: ${buffer.length} bytes`);
+        }
+        
+        const base64Image = buffer.toString('base64');
+        
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${CONFIG.geminiKey}`,
             {
@@ -787,8 +920,17 @@ async function analyzeImageWithGemini(imageBuffer) {
                         parts: [
                             {
                                 text: `Extract all part numbers and quantities from this image.
-                                Return ONLY valid JSON: {"items":[{"part":"PART123","qty":2}]}
-                                If no quantities, set qty to 1.`
+
+INSTRUCTIONS:
+1. Look for part numbers (alphanumeric, 5-20 characters)
+2. Look for quantities (numbers after part numbers)
+3. Return ONLY valid JSON format
+4. If no quantities found, set qty to 1
+5. If multiple parts, list all of them
+
+Example: {"items":[{"part":"0801BA0285N","qty":2}]}
+
+Return ONLY the JSON, no other text.`
                             },
                             {
                                 inline_data: {
@@ -801,15 +943,146 @@ async function analyzeImageWithGemini(imageBuffer) {
                 })
             }
         );
+        
         const data = await response.json();
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+            console.log('✅ Gemini Vision response received');
             return data.candidates[0].content.parts[0].text;
         }
+        console.log('❌ Gemini Vision error:', data.error?.message || 'Unknown');
         return null;
+        
     } catch (error) {
-        console.error('Gemini Vision error:', error.message);
+        console.error('❌ Gemini Vision exception:', error.message);
         return null;
     }
+}
+
+async function getMediaURL(mediaId) {
+    try {
+        const url = `https://graph.facebook.com/v23.0/${mediaId}`;
+        console.log(`📸 Fetching media URL: ${url}`);
+        
+        const response = await fetch(url, {
+            headers: { 
+                'Authorization': `Bearer ${CONFIG.accessToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Media URL fetch failed: ${response.status} - ${errorText}`);
+            throw new Error(`Failed to get media URL: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`📸 Media URL response:`, JSON.stringify(data, null, 2));
+        
+        if (!data.url) {
+            throw new Error('No URL in media response');
+        }
+        
+        return data.url;
+    } catch (error) {
+        console.error(`❌ getMediaURL error:`, error.message);
+        throw error;
+    }
+}
+
+async function downloadMedia(mediaUrl) {
+    try {
+        console.log(`📸 Downloading from: ${mediaUrl}`);
+        
+        const response = await fetch(mediaUrl, {
+            headers: { 
+                'Authorization': `Bearer ${CONFIG.accessToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Media download failed: ${response.status} - ${errorText}`);
+            throw new Error(`Failed to download media: ${response.status}`);
+        }
+        
+        const buffer = await response.arrayBuffer();
+        console.log(`📸 Downloaded ${buffer.byteLength} bytes`);
+        return Buffer.from(buffer);
+    } catch (error) {
+        console.error(`❌ downloadMedia error:`, error.message);
+        throw error;
+    }
+}
+
+async function extractOrderFromImage(imageBuffer, mimeType) {
+    // This is your existing OCR function - kept as fallback
+    logger.info('🖼️ Extracting order from image using OCR...');
+    
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/tiff'];
+    if (!allowedTypes.includes(mimeType)) {
+        throw new Error('Unsupported image format.');
+    }
+    if (imageBuffer.length > CONFIG.maxImageSize) {
+        throw new Error('Image too large. Max size: 10MB');
+    }
+
+    const processedImage = await preprocessImageForOCR(imageBuffer);
+
+    try {
+        const Tesseract = require('tesseract.js');
+        const result = await Tesseract.recognize(processedImage, 'eng', {
+            logger: m => console.log(m.status)
+        });
+        return parseOCRText(result.data.text);
+    } catch (error) {
+        console.error(`❌ Tesseract OCR failed: ${error.message}`);
+        return { items: [] };
+    }
+}
+
+async function preprocessImageForOCR(imageBuffer) {
+    try {
+        const sharp = require('sharp');
+        return await sharp(imageBuffer)
+            .resize(2000, null, { withoutEnlargement: true })
+            .grayscale()
+            .sharpen()
+            .normalize()
+            .toBuffer();
+    } catch (error) {
+        console.warn(`⚠️ Image preprocessing failed: ${error.message}`);
+        return imageBuffer;
+    }
+}
+
+function parseOCRText(text) {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const items = [];
+    const patterns = [
+        { regex: /^([A-Z0-9А-Я\-]{5,30})\s*[=\-:|\/]\s*(\d+)$/i, hasQty: true },
+        { regex: /^(\d+)\s*[@Pp]\s*([A-Z0-9\-]{5,30})$/i, hasQty: true },
+        { regex: /^([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*[Xx]$/i, hasQty: true },
+        { regex: /^(\d+)\s+([A-Z0-9А-Я\-]{5,30})$/i, hasQty: true },
+        { regex: /^([A-Z0-9\-]{5,30})$/i, hasQty: false }
+    ];
+    
+    for (const line of lines) {
+        for (const pattern of patterns) {
+            const match = line.match(pattern.regex);
+            if (match) {
+                if (pattern.hasQty) {
+                    const qty = parseInt(match[2]) || 1;
+                    if (qty > 0 && qty < 1000000) {
+                        items.push({ part: match[1].toUpperCase(), qty });
+                    }
+                } else {
+                    items.push({ part: match[1].toUpperCase(), qty: 1 });
+                }
+                break;
+            }
+        }
+    }
+    return { items };
 }
 
 function parseAIResponse(content) {
@@ -826,23 +1099,6 @@ function parseAIResponse(content) {
         console.error('Parse AI response error:', error.message);
         return { items: [] };
     }
-}
-
-async function getMediaURL(mediaId) {
-    const url = `https://graph.facebook.com/v23.0/${mediaId}`;
-    const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${CONFIG.accessToken}` }
-    });
-    const data = await response.json();
-    return data.url;
-}
-
-async function downloadMedia(mediaUrl) {
-    const response = await fetch(mediaUrl, {
-        headers: { 'Authorization': `Bearer ${CONFIG.accessToken}` }
-    });
-    const buffer = await response.arrayBuffer();
-    return Buffer.from(buffer);
 }
 
 // ============================================================
