@@ -1,6 +1,7 @@
 // ============================================================
 // 📦 DATABASE MODULE - SQLite (COMPLETE FIXED)
 // Handles: Part numbers with and without separators
+// Added: getProductExact() for exact match first
 // ============================================================
 
 const sqlite3 = require('sqlite3').verbose();
@@ -281,7 +282,40 @@ function searchProducts(query, limit = 10) {
 }
 
 // ============================================================
-// 🔍 GET PRODUCT - Handles all part number formats
+// 🔍 GET PRODUCT BY EXACT PART NUMBER (NEW - EXACT MATCH FIRST)
+// ============================================================
+
+function getProductExact(part) {
+    return new Promise((resolve, reject) => {
+        const clean = part.trim().toUpperCase();
+        if (!clean || clean.length < 2) {
+            resolve(null);
+            return;
+        }
+        
+        // ✅ EXACT match only - case insensitive
+        db.get(
+            `SELECT * FROM products WHERE UPPER(part) = UPPER(?)`,
+            [clean],
+            (err, row) => {
+                if (err) {
+                    console.error('Get product exact error:', err.message);
+                    reject(err);
+                } else {
+                    if (row) {
+                        console.log(`✅ Exact match found: ${row.part}`);
+                    } else {
+                        console.log(`❌ No exact match for: ${clean}`);
+                    }
+                    resolve(row);
+                }
+            }
+        );
+    });
+}
+
+// ============================================================
+// 🔍 GET PRODUCT - Handles all part number formats (Fuzzy fallback)
 // ============================================================
 
 function getProduct(part) {
@@ -295,9 +329,9 @@ function getProduct(part) {
 
         // Clean the part number - remove spaces, hyphens, dots, slashes
         const cleanPart = cleanPartNumber(clean);
-        console.log(`🔍 GetProduct: Original="${clean}", Cleaned="${cleanPart}"`);
+        console.log(`🔍 GetProduct (Fuzzy): Original="${clean}", Cleaned="${cleanPart}"`);
         
-        // Try multiple search patterns
+        // Try multiple search patterns (fuzzy fallback)
         db.get(
             `SELECT *
              FROM products
@@ -320,7 +354,7 @@ function getProduct(part) {
                     reject(err);
                 } else {
                     if (row) {
-                        console.log(`✅ Found product: ${row.part}`);
+                        console.log(`✅ Found product (fuzzy): ${row.part}`);
                     } else {
                         console.log(`❌ No product found for: ${clean}`);
                     }
@@ -568,7 +602,8 @@ module.exports = {
     clearProducts,
     importProducts,
     searchProducts,
-    getProduct,
+    getProductExact,      // ✅ NEW - Exact match first
+    getProduct,           // Fuzzy fallback
     getProducts,
     getStats,
     getImportHistory,
