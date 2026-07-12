@@ -180,9 +180,9 @@ app.get('/api/test-gemini', async (req, res) => {
             results.gemini.error = data.error?.message || null;
             
             if (response.ok && data.models) {
-                const hasVision = data.models.some(m => m.name.includes('vision'));
+                const hasVision = data.models.some(m => m.name.includes('flash') || m.name.includes('vision'));
                 results.gemini.hasVision = hasVision ? '✅' : '❌';
-                results.gemini.models = data.models.slice(0, 5).map(m => m.name);
+                results.gemini.models = data.models.slice(0, 10).map(m => m.name);
             }
         } catch (error) {
             results.gemini.test = '❌ Error';
@@ -382,7 +382,7 @@ async function sendWhatsAppMessage(to, message) {
 }
 
 // ============================================================
-// 🖼️ IMAGE HANDLING - GEMINI PRIMARY (ChatGPT 5.5 doesn't support Vision)
+// 🖼️ IMAGE HANDLING - UPDATED WITH FIXED GEMINI MODELS
 // ============================================================
 
 async function handleWhatsAppImage(message, from) {
@@ -453,14 +453,49 @@ async function handleWhatsAppImage(message, from) {
         }
         
         // ============================================================
-        // STEP 3: Try OCR (Tesseract) - Fallback
+        // STEP 3: Try OCR (Tesseract) with preprocessing - Fallback
         // ============================================================
         if (extractedItems.length === 0) {
             try {
-                console.log('🔍 Trying OCR (Tesseract)...');
-                const ocrResult = await extractOrderFromImage(imageBuffer, mimeType);
-                if (ocrResult.items && ocrResult.items.length > 0) {
-                    extractedItems = ocrResult.items;
+                console.log('🔍 Trying OCR (Tesseract) with preprocessing...');
+                
+                // Preprocess image for better OCR
+                let processedBuffer = imageBuffer;
+                try {
+                    const sharp = require('sharp');
+                    processedBuffer = await sharp(imageBuffer)
+                        .resize(1200, null, { withoutEnlargement: true })
+                        .grayscale()
+                        .sharpen()
+                        .normalize()
+                        .toBuffer();
+                    console.log(`📸 Image preprocessed: ${processedBuffer.length} bytes`);
+                } catch (sharpError) {
+                    console.log(`⚠️ Sharp preprocessing failed, using original image`);
+                    processedBuffer = imageBuffer;
+                }
+                
+                // Run OCR with Tesseract
+                const Tesseract = require('tesseract.js');
+                const result = await Tesseract.recognize(
+                    processedBuffer,
+                    'eng',
+                    {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                console.log(`📸 OCR progress: ${Math.round(m.progress * 100)}%`);
+                            }
+                        }
+                    }
+                );
+                
+                const ocrText = result.data.text;
+                console.log(`📸 OCR Text:`, ocrText.substring(0, 300));
+                
+                // Extract items from OCR text
+                const items = extractItemsFromTextUltimate(ocrText);
+                if (items && items.length > 0) {
+                    extractedItems = items;
                     source = 'ocr';
                     console.log(`✅ OCR extracted ${extractedItems.length} items:`, extractedItems);
                 } else {
@@ -540,7 +575,7 @@ async function handleWhatsAppImage(message, from) {
 }
 
 // ============================================================
-// 🤖 GEMINI VISION - PRIMARY (Better than ChatGPT for images)
+// 🤖 GEMINI VISION - FIXED WITH AVAILABLE MODELS
 // ============================================================
 
 async function analyzeImageWithGemini(imageBuffer) {
@@ -575,9 +610,10 @@ async function analyzeImageWithGemini(imageBuffer) {
         const base64Image = buffer.toString('base64');
         console.log(`📸 Gemini Vision: Base64 length: ${base64Image.length}`);
         
-        // Gemini Vision API call
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${CONFIG.geminiKey}`;
-        console.log(`📸 Gemini Vision: Calling API...`);
+        // ✅ Use gemini-2.5-flash (available and supports vision)
+        const model = 'gemini-2.5-flash';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${CONFIG.geminiKey}`;
+        console.log(`📸 Gemini Vision: Using model: ${model}`);
         
         const response = await fetch(url, {
             method: 'POST',
@@ -606,7 +642,13 @@ Return ONLY the JSON, no other text.`
                             }
                         }
                     ]
-                }]
+                }],
+                generationConfig: {
+                    temperature: 0.1,
+                    topK: 1,
+                    topP: 0.1,
+                    maxOutputTokens: 1024
+                }
             })
         });
         
@@ -619,6 +661,10 @@ Return ONLY the JSON, no other text.`
             console.log(`❌ Gemini Vision Error:`, data.error.message);
             if (data.error.message && data.error.message.includes('quota')) {
                 console.log(`💡 Gemini quota exceeded. You may need to wait or upgrade.`);
+            }
+            if (data.error.message && data.error.message.includes('not found')) {
+                console.log(`💡 Model not found. Trying fallback model...`);
+                return await analyzeImageWithGeminiFallback(imageBuffer);
             }
             return null;
         }
@@ -637,6 +683,88 @@ Return ONLY the JSON, no other text.`
         console.error(`❌ Gemini Vision Exception:`, error.message);
         return null;
     }
+}
+
+// ============================================================
+// 🤖 GEMINI VISION FALLBACK - Try alternative models
+// ============================================================
+
+async function analyzeImageWithGeminiFallback(imageBuffer) {
+    // Try multiple models in order of preference
+    const fallbackModels = [
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-001',
+        'gemini-flash-latest',
+        'gemini-2.5-flash'
+    ];
+    
+    for (const model of fallbackModels) {
+        try {
+            console.log(`📸 Gemini Vision: Trying fallback model: ${model}`);
+            
+            // Resize if too large
+            let buffer = imageBuffer;
+            if (buffer.length > 3 * 1024 * 1024) {
+                try {
+                    const sharp = require('sharp');
+                    buffer = await sharp(buffer)
+                        .resize(800, 800, { fit: 'inside' })
+                        .jpeg({ quality: 80 })
+                        .toBuffer();
+                } catch (e) {
+                    buffer = imageBuffer;
+                }
+            }
+            
+            const base64Image = buffer.toString('base64');
+            
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${CONFIG.geminiKey}`;
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            {
+                                text: `Extract all part numbers and quantities from this image. Return ONLY valid JSON format: {"items":[{"part":"PART123","qty":2}]} If no quantities found, set qty to 1.`
+                            },
+                            {
+                                inline_data: {
+                                    mime_type: 'image/jpeg',
+                                    data: base64Image
+                                }
+                            }
+                        ]
+                    }],
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 1024
+                    }
+                })
+            });
+            
+            console.log(`📸 Gemini Vision Fallback: Response status: ${response.status} for model ${model}`);
+            
+            const data = await response.json();
+            
+            if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                const content = data.candidates[0].content.parts[0].text;
+                console.log(`✅ Gemini Vision Fallback: Success with ${model}!`);
+                return content;
+            }
+            
+            if (data.error) {
+                console.log(`❌ Gemini Vision Fallback Error for ${model}:`, data.error.message);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Gemini Vision Fallback Exception for ${model}:`, error.message);
+        }
+    }
+    
+    console.log(`❌ All Gemini Vision models failed`);
+    return null;
 }
 
 // ============================================================
@@ -716,22 +844,27 @@ function parseAIResponse(content) {
 }
 
 function extractItemsFromTextUltimate(text) {
+    if (!text) return [];
+    
     const items = [];
-    const lines = text.split(/[,;\n]/).map(l => l.trim()).filter(l => l.length > 0);
+    const lines = text.split(/[,;\n\r]/).map(l => l.trim()).filter(l => l.length > 0);
     
     for (const line of lines) {
+        // Pattern: PART123 2 or PART123:2 or PART123=2
         let match = line.match(/\b([A-Z0-9]{5,20})\s*[=\-:|\/]\s*(\d+)\b/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
             continue;
         }
         
+        // Pattern: 2 PART123
         match = line.match(/(\d+)\s+([A-Z0-9]{5,20})\b/i);
         if (match) {
             items.push({ part: match[2].toUpperCase(), qty: parseInt(match[1]) || 1 });
             continue;
         }
         
+        // Pattern: PART123 (no quantity)
         match = line.match(/\b([A-Z0-9]{5,20})\b/i);
         if (match) {
             items.push({ part: match[1].toUpperCase(), qty: 1 });
@@ -740,59 +873,6 @@ function extractItemsFromTextUltimate(text) {
     }
     
     return items;
-}
-
-async function extractOrderFromImage(imageBuffer, mimeType) {
-    console.log('🖼️ Extracting order from image using OCR...');
-    
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/tiff'];
-    if (!allowedTypes.includes(mimeType)) {
-        throw new Error('Unsupported image format.');
-    }
-    if (imageBuffer.length > 10 * 1024 * 1024) {
-        throw new Error('Image too large. Max size: 10MB');
-    }
-
-    try {
-        const Tesseract = require('tesseract.js');
-        const result = await Tesseract.recognize(imageBuffer, 'eng', {
-            logger: m => console.log(m.status)
-        });
-        return parseOCRText(result.data.text);
-    } catch (error) {
-        console.error(`❌ Tesseract OCR failed: ${error.message}`);
-        return { items: [] };
-    }
-}
-
-function parseOCRText(text) {
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    const items = [];
-    const patterns = [
-        { regex: /^([A-Z0-9А-Я\-]{5,30})\s*[=\-:|\/]\s*(\d+)$/i, hasQty: true },
-        { regex: /^(\d+)\s*[@Pp]\s*([A-Z0-9\-]{5,30})$/i, hasQty: true },
-        { regex: /^([A-Z0-9\-]{5,30})\s*[=\-:|\/]\s*(\d+)\s*[Xx]$/i, hasQty: true },
-        { regex: /^(\d+)\s+([A-Z0-9А-Я\-]{5,30})$/i, hasQty: true },
-        { regex: /^([A-Z0-9\-]{5,30})$/i, hasQty: false }
-    ];
-    
-    for (const line of lines) {
-        for (const pattern of patterns) {
-            const match = line.match(pattern.regex);
-            if (match) {
-                if (pattern.hasQty) {
-                    const qty = parseInt(match[2]) || 1;
-                    if (qty > 0 && qty < 1000000) {
-                        items.push({ part: match[1].toUpperCase(), qty });
-                    }
-                } else {
-                    items.push({ part: match[1].toUpperCase(), qty: 1 });
-                }
-                break;
-            }
-        }
-    }
-    return { items };
 }
 
 // ============================================================
@@ -884,7 +964,7 @@ async function getAIResponse(message, context = '') {
     if (CONFIG.geminiKey) {
         try {
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${CONFIG.geminiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CONFIG.geminiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -979,7 +1059,7 @@ Rules:
     if (CONFIG.geminiKey) {
         try {
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${CONFIG.geminiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CONFIG.geminiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
