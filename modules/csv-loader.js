@@ -1,5 +1,5 @@
 // ============================================================
-// 📦 CSV LOADER - Robust Import
+// 📦 CSV LOADER - Streaming Import
 // ============================================================
 
 const fs = require('fs');
@@ -23,11 +23,7 @@ function readCSV(filepath) {
         console.log(`📖 Reading CSV: ${filepath}`);
 
         fs.createReadStream(filepath)
-            .pipe(csv({
-                skipLines: 0,
-                strict: false,
-                trim: true
-            }))
+            .pipe(csv({ skipLines: 0, strict: false, trim: true }))
             .on('headers', (headers) => {
                 console.log(`📋 Headers: ${headers.join(', ')}`);
             })
@@ -35,34 +31,30 @@ function readCSV(filepath) {
                 rowCount++;
                 
                 try {
-                    const part = row['Material'] || 
-                                row['material'] || 
-                                row['Part No'] || 
-                                row['Part'] || 
-                                row['PART'] || 
-                                '';
-                    
+                    const part = row['Material'] || row['material'] || row['Part'] || '';
                     if (!part || part.trim() === '') return;
 
                     const cleanPart = part.trim();
-                    
                     if (seenParts.has(cleanPart.toUpperCase())) {
                         duplicates.push(cleanPart);
                         return;
                     }
                     seenParts.add(cleanPart.toUpperCase());
 
+                    let description = row['Material2'] || row['Description'] || row['Product Sub Group'] || 'Auto Spare Part';
+                    description = description.trim().replace(/\s+/g, ' ').replace(/^["']|["']$/g, '');
+
                     const product = {
                         part: cleanPart,
-                        description: row['Material2'] || row['Description'] || 'Auto Spare Part',
+                        description: description,
                         brand: row['brand'] || row['Brand'] || 'Unknown',
                         make: row['Make'] || row['make'] || '',
                         type: row['TYPE'] || row['Type'] || '',
                         finish: row['FINISH'] || row['Finish'] || '',
-                        list_price: parseFloat(row['LIST PRICE'] || row['List Price'] || 0) || 0,
-                        mrp: parseFloat(row['MRP PRICE'] || row['MRP Price'] || 0) || 0,
-                        billing_price: parseFloat(row['billing price'] || row['Billing Price'] || 0) || 0,
-                        stock: parseInt(row['STOCK'] || row['Stock'] || 0) || 0,
+                        list_price: parseFloat(row['LIST PRICE'] || 0) || 0,
+                        mrp: parseFloat(row['MRP PRICE'] || 0) || 0,
+                        billing_price: parseFloat(row['billing price'] || 0) || 0,
+                        stock: parseInt(row['STOCK'] || 0) || 0,
                         box_qty: parseInt(row['Box Qty'] || 0) || 0,
                         carton: parseInt(row['Carton'] || 0) || 0,
                         model: row['Model'] || row['model'] || '',
@@ -71,7 +63,7 @@ function readCSV(filepath) {
                         segment: row['Segment'] || '',
                         hsn: row['HSN'] || row['hsn'] || '',
                         gst: 18,
-                        most_selling: row['most_selling'] === '1' || row['Most Selling'] === '1'
+                        most_selling: row['most_selling'] === '1'
                     };
 
                     if (product.billing_price === 0) {
@@ -90,7 +82,6 @@ function readCSV(filepath) {
                 console.log(`   Products: ${products.length}`);
                 console.log(`   Duplicates: ${duplicates.length}`);
                 console.log(`   Errors: ${errors.length}`);
-                
                 resolve({ products, duplicates, errors, totalRows: rowCount, totalProducts: products.length });
             })
             .on('error', (error) => {
@@ -108,14 +99,7 @@ async function importCSV(filepath) {
         const result = await readCSV(filepath);
         
         if (result.products.length === 0) {
-            console.warn('⚠️ No products to import');
-            return {
-                success: false,
-                imported: 0,
-                total: 0,
-                duplicates: result.duplicates.length,
-                errors: result.errors.length
-            };
+            return { success: false, imported: 0, total: 0, duplicates: result.duplicates.length, errors: result.errors.length };
         }
 
         await db.clearProducts();
@@ -123,15 +107,6 @@ async function importCSV(filepath) {
 
         const importResult = await db.importProducts(result.products);
         console.log(`✅ Imported ${importResult.imported} products`);
-
-        await db.logImport(
-            path.basename(filepath),
-            result.totalProducts,
-            importResult.imported,
-            result.duplicates.length,
-            result.duplicates.length,
-            result.errors.length
-        );
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         console.log(`⏱️ Import completed in ${duration}s`);
