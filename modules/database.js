@@ -1,7 +1,5 @@
 // ============================================================
-// 📦 DATABASE MODULE - SQLite (COMPLETE FIXED)
-// Handles: Part numbers with and without separators
-// Added: getProductExact() for exact match first
+// 📦 DATABASE MODULE - Complete with Description Search
 // ============================================================
 
 const sqlite3 = require('sqlite3').verbose();
@@ -26,12 +24,11 @@ db.run('PRAGMA temp_store = MEMORY');
 db.run('PRAGMA cache_size = 10000');
 
 // ============================================================
-// 🔧 CLEAN PART NUMBER (Remove spaces, hyphens, dots, slashes)
+// 🔧 CLEAN PART NUMBER
 // ============================================================
 
 function cleanPartNumber(part) {
     if (!part) return '';
-    // Remove spaces, hyphens, dots, slashes
     return part.replace(/[\s\-\.\/]/g, '').toUpperCase().trim();
 }
 
@@ -79,28 +76,80 @@ function initDatabase() {
             });
 
             // Create indexes for fast search
-            db.run(`CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_products_make ON products(make)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_products_description ON products(description)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_products_model ON products(model)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_products_hsn ON products(hsn)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_products_clean_part ON products(part)`);
+            const indexes = [
+                'CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)',
+                'CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)',
+                'CREATE INDEX IF NOT EXISTS idx_products_make ON products(make)',
+                'CREATE INDEX IF NOT EXISTS idx_products_description ON products(description)',
+                'CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)',
+                'CREATE INDEX IF NOT EXISTS idx_products_model ON products(model)',
+                'CREATE INDEX IF NOT EXISTS idx_products_type ON products(type)',
+                'CREATE INDEX IF NOT EXISTS idx_products_segment ON products(segment)'
+            ];
 
-            // Import history
+            for (const sql of indexes) {
+                db.run(sql);
+            }
+            console.log('✅ Indexes created');
+
+            // Customer Enquiries
             db.run(`
-                CREATE TABLE IF NOT EXISTS import_history (
+                CREATE TABLE IF NOT EXISTS customer_enquiries (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    filename TEXT,
-                    total_products INTEGER,
-                    imported INTEGER,
-                    skipped INTEGER,
-                    duplicates INTEGER,
-                    errors INTEGER,
-                    started_at DATETIME,
-                    completed_at DATETIME,
-                    status TEXT
+                    phone TEXT NOT NULL,
+                    enquiry_type TEXT,
+                    enquiry_text TEXT,
+                    media_id TEXT,
+                    image_url TEXT,
+                    response_text TEXT,
+                    products_found TEXT,
+                    products_out_of_stock TEXT,
+                    status TEXT DEFAULT 'pending',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    processed_at DATETIME,
+                    metadata TEXT
+                )
+            `);
+
+            // Out of Stock Tracking
+            db.run(`
+                CREATE TABLE IF NOT EXISTS out_of_stock_tracking (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone TEXT NOT NULL,
+                    part TEXT NOT NULL,
+                    product_name TEXT,
+                    quantity INTEGER DEFAULT 1,
+                    status TEXT DEFAULT 'waiting',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    notified_at DATETIME,
+                    UNIQUE(phone, part)
+                )
+            `);
+
+            // Stock History
+            db.run(`
+                CREATE TABLE IF NOT EXISTS stock_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    part TEXT NOT NULL,
+                    old_stock INTEGER,
+                    new_stock INTEGER,
+                    change_amount INTEGER,
+                    source TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            // Notification Log
+            db.run(`
+                CREATE TABLE IF NOT EXISTS notification_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone TEXT NOT NULL,
+                    type TEXT,
+                    title TEXT,
+                    message TEXT,
+                    status TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    sent_at DATETIME
                 )
             `);
 
@@ -131,13 +180,188 @@ function initDatabase() {
                 )
             `);
 
+            // Import history
+            db.run(`
+                CREATE TABLE IF NOT EXISTS import_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename TEXT,
+                    total_products INTEGER,
+                    imported INTEGER,
+                    skipped INTEGER,
+                    duplicates INTEGER,
+                    errors INTEGER,
+                    started_at DATETIME,
+                    completed_at DATETIME,
+                    status TEXT
+                )
+            `);
+
+            // Create additional indexes for logging
+            const logIndexes = [
+                'CREATE INDEX IF NOT EXISTS idx_enquiries_phone ON customer_enquiries(phone)',
+                'CREATE INDEX IF NOT EXISTS idx_enquiries_created ON customer_enquiries(created_at)',
+                'CREATE INDEX IF NOT EXISTS idx_tracking_phone ON out_of_stock_tracking(phone)',
+                'CREATE INDEX IF NOT EXISTS idx_tracking_part ON out_of_stock_tracking(part)',
+                'CREATE INDEX IF NOT EXISTS idx_stock_history_part ON stock_history(part)',
+                'CREATE INDEX IF NOT EXISTS idx_notifications_phone ON notification_log(phone)'
+            ];
+
+            for (const sql of logIndexes) {
+                db.run(sql);
+            }
+
             resolve();
         });
     });
 }
 
 // ============================================================
-// 📦 DATABASE OPERATIONS
+// 🔍 SEARCH PRODUCTS - With description support
+// ============================================================
+
+function searchProducts(query, limit = 20) {
+    return new Promise((resolve, reject) => {
+        const clean = query.trim();
+        if (clean.length < 2) {
+            resolve([]);
+            return;
+        }
+
+        const cleanQuery = cleanPartNumber(clean);
+        const searchPattern = `%${cleanQuery}%`;
+        const originalPattern = `%${clean.toUpperCase()}%`;
+        const descPattern = `%${clean}%`;
+
+        const sql = `
+            SELECT *,
+                   CASE 
+                       WHEN UPPER(part) = UPPER(?) THEN 100 
+                       WHEN UPPER(part) = UPPER(?) THEN 100 
+                       WHEN UPPER(part) LIKE UPPER(?) THEN 50 
+                       WHEN UPPER(part) LIKE UPPER(?) THEN 30 
+                       WHEN UPPER(description) LIKE UPPER(?) THEN 25 
+                       WHEN UPPER(description) LIKE UPPER(?) THEN 20 
+                       WHEN UPPER(brand) LIKE UPPER(?) THEN 15 
+                       WHEN UPPER(make) LIKE UPPER(?) THEN 15 
+                       WHEN UPPER(model) LIKE UPPER(?) THEN 15 
+                       WHEN UPPER(type) LIKE UPPER(?) THEN 10 
+                       ELSE 0 
+                   END as relevance
+            FROM products
+            WHERE UPPER(part) = UPPER(?)
+               OR UPPER(part) = UPPER(?)
+               OR UPPER(part) LIKE UPPER(?)
+               OR UPPER(part) LIKE UPPER(?)
+               OR UPPER(description) LIKE UPPER(?)
+               OR UPPER(description) LIKE UPPER(?)
+               OR UPPER(brand) LIKE UPPER(?)
+               OR UPPER(make) LIKE UPPER(?)
+               OR UPPER(model) LIKE UPPER(?)
+               OR UPPER(type) LIKE UPPER(?)
+            ORDER BY relevance DESC, stock DESC
+            LIMIT ?
+        `;
+
+        db.all(sql, [
+            clean, cleanQuery, searchPattern, originalPattern,
+            descPattern, searchPattern, originalPattern,
+            originalPattern, originalPattern, originalPattern,
+            clean, cleanQuery, searchPattern, originalPattern,
+            descPattern, searchPattern, originalPattern,
+            originalPattern, originalPattern, originalPattern,
+            limit
+        ], (err, rows) => {
+            if (err) {
+                console.error('Search error:', err.message);
+                reject(err);
+            } else {
+                resolve(rows || []);
+            }
+        });
+    });
+}
+
+// ============================================================
+// GET PRODUCT EXACT
+// ============================================================
+
+function getProductExact(part) {
+    return new Promise((resolve, reject) => {
+        const clean = part.trim().toUpperCase();
+        if (!clean || clean.length < 2) {
+            resolve(null);
+            return;
+        }
+        db.get('SELECT * FROM products WHERE UPPER(part) = UPPER(?)', [clean], (err, row) => {
+            if (err) {
+                console.error('Get product exact error:', err.message);
+                reject(err);
+            } else {
+                resolve(row || null);
+            }
+        });
+    });
+}
+
+// ============================================================
+// GET PRODUCT (Fuzzy)
+// ============================================================
+
+function getProduct(part) {
+    return new Promise((resolve, reject) => {
+        const clean = part.trim();
+        if (!clean || clean.length < 2) {
+            resolve(null);
+            return;
+        }
+
+        const cleanPart = cleanPartNumber(clean);
+        db.get(
+            `SELECT * FROM products
+             WHERE UPPER(part) = UPPER(?)
+                OR UPPER(part) = UPPER(?)
+                OR UPPER(part) LIKE UPPER(?)
+                OR UPPER(part) LIKE UPPER(?)
+             LIMIT 1`,
+            [clean, cleanPart, `%${cleanPart}%`, `%${clean}%`],
+            (err, row) => {
+                if (err) {
+                    console.error('Get product error:', err.message);
+                    reject(err);
+                } else {
+                    resolve(row || null);
+                }
+            }
+        );
+    });
+}
+
+// ============================================================
+// GET STATS
+// ============================================================
+
+function getStats() {
+    return new Promise((resolve, reject) => {
+        db.get(`
+            SELECT 
+                COUNT(*) as total_products,
+                SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END) as in_stock,
+                SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END) as out_of_stock,
+                SUM(stock) as total_stock
+            FROM products
+        `, (err, row) => {
+            if (err) {
+                console.error('Stats error:', err.message);
+                reject(err);
+            } else {
+                resolve(row || { total_products: 0, in_stock: 0, out_of_stock: 0, total_stock: 0 });
+            }
+        });
+    });
+}
+
+// ============================================================
+// CLEAR PRODUCTS
 // ============================================================
 
 function clearProducts() {
@@ -148,6 +372,10 @@ function clearProducts() {
         });
     });
 }
+
+// ============================================================
+// IMPORT PRODUCTS
+// ============================================================
 
 function importProducts(products) {
     return new Promise((resolve, reject) => {
@@ -171,7 +399,7 @@ function importProducts(products) {
                     stmt.run(
                         p.part,
                         p.description || '',
-                        p.brand || '',
+                        p.brand || 'Unknown',
                         p.make || '',
                         p.type || '',
                         p.finish || '',
@@ -206,274 +434,7 @@ function importProducts(products) {
 }
 
 // ============================================================
-// 🔍 SEARCH PRODUCTS - Handles all part number formats
-// ============================================================
-
-function searchProducts(query, limit = 10) {
-    return new Promise((resolve, reject) => {
-        const clean = query.trim();
-        
-        if (clean.length < 2) {
-            resolve([]);
-            return;
-        }
-
-        // Clean the query - remove spaces, hyphens, dots, slashes
-        const cleanQuery = cleanPartNumber(clean);
-        const searchPattern = `%${cleanQuery}%`;
-        const originalPattern = `%${clean.toUpperCase()}%`;
-        
-        console.log(`🔍 Search: Original="${clean}", Cleaned="${cleanQuery}"`);
-        
-        const sql = `
-            SELECT *,
-                   CASE 
-                       WHEN UPPER(part) = UPPER(?) THEN 100 
-                       WHEN UPPER(part) = UPPER(?) THEN 100 
-                       WHEN UPPER(part) LIKE UPPER(?) THEN 50 
-                       WHEN UPPER(part) LIKE UPPER(?) THEN 30 
-                       WHEN UPPER(description) LIKE UPPER(?) THEN 20 
-                       WHEN UPPER(brand) LIKE UPPER(?) THEN 15 
-                       WHEN UPPER(make) LIKE UPPER(?) THEN 15 
-                       ELSE 0 
-                   END as relevance
-            FROM products
-            WHERE UPPER(part) = UPPER(?)
-               OR UPPER(part) = UPPER(?)
-               OR UPPER(part) LIKE UPPER(?)
-               OR UPPER(part) LIKE UPPER(?)
-               OR UPPER(description) LIKE UPPER(?)
-               OR UPPER(brand) LIKE UPPER(?)
-               OR UPPER(make) LIKE UPPER(?)
-               OR UPPER(model) LIKE UPPER(?)
-               OR UPPER(hsn) LIKE UPPER(?)
-            ORDER BY relevance DESC, stock DESC
-            LIMIT ?
-        `;
-        
-        db.all(sql, [
-            clean,              // exact match boost (original)
-            cleanQuery,         // exact match boost (cleaned)
-            searchPattern,      // part contains (cleaned)
-            originalPattern,    // part contains (original)
-            originalPattern,    // description contains
-            originalPattern,    // brand contains
-            originalPattern,    // make contains
-            clean,              // WHERE: original
-            cleanQuery,         // WHERE: cleaned
-            searchPattern,      // WHERE: part LIKE (cleaned)
-            originalPattern,    // WHERE: part LIKE (original)
-            originalPattern,    // WHERE: description LIKE
-            originalPattern,    // WHERE: brand LIKE
-            originalPattern,    // WHERE: make LIKE
-            originalPattern,    // WHERE: model LIKE
-            originalPattern,    // WHERE: hsn LIKE
-            limit
-        ], (err, rows) => {
-            if (err) {
-                console.error('Search error:', err.message);
-                reject(err);
-            } else {
-                console.log(`📊 Found ${rows?.length || 0} results for "${clean}"`);
-                resolve(rows || []);
-            }
-        });
-    });
-}
-
-// ============================================================
-// 🔍 GET PRODUCT BY EXACT PART NUMBER (NEW - EXACT MATCH FIRST)
-// ============================================================
-
-function getProductExact(part) {
-    return new Promise((resolve, reject) => {
-        const clean = part.trim().toUpperCase();
-        if (!clean || clean.length < 2) {
-            resolve(null);
-            return;
-        }
-        
-        // ✅ EXACT match only - case insensitive
-        db.get(
-            `SELECT * FROM products WHERE UPPER(part) = UPPER(?)`,
-            [clean],
-            (err, row) => {
-                if (err) {
-                    console.error('Get product exact error:', err.message);
-                    reject(err);
-                } else {
-                    if (row) {
-                        console.log(`✅ Exact match found: ${row.part}`);
-                    } else {
-                        console.log(`❌ No exact match for: ${clean}`);
-                    }
-                    resolve(row);
-                }
-            }
-        );
-    });
-}
-
-// ============================================================
-// 🔍 GET PRODUCT - Handles all part number formats (Fuzzy fallback)
-// ============================================================
-
-function getProduct(part) {
-    return new Promise((resolve, reject) => {
-        const clean = part.trim();
-        
-        if (!clean || clean.length < 2) {
-            resolve(null);
-            return;
-        }
-
-        // Clean the part number - remove spaces, hyphens, dots, slashes
-        const cleanPart = cleanPartNumber(clean);
-        console.log(`🔍 GetProduct (Fuzzy): Original="${clean}", Cleaned="${cleanPart}"`);
-        
-        // Try multiple search patterns (fuzzy fallback)
-        db.get(
-            `SELECT *
-             FROM products
-             WHERE UPPER(part) = UPPER(?)
-                OR UPPER(part) = UPPER(?)
-                OR UPPER(part) LIKE UPPER(?)
-                OR UPPER(part) LIKE UPPER(?)
-                OR UPPER(part) LIKE UPPER(?)
-             LIMIT 1`,
-            [
-                clean,              // Original with spaces/hyphens
-                cleanPart,          // Cleaned version
-                `%${cleanPart}%`,   // Partial match (cleaned)
-                `%${clean}%`,       // Partial match (original)
-                `%${cleanPart.slice(0, 6)}%` // Prefix match
-            ],
-            (err, row) => {
-                if (err) {
-                    console.error('Get product error:', err.message);
-                    reject(err);
-                } else {
-                    if (row) {
-                        console.log(`✅ Found product (fuzzy): ${row.part}`);
-                    } else {
-                        console.log(`❌ No product found for: ${clean}`);
-                    }
-                    resolve(row);
-                }
-            }
-        );
-    });
-}
-
-// ============================================================
-// 🔍 GET PRODUCTS BY MULTIPLE PART NUMBERS
-// ============================================================
-
-function getProducts(parts) {
-    return new Promise((resolve, reject) => {
-        if (!parts || parts.length === 0) {
-            resolve([]);
-            return;
-        }
-
-        // Clean all part numbers
-        const cleanedParts = parts.map(p => cleanPartNumber(p));
-        
-        // Build query with placeholders
-        const placeholders = cleanedParts.map(() => '?').join(',');
-        const sql = `
-            SELECT * FROM products 
-            WHERE UPPER(part) IN (${placeholders})
-               OR UPPER(part) IN (${placeholders.map(() => '?').join(',')})
-               OR UPPER(part) LIKE UPPER(?)
-               OR UPPER(part) LIKE UPPER(?)
-        `;
-        
-        // Combine both original and cleaned for matching
-        const params = [
-            ...cleanedParts, 
-            ...parts.map(p => p.toUpperCase()),
-            `%${cleanedParts[0] || ''}%`,
-            `%${(parts[0] || '').toUpperCase()}%`
-        ];
-        
-        db.all(sql, params, (err, rows) => {
-            if (err) {
-                console.error('Get products error:', err.message);
-                reject(err);
-            } else {
-                console.log(`✅ Found ${rows?.length || 0} products`);
-                resolve(rows || []);
-            }
-        });
-    });
-}
-
-// ============================================================
-// 📊 GET STATS
-// ============================================================
-
-function getStats() {
-    return new Promise((resolve, reject) => {
-        db.get(`
-            SELECT 
-                COUNT(*) as total_products,
-                SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END) as in_stock,
-                SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END) as out_of_stock,
-                SUM(stock) as total_stock,
-                AVG(stock) as avg_stock,
-                SUM(list_price * stock) as total_value,
-                SUM(CASE WHEN most_selling = 1 THEN 1 ELSE 0 END) as best_sellers
-            FROM products
-        `, (err, row) => {
-            if (err) {
-                console.error('Stats error:', err.message);
-                reject(err);
-            } else {
-                console.log(`📊 Database Stats: ${row?.total_products || 0} products, ${row?.in_stock || 0} in stock`);
-                resolve(row || { total_products: 0, in_stock: 0, out_of_stock: 0, total_stock: 0, avg_stock: 0, total_value: 0, best_sellers: 0 });
-            }
-        });
-    });
-}
-
-// ============================================================
-// 📋 GET IMPORT HISTORY
-// ============================================================
-
-function getImportHistory(limit = 10) {
-    return new Promise((resolve, reject) => {
-        db.all(`
-            SELECT * FROM import_history 
-            ORDER BY id DESC 
-            LIMIT ?
-        `, [limit], (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows || []);
-        });
-    });
-}
-
-// ============================================================
-// 📝 LOG IMPORT
-// ============================================================
-
-function logImport(filename, total, imported, skipped, duplicates, errors) {
-    return new Promise((resolve, reject) => {
-        db.run(`
-            INSERT INTO import_history (
-                filename, total_products, imported, skipped, duplicates, errors,
-                started_at, completed_at, status
-            ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)
-        `, [filename, total, imported, skipped, duplicates, errors, errors > 0 ? 'completed_with_errors' : 'completed'], function(err) {
-            if (err) reject(err);
-            else resolve(this.lastID);
-        });
-    });
-}
-
-// ============================================================
-// 🛒 CART OPERATIONS
+// CART FUNCTIONS
 // ============================================================
 
 function saveCart(phone, items, subtotal, total) {
@@ -482,13 +443,8 @@ function saveCart(phone, items, subtotal, total) {
             INSERT OR REPLACE INTO carts (phone, items, subtotal, total, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         `, [phone, JSON.stringify(items), subtotal, total], (err) => {
-            if (err) {
-                console.error('Save cart error:', err.message);
-                reject(err);
-            } else {
-                console.log(`✅ Cart saved for ${phone}: ${items.length} items, total: ₹${total.toFixed(2)}`);
-                resolve();
-            }
+            if (err) reject(err);
+            else resolve();
         });
     });
 }
@@ -496,12 +452,8 @@ function saveCart(phone, items, subtotal, total) {
 function getCart(phone) {
     return new Promise((resolve, reject) => {
         db.get('SELECT * FROM carts WHERE phone = ?', [phone], (err, row) => {
-            if (err) {
-                console.error('Get cart error:', err.message);
-                reject(err);
-            } else {
-                resolve(row);
-            }
+            if (err) reject(err);
+            else resolve(row || null);
         });
     });
 }
@@ -516,7 +468,7 @@ function clearCart(phone) {
 }
 
 // ============================================================
-// 📋 ORDER OPERATIONS
+// ORDER FUNCTIONS
 // ============================================================
 
 function saveOrder(orderId, phone, items, total) {
@@ -531,69 +483,8 @@ function saveOrder(orderId, phone, items, total) {
     });
 }
 
-function getOrders(phone, limit = 10) {
-    return new Promise((resolve, reject) => {
-        db.all(`
-            SELECT * FROM orders 
-            WHERE phone = ? 
-            ORDER BY created_at DESC 
-            LIMIT ?
-        `, [phone, limit], (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows || []);
-        });
-    });
-}
-
 // ============================================================
-// 🔍 SUGGEST PRODUCTS
-// ============================================================
-
-function suggestProducts(query, limit = 5) {
-    return new Promise((resolve, reject) => {
-        const clean = query.trim();
-        if (clean.length < 2) {
-            resolve([]);
-            return;
-        }
-
-        const cleanQuery = cleanPartNumber(clean);
-        const searchPattern = `%${cleanQuery}%`;
-        
-        const sql = `
-            SELECT part, description, brand, stock
-            FROM products
-            WHERE UPPER(part) LIKE UPPER(?)
-               OR UPPER(description) LIKE UPPER(?)
-            ORDER BY 
-                CASE WHEN UPPER(part) = UPPER(?) THEN 1 ELSE 0 END,
-                stock DESC,
-                part ASC
-            LIMIT ?
-        `;
-        
-        db.all(sql, [searchPattern, searchPattern, cleanQuery, limit], (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows || []);
-        });
-    });
-}
-
-// ============================================================
-// 🚪 CLOSE DATABASE
-// ============================================================
-
-function closeDatabase() {
-    return new Promise((resolve, reject) => {
-        db.close((err) => {
-            if (err) reject(err);
-            else resolve();
-        });
-    });
-}
-
-// ============================================================
-// 🚀 EXPORT
+// EXPORT
 // ============================================================
 
 module.exports = {
@@ -602,18 +493,12 @@ module.exports = {
     clearProducts,
     importProducts,
     searchProducts,
-    getProductExact,      // ✅ NEW - Exact match first
-    getProduct,           // Fuzzy fallback
-    getProducts,
+    getProductExact,
+    getProduct,
     getStats,
-    getImportHistory,
-    logImport,
     saveCart,
     getCart,
     clearCart,
     saveOrder,
-    getOrders,
-    suggestProducts,
-    cleanPartNumber,
-    closeDatabase
+    cleanPartNumber
 };
