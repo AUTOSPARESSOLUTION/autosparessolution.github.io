@@ -1,5 +1,5 @@
 // ============================================================
-// 🚀 ASSIST WhatsApp Webhook v3.0 - PRODUCTION READY
+// 🚀 ASSIST WhatsApp Webhook v3.0 - COMPLETE FIXED
 // Features: 
 //   - Memory optimized (streaming, lazy loading)
 //   - Description search
@@ -8,6 +8,7 @@
 //   - Anti-crash with duplicate detection
 //   - Auto restock scheduler
 //   - Gemini AI fallback with web search
+//   - Enhanced image processing with debug logs
 // ============================================================
 
 const express = require('express');
@@ -622,7 +623,6 @@ Example response format:
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
             let content = data.candidates[0].content.parts[0].text;
             
-            // Ensure phone number and website are included
             if (!content.includes(CONFIG.businessPhone)) {
                 content += `\n\n📞 Call: ${CONFIG.businessPhone}`;
             }
@@ -724,7 +724,6 @@ Otherwise, return a helpful message.`,
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
             let content = data.candidates[0].content.parts[0].text;
             
-            // Try to parse JSON if it's a part number
             try {
                 const jsonMatch = content.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
@@ -735,7 +734,6 @@ Otherwise, return a helpful message.`,
                 }
             } catch (e) { /* not JSON */ }
             
-            // Ensure phone number and website are included
             if (!content.includes(CONFIG.businessPhone)) {
                 content += `\n\n📞 Call: ${CONFIG.businessPhone}`;
             }
@@ -764,7 +762,6 @@ async function handleWhatsAppMessage(message, from) {
         const text = message.text?.body || '';
         console.log(`💬 Message: "${text}"`);
         
-        // Log enquiry
         await customerLog.logEnquiry(from, 'text', {
             text: text,
             status: 'pending'
@@ -837,7 +834,6 @@ async function handleWhatsAppMessage(message, from) {
                     if (product.box_qty > 0) reply += ` | Box: ${product.box_qty}`;
                     if (product.carton > 0) reply += ` | Carton: ${product.carton}`;
                     
-                    // Log successful price check
                     await customerLog.logEnquiry(from, 'price_check', {
                         text: text,
                         productsFound: [product.part],
@@ -848,7 +844,6 @@ async function handleWhatsAppMessage(message, from) {
                     await sendWhatsAppMessage(from, reply);
                     return;
                 } else {
-                    // Try Gemini web search for the part
                     const geminiReply = await getGeminiWebSearch(`Part number ${partNumber} auto spare part`, from);
                     if (geminiReply) {
                         await sendWhatsAppMessage(from, `🔍 *Part "${partNumber}" not found in our database*\n\n${geminiReply}`);
@@ -946,7 +941,6 @@ async function handleWhatsAppMessage(message, from) {
             let foundItems = [];
             let notFound = [];
             let outOfStock = [];
-            let descriptionMatches = [];
             
             for (const item of result.items) {
                 let product = await db.getProductExact(item.part);
@@ -990,7 +984,6 @@ async function handleWhatsAppMessage(message, from) {
             }
             
             if (notFound.length > 0 && foundItems.length === 0) {
-                // Try Gemini web search for the query
                 const geminiReply = await getGeminiWebSearch(text, from);
                 if (geminiReply) {
                     await sendWhatsAppMessage(from, `🔍 *I couldn't find exact products for your enquiry*\n\n${geminiReply}`);
@@ -1176,7 +1169,6 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
             
-            // Fuzzy search with description support
             const results = await db.searchProducts(cleaned, 10);
             if (results.length > 0) {
                 let reply = `🔍 Found ${results.length} result(s) for "${cleaned}"\n\n`;
@@ -1244,7 +1236,7 @@ async function handleWhatsAppMessage(message, from) {
 }
 
 // ============================================================
-// 🖼️ HANDLE WHATSAPP IMAGE
+// 🖼️ HANDLE WHATSAPP IMAGE - ENHANCED WITH DEBUG
 // ============================================================
 
 async function handleWhatsAppImage(message, from) {
@@ -1254,6 +1246,8 @@ async function handleWhatsAppImage(message, from) {
         const mimeType = message.image.mime_type || 'image/jpeg';
         
         console.log(`📸 Processing image from ${from}`);
+        console.log(`📸 Media ID: ${mediaId}`);
+        console.log(`📸 Caption: "${caption}"`);
         
         await customerLog.logEnquiry(from, 'image', {
             mediaId: mediaId,
@@ -1264,6 +1258,7 @@ async function handleWhatsAppImage(message, from) {
         let imageBuffer;
         try {
             const mediaUrl = await getMediaURL(mediaId);
+            console.log(`📸 Fetching media URL: ${mediaUrl}`);
             imageBuffer = await downloadMedia(mediaUrl);
             console.log(`📸 Image size: ${imageBuffer.length} bytes`);
         } catch (downloadError) {
@@ -1281,62 +1276,94 @@ async function handleWhatsAppImage(message, from) {
         let errors = [];
         let geminiHelpMessage = null;
         
-        // Try Gemini Vision with Web Search Fallback
+        // ============================================================
+        // STEP 1: Try Gemini Vision with Web Search Fallback
+        // ============================================================
         if (CONFIG.geminiKey) {
             try {
                 console.log('🤖 Trying Gemini Vision with Web Search...');
                 const result = await getGeminiVisionWithWebSearch(imageBuffer, caption);
                 
+                console.log(`📸 Gemini Result:`, JSON.stringify(result, null, 2));
+                
                 if (result) {
                     if (result.type === 'part') {
-                        // Found a part number
                         extractedItems = [{ part: result.data.part, qty: result.data.qty || 1 }];
                         source = 'gemini-vision';
                         console.log(`✅ Gemini extracted part: ${result.data.part}`);
+                        console.log(`✅ Gemini description: ${result.data.description || 'N/A'}`);
                     } else if (result.type === 'message') {
-                        // Helpful message
                         geminiHelpMessage = result.data;
                         source = 'gemini-help';
                         console.log(`✅ Gemini provided help message`);
                     }
+                } else {
+                    console.log(`⚠️ Gemini returned null/undefined`);
                 }
             } catch (error) {
+                console.error(`❌ Gemini Vision error:`, error.message);
                 errors.push(`Gemini: ${error.message}`);
             }
+        } else {
+            console.log(`⚠️ Gemini key not set, skipping Gemini Vision`);
         }
         
-        // Fallback to OCR if Gemini didn't find a part
+        // ============================================================
+        // STEP 2: DEBUG - Log extracted items state
+        // ============================================================
+        console.log(`📊 [DEBUG] Extracted Items:`, JSON.stringify(extractedItems, null, 2));
+        console.log(`📊 [DEBUG] Source: ${source}`);
+        console.log(`📊 [DEBUG] Gemini Help Message: ${geminiHelpMessage ? 'Yes' : 'No'}`);
+        console.log(`📊 [DEBUG] Errors:`, errors.length > 0 ? errors : 'None');
+        
+        // ============================================================
+        // STEP 3: Fallback to OCR if Gemini didn't find a part
+        // ============================================================
         if (extractedItems.length === 0 && !geminiHelpMessage) {
             try {
                 console.log('🔍 Trying OCR...');
                 const Tesseract = require('tesseract.js');
                 const result = await Tesseract.recognize(imageBuffer, 'eng');
                 const ocrText = result.data.text;
+                console.log(`📸 OCR Text: "${ocrText.substring(0, 200)}..."`);
                 const items = extractItemsFromText(ocrText);
                 if (items && items.length > 0) {
                     extractedItems = items;
                     source = 'ocr';
-                    console.log(`✅ OCR extracted ${extractedItems.length} items`);
+                    console.log(`✅ OCR extracted ${extractedItems.length} items:`, JSON.stringify(items));
                 }
             } catch (error) {
+                console.error(`❌ OCR error:`, error.message);
                 errors.push(`OCR: ${error.message}`);
             }
         }
         
-        // Try caption
+        // ============================================================
+        // STEP 4: Try caption
+        // ============================================================
         if (extractedItems.length === 0 && !geminiHelpMessage && caption && caption.trim().length > 0) {
+            console.log(`🔍 Trying caption: "${caption}"`);
             const items = extractItemsFromText(caption);
             if (items && items.length > 0) {
                 extractedItems = items;
                 source = 'caption';
-                console.log(`✅ Caption extracted ${extractedItems.length} items`);
+                console.log(`✅ Caption extracted ${extractedItems.length} items:`, JSON.stringify(items));
             }
         }
         
-        // Process extracted items
+        // ============================================================
+        // STEP 5: Process extracted items
+        // ============================================================
         if (extractedItems.length > 0) {
+            console.log(`📦 [DEBUG] Processing ${extractedItems.length} extracted items`);
+            console.log(`📦 [DEBUG] Items:`, JSON.stringify(extractedItems, null, 2));
+            
             const orderText = extractedItems.map(i => `${i.part} ${i.qty || 1}`).join('\n');
+            console.log(`📝 [DEBUG] Order text: "${orderText}"`);
+            
             const reply = await processOrderFromText(orderText, from);
+            console.log(`📝 [DEBUG] Reply from processOrderFromText:`, reply ? `Yes (length: ${reply.length})` : 'No');
+            
             if (reply) {
                 await customerLog.logEnquiry(from, 'image', {
                     mediaId: mediaId,
@@ -1349,11 +1376,17 @@ async function handleWhatsAppImage(message, from) {
                 
                 await sendWhatsAppMessage(from, `📸 *Image Processed (via ${source})*\n\n${reply}`);
                 return;
+            } else {
+                console.log(`⚠️ [DEBUG] processOrderFromText returned null/empty for: "${orderText}"`);
+                console.log(`⚠️ [DEBUG] This usually means the product wasn't found in the database`);
             }
         }
         
-        // If Gemini provided a help message, send it
+        // ============================================================
+        // STEP 6: If Gemini provided a help message, send it
+        // ============================================================
         if (geminiHelpMessage) {
+            console.log(`📤 [DEBUG] Sending Gemini help message`);
             await customerLog.logEnquiry(from, 'image', {
                 mediaId: mediaId,
                 text: caption,
@@ -1366,7 +1399,11 @@ async function handleWhatsAppImage(message, from) {
             return;
         }
         
-        // No items found - send helpful message
+        // ============================================================
+        // STEP 7: No items found - send helpful message
+        // ============================================================
+        console.log(`❌ [DEBUG] No items extracted. Errors:`, errors);
+        
         let errorMessage = `📸 *Photo Received!*\n\n` +
             `I couldn't read any part numbers from the image.\n\n` +
             `💡 *Tips:*\n` +
@@ -1386,6 +1423,7 @@ async function handleWhatsAppImage(message, from) {
         
     } catch (error) {
         console.error(`❌ Image handler error:`, error.message);
+        console.error(error.stack);
         await sendWhatsAppMessage(from, 
             `📸 *Sorry, I couldn't process your image.*\n\n` +
             `💡 Please send the part number directly.\n` +
@@ -1573,8 +1611,14 @@ async function getAIResponse(message) {
 // ============================================================
 
 async function processOrderFromText(text, from) {
+    console.log(`📋 processOrderFromText called with: "${text}"`);
     const items = extractItemsFromText(text);
-    if (items.length === 0) return null;
+    console.log(`📋 Extracted items:`, JSON.stringify(items, null, 2));
+    
+    if (items.length === 0) {
+        console.log(`⚠️ No items extracted from text`);
+        return null;
+    }
     
     let cartItems = [];
     let total = 0;
@@ -1582,16 +1626,22 @@ async function processOrderFromText(text, from) {
     let outOfStock = [];
     
     for (const item of items) {
+        console.log(`🔍 Searching for: ${item.part}`);
         let product = await db.getProductExact(item.part);
         if (!product) {
+            console.log(`🔍 No exact match, trying fuzzy search...`);
             const results = await db.searchProducts(item.part, 1);
             if (results && results.length > 0) {
                 const firstResult = results[0];
                 const similarity = calculateSimilarity(item.part, firstResult.part);
+                console.log(`🔍 Similarity: ${similarity} for ${firstResult.part}`);
                 if (similarity >= 0.7) {
                     product = firstResult;
+                    console.log(`✅ Fuzzy match found: ${product.part}`);
                 }
             }
+        } else {
+            console.log(`✅ Exact match found: ${product.part}`);
         }
         
         if (product) {
@@ -1618,13 +1668,21 @@ async function processOrderFromText(text, from) {
             }
         } else {
             notFound.push(item.part);
+            console.log(`❌ Product not found: ${item.part}`);
         }
     }
     
     if (notFound.length > 0 && cartItems.length === 0) {
+        console.log(`❌ All products not found: ${notFound.join(', ')}`);
         return `❌ Products not found: ${notFound.join(', ')}\n\n💡 Please check the part numbers.`;
     }
     
+    if (cartItems.length === 0) {
+        console.log(`⚠️ No cart items after processing`);
+        return null;
+    }
+    
+    console.log(`✅ Cart items: ${cartItems.length}, Total: ₹${total.toFixed(2)}`);
     await db.saveCart(from, cartItems, total, total);
     
     let reply = `🛒 *ORDER SUMMARY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
@@ -1655,6 +1713,7 @@ async function processOrderFromText(text, from) {
     reply += `🗑️ *Clear Cart* - Start fresh\n\n`;
     reply += `📞 Call: ${CONFIG.businessPhone}`;
     
+    console.log(`📤 Returning reply of length: ${reply.length}`);
     return reply;
 }
 
