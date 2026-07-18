@@ -8,7 +8,7 @@
 //   - Anti-crash with duplicate detection
 //   - Auto restock scheduler
 //   - Gemini AI fallback with web search
-//   - Enhanced image processing with debug logs
+//   - FIXED: Image processing with working Gemini prompt
 // ============================================================
 
 const express = require('express');
@@ -58,7 +58,7 @@ const CONFIG = {
     deepseekKey: process.env.DEEPSEEK_API_KEY,
     geminiKey: process.env.GEMINI_KEY,
     maxMemory: process.env.MAX_OLD_SPACE_SIZE || 512,
-    cacheTTL: 120000, // 2 minutes for duplicate detection
+    cacheTTL: 120000,
 };
 
 console.log('====================================');
@@ -124,7 +124,6 @@ const messageCache = new Map();
 const processingSet = new Set();
 const CACHE_TTL = CONFIG.cacheTTL;
 
-// Auto-cleanup cache every 5 minutes
 setInterval(() => {
     const now = Date.now();
     let cleaned = 0;
@@ -600,13 +599,7 @@ IMPORTANT RULES:
    - Our website: https://autosparessolution.com
 6. Be helpful, friendly, and practical
 7. Reply in Hinglish (Hindi + English mix)
-8. Keep the response informative but concise (max 5-6 sentences)
-
-Example response format:
-"🔍 *About ${query}*: [Brief explanation of what it is and why it's important]
-💡 *Suggestion*: [Practical advice or solution]
-📞 Need more help? Call ${CONFIG.businessPhone}
-🛒 Shop: https://autosparessolution.com"`,
+8. Keep the response informative but concise (max 5-6 sentences)`,
                     }]
                 }],
                 generationConfig: {
@@ -644,7 +637,7 @@ Example response format:
 }
 
 // ============================================================
-// 🤖 GEMINI VISION WITH WEB SEARCH FALLBACK
+// 🤖 GEMINI VISION - RESTORED WORKING PROMPT
 // ============================================================
 
 async function getGeminiVisionWithWebSearch(imageBuffer, caption = '') {
@@ -669,6 +662,9 @@ async function getGeminiVisionWithWebSearch(imageBuffer, caption = '') {
         const base64Image = buffer.toString('base64');
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${CONFIG.geminiKey}`;
         
+        // ============================================================
+        // ✅ RESTORED WORKING PROMPT FROM OLD CODE
+        // ============================================================
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -676,31 +672,22 @@ async function getGeminiVisionWithWebSearch(imageBuffer, caption = '') {
                 contents: [{
                     parts: [
                         {
-                            text: `You are an auto spares assistant for "Auto Spares Solution" in India.
-                            
-Analyze this image and help the customer.
+                            text: `Extract all part numbers and quantities from this image.
 
-Caption (if any): "${caption}"
+INSTRUCTIONS:
+1. Look for part numbers (alphanumeric, 5-20 characters like 0801BA0285N or 29370818JA)
+2. Look for quantities (numbers after part numbers)
+3. Return ONLY valid JSON format
+4. If no quantities found, set qty to 1
+5. If multiple parts, list all of them
+6. If you can't find any part number, return {"items":[]}
+7. Do NOT include any other text or explanation - ONLY JSON
 
-IMPORTANT RULES:
-1. Try to identify the product in the image
-2. If you can identify a part number or product, extract it
-3. If you can't identify the exact product, help the customer with:
-   - What the product might be
-   - What it's used for
-   - How to find the right part number
-   - Similar products that might work
-4. Provide practical, helpful advice
-5. ALWAYS include:
-   - Our phone number: ${CONFIG.businessPhone}
-   - Our website: https://autosparessolution.com
-6. Reply in Hinglish (Hindi + English mix)
-7. Keep the response informative but concise (max 5-6 sentences)
+Example: {"items":[{"part":"0801BA0285N","qty":2},{"part":"0303BC0071N","qty":1}]}
 
-If you can identify a part number, return ONLY valid JSON:
-{"part":"PART123","qty":1,"description":"Brief description"}
+Return ONLY the JSON, no other text.
 
-Otherwise, return a helpful message.`,
+Caption (if any): "${caption}"`
                         },
                         {
                             inline_data: {
@@ -711,10 +698,10 @@ Otherwise, return a helpful message.`,
                     ]
                 }],
                 generationConfig: {
-                    temperature: 0.3,
+                    temperature: 0.1,
                     maxOutputTokens: 500,
-                    topK: 40,
-                    topP: 0.95
+                    topK: 1,
+                    topP: 0.1
                 }
             })
         });
@@ -723,28 +710,66 @@ Otherwise, return a helpful message.`,
         
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
             let content = data.candidates[0].content.parts[0].text;
+            console.log(`📸 Gemini Raw Response: ${content.substring(0, 300)}...`);
             
+            // ============================================================
+            // ✅ Parse JSON from response
+            // ============================================================
             try {
                 const jsonMatch = content.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
                     const parsed = JSON.parse(jsonMatch[0]);
-                    if (parsed.part) {
-                        return { type: 'part', data: parsed };
+                    console.log(`✅ Gemini parsed JSON:`, JSON.stringify(parsed, null, 2));
+                    
+                    // Check for items array (preferred format)
+                    if (parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
+                        const item = parsed.items[0];
+                        if (item.part && item.part.length >= 5) {
+                            return { 
+                                type: 'part', 
+                                data: { 
+                                    part: item.part.toUpperCase(), 
+                                    qty: item.qty || 1,
+                                    description: item.description || ''
+                                } 
+                            };
+                        }
+                    }
+                    
+                    // Check for single part (fallback format)
+                    if (parsed.part && parsed.part.length >= 5) {
+                        return { 
+                            type: 'part', 
+                            data: { 
+                                part: parsed.part.toUpperCase(), 
+                                qty: parsed.qty || 1,
+                                description: parsed.description || ''
+                            } 
+                        };
                     }
                 }
-            } catch (e) { /* not JSON */ }
-            
-            if (!content.includes(CONFIG.businessPhone)) {
-                content += `\n\n📞 Call: ${CONFIG.businessPhone}`;
-            }
-            if (!content.includes('autosparessolution.com')) {
-                content += `\n🛒 Shop: https://autosparessolution.com`;
+            } catch (e) {
+                console.log(`⚠️ Failed to parse JSON:`, e.message);
             }
             
-            console.log(`✅ Gemini vision response received`);
-            return { type: 'message', data: content };
+            // ============================================================
+            // ✅ If no part found, check if it's a helpful message
+            // ============================================================
+            if (content && content.length > 10 && !content.includes('{')) {
+                if (!content.includes(CONFIG.businessPhone)) {
+                    content += `\n\n📞 Call: ${CONFIG.businessPhone}`;
+                }
+                if (!content.includes('autosparessolution.com')) {
+                    content += `\n🛒 Shop: https://autosparessolution.com`;
+                }
+                return { type: 'message', data: content };
+            }
+            
+            console.log(`⚠️ No valid part number found in Gemini response`);
+            return null;
         }
         
+        console.log(`⚠️ Gemini vision returned no content`);
         return null;
         
     } catch (error) {
@@ -754,7 +779,7 @@ Otherwise, return a helpful message.`,
 }
 
 // ============================================================
-// 📩 HANDLE WHATSAPP TEXT MESSAGE - COMPLETE
+// 📩 HANDLE WHATSAPP TEXT MESSAGE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -775,9 +800,7 @@ async function handleWhatsAppMessage(message, from) {
         
         const msgLower = cleaned.toLowerCase().trim();
         
-        // ============================================================
         // STEP 1: WELCOME / HELP
-        // ============================================================
         if (['hi', 'hello', 'help', 'start', 'menu'].includes(msgLower)) {
             const welcome = 
                 `👋 *Welcome to Auto Spares Solution!*\n\n` +
@@ -806,9 +829,7 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
         
-        // ============================================================
         // STEP 2: PRICE CHECK
-        // ============================================================
         if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
             const partNumber = extractPartNumber(cleaned);
             if (partNumber) {
@@ -855,9 +876,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
         
-        // ============================================================
         // STEP 3: STOCK CHECK
-        // ============================================================
         if (msgLower.includes('stock') || msgLower.includes('available')) {
             const partNumber = extractPartNumber(cleaned);
             if (partNumber) {
@@ -886,9 +905,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
         
-        // ============================================================
         // STEP 4: CONFIRM ORDER
-        // ============================================================
         if (msgLower === 'confirm order' || msgLower === 'confirm') {
             const cart = await db.getCart(from);
             if (cart && cart.items) {
@@ -913,18 +930,14 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
         
-        // ============================================================
         // STEP 5: CLEAR CART
-        // ============================================================
         if (msgLower === 'clear cart' || msgLower === 'clear') {
             await db.clearCart(from);
             await sendWhatsAppMessage(from, '🗑️ Cart cleared!');
             return;
         }
         
-        // ============================================================
         // STEP 6: MULTI-PRODUCT DETECTION
-        // ============================================================
         const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
         const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
         const hasMultipleParts = uniqueParts.length > 1;
@@ -1074,9 +1087,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
         
-        // ============================================================
         // STEP 7: SINGLE PRODUCT ORDER
-        // ============================================================
         const partNumber = extractPartNumber(cleaned);
         const quantity = extractQuantity(cleaned);
         
@@ -1145,9 +1156,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
         
-        // ============================================================
-        // STEP 8: SEARCH PRODUCTS (Description/Brand/Part search)
-        // ============================================================
+        // STEP 8: SEARCH PRODUCTS
         if (cleaned.length >= 2) {
             let exactProduct = await db.getProductExact(cleaned);
             
@@ -1191,9 +1200,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
         
-        // ============================================================
         // STEP 9: GEMINI WEB SEARCH FALLBACK
-        // ============================================================
         console.log(`🔄 No product found. Trying Gemini web search...`);
         const geminiReply = await getGeminiWebSearch(text, from);
         if (geminiReply) {
@@ -1208,18 +1215,14 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
         
-        // ============================================================
-        // STEP 10: AI FALLBACK (ChatGPT/DeepSeek)
-        // ============================================================
+        // STEP 10: AI FALLBACK
         const aiReply = await getAIResponse(text);
         if (aiReply) {
             await sendWhatsAppMessage(from, `🤖 ${aiReply}`);
             return;
         }
         
-        // ============================================================
         // STEP 11: NO RESULTS
-        // ============================================================
         await sendWhatsAppMessage(from, 
             `🔍 No results found for "${text}"\n\n` +
             `💡 Try sending a part number like "0801BA0285N"\n` +
@@ -1236,7 +1239,7 @@ async function handleWhatsAppMessage(message, from) {
 }
 
 // ============================================================
-// 🖼️ HANDLE WHATSAPP IMAGE - ENHANCED WITH DEBUG
+// 🖼️ HANDLE WHATSAPP IMAGE - FIXED
 // ============================================================
 
 async function handleWhatsAppImage(message, from) {
@@ -1276,49 +1279,38 @@ async function handleWhatsAppImage(message, from) {
         let errors = [];
         let geminiHelpMessage = null;
         
-        // ============================================================
-        // STEP 1: Try Gemini Vision with Web Search Fallback
-        // ============================================================
+        // STEP 1: Try Gemini Vision
         if (CONFIG.geminiKey) {
             try {
-                console.log('🤖 Trying Gemini Vision with Web Search...');
+                console.log('🤖 Trying Gemini Vision...');
                 const result = await getGeminiVisionWithWebSearch(imageBuffer, caption);
                 
                 console.log(`📸 Gemini Result:`, JSON.stringify(result, null, 2));
                 
                 if (result) {
                     if (result.type === 'part') {
-                        extractedItems = [{ part: result.data.part, qty: result.data.qty || 1 }];
+                        extractedItems = [{ 
+                            part: result.data.part, 
+                            qty: result.data.qty || 1 
+                        }];
                         source = 'gemini-vision';
                         console.log(`✅ Gemini extracted part: ${result.data.part}`);
-                        console.log(`✅ Gemini description: ${result.data.description || 'N/A'}`);
+                        if (result.data.description) {
+                            console.log(`✅ Gemini description: ${result.data.description}`);
+                        }
                     } else if (result.type === 'message') {
                         geminiHelpMessage = result.data;
                         source = 'gemini-help';
                         console.log(`✅ Gemini provided help message`);
                     }
-                } else {
-                    console.log(`⚠️ Gemini returned null/undefined`);
                 }
             } catch (error) {
                 console.error(`❌ Gemini Vision error:`, error.message);
                 errors.push(`Gemini: ${error.message}`);
             }
-        } else {
-            console.log(`⚠️ Gemini key not set, skipping Gemini Vision`);
         }
         
-        // ============================================================
-        // STEP 2: DEBUG - Log extracted items state
-        // ============================================================
-        console.log(`📊 [DEBUG] Extracted Items:`, JSON.stringify(extractedItems, null, 2));
-        console.log(`📊 [DEBUG] Source: ${source}`);
-        console.log(`📊 [DEBUG] Gemini Help Message: ${geminiHelpMessage ? 'Yes' : 'No'}`);
-        console.log(`📊 [DEBUG] Errors:`, errors.length > 0 ? errors : 'None');
-        
-        // ============================================================
-        // STEP 3: Fallback to OCR if Gemini didn't find a part
-        // ============================================================
+        // STEP 2: Fallback to OCR
         if (extractedItems.length === 0 && !geminiHelpMessage) {
             try {
                 console.log('🔍 Trying OCR...');
@@ -1330,7 +1322,7 @@ async function handleWhatsAppImage(message, from) {
                 if (items && items.length > 0) {
                     extractedItems = items;
                     source = 'ocr';
-                    console.log(`✅ OCR extracted ${extractedItems.length} items:`, JSON.stringify(items));
+                    console.log(`✅ OCR extracted ${extractedItems.length} items`);
                 }
             } catch (error) {
                 console.error(`❌ OCR error:`, error.message);
@@ -1338,31 +1330,27 @@ async function handleWhatsAppImage(message, from) {
             }
         }
         
-        // ============================================================
-        // STEP 4: Try caption
-        // ============================================================
+        // STEP 3: Try caption
         if (extractedItems.length === 0 && !geminiHelpMessage && caption && caption.trim().length > 0) {
             console.log(`🔍 Trying caption: "${caption}"`);
             const items = extractItemsFromText(caption);
             if (items && items.length > 0) {
                 extractedItems = items;
                 source = 'caption';
-                console.log(`✅ Caption extracted ${extractedItems.length} items:`, JSON.stringify(items));
+                console.log(`✅ Caption extracted ${extractedItems.length} items`);
             }
         }
         
-        // ============================================================
-        // STEP 5: Process extracted items
-        // ============================================================
+        // STEP 4: Process extracted items
         if (extractedItems.length > 0) {
-            console.log(`📦 [DEBUG] Processing ${extractedItems.length} extracted items`);
-            console.log(`📦 [DEBUG] Items:`, JSON.stringify(extractedItems, null, 2));
+            console.log(`📦 Processing ${extractedItems.length} extracted items`);
+            console.log(`📦 Items:`, JSON.stringify(extractedItems, null, 2));
             
             const orderText = extractedItems.map(i => `${i.part} ${i.qty || 1}`).join('\n');
-            console.log(`📝 [DEBUG] Order text: "${orderText}"`);
+            console.log(`📝 Order text: "${orderText}"`);
             
             const reply = await processOrderFromText(orderText, from);
-            console.log(`📝 [DEBUG] Reply from processOrderFromText:`, reply ? `Yes (length: ${reply.length})` : 'No');
+            console.log(`📝 Reply from processOrderFromText:`, reply ? `Yes (length: ${reply.length})` : 'No');
             
             if (reply) {
                 await customerLog.logEnquiry(from, 'image', {
@@ -1376,17 +1364,12 @@ async function handleWhatsAppImage(message, from) {
                 
                 await sendWhatsAppMessage(from, `📸 *Image Processed (via ${source})*\n\n${reply}`);
                 return;
-            } else {
-                console.log(`⚠️ [DEBUG] processOrderFromText returned null/empty for: "${orderText}"`);
-                console.log(`⚠️ [DEBUG] This usually means the product wasn't found in the database`);
             }
         }
         
-        // ============================================================
-        // STEP 6: If Gemini provided a help message, send it
-        // ============================================================
+        // STEP 5: Gemini Help Message
         if (geminiHelpMessage) {
-            console.log(`📤 [DEBUG] Sending Gemini help message`);
+            console.log(`📤 Sending Gemini help message`);
             await customerLog.logEnquiry(from, 'image', {
                 mediaId: mediaId,
                 text: caption,
@@ -1399,15 +1382,14 @@ async function handleWhatsAppImage(message, from) {
             return;
         }
         
-        // ============================================================
-        // STEP 7: No items found - send helpful message
-        // ============================================================
-        console.log(`❌ [DEBUG] No items extracted. Errors:`, errors);
+        // STEP 6: No items found
+        console.log(`❌ No items extracted. Errors:`, errors);
         
         let errorMessage = `📸 *Photo Received!*\n\n` +
             `I couldn't read any part numbers from the image.\n\n` +
             `💡 *Tips:*\n` +
             `• Take a clear photo with good lighting\n` +
+            `• Make sure part numbers are visible\n` +
             `• Or send the part number directly\n` +
             `📝 Example: "0801BA0285N 2"\n\n` +
             `📞 Call: ${CONFIG.businessPhone}`;
@@ -1432,7 +1414,6 @@ async function handleWhatsAppImage(message, from) {
     }
 }
 
-// ============================================================
 // ============================================================
 // 🤖 HELPER FUNCTIONS
 // ============================================================
@@ -1551,7 +1532,7 @@ async function downloadMedia(mediaUrl) {
 }
 
 // ============================================================
-// 🤖 AI RESPONSE (ChatGPT/DeepSeek)
+// 🤖 AI RESPONSE
 // ============================================================
 
 async function getAIResponse(message) {
@@ -1718,7 +1699,6 @@ async function processOrderFromText(text, from) {
 }
 
 // ============================================================
-// ============================================================
 // 🚀 START SERVER
 // ============================================================
 
@@ -1756,7 +1736,7 @@ async function startServer() {
             console.log(`🔗 Health Check: /health`);
             console.log(`📱 Webhook: /webhook`);
             console.log(`📊 Admin Dashboard: /api/admin/dashboard`);
-            console.log(`🤖 Gemini Web Search: ✅ Active`);
+            console.log(`🤖 Gemini Vision: ✅ Active (Working Prompt)`);
             console.log(`💾 Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
             console.log('====================================');
         });
