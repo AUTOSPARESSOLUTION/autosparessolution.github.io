@@ -1332,3 +1332,92 @@
     };
 
 })();
+// ============================================================
+// 🔄 WEBHOOK SYNC INTEGRATION
+// ============================================================
+
+// Extend DealerIntelligence with webhook sync
+(function() {
+    const originalRunFullAnalysis = DealerIntelligence.runFullAnalysis;
+    
+    // ============================================================
+    // 📥 SYNC DATA FROM WEBHOOK BEFORE ANALYSIS
+    // ============================================================
+    DealerIntelligence.syncFromWebhook = async function() {
+        try {
+            if (window.webhookSync) {
+                console.log('🔄 Syncing data from webhook before analysis...');
+                await window.webhookSync.pullAllData();
+                
+                // Update distributor stock from webhook data
+                if (window.webhookSync.data.stockLedger) {
+                    const stockData = window.webhookSync.data.stockLedger;
+                    localStorage.setItem('stockLedger', JSON.stringify(stockData));
+                    console.log(`✅ Loaded ${stockData.length} stock entries from webhook`);
+                }
+                
+                // Update customers from webhook data
+                if (window.webhookSync.data.customers) {
+                    const customers = window.webhookSync.data.customers;
+                    localStorage.setItem('customers', JSON.stringify(customers));
+                    console.log(`✅ Loaded ${customers.length} customers from webhook`);
+                }
+                
+                // Update suppliers from webhook data
+                if (window.webhookSync.data.suppliers) {
+                    const suppliers = window.webhookSync.data.suppliers;
+                    localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                    console.log(`✅ Loaded ${suppliers.length} suppliers from webhook`);
+                }
+                
+                return true;
+            }
+            console.log('⚠️ Webhook sync not available');
+            return false;
+        } catch (error) {
+            console.error('❌ Webhook sync error:', error.message);
+            return false;
+        }
+    };
+    
+    // ============================================================
+    // 🔄 OVERRIDE runFullAnalysis WITH SYNC
+    // ============================================================
+    DealerIntelligence.runFullAnalysis = async function() {
+        // First sync from webhook
+        await DealerIntelligence.syncFromWebhook();
+        
+        // Then run the original analysis
+        return await originalRunFullAnalysis.call(this);
+    };
+    
+    // ============================================================
+    // 📤 PUSH OFFERS TO WEBHOOK
+    // ============================================================
+    DealerIntelligence.pushOffersToWebhook = async function() {
+        try {
+            if (!window.webhookSync) {
+                console.log('⚠️ Webhook sync not available');
+                return false;
+            }
+            
+            const offers = DealerIntelligence.getActiveOffers();
+            if (!offers || offers.length === 0) {
+                console.log('ℹ️ No offers to push');
+                return false;
+            }
+            
+            const result = await window.webhookSync.pushData('offers', offers);
+            if (result) {
+                console.log(`✅ Pushed ${offers.length} offers to webhook`);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('❌ Push offers error:', error.message);
+            return false;
+        }
+    };
+    
+    console.log('✅ DealerIntelligence webhook sync integrated');
+})();
