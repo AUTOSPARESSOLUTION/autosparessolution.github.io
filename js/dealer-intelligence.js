@@ -1330,8 +1330,6 @@
         CONFIG,
         isRunning: () => isRunning
     };
-
-})();
 // ============================================================
 // 🔄 WEBHOOK SYNC INTEGRATION
 // ============================================================
@@ -1420,4 +1418,6 @@
     };
     
     console.log('✅ DealerIntelligence webhook sync integrated');
+})();
+
 })();
