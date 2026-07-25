@@ -456,5 +456,206 @@
     // Initialize
     loadSuppliers();
 </script>
+    <!-- Add before closing </body> tag -->
+<script>
+// ============================================================
+// 📊 WEBHOOK SYNC - Single Source of Truth
+// ============================================================
+class WebhookSync {
+    constructor() {
+        this.apiBase = '/api';
+        this.syncInterval = 60 * 1000;
+        this.isSyncing = false;
+        this.lastSync = null;
+        this.data = {
+            customers: [],
+            suppliers: [],
+            vendorStatus: [],
+            orders: [],
+            invoices: [],
+            stockLedger: [],
+            payments: [],
+            offers: []
+        };
+    }
+
+    init() {
+        console.log('🔄 Webhook Sync Initialized');
+        this.pullAllData();
+        setInterval(() => this.pullAllData(), this.syncInterval);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) this.pullAllData();
+        });
+        window.addEventListener('online', () => {
+            console.log('🌐 Online - Syncing data...');
+            this.pullAllData();
+        });
+    }
+
+    async pullAllData() {
+        if (this.isSyncing) return;
+        this.isSyncing = true;
+        console.log('📥 Pulling data from webhook...');
+        
+        try {
+            const response = await fetch(`${this.apiBase}/sync/pull?entity=all`);
+            const result = await response.json();
+            
+            if (result.success) {
+                this.data = result.data || {};
+                this.lastSync = new Date();
+                this.updateLocalStorage();
+                document.dispatchEvent(new CustomEvent('dataSynced', { 
+                    detail: this.data 
+                }));
+                return this.data;
+            }
+            throw new Error(result.error || 'Sync failed');
+        } catch (error) {
+            console.error('❌ Pull failed:', error.message);
+            this.loadFromLocalStorage();
+        } finally {
+            this.isSyncing = false;
+        }
+    }
+
+    async pushData(entity, data) {
+        try {
+            const response = await fetch(`${this.apiBase}/sync/push`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entity, data })
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                console.log(`✅ ${entity} pushed successfully`);
+                await this.pullAllData();
+                return result;
+            }
+            throw new Error(result.error);
+        } catch (error) {
+            console.error(`❌ Push ${entity} failed:`, error.message);
+            return null;
+        }
+    }
+
+    updateLocalStorage() {
+        try {
+            const data = this.data;
+            if (data.customers) localStorage.setItem('customers', JSON.stringify(data.customers));
+            if (data.suppliers) localStorage.setItem('suppliers', JSON.stringify(data.suppliers));
+            if (data.vendorStatus) localStorage.setItem('vendorStatus', JSON.stringify(data.vendorStatus));
+            if (data.orders) localStorage.setItem('orders', JSON.stringify(data.orders));
+            if (data.invoices) localStorage.setItem('invoices', JSON.stringify(data.invoices));
+            if (data.stockLedger) localStorage.setItem('stockLedger', JSON.stringify(data.stockLedger));
+            if (data.payments) localStorage.setItem('payments', JSON.stringify(data.payments));
+            if (data.offers) localStorage.setItem('offers', JSON.stringify(data.offers));
+            localStorage.setItem('lastSyncTime', this.lastSync?.toISOString() || '');
+            console.log('💾 localStorage updated');
+        } catch (error) {
+            console.error('❌ localStorage update failed:', error.message);
+        }
+    }
+
+    loadFromLocalStorage() {
+        try {
+            this.data.customers = JSON.parse(localStorage.getItem('customers') || '[]');
+            this.data.suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
+            this.data.vendorStatus = JSON.parse(localStorage.getItem('vendorStatus') || '[]');
+            this.data.orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            this.data.invoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+            this.data.stockLedger = JSON.parse(localStorage.getItem('stockLedger') || '[]');
+            this.data.payments = JSON.parse(localStorage.getItem('payments') || '[]');
+            this.data.offers = JSON.parse(localStorage.getItem('offers') || '[]');
+            console.log('📂 Data loaded from localStorage (fallback)');
+            return this.data;
+        } catch (error) {
+            console.error('❌ localStorage load failed:', error.message);
+            return null;
+        }
+    }
+
+    getCustomers() { return this.data.customers || []; }
+    getSuppliers() { return this.data.suppliers || []; }
+    getVendorStatus() { return this.data.vendorStatus || []; }
+    getOrders() { return this.data.orders || []; }
+    getInvoices() { return this.data.invoices || []; }
+    getStockLedger() { return this.data.stockLedger || []; }
+    getPayments() { return this.data.payments || []; }
+    getOffers() { return this.data.offers || []; }
+
+    getCustomerByPhone(phone) {
+        return this.data.customers?.find(c => c.phone === phone) || null;
+    }
+    
+    getSupplierById(id) {
+        return this.data.suppliers?.find(s => s.id === id) || null;
+    }
+
+    async syncCustomer(customer) {
+        return await this.pushData('customers', [customer]);
+    }
+    
+    async syncSupplier(supplier) {
+        return await this.pushData('suppliers', [supplier]);
+    }
+    
+    async syncPayment(payment) {
+        return await this.pushData('payments', [payment]);
+    }
+
+    getSyncStatus() {
+        return {
+            lastSync: this.lastSync,
+            isSyncing: this.isSyncing,
+            dataCounts: {
+                customers: this.data.customers?.length || 0,
+                suppliers: this.data.suppliers?.length || 0,
+                vendorStatus: this.data.vendorStatus?.length || 0,
+                orders: this.data.orders?.length || 0,
+                invoices: this.data.invoices?.length || 0,
+                stockLedger: this.data.stockLedger?.length || 0,
+                payments: this.data.payments?.length || 0,
+                offers: this.data.offers?.length || 0
+            }
+        };
+    }
+}
+
+const webhookSync = new WebhookSync();
+window.webhookSync = webhookSync;
+
+document.addEventListener('DOMContentLoaded', () => {
+    webhookSync.init();
+});
+
+function updateSyncStatus() {
+    const status = webhookSync.getSyncStatus();
+    let statusEl = document.getElementById('syncStatus');
+    if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.id = 'syncStatus';
+        statusEl.style.cssText = `
+            position: fixed; bottom: 10px; right: 10px;
+            background: #1e293b; color: #fff; padding: 6px 10px;
+            border-radius: 8px; font-size: 10px; z-index: 9999;
+            font-family: Arial, sans-serif; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex; align-items: center; gap: 6px;
+            cursor: pointer; opacity: 0.8;
+        `;
+        statusEl.onclick = () => webhookSync.pullAllData();
+        document.body.appendChild(statusEl);
+    }
+    const icon = status.isSyncing ? '🔄' : (status.lastSync ? '✅' : '⚠️');
+    const time = status.lastSync ? status.lastSync.toLocaleTimeString() : 'Never';
+    const counts = status.dataCounts;
+    statusEl.innerHTML = `${icon} ${time} <span style="font-size:8px;color:#94a3b8;margin-left:4px;">C:${counts.customers} S:${counts.suppliers} O:${counts.orders}</span>`;
+}
+
+setInterval(updateSyncStatus, 5000);
+updateSyncStatus();
+document.addEventListener('dataSynced', updateSyncStatus);
+</script>
 </body>
     </html>
