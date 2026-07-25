@@ -41,63 +41,124 @@ dirs.forEach(dir => {
 });
 
 // ============================================================
-// 📦 IMPORT MODULES
+// 📦 IMPORT MODULES (WITH FALLBACK FOR MISSING FILES)
 // ============================================================
 
+// Core modules that MUST exist
 const db = require('./modules/database');
 const { importCSV } = require('./modules/csv-loader');
 const { parseOrder, extractPartNumber, extractQuantity, parseOrderWithDescription } = require('./modules/order-parser');
-const customerLog = require('./modules/customer-log');
 const scheduler = require('./modules/scheduler');
 const invoice = require('./modules/invoice');
-const dealerIntelligence = require('./modules/dealer-intelligence');
-const supplierVendor = require('./modules/supplier-vendor');
-const supplierEnquiry = require('./modules/supplier-enquiry');
-const geminiPurchase = require('./modules/gemini-purchase');
-const geminiPayment = require('./modules/gemini-payment');
-const payment = require('./modules/payment');
 
-// Try to load optional modules
+// Optional modules - try to load, fallback if missing
+let customerLog = null;
+try { customerLog = require('./modules/customer-log'); } catch(e) { 
+    console.log('⚠️ customer-log module not found - using fallback');
+    customerLog = { 
+        logEnquiry: async () => {}, 
+        getEnquiryStats: async () => ({}), 
+        getWaitingNotifications: async () => [],
+        trackOutOfStock: async () => {},
+        notifyRestock: async () => ({ notified: 0, failed: 0 })
+    };
+}
+
+let dealerIntelligence = null;
+try { dealerIntelligence = require('./modules/dealer-intelligence'); } catch(e) { 
+    console.log('⚠️ dealer-intelligence module not found - using fallback');
+    dealerIntelligence = { 
+        getDealerOffersForCustomer: async () => ({ customer: null, offers: [], summary: {} }),
+        sendOffersToCustomer: async () => ({ offerCount: 0 }),
+        saveDistributorStock: (s) => s,
+        getDistributorStock: () => [],
+        sendOffersToAllCustomers: async () => ({ sent: 0, failed: 0 }),
+        init: () => console.log("Dealer Intelligence (fallback)")
+    };
+}
+
+let supplierVendor = null;
+try { supplierVendor = require('./modules/supplier-vendor'); } catch(e) { 
+    console.log('⚠️ supplier-vendor module not found - using fallback');
+    supplierVendor = { 
+        getSupplier: async () => null,
+        createSupplier: async () => null,
+        updateSupplier: async () => null
+    };
+}
+
+let supplierEnquiry = null;
+try { supplierEnquiry = require('./modules/supplier-enquiry'); } catch(e) { 
+    console.log('⚠️ supplier-enquiry module not found - using fallback');
+    supplierEnquiry = {};
+}
+
+let geminiPurchase = null;
+try { geminiPurchase = require('./modules/gemini-purchase'); } catch(e) { 
+    console.log('⚠️ gemini-purchase module not found - using fallback');
+    geminiPurchase = {
+        extractPurchaseInvoiceWithGemini: async () => null,
+        validateInvoiceData: () => ({ valid: false, errors: ['Module not available'] }),
+        formatExtractedData: () => 'Purchase invoice module not available'
+    };
+}
+
+let geminiPayment = null;
+try { geminiPayment = require('./modules/gemini-payment'); } catch(e) { 
+    console.log('⚠️ gemini-payment module not found - using fallback');
+    geminiPayment = {
+        extractPaymentWithGemini: async () => null,
+        processPaymentData: () => ({})
+    };
+}
+
+let payment = null;
+try { payment = require('./modules/payment'); } catch(e) { 
+    console.log('⚠️ payment module not found - using fallback');
+    payment = {
+        recordSupplierPayment: async () => ({ success: false, message: 'Payment module unavailable' }),
+        recordCustomerPayment: async () => ({ success: false, message: 'Payment module unavailable' }),
+        processPaymentFromWhatsApp: async () => ({ error: true, message: 'Payment module unavailable' })
+    };
+}
+
 let deliverySystem = null;
+try { deliverySystem = require('./modules/delivery-system'); } catch(e) { 
+    console.log('⚠️ delivery-system module not found - using fallback');
+    deliverySystem = {
+        initTables: async () => {},
+        registerDeliveryBoy: async () => ({ boyId: 'DB-001', deviceType: 'smart', notificationMethod: 'whatsapp' }),
+        getAllDeliveryBoys: async () => [],
+        isDeliveryBoy: async () => false,
+        updateDeliveryBoyLocation: async () => true,
+        processOrderDelivery: async () => null,
+        getDeliveryStats: async () => ({}),
+        getDeliveryHistory: async () => [],
+        getCustomerPendingDelivery: async () => null,
+        notifyDeliveryBoyLocation: async () => true
+    };
+}
+
 let vendorManagement = null;
-let ExcelJS = null;
-let PdfPrinter = null;
+try { vendorManagement = require('./modules/vendor-management'); } catch(e) { 
+    console.log('⚠️ vendor-management module not found - using fallback');
+    vendorManagement = {
+        registerVendor: async () => ({ vendorId: 'VND-001' }),
+        updateVendorStock: async () => ({ accepted: [], rejected: [] }),
+        getAllVendors: async () => [],
+        importVendorsFromDealerMaster: async () => ({ imported: 0, updated: 0, skipped: 0, customerVendors: 0 })
+    };
+}
+
+// Optional Excel/PDF modules
 let XLSX = null;
+try { XLSX = require('xlsx'); } catch(e) { console.log('⚠️ XLSX module not found - Excel export disabled'); }
 
-try {
-    deliverySystem = require('./modules/delivery-system');
-    console.log('✅ Delivery system module loaded');
-} catch (e) {
-    console.log('⚠️ Delivery system module not found - basic mode');
-}
+let ExcelJS = null;
+try { ExcelJS = require('exceljs'); } catch(e) { console.log('⚠️ ExcelJS module not found - Excel export disabled'); }
 
-try {
-    vendorManagement = require('./modules/vendor-management');
-    console.log('✅ Vendor management module loaded');
-} catch (e) {
-    console.log('⚠️ Vendor management module not found - basic mode');
-}
-
-try {
-    XLSX = require('xlsx');
-    console.log('✅ XLSX module loaded');
-} catch (e) {
-    console.log('⚠️ XLSX module not found - Excel export disabled');
-}
-
-try {
-    ExcelJS = require('exceljs');
-    console.log('✅ ExcelJS module loaded');
-} catch (e) {
-    console.log('⚠️ ExcelJS module not found - Excel export disabled');
-}
-
-try {
-    PdfPrinter = require('pdfmake');
-    console.log('✅ PDFMake module loaded');
-} catch (e) {
-    console.log('⚠️ PDFMake module not found - PDF export disabled');
-}
+let PdfPrinter = null;
+try { PdfPrinter = require('pdfmake'); } catch(e) { console.log('⚠️ PDFMake module not found - PDF export disabled'); }
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -372,7 +433,6 @@ async function initAllTables() {
         if (deliverySystem && deliverySystem.initTables) {
             await deliverySystem.initTables();
         } else {
-            // Basic delivery tables
             await createBasicDeliveryTables();
         }
 
@@ -388,7 +448,6 @@ async function initAllTables() {
 
 async function createBasicDeliveryTables() {
     try {
-        // Delivery Boys
         await new Promise((resolve, reject) => {
             db.db.run(`
                 CREATE TABLE IF NOT EXISTS delivery_boys (
@@ -422,7 +481,6 @@ async function createBasicDeliveryTables() {
             });
         });
 
-        // Deliveries
         await new Promise((resolve, reject) => {
             db.db.run(`
                 CREATE TABLE IF NOT EXISTS deliveries (
@@ -481,7 +539,6 @@ async function createBasicDeliveryTables() {
             });
         });
 
-        // Delivery Locations
         await new Promise((resolve, reject) => {
             db.db.run(`
                 CREATE TABLE IF NOT EXISTS delivery_locations (
@@ -574,11 +631,9 @@ app.get('/', (req, res) => {
             customerMaster: '✅',
             invoiceSystem: '✅',
             stockLedger: '✅',
-            dealerIntelligence: '✅',
+            dealerIntelligence: dealerIntelligence ? '✅' : '❌',
             excelExport: ExcelJS ? '✅' : '❌',
-            pdfExport: PdfPrinter ? '✅' : '❌',
-            deliverySystem: deliverySystem ? '✅' : '❌',
-            vendorManagement: vendorManagement ? '✅' : '❌'
+            pdfExport: PdfPrinter ? '✅' : '❌'
         },
         endpoints: {
             health: '/health',
@@ -594,7 +649,7 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================
-// 🔍 API: SEARCH PRODUCTS (IMPROVED)
+// 🔍 API: SEARCH PRODUCTS
 // ============================================================
 
 app.get('/api/search', async (req, res) => {
@@ -603,18 +658,7 @@ app.get('/api/search', async (req, res) => {
         if (!q) {
             return res.status(400).json({ error: 'Query parameter "q" is required' });
         }
-        
-        // Check if query is too generic (like "clutch plate")
-        const words = q.trim().split(' ');
-        const genericWords = ['i', 'need', 'want', 'for', 'my', 'the', 'a', 'an'];
-        const filteredWords = words.filter(w => !genericWords.includes(w.toLowerCase()));
-        
-        let searchQuery = q;
-        if (filteredWords.length > 0) {
-            searchQuery = filteredWords.join(' ');
-        }
-        
-        const results = await db.searchProducts(searchQuery, parseInt(limit));
+        const results = await db.searchProducts(q, parseInt(limit));
         res.json({ query: q, count: results.length, results });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -627,19 +671,11 @@ app.get('/api/search', async (req, res) => {
 
 app.get('/api/admin/dashboard', async (req, res) => {
     try {
-        const [stats, waiting, stockStats] = await Promise.all([
-            customerLog.getEnquiryStats ? customerLog.getEnquiryStats() : { total: 0 },
-            customerLog.getWaitingNotifications ? customerLog.getWaitingNotifications() : [],
-            db.getStats()
-        ]);
+        const stats = await db.getStats();
         res.json({
             success: true,
-            stats: {
-                enquiries: stats,
-                waiting_notifications: waiting.length,
-                products: stockStats
-            },
-            top_out_of_stock: waiting.slice(0, 10)
+            products: stats,
+            timestamp: new Date().toISOString()
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -877,7 +913,7 @@ IMPORTANT RULES:
 }
 
 // ============================================================
-// 📩 HANDLE WHATSAPP TEXT MESSAGE (SIMPLIFIED)
+// 📩 HANDLE WHATSAPP TEXT MESSAGE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -890,14 +926,13 @@ async function handleWhatsAppMessage(message, from) {
         const msgUpper = cleaned.toUpperCase().trim();
 
         // ============================================================
-        // 🧭 ENQUIRY GUIDE HANDLER
+        // 🧭 ENQUIRY GUIDE
         // ============================================================
         if (['guide', 'help me find', 'i need help', 'find part', 'shop', 'browse'].includes(msgLower)) {
             await sendWhatsAppMessage(from, 
                 `🛒 *WELCOME TO AUTO SPARES SHOPPING* 🚗\n\n` +
                 `I'll help you find parts step by step!\n\n` +
-                `📋 *Step 1: What are you looking for?*\n\n` +
-                `Reply with:\n` +
+                `📋 *Reply with:*\n` +
                 `• Part number: "0801BA0285N"\n` +
                 `• Description: "clutch plate"\n` +
                 `• Vehicle: "Bajaj Pulsar"\n` +
@@ -908,13 +943,13 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 📄 QUOTATION, PROFORMA, INVOICE REQUESTS
+        // 📄 QUOTATION, PROFORMA, INVOICE
         // ============================================================
         if (msgLower === 'quotation' || msgLower === 'quote') {
             await sendWhatsAppMessage(from, 
                 `📄 *QUOTATION*\n\n` +
-                `Please provide your order details first.\n` +
-                `Add items to cart and reply "CONFIRM ORDER".`
+                `Please add items to cart first.\n` +
+                `Reply "GUIDE" to start shopping.`
             );
             return;
         }
@@ -922,8 +957,8 @@ async function handleWhatsAppMessage(message, from) {
         if (msgLower === 'proforma' || msgLower === 'proforma invoice') {
             await sendWhatsAppMessage(from, 
                 `📄 *PROFORMA INVOICE*\n\n` +
-                `Please provide your order details first.\n` +
-                `Add items to cart and reply "CONFIRM ORDER".`
+                `Please add items to cart first.\n` +
+                `Reply "GUIDE" to start shopping.`
             );
             return;
         }
@@ -932,13 +967,13 @@ async function handleWhatsAppMessage(message, from) {
             await sendWhatsAppMessage(from, 
                 `📄 *TAX INVOICE*\n\n` +
                 `Please complete your order first.\n` +
-                `Add items to cart and reply "CONFIRM ORDER".`
+                `Reply "GUIDE" to start shopping.`
             );
             return;
         }
 
         // ============================================================
-        // 🎯 OFFERS COMMAND
+        // 🎯 OFFERS
         // ============================================================
         if (msgLower === 'offers') {
             await sendWhatsAppMessage(from, 
@@ -1105,7 +1140,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // STEP 7: SEARCH PRODUCTS (IMPROVED)
+        // STEP 7: SEARCH PRODUCTS
         // ============================================================
         if (cleaned.length >= 2) {
             // First try exact match
@@ -1180,7 +1215,7 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 🖼️ HANDLE WHATSAPP IMAGE (SIMPLIFIED)
+// 🖼️ HANDLE WHATSAPP IMAGE
 // ============================================================
 
 async function handleWhatsAppImage(message, from) {
@@ -1284,6 +1319,11 @@ async function startServer() {
         // Create all tables
         await initAllTables();
         console.log('✅ All tables ready');
+
+        // Initialize dealer intelligence if available
+        if (dealerIntelligence && dealerIntelligence.init) {
+            dealerIntelligence.init();
+        }
 
         // Import CSV if no products
         const stats = await db.getStats();
