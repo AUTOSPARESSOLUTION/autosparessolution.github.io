@@ -274,6 +274,13 @@
             cursor: pointer;
             font-size: 11px;
         }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover { background: #e0a800; }
+        #gstLabel2 { display: none; }
+        #sgstRow { display: table-row; }
+        #igstRow { display: none; }
     </style>
     <script src="data-manager.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -356,7 +363,7 @@
             <tr>
                 <th>#</th><th>Part No</th><th>Description</th><th>HSN/SAC</th><th>UOM</th>
                 <th>Qty</th><th>Unit Price (₹)</th><th>Disc %</th><th>Taxable (₹)</th>
-                <th>GST%</th><th>CGST (₹)</th><th>SGST (₹)</th><th>Total (₹)</th><th>Act</th>
+                <th>GST%</th><th id="gstCol1">CGST (₹)</th><th id="gstCol2">SGST (₹)</th><th>Total (₹)</th><th>Act</th>
             </tr>
         </thead>
         <tbody id="itemsBody"></tbody>
@@ -383,21 +390,22 @@
 
     <!-- Tax Summary Table -->
     <table class="tax-summary-table">
-        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
+        <thead><tr><th>HSN/SAC</th><th>Taxable Value (₹)</th><th id="taxCol1">CGST (₹)</th><th id="taxCol2">SGST (₹)</th><th id="taxCol3">IGST (₹)</th><th>Total Tax (₹)</th></tr></thead>
         <tbody id="taxSummaryBody"></tbody>
     </table>
 
     <!-- Totals -->
     <div class="totals">
         <table>
-            <tr><td style="text-align:right;">Subtotal (after discount):</strong></td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
+            <tr><td style="text-align:right;">Subtotal (after discount):</td><td style="text-align:right;">₹<span id="subtotal">0.00</span></td></tr>
             <tr id="packingRow">
-                <td style="text-align:right;">Packing & Forwarding Charges:</strong></td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
-            <tr><td id="gstLabel1" style="text-align:right;">CGST (9%):</strong></td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
-            <tr><td id="gstLabel2" style="text-align:right;">SGST (9%):</strong></td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+                <td style="text-align:right;">Packing & Forwarding Charges:</td><td style="text-align:right;">₹<span id="packingChargeDisplay">0.00</span></td></tr>
+            <tr id="cgstRow"><td style="text-align:right;">CGST (9%):</td><td style="text-align:right;">₹<span id="cgstTotal">0.00</span></td></tr>
+            <tr id="sgstRow"><td style="text-align:right;">SGST (9%):</td><td style="text-align:right;">₹<span id="sgstTotal">0.00</span></td></tr>
+            <tr id="igstRow" style="display:none;"><td style="text-align:right;">IGST (18%):</td><td style="text-align:right;">₹<span id="igstTotal">0.00</span></td></tr>
             <tr id="roundOffRow">
-                <td style="text-align:right;">Round Off (on Taxable + GST):</strong></td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
-            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</strong></td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
+                <td style="text-align:right;">Round Off (on Taxable + GST):</td><td style="text-align:right;">₹<span id="roundOff">0.00</span></td></tr>
+            <tr style="font-weight:bold;"><td style="text-align:right;">Grand Total:</td><td style="text-align:right;">₹<span id="grandTotal">0.00</span></td></tr>
         </table>
     </div>
 
@@ -527,24 +535,46 @@
         }
     }
 
-    // ========== GST LOGIC ==========
+    // ========== GST LOGIC (FIXED - matches original invoice) ==========
     function isLocalGst() {
-        const gst = document.getElementById('buyerGstin').value.trim();
-        return gst.startsWith('19');
+        const state = (document.getElementById('buyerState').value || '').trim().toLowerCase();
+        const localStates = ['west bengal', 'wb', 'westbengal', 'kolkata', 'howrah', 'siliguri', 'darjeeling', 'asansol', 'hooghly', 'bardhaman'];
+        return localStates.some(ls => state.includes(ls));
     }
+
     function updateGstDisplay() {
         const isLocal = isLocalGst();
-        const cgstLabel = document.getElementById('gstLabel1');
-        const sgstLabel = document.getElementById('gstLabel2');
-        if (!isLocal) {
-            cgstLabel.innerHTML = 'IGST (18%):';
-            sgstLabel.innerHTML = '';
+        const cgstRow = document.getElementById('cgstRow');
+        const sgstRow = document.getElementById('sgstRow');
+        const igstRow = document.getElementById('igstRow');
+        const gstCol1 = document.getElementById('gstCol1');
+        const gstCol2 = document.getElementById('gstCol2');
+        const taxCol1 = document.getElementById('taxCol1');
+        const taxCol2 = document.getElementById('taxCol2');
+        const taxCol3 = document.getElementById('taxCol3');
+
+        if (isLocal) {
+            cgstRow.style.display = 'table-row';
+            sgstRow.style.display = 'table-row';
+            igstRow.style.display = 'none';
+            gstCol1.textContent = 'CGST (₹)';
+            gstCol2.textContent = 'SGST (₹)';
+            taxCol1.textContent = 'CGST (₹)';
+            taxCol2.textContent = 'SGST (₹)';
+            taxCol3.textContent = 'IGST (₹)';
         } else {
-            cgstLabel.innerHTML = 'CGST (9%):';
-            sgstLabel.innerHTML = 'SGST (9%):';
+            cgstRow.style.display = 'none';
+            sgstRow.style.display = 'none';
+            igstRow.style.display = 'table-row';
+            gstCol1.textContent = 'IGST (₹)';
+            gstCol2.textContent = '-';
+            taxCol1.textContent = '-';
+            taxCol2.textContent = '-';
+            taxCol3.textContent = 'IGST (₹)';
         }
         renderItems();
     }
+    document.getElementById('buyerState').addEventListener('input', updateGstDisplay);
     document.getElementById('buyerGstin').addEventListener('input', updateGstDisplay);
 
     // ========== CALCULATIONS ==========
@@ -592,20 +622,22 @@
         document.getElementById('subtotal').innerText = taxableTotals.subtotal.toFixed(2);
         document.getElementById('cgstTotal').innerText = taxableTotals.cgstTotal.toFixed(2);
         document.getElementById('sgstTotal').innerText = taxableTotals.sgstTotal.toFixed(2);
+        document.getElementById('igstTotal').innerText = taxableTotals.igstTotal.toFixed(2);
         document.getElementById('packingChargeDisplay').innerText = packing.toFixed(2);
         document.getElementById('roundOff').innerText = roundOff.toFixed(2);
         document.getElementById('grandTotal').innerText = grandTotal.toFixed(2);
         let taxHtml = '';
+        const isLocal = taxableTotals.isLocal;
         for (let hsn in taxableTotals.taxGroups) {
             const g = taxableTotals.taxGroups[hsn];
             const totalTax = g.cgst + g.sgst + g.igst;
             taxHtml += `<tr>
-                <td style="word-wrap:break-word;">${hsn || 'N/A'}</strong></td>
-                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</strong></td>
-                <td style="text-align:right;">${taxableTotals.isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</strong></td>
-                ${taxableTotals.isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</strong></td>` : ''}
-                <td style="text-align:right;">${!taxableTotals.isLocal ? '₹'+g.igst.toFixed(2) : '-'}</strong></td>
-                <td style="text-align:right;">₹${totalTax.toFixed(2)}</strong></td>
+                <td style="word-wrap:break-word;">${hsn || 'N/A'}</td>
+                <td style="text-align:right;">₹${g.taxable.toFixed(2)}</td>
+                <td style="text-align:right;">${isLocal ? '₹'+g.cgst.toFixed(2) : '-'}</td>
+                ${isLocal ? `<td style="text-align:right;">₹${g.sgst.toFixed(2)}</td>` : ''}
+                <td style="text-align:right;">${!isLocal ? '₹'+g.igst.toFixed(2) : '-'}</td>
+                <td style="text-align:right;">₹${totalTax.toFixed(2)}</td>
             </tr>`;
         }
         document.getElementById('taxSummaryBody').innerHTML = taxHtml;
@@ -699,7 +731,11 @@
             cellGstPct.innerText = '18%';
             cellGstPct.style.textAlign = 'center';
             const cellCgst = row.insertCell(10);
-            cellCgst.innerText = isLocal ? `₹${cgst.toFixed(2)}` : `₹${igst.toFixed(2)}`;
+            if (isLocal) {
+                cellCgst.innerText = `₹${cgst.toFixed(2)}`;
+            } else {
+                cellCgst.innerText = `₹${igst.toFixed(2)}`;
+            }
             cellCgst.style.textAlign = 'right';
             const cellSgst = row.insertCell(11);
             if (isLocal) {
@@ -732,13 +768,13 @@
         renderItems();
     }
 
-    // ========== HELPER: ENSURE PRODUCT EXISTS IN MASTER (PREVENTS UNKNOWN PRODUCTS) ==========
+    // ========== HELPER: ENSURE PRODUCT EXISTS IN MASTER ==========
     function ensureProductInMaster(sku, name, hsn, price) {
         let products = getProducts();
         let existing = products.find(p => p.sku === sku);
         if (!existing) {
             products.push({
-                id: sku,   // use SKU as ID for consistency
+                id: sku,
                 sku: sku,
                 name: name || sku,
                 hsn: hsn || '',
@@ -750,12 +786,10 @@
             });
             saveProducts(products);
         } else {
-            // Update HSN if missing
             if (hsn && (!existing.hsn || existing.hsn === '')) {
                 existing.hsn = hsn;
                 saveProducts(products);
             }
-            // Update name if missing
             if (name && (!existing.name || existing.name === '')) {
                 existing.name = name;
                 saveProducts(products);
@@ -764,7 +798,7 @@
         return true;
     }
 
-    // ========== CONVERT TO SALES INVOICE (FIXED) ==========
+    // ========== CONVERT TO SALES INVOICE ==========
     function convertToInvoice() {
         if (cart.length === 0) {
             alert('No items to convert');
@@ -776,13 +810,11 @@
             return;
         }
 
-        // 1. Ensure all products exist in product master
         for (let item of cart) {
             if (!item.part) continue;
             ensureProductInMaster(item.part, item.desc, item.hsn, item.price);
         }
 
-        // 2. Ensure customer exists
         let customers = JSON.parse(localStorage.getItem('customers') || '[]');
         let customer = customers.find(c => c.email === customerEmail);
         if (!customer) {
@@ -805,7 +837,6 @@
             localStorage.setItem('customers', JSON.stringify(customers));
         }
 
-        // 3. Build invoice items (use productId = sku)
         const invoiceItems = cart.filter(item => item.part).map(item => ({
             productId: item.part,
             quantity: item.qty,
@@ -868,11 +899,13 @@
             subtotal: parseFloat(document.getElementById('subtotal').innerText),
             cgst: parseFloat(document.getElementById('cgstTotal').innerText),
             sgst: parseFloat(document.getElementById('sgstTotal').innerText),
+            igst: parseFloat(document.getElementById('igstTotal').innerText),
             grandTotal: parseFloat(document.getElementById('grandTotal').innerText),
             roundOff: parseFloat(document.getElementById('roundOff').innerText),
             packingCharges: getPackingCharge(),
             cartonQty: parseFloat(document.getElementById('packingCartons').value) || 0,
-            packingRate: parseFloat(document.getElementById('packingRate').value) || 0
+            packingRate: parseFloat(document.getElementById('packingRate').value) || 0,
+            isLocal: isLocalGst()
         };
         let proformas = JSON.parse(localStorage.getItem('proformas') || '[]');
         proformas.push(proforma);
@@ -927,4 +960,4 @@
     calculatePackingCharges();
 </script>
 </body>
-                                                                                                               </html>
+</html>
