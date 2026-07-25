@@ -377,6 +377,31 @@ LOAD APPLICATION SCRIPTS IN ORDER
             margin-top: 15px;
         }
         
+        /* ============================================================
+        SYNC STATUS STYLES
+        ============================================================ */
+        .sync-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: #1e293b;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 10px;
+            z-index: 9999;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .sync-status:hover { opacity: 1; }
+        .sync-btn { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        .sync-btn:hover { background: #218838; }
+        
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -412,6 +437,9 @@ LOAD APPLICATION SCRIPTS IN ORDER
             <span class="status-indicator status-loading"></span>
             <span class="text-muted" style="font-size:12px;">Initializing...</span>
         </span>
+        <span id="syncIndicator" style="margin-left: 15px; font-size: 11px; color: #94a3b8;">
+            🔄 Syncing...
+        </span>
     </p>
 
     <!-- Distributor Stock Upload Section -->
@@ -446,6 +474,10 @@ LOAD APPLICATION SCRIPTS IN ORDER
             </button>
             <button class="btn btn-flyer btn-small" onclick="loadAllFlyerDealersFromPagination()">
                 <i class="fas fa-file-pdf"></i> Load Flyer Dealers
+            </button>
+            <!-- ✅ NEW: Sync Button -->
+            <button class="btn btn-success" onclick="syncFromWebhook()">
+                <i class="fas fa-cloud-download-alt"></i> Sync from Server
             </button>
         </div>
         <div id="distributorStockBadge" class="distributor-badge badge-inactive">
@@ -496,6 +528,10 @@ LOAD APPLICATION SCRIPTS IN ORDER
         <div class="btn-group">
             <button class="btn btn-whatsapp btn-small" onclick="sendBulkWhatsAppFlyers()">
                 <i class="fab fa-whatsapp"></i> Bulk WhatsApp
+            </button>
+            <!-- ✅ NEW: Quick Sync Button -->
+            <button class="btn btn-success btn-small" onclick="syncFromWebhook()">
+                <i class="fas fa-cloud-download-alt"></i> Sync
             </button>
         </div>
     </div>
@@ -755,6 +791,32 @@ LOAD APPLICATION SCRIPTS IN ORDER
 </div>
 
 <script>
+// ============================================================
+// 🔄 WEBHOOK SYNC - Single Source of Truth
+// ============================================================
+
+// ============================================================
+// 📥 SYNC FROM WEBHOOK
+// ============================================================
+
+async function syncFromWebhook() {
+    showToast('Syncing data from webhook...', 'info');
+    try {
+        if (window.webhookSync) {
+            await window.webhookSync.pullAllData();
+            showToast('✅ Data synced from server', 'success');
+            // Refresh data after sync
+            updateDistributorIndicators();
+            setTimeout(() => runAnalysis(), 1000);
+        } else {
+            showToast('⚠️ Webhook sync not available', 'error');
+        }
+    } catch (err) {
+        showToast('❌ Sync failed: ' + err.message, 'error');
+        console.error('Sync error:', err);
+    }
+}
+
 // ============================================================
 // NORMALIZE DEALER NAME HELPER - GLOBAL
 // ============================================================
@@ -2608,11 +2670,27 @@ async function loadAllDealersFromDB() {
 }
 
 // ============================================================
+// 🔄 SYNC INDICATOR
+// ============================================================
+
+function updateSyncIndicator() {
+    const indicator = document.getElementById('syncIndicator');
+    if (window.webhookSync) {
+        indicator.textContent = '✅ Connected';
+        indicator.style.color = '#4ade80';
+    } else {
+        indicator.textContent = '⚠️ Offline';
+        indicator.style.color = '#f87171';
+    }
+}
+
+// ============================================================
 // PAGE LOAD
 // ============================================================
 window.addEventListener('load', function() {
     console.log('📋 Dashboard loading...');
     
+    updateSyncIndicator();
     updateDistributorIndicators();
     
     const statusEl = document.getElementById('systemStatus');
@@ -2666,6 +2744,36 @@ window.addEventListener('load', function() {
         }
     }, 6000);
 });
+
+// ============================================================
+// 📊 SYNC STATUS DISPLAY
+// ============================================================
+
+function updateSyncStatus() {
+    if (!window.webhookSync) return;
+    const status = window.webhookSync.getSyncStatus();
+    let statusEl = document.getElementById('syncStatusBar');
+    
+    if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.id = 'syncStatusBar';
+        statusEl.className = 'sync-status';
+        statusEl.onclick = () => window.webhookSync.pullAllData();
+        document.body.appendChild(statusEl);
+    }
+    
+    const icon = status.isSyncing ? '🔄' : (status.lastSync ? '✅' : '⚠️');
+    const time = status.lastSync ? status.lastSync.toLocaleTimeString() : 'Never';
+    const counts = status.dataCounts;
+    statusEl.innerHTML = `${icon} ${time} <span style="font-size:8px;color:#94a3b8;margin-left:4px;">O:${counts.offers || 0}</span>`;
+}
+
+setInterval(updateSyncStatus, 5000);
+updateSyncStatus();
+document.addEventListener('dataSynced', updateSyncStatus);
+
+// Expose sync function globally
+window.syncFromWebhook = syncFromWebhook;
 </script>
 </body>
-    </html>
+</html>
