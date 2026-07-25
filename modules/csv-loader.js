@@ -29,9 +29,11 @@ function readCSV(filepath) {
             })
             .on('data', (row) => {
                 rowCount++;
+                
                 try {
                     const part = row['Material'] || row['material'] || row['Part'] || '';
                     if (!part || part.trim() === '') return;
+
                     const cleanPart = part.trim();
                     if (seenParts.has(cleanPart.toUpperCase())) {
                         duplicates.push(cleanPart);
@@ -63,10 +65,13 @@ function readCSV(filepath) {
                         gst: 18,
                         most_selling: row['most_selling'] === '1'
                     };
+
                     if (product.billing_price === 0) {
                         product.billing_price = product.list_price;
                     }
+
                     products.push(product);
+
                 } catch (err) {
                     errors.push({ row: rowCount, error: err.message });
                 }
@@ -89,17 +94,23 @@ function readCSV(filepath) {
 async function importCSV(filepath) {
     const startTime = Date.now();
     console.log(`📥 Starting CSV import from: ${filepath}`);
+
     try {
         const result = await readCSV(filepath);
+        
         if (result.products.length === 0) {
             return { success: false, imported: 0, total: 0, duplicates: result.duplicates.length, errors: result.errors.length };
         }
+
         await db.clearProducts();
         console.log('🗑️ Cleared existing products');
+
         const importResult = await db.importProducts(result.products);
         console.log(`✅ Imported ${importResult.imported} products`);
+
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         console.log(`⏱️ Import completed in ${duration}s`);
+
         return {
             success: true,
             imported: importResult.imported,
@@ -108,6 +119,7 @@ async function importCSV(filepath) {
             errors: result.errors.length,
             duration: duration
         };
+
     } catch (error) {
         console.error('❌ Import failed:', error.message);
         throw error;
