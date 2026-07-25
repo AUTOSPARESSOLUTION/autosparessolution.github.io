@@ -2253,5 +2253,157 @@ window.addEventListener('load', async function() {
 });
 
 console.log("✅ Brochure Generator loaded");
+// ============================================================
+// 🔄 WEBHOOK SYNC INTEGRATION - BrochureGenerator
+// ============================================================
 
+(function() {
+    const originalInit = BrochureGenerator.init;
+    const originalLoadOffers = BrochureGenerator.loadOffers;
+    const originalGetDealersWithOffers = BrochureGenerator.getDealersWithOffers;
+    
+    // ============================================================
+    // 📥 SYNC DEALER DATA FROM WEBHOOK
+    // ============================================================
+    BrochureGenerator.syncDealersFromWebhook = async function() {
+        try {
+            if (window.webhookSync) {
+                console.log('🔄 Syncing dealer data from webhook...');
+                await window.webhookSync.pullAllData();
+                
+                // Update customers (which contain dealer data)
+                if (window.webhookSync.data.customers) {
+                    const customers = window.webhookSync.data.customers;
+                    localStorage.setItem('customers', JSON.stringify(customers));
+                    console.log(`✅ Loaded ${customers.length} customers/dealers from webhook`);
+                }
+                
+                // Update suppliers (which contain vendor data)
+                if (window.webhookSync.data.suppliers) {
+                    const suppliers = window.webhookSync.data.suppliers;
+                    localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                    console.log(`✅ Loaded ${suppliers.length} suppliers from webhook`);
+                }
+                
+                // Update orders (which contain dealer purchase history)
+                if (window.webhookSync.data.orders) {
+                    const orders = window.webhookSync.data.orders;
+                    localStorage.setItem('orders', JSON.stringify(orders));
+                    console.log(`✅ Loaded ${orders.length} orders from webhook`);
+                }
+                
+                // Update invoices (which contain dealer transactions)
+                if (window.webhookSync.data.invoices) {
+                    const invoices = window.webhookSync.data.invoices;
+                    localStorage.setItem('invoices', JSON.stringify(invoices));
+                    console.log(`✅ Loaded ${invoices.length} invoices from webhook`);
+                }
+                
+                // Update offers
+                if (window.webhookSync.data.offers) {
+                    const offers = window.webhookSync.data.offers;
+                    // Store in localStorage for BrochureGenerator
+                    const offerData = {
+                        offers: offers,
+                        generatedAt: new Date().toISOString(),
+                        offerCount: offers.length
+                    };
+                    localStorage.setItem('dealerOffers', JSON.stringify(offerData));
+                    console.log(`✅ Loaded ${offers.length} offers from webhook`);
+                }
+                
+                return true;
+            }
+            console.log('⚠️ Webhook sync not available');
+            return false;
+        } catch (error) {
+            console.error('❌ Webhook sync error:', error.message);
+            return false;
+        }
+    };
+    
+    // ============================================================
+    // 🔄 OVERRIDE init WITH SYNC
+    // ============================================================
+    BrochureGenerator.init = async function() {
+        // First sync from webhook
+        await BrochureGenerator.syncDealersFromWebhook();
+        
+        // Then run the original init
+        return await originalInit.call(this);
+    };
+    
+    // ============================================================
+    // 🔄 OVERRIDE loadOffers WITH SYNC
+    // ============================================================
+    BrochureGenerator.loadOffers = function() {
+        // Try to load from webhook data first
+        if (window.webhookSync && window.webhookSync.data.offers) {
+            const offers = window.webhookSync.data.offers;
+            if (offers && offers.length > 0) {
+                console.log(`📊 Loading ${offers.length} offers from webhook data`);
+                // Store in localStorage for BrochureGenerator
+                const offerData = {
+                    offers: offers,
+                    generatedAt: new Date().toISOString(),
+                    offerCount: offers.length
+                };
+                localStorage.setItem('dealerOffers', JSON.stringify(offerData));
+                return originalLoadOffers.call(this);
+            }
+        }
+        return originalLoadOffers.call(this);
+    };
+    
+    // ============================================================
+    // 🔄 OVERRIDE getDealersWithOffers WITH SYNC
+    // ============================================================
+    BrochureGenerator.getDealersWithOffers = async function() {
+        // First sync from webhook
+        await BrochureGenerator.syncDealersFromWebhook();
+        
+        // Then run the original function
+        return await originalGetDealersWithOffers.call(this);
+    };
+    
+    // ============================================================
+    // 📤 PUSH FLYERS TO WEBHOOK
+    // ============================================================
+    BrochureGenerator.pushFlyersToWebhook = async function() {
+        try {
+            if (!window.webhookSync) {
+                console.log('⚠️ Webhook sync not available');
+                return false;
+            }
+            
+            const dealers = await BrochureGenerator.getDealersWithOffers();
+            if (!dealers || dealers.length === 0) {
+                console.log('ℹ️ No flyers to push');
+                return false;
+            }
+            
+            const flyerData = dealers.map(d => ({
+                name: d.name,
+                phone: d.phone,
+                district: d.district,
+                offerCount: d.offerCount,
+                hasPhone: d.hasPhone,
+                myStockCount: d.myStockCount,
+                distStockCount: d.distStockCount
+            }));
+            
+            const result = await window.webhookSync.pushData('flyers', flyerData);
+            if (result) {
+                console.log(`✅ Pushed ${flyerData.length} flyers to webhook`);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('❌ Push flyers error:', error.message);
+            return false;
+        }
+    };
+    
+    console.log('✅ BrochureGenerator webhook sync integrated');
+})();
 })();
