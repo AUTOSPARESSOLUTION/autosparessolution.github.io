@@ -997,7 +997,7 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📱 HANDLE WHATSAPP TEXT MESSAGE - PRIORITY ORDER
+// 📱 HANDLE WHATSAPP TEXT MESSAGE - COMPLETE FIXED
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -1007,6 +1007,7 @@ async function handleWhatsAppMessage(message, from) {
         
         const cleaned = text.replace(/^["']|["']$/g, '').replace(/["']/g, '').replace(/\s+/g, ' ').trim();
         const msgLower = cleaned.toLowerCase().trim();
+        const msgUpper = cleaned.toUpperCase().trim();
 
         // ============================================================
         // STEP 1: WELCOME / HELP
@@ -1019,12 +1020,186 @@ async function handleWhatsAppMessage(message, from) {
                 `📸 *Send Photo:* Take photo of your order list\n` +
                 `🎙️ *Send Voice:* Speak your order\n` +
                 `🛒 *Order:* "ORDER 0801BA0285N 2"\n` +
+                `📦 *Purchase:* "PURCHASE" (Admin only)\n` +
                 `📞 *Call:* ${CONFIG.businessPhone}\n` +
                 `🛒 *Shop:* https://autosparessolution.com`
             );
             return;
         }
 
+        // ============================================================
+        // STEP 2: ADMIN COMMANDS - ✅ MOVED TO TOP (BEFORE SEARCH)
+        // ============================================================
+        if (from === ADMIN_PHONE) {
+            
+            // ============================================================
+            // 📦 PURCHASE COMMAND
+            // ============================================================
+            if (msgUpper === 'PURCHASE') {
+                console.log(`📦 Admin purchase command from ${from}`);
+                await sendWhatsAppMessage(from, 
+                    `📦 *Purchase Invoice System*\n\n` +
+                    `📸 *Upload a purchase invoice image* (photo or screenshot)\n\n` +
+                    `💡 I'll extract the details automatically.\n\n` +
+                    `📝 Or reply with:\n` +
+                    `"PURCHASE MANUAL" for manual entry.\n\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+            
+            // ============================================================
+            // 📦 PURCHASE MANUAL
+            // ============================================================
+            if (msgUpper === 'PURCHASE MANUAL') {
+                console.log(`📦 Admin manual purchase from ${from}`);
+                pendingPurchaseUpload.set(from, { step: 'awaiting_manual_entry' });
+                await sendWhatsAppMessage(from, 
+                    `📝 *Manual Purchase Entry*\n\n` +
+                    `Please provide the details in this format:\n\n` +
+                    `Supplier: [Supplier Name]\n` +
+                    `Invoice No: [Invoice Number]\n` +
+                    `Date: [DD/MM/YYYY]\n` +
+                    `Items:\n` +
+                    `PART123, Qty: 2, Cost: 100\n` +
+                    `PART456, Qty: 1, Cost: 200\n\n` +
+                    `Or reply "CANCEL" to cancel.\n\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+            
+            // ============================================================
+            // ✅ CONFIRM PURCHASE
+            // ============================================================
+            if (pendingPurchaseUpload.has(from)) {
+                const pending = pendingPurchaseUpload.get(from);
+                if (pending.step === 'awaiting_confirmation') {
+                    if (msgUpper === 'CONFIRM') {
+                        await processPurchaseInvoice(from, pending.data);
+                        return;
+                    } else if (msgUpper === 'EDIT') {
+                        await sendWhatsAppMessage(from, 
+                            `✏️ *Edit Purchase Invoice*\n\n` +
+                            `Please provide the correct details in this format:\n\n` +
+                            `Supplier: [Supplier Name]\nInvoice No: [Invoice Number]\nDate: [DD/MM/YYYY]\nItems:\n` +
+                            `PART123, Qty: 2, Cost: 100\nPART456, Qty: 1, Cost: 200`
+                        );
+                        pending.step = 'awaiting_manual_entry';
+                        pendingPurchaseUpload.set(from, pending);
+                        return;
+                    } else if (msgUpper === 'CANCEL') {
+                        pendingPurchaseUpload.delete(from);
+                        await sendWhatsAppMessage(from, '❌ Purchase entry cancelled.');
+                        return;
+                    }
+                }
+                if (pending.step === 'awaiting_manual_entry') {
+                    const handled = await handlePurchaseManualEntry(from, text);
+                    if (handled) return;
+                }
+            }
+
+            // ============================================================
+            // 💳 PAY SUPPLIER
+            // ============================================================
+            if (msgUpper.startsWith('PAY SUPPLIER')) {
+                const result = await payment.processPaymentFromWhatsApp(from, text, db);
+                if (result && result.message) {
+                    await sendWhatsAppMessage(from, result.message);
+                }
+                return;
+            }
+
+            // ============================================================
+            // 💳 PAY CUSTOMER
+            // ============================================================
+            if (msgUpper.startsWith('PAY CUSTOMER')) {
+                const result = await payment.processPaymentFromWhatsApp(from, text, db);
+                if (result && result.message) {
+                    await sendWhatsAppMessage(from, result.message);
+                }
+                return;
+            }
+
+            // ============================================================
+            // 📊 SUPPLIER BALANCE
+            // ============================================================
+            if (msgUpper.startsWith('SUPPLIER BALANCE')) {
+                const supplierId = msgUpper.replace('SUPPLIER BALANCE', '').trim();
+                if (supplierId) {
+                    await handleSupplierBalance(from, supplierId);
+                } else {
+                    await sendWhatsAppMessage(from, 
+                        `❌ *Invalid Command*\n\n` +
+                        `Usage: SUPPLIER BALANCE [Supplier ID]\n` +
+                        `Example: SUPPLIER BALANCE SUP-001`
+                    );
+                }
+                return;
+            }
+
+            // ============================================================
+            // 📋 LIST SUPPLIERS
+            // ============================================================
+            if (msgLower === 'suppliers' || msgLower === 'list suppliers') {
+                await handleListSuppliers(from);
+                return;
+            }
+
+            // ============================================================
+            // 💰 PRICE CHECK (Admin)
+            // ============================================================
+            if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
+                const partNumber = extractPartNumber(cleaned);
+                if (partNumber) {
+                    let product = await db.getProductExact(partNumber);
+                    if (!product) product = await db.getProduct(partNumber);
+                    if (product) {
+                        const listPrice = product.list_price || 0;
+                        const mrpPrice = product.mrp || 0;
+                        const billingPrice = product.billing_price || 0;
+                        const priceWithGST = billingPrice * 1.18;
+                        
+                        let reply = `💰 *Price: ${product.part}*\n\n`;
+                        reply += `📝 ${product.description || 'N/A'}\n`;
+                        if (product.brand) reply += `🏷️ Brand: ${product.brand}\n`;
+                        if (product.make) reply += `🚗 Make: ${product.make}\n`;
+                        if (product.model) reply += `🎯 Model: ${product.model}\n`;
+                        reply += `\n`;
+                        if (listPrice > 0) reply += `💰 LIST PRICE: ₹${listPrice.toFixed(2)}\n`;
+                        if (mrpPrice > 0) reply += `💰 MRP PRICE: ₹${mrpPrice.toFixed(2)}\n`;
+                        if (billingPrice > 0) {
+                            reply += `💳 Billing Price: ₹${billingPrice.toFixed(2)}\n`;
+                            reply += `💳 Price incl. GST: ₹${priceWithGST.toFixed(2)}\n`;
+                        }
+                        reply += `\n📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
+                        await sendWhatsAppMessage(from, reply);
+                        return;
+                    }
+                }
+            }
+
+            // ============================================================
+            // 📦 STOCK CHECK (Admin)
+            // ============================================================
+            if (msgLower.includes('stock') || msgLower.includes('available')) {
+                const partNumber = extractPartNumber(cleaned);
+                if (partNumber) {
+                    let product = await db.getProductExact(partNumber);
+                    if (!product) product = await db.getProduct(partNumber);
+                    if (product) {
+                        let reply = `📦 *Stock: ${product.part}*\n\n`;
+                        reply += `📝 ${product.description || 'N/A'}\n`;
+                        reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
+                        await sendWhatsAppMessage(from, reply);
+                        return;
+                    }
+                }
+            }
+        }
+
+        
        // ============================================================
 // 📦 MULTI-PRODUCT DETECTION - FIXED
 // ============================================================
