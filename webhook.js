@@ -694,66 +694,6 @@ const pendingPurchaseUpload = new Map();
 const pendingPaymentConfirmation = new Map();
 
 // ============================================================
-// 🤖 GEMINI FUNCTIONS
-// ============================================================
-
-const geminiCache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000;
-
-async function getGeminiWebSearch(query) {
-    if (!CONFIG.geminiKey) return null;
-    
-    const cacheKey = query.toLowerCase().trim();
-    if (geminiCache.has(cacheKey)) {
-        const cached = geminiCache.get(cacheKey);
-        if (Date.now() - cached.timestamp < CACHE_DURATION) return cached.response;
-        geminiCache.delete(cacheKey);
-    }
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${CONFIG.geminiKey}`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: `You are an auto spares assistant for "Auto Spares Solution" in India.
-Customer Enquiry: "${query}"
-IMPORTANT RULES:
-1. Help with useful information about auto parts
-2. Suggest what they might need
-3. ALWAYS include phone: ${CONFIG.businessPhone}
-4. Reply in Hinglish
-5. Keep response concise (max 3-4 sentences)`
-                    }]
-                }],
-                generationConfig: { temperature: 0.7, maxOutputTokens: 200 }
-            })
-        });
-
-        clearTimeout(timeoutId);
-
-        const data = await response.json();
-        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-            let content = data.candidates[0].content.parts[0].text;
-            if (!content.includes(CONFIG.businessPhone)) content += `\n\n📞 Call: ${CONFIG.businessPhone}`;
-            geminiCache.set(cacheKey, { response: content, timestamp: Date.now() });
-            return content;
-        }
-        return null;
-
-    } catch (error) {
-        if (error.name === 'AbortError') console.log(`⏱️ Gemini timeout`);
-        return null;
-    }
-}
-
-// ============================================================
 // 📥 MEDIA DOWNLOAD
 // ============================================================
 
@@ -775,7 +715,7 @@ async function downloadMediaWithToken(mediaId) {
 }
 
 // ============================================================
-// 🎙️ VOICE MESSAGE HANDLER
+// 🎙️ VOICE MESSAGE HANDLER - COMPLETE
 // ============================================================
 
 async function handleVoiceMessage(message, from) {
@@ -783,8 +723,9 @@ async function handleVoiceMessage(message, from) {
         const audioId = message.audio?.id;
         const duration = message.audio?.duration || 0;
         
-        console.log(`🎙️ Voice message from ${from}, duration: ${duration}s`);
+        console.log(`🎙️ Voice message from ${from}, duration: ${duration}s, ID: ${audioId}`);
 
+        // Send initial acknowledgment
         await sendWhatsAppMessage(from, 
             `🎙️ *Voice Message Received!*\n\n` +
             `⏳ Processing your voice command...\n` +
@@ -793,23 +734,26 @@ async function handleVoiceMessage(message, from) {
         );
 
         if (!CONFIG.geminiKey) {
+            console.log(`⚠️ No Gemini key, skipping voice processing`);
             await sendWhatsAppMessage(from, 
                 `🎙️ *Voice Processing Limited*\n\n` +
-                `💡 Please type your message for better accuracy.\n` +
-                `📝 Example: "ORDER 0801BA0285N 2"\n\n` +
+                `💡 Please type your message.\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             return;
         }
 
         // Download audio
+        console.log(`📥 Downloading audio: ${audioId}`);
         const audioBuffer = await downloadMediaWithToken(audioId);
         console.log(`📥 Audio downloaded: ${audioBuffer.length} bytes`);
 
         // Transcribe with Gemini
+        console.log(`🤖 Transcribing with Gemini...`);
         const transcribedText = await transcribeWithGemini(audioBuffer);
         
         if (!transcribedText || transcribedText.trim().length === 0) {
+            console.log(`⚠️ No transcription result`);
             await sendWhatsAppMessage(from, 
                 `🎙️ *Couldn't understand the audio*\n\n` +
                 `💡 Please try speaking clearly and slowly.\n` +
@@ -829,7 +773,7 @@ async function handleVoiceMessage(message, from) {
         console.error(`❌ Voice handler error:`, error.message);
         await sendWhatsAppMessage(from, 
             `🎙️ *Voice Processing Failed*\n\n` +
-            `⚠️ Sorry, I couldn't process your voice message.\n\n` +
+            `⚠️ Error: ${error.message}\n\n` +
             `💡 Please try again or type your message.\n` +
             `📞 Call: ${CONFIG.businessPhone}`
         );
@@ -844,6 +788,8 @@ async function transcribeWithGemini(audioBuffer) {
     try {
         const base64Audio = audioBuffer.toString('base64');
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${CONFIG.geminiKey}`;
+        
+        console.log(`🔊 Sending audio to Gemini (${base64Audio.length} chars)`);
         
         const response = await fetch(url, {
             method: 'POST',
@@ -874,12 +820,15 @@ async function transcribeWithGemini(audioBuffer) {
         });
 
         const data = await response.json();
+        console.log(`📊 Gemini response received`);
+        
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
             const text = data.candidates[0].content.parts[0].text.trim();
             if (text !== 'INVALID' && text.length > 2) {
                 return text;
             }
         }
+        console.log(`⚠️ No valid transcription from Gemini`);
         return null;
 
     } catch (error) {
@@ -889,7 +838,7 @@ async function transcribeWithGemini(audioBuffer) {
 }
 
 // ============================================================
-// 📸 IMAGE HANDLER
+// 📸 IMAGE HANDLER - COMPLETE
 // ============================================================
 
 async function handleWhatsAppImage(message, from) {
@@ -907,6 +856,7 @@ async function handleWhatsAppImage(message, from) {
         );
 
         if (!CONFIG.geminiKey) {
+            console.log(`⚠️ No Gemini key, skipping image processing`);
             await sendWhatsAppMessage(from, 
                 `📸 *Image Processing Limited*\n\n` +
                 `💡 Please type the part numbers directly.\n` +
@@ -917,10 +867,12 @@ async function handleWhatsAppImage(message, from) {
         }
 
         // Download image
+        console.log(`📥 Downloading image: ${mediaId}`);
         const imageBuffer = await downloadMediaWithToken(mediaId);
-        console.log(`📸 Image size: ${imageBuffer.length} bytes`);
+        console.log(`📸 Image downloaded: ${imageBuffer.length} bytes`);
 
         // Process with Gemini Vision
+        console.log(`🤖 Processing image with Gemini Vision...`);
         const extractedText = await processImageWithGemini(imageBuffer, caption);
         
         if (extractedText) {
@@ -928,6 +880,7 @@ async function handleWhatsAppImage(message, from) {
             const mockMessage = { text: { body: extractedText } };
             await handleWhatsAppMessage(mockMessage, from);
         } else {
+            console.log(`⚠️ No text extracted from image`);
             await sendWhatsAppMessage(from, 
                 `📸 *Couldn't read the image*\n\n` +
                 `💡 Please type the part numbers directly.\n` +
@@ -954,7 +907,20 @@ async function processImageWithGemini(imageBuffer, caption) {
     try {
         if (!CONFIG.geminiKey) return null;
 
-        const base64Image = imageBuffer.toString('base64');
+        // Compress image for faster processing
+        let buffer = imageBuffer;
+        if (buffer.length > 2 * 1024 * 1024) {
+            try {
+                const sharp = require('sharp');
+                buffer = await sharp(buffer)
+                    .resize(800, 800, { fit: 'inside' })
+                    .jpeg({ quality: 80 })
+                    .toBuffer();
+                console.log(`📸 Image compressed: ${(imageBuffer.length/1024).toFixed(1)}KB → ${(buffer.length/1024).toFixed(1)}KB`);
+            } catch (e) {}
+        }
+
+        const base64Image = buffer.toString('base64');
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${CONFIG.geminiKey}`;
 
         const response = await fetch(url, {
@@ -1391,6 +1357,66 @@ async function handleWhatsAppMessage(message, from) {
         console.error(`❌ Message handler error: ${error.message}`);
         console.error(error.stack);
         await sendWhatsAppMessage(from, '⚠️ Sorry, something went wrong. Please try again.');
+    }
+}
+
+// ============================================================
+// 🤖 GEMINI WEB SEARCH
+// ============================================================
+
+const geminiCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000;
+
+async function getGeminiWebSearch(query) {
+    if (!CONFIG.geminiKey) return null;
+    
+    const cacheKey = query.toLowerCase().trim();
+    if (geminiCache.has(cacheKey)) {
+        const cached = geminiCache.get(cacheKey);
+        if (Date.now() - cached.timestamp < CACHE_DURATION) return cached.response;
+        geminiCache.delete(cacheKey);
+    }
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${CONFIG.geminiKey}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: `You are an auto spares assistant for "Auto Spares Solution" in India.
+Customer Enquiry: "${query}"
+IMPORTANT RULES:
+1. Help with useful information about auto parts
+2. Suggest what they might need
+3. ALWAYS include phone: ${CONFIG.businessPhone}
+4. Reply in Hinglish
+5. Keep response concise (max 3-4 sentences)`
+                    }]
+                }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 200 }
+            })
+        });
+
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+            let content = data.candidates[0].content.parts[0].text;
+            if (!content.includes(CONFIG.businessPhone)) content += `\n\n📞 Call: ${CONFIG.businessPhone}`;
+            geminiCache.set(cacheKey, { response: content, timestamp: Date.now() });
+            return content;
+        }
+        return null;
+
+    } catch (error) {
+        if (error.name === 'AbortError') console.log(`⏱️ Gemini timeout`);
+        return null;
     }
 }
 
