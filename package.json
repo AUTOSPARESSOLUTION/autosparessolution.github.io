@@ -15,7 +15,7 @@
     "helmet": "^7.1.0",
     "sqlite3": "^5.1.7",
     "nodemailer": "^6.9.13",
-    "twilio": "^4.23.1",
+    "twilio": "^5.0.0",
     "sharp": "^0.33.4",
     "pdf-parse": "^1.1.1",
     "tesseract.js": "^5.0.5",
