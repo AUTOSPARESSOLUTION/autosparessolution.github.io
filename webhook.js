@@ -1,7 +1,6 @@
 // ============================================================
 // 🚀 ASSIST WhatsApp Webhook v3.0 - COMPLETE FIXED VERSION
-// ALL Features: Search, Order, Multi-Product, Voice, Image,
-// Delivery, Invoice, Admin, Price Display
+// Priority: Multi-Product → Exact Match → Single Order → Search
 // ============================================================
 
 const express = require('express');
@@ -715,7 +714,7 @@ async function downloadMediaWithToken(mediaId) {
 }
 
 // ============================================================
-// 🎙️ VOICE MESSAGE HANDLER - COMPLETE
+// 🎙️ VOICE MESSAGE HANDLER
 // ============================================================
 
 async function handleVoiceMessage(message, from) {
@@ -725,7 +724,6 @@ async function handleVoiceMessage(message, from) {
         
         console.log(`🎙️ Voice message from ${from}, duration: ${duration}s, ID: ${audioId}`);
 
-        // Send initial acknowledgment
         await sendWhatsAppMessage(from, 
             `🎙️ *Voice Message Received!*\n\n` +
             `⏳ Processing your voice command...\n` +
@@ -743,12 +741,10 @@ async function handleVoiceMessage(message, from) {
             return;
         }
 
-        // Download audio
         console.log(`📥 Downloading audio: ${audioId}`);
         const audioBuffer = await downloadMediaWithToken(audioId);
         console.log(`📥 Audio downloaded: ${audioBuffer.length} bytes`);
 
-        // Transcribe with Gemini
         console.log(`🤖 Transcribing with Gemini...`);
         const transcribedText = await transcribeWithGemini(audioBuffer);
         
@@ -765,7 +761,6 @@ async function handleVoiceMessage(message, from) {
 
         console.log(`📝 Transcribed: "${transcribedText}"`);
 
-        // Process as text message
         const mockMessage = { text: { body: transcribedText } };
         await handleWhatsAppMessage(mockMessage, from);
 
@@ -798,11 +793,15 @@ async function transcribeWithGemini(audioBuffer) {
                 contents: [{
                     parts: [
                         {
-                            text: `Transcribe this audio message from a customer.\n
-                            The customer is enquiring about auto spare parts.\n
-                            Extract part numbers, quantities, or questions.\n
-                            Return ONLY the transcribed text, no explanations.\n
-                            If you can't understand, return "INVALID".`
+                            text: `Transcribe this audio message from a customer.
+                            
+IMPORTANT RULES:
+1. Look for EXACT part numbers (alphanumeric, 5-20 characters like 0801BA0285N)
+2. If you find a part number, return ONLY the part number
+3. If you find part number with quantity, return "PART_NUMBER QTY"
+4. Example: "0801BA0285N 2"
+5. If multiple part numbers, list each on new line
+6. If no part number found, return the full transcription`
                         },
                         {
                             inline_data: {
@@ -838,7 +837,7 @@ async function transcribeWithGemini(audioBuffer) {
 }
 
 // ============================================================
-// 📸 IMAGE HANDLER - COMPLETE
+// 📸 IMAGE HANDLER
 // ============================================================
 
 async function handleWhatsAppImage(message, from) {
@@ -866,12 +865,10 @@ async function handleWhatsAppImage(message, from) {
             return;
         }
 
-        // Download image
         console.log(`📥 Downloading image: ${mediaId}`);
         const imageBuffer = await downloadMediaWithToken(mediaId);
         console.log(`📸 Image downloaded: ${imageBuffer.length} bytes`);
 
-        // Process with Gemini Vision
         console.log(`🤖 Processing image with Gemini Vision...`);
         const extractedText = await processImageWithGemini(imageBuffer, caption);
         
@@ -907,7 +904,6 @@ async function processImageWithGemini(imageBuffer, caption) {
     try {
         if (!CONFIG.geminiKey) return null;
 
-        // Compress image for faster processing
         let buffer = imageBuffer;
         if (buffer.length > 2 * 1024 * 1024) {
             try {
@@ -916,7 +912,7 @@ async function processImageWithGemini(imageBuffer, caption) {
                     .resize(800, 800, { fit: 'inside' })
                     .jpeg({ quality: 80 })
                     .toBuffer();
-                console.log(`📸 Image compressed: ${(imageBuffer.length/1024).toFixed(1)}KB → ${(buffer.length/1024).toFixed(1)}KB`);
+                console.log(`📸 Image compressed`);
             } catch (e) {}
         }
 
@@ -930,14 +926,18 @@ async function processImageWithGemini(imageBuffer, caption) {
                 contents: [{
                     parts: [
                         {
-                            text: `Extract all part numbers and quantities from this image.
+                            text: `Extract ALL part numbers from this image.
+                            
 INSTRUCTIONS:
-1. Look for part numbers (alphanumeric, 5-20 characters)
-2. Look for quantities (numbers after part numbers)
-3. Return in format: PART-QTY (one per line)
-4. If no quantities found, assume qty = 1
-5. If multiple parts, list all of them
-6. If you can't find any, return "NO_PARTS_FOUND"
+1. Look for part numbers (alphanumeric, 5-20 characters like 0801BA0285N)
+2. Extract EVERY part number you can find
+3. If quantities are present, include them
+4. Return each part number on a new line
+5. Format: PART_NUMBER QTY (if quantity found)
+6. Example output:
+   0801BA0285N 2
+   0303BC0071N 1
+7. If no part numbers found, return "NO_PARTS_FOUND"
 
 Caption: "${caption}"`
                         },
@@ -997,7 +997,7 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📱 HANDLE WHATSAPP TEXT MESSAGE
+// 📱 HANDLE WHATSAPP TEXT MESSAGE - PRIORITY ORDER
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -1009,7 +1009,7 @@ async function handleWhatsAppMessage(message, from) {
         const msgLower = cleaned.toLowerCase().trim();
 
         // ============================================================
-        // WELCOME / HELP
+        // STEP 1: WELCOME / HELP
         // ============================================================
         if (['hi', 'hello', 'help', 'start', 'menu'].includes(msgLower)) {
             await sendWhatsAppMessage(from, 
@@ -1026,7 +1026,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 📦 MULTI-PRODUCT DETECTION
+        // STEP 2: MULTI-PRODUCT DETECTION (HIGHEST PRIORITY)
         // ============================================================
         const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
         const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
@@ -1037,11 +1037,11 @@ async function handleWhatsAppMessage(message, from) {
 
         const isMultiProduct = hasMultipleParts || hasNewLines || hasDash || hasCommas;
 
-        if (isMultiProduct) {
+        if (isMultiProduct && uniqueParts.length > 1) {
             console.log(`📋 Processing multi-product enquiry...`);
             
             const items = parseOrder(text);
-            console.log(`📦 Parsed ${items.length} items:`, JSON.stringify(items, null, 2));
+            console.log(`📦 Parsed ${items.length} items`);
             
             if (items.length > 0) {
                 let foundItems = [];
@@ -1141,59 +1141,50 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 🔍 SEARCH PRODUCTS
+        // STEP 3: EXACT PART NUMBER MATCH (WITH QUANTITY)
         // ============================================================
-        if (cleaned.length >= 2) {
-            const commonWords = ['i', 'need', 'want', 'for', 'my', 'the', 'a', 'an', 'me', 'please', 'from', 'to', 'of', 'with', 'have', 'has', 'is', 'are', 'was', 'were', 'and', 'or', 'but'];
-            let searchWords = cleaned.toLowerCase().split(' ').filter(w => !commonWords.includes(w) && w.length > 1).join(' ');
-            if (!searchWords) searchWords = cleaned;
-
-            console.log(`🔍 Searching for: "${searchWords}"`);
-
-            let exactProduct = await db.getProductExact(searchWords.toUpperCase());
+        
+        // Check if the message is EXACTLY a part number
+        const exactPartMatch = cleaned.match(/^[A-Z0-9]{5,20}$/);
+        if (exactPartMatch) {
+            const partNumber = exactPartMatch[0];
+            console.log(`🔍 Exact part number detected: ${partNumber}`);
+            
+            const exactProduct = await db.getProductExact(partNumber);
             if (exactProduct) {
-                let reply = `🔍 Found 1 result\n\n`;
+                let reply = `🔍 *Exact Match Found*\n\n`;
                 reply += formatProductForWhatsApp(exactProduct, 0);
                 reply += `\n🛒 To order: "${exactProduct.part} 2"\n`;
                 reply += `📞 Call: ${CONFIG.businessPhone}`;
                 await sendWhatsAppMessage(from, reply);
                 return;
             }
+        }
 
-            let results = await db.searchProducts(searchWords, 10);
+        // Check if the message CONTAINS a part number (with extra words)
+        const partInMessage = cleaned.match(/\b([A-Z0-9]{5,20})\b/);
+        if (partInMessage) {
+            const partNumber = partInMessage[1];
+            console.log(`🔍 Part number found in message: ${partNumber}`);
             
-            if (results.length === 0) {
-                console.log(`🔄 No results, trying vehicle search...`);
-                results = await db.searchByVehicle(searchWords, 10);
-            }
-
-            if (results.length === 0) {
-                console.log(`🔄 No results, trying description search...`);
-                results = await db.searchDescriptionOnly(searchWords, 10);
-            }
-
-            if (results.length === 0) {
-                console.log(`🔄 No results, trying word-by-word search...`);
-                const words = cleaned.split(' ').filter(w => w.length > 2 && !commonWords.includes(w.toLowerCase()));
-                for (const word of words) {
-                    const wordResults = await db.searchProducts(word, 5);
-                    if (wordResults.length > 0) {
-                        results = wordResults;
-                        break;
-                    }
+            const exactProduct = await db.getProductExact(partNumber);
+            if (exactProduct) {
+                // Check if there's a quantity after the part number
+                const qtyMatch = cleaned.match(new RegExp(`${partNumber}\\s*(\\d+)`, 'i'));
+                const quantity = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+                
+                let reply = `🔍 *Exact Match Found for "${partNumber}"*\n\n`;
+                reply += formatProductForWhatsApp(exactProduct, 0);
+                
+                if (quantity > 1) {
+                    const price = (exactProduct.billing_price || exactProduct.list_price || 0) * 1.18;
+                    const total = price * quantity;
+                    reply += `\n📦 *Quantity: ${quantity}*\n`;
+                    reply += `💰 *Total: ₹${total.toFixed(2)}*\n\n`;
+                    reply += `✅ Reply "CONFIRM ORDER" to place order\n`;
+                } else {
+                    reply += `\n🛒 To order: "${exactProduct.part} 2"\n`;
                 }
-            }
-
-            if (results.length > 0) {
-                let reply = `🔍 Found ${results.length} result(s) for "${cleaned}"\n\n`;
-                results.slice(0, 5).forEach((p, i) => {
-                    reply += formatProductForWhatsApp(p, i);
-                    reply += `\n`;
-                });
-                if (results.length > 5) {
-                    reply += `... and ${results.length - 5} more\n\n`;
-                }
-                reply += `🛒 To order: Send part number with quantity\n`;
                 reply += `📞 Call: ${CONFIG.businessPhone}`;
                 await sendWhatsAppMessage(from, reply);
                 return;
@@ -1201,58 +1192,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 💰 PRICE CHECK
-        // ============================================================
-        if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
-            const partNumber = extractPartNumber(cleaned);
-            if (partNumber) {
-                let product = await db.getProductExact(partNumber);
-                if (!product) product = await db.getProduct(partNumber);
-                if (product) {
-                    const listPrice = product.list_price || 0;
-                    const mrpPrice = product.mrp || 0;
-                    const billingPrice = product.billing_price || 0;
-                    const priceWithGST = billingPrice * 1.18;
-                    
-                    let reply = `💰 *Price: ${product.part}*\n\n`;
-                    reply += `📝 ${product.description || 'N/A'}\n`;
-                    if (product.brand) reply += `🏷️ Brand: ${product.brand}\n`;
-                    if (product.make) reply += `🚗 Make: ${product.make}\n`;
-                    if (product.model) reply += `🎯 Model: ${product.model}\n`;
-                    reply += `\n`;
-                    if (listPrice > 0) reply += `💰 LIST PRICE: ₹${listPrice.toFixed(2)}\n`;
-                    if (mrpPrice > 0) reply += `💰 MRP PRICE: ₹${mrpPrice.toFixed(2)}\n`;
-                    if (billingPrice > 0) {
-                        reply += `💳 Billing Price: ₹${billingPrice.toFixed(2)}\n`;
-                        reply += `💳 Price incl. GST: ₹${priceWithGST.toFixed(2)}\n`;
-                    }
-                    reply += `\n📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
-                    await sendWhatsAppMessage(from, reply);
-                    return;
-                }
-            }
-        }
-
-        // ============================================================
-        // 📦 STOCK CHECK
-        // ============================================================
-        if (msgLower.includes('stock') || msgLower.includes('available')) {
-            const partNumber = extractPartNumber(cleaned);
-            if (partNumber) {
-                let product = await db.getProductExact(partNumber);
-                if (!product) product = await db.getProduct(partNumber);
-                if (product) {
-                    let reply = `📦 *Stock: ${product.part}*\n\n`;
-                    reply += `📝 ${product.description || 'N/A'}\n`;
-                    reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
-                    await sendWhatsAppMessage(from, reply);
-                    return;
-                }
-            }
-        }
-
-        // ============================================================
-        // 🛒 SINGLE PRODUCT ORDER
+        // STEP 4: SINGLE PRODUCT ORDER (ORDER PART QTY)
         // ============================================================
         const partNumber = extractPartNumber(cleaned);
         const quantity = extractQuantity(cleaned);
@@ -1298,7 +1238,108 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // ✅ CONFIRM ORDER
+        // STEP 5: PRICE CHECK
+        // ============================================================
+        if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
+            const partNumber = extractPartNumber(cleaned);
+            if (partNumber) {
+                let product = await db.getProductExact(partNumber);
+                if (!product) product = await db.getProduct(partNumber);
+                if (product) {
+                    const listPrice = product.list_price || 0;
+                    const mrpPrice = product.mrp || 0;
+                    const billingPrice = product.billing_price || 0;
+                    const priceWithGST = billingPrice * 1.18;
+                    
+                    let reply = `💰 *Price: ${product.part}*\n\n`;
+                    reply += `📝 ${product.description || 'N/A'}\n`;
+                    if (product.brand) reply += `🏷️ Brand: ${product.brand}\n`;
+                    if (product.make) reply += `🚗 Make: ${product.make}\n`;
+                    if (product.model) reply += `🎯 Model: ${product.model}\n`;
+                    reply += `\n`;
+                    if (listPrice > 0) reply += `💰 LIST PRICE: ₹${listPrice.toFixed(2)}\n`;
+                    if (mrpPrice > 0) reply += `💰 MRP PRICE: ₹${mrpPrice.toFixed(2)}\n`;
+                    if (billingPrice > 0) {
+                        reply += `💳 Billing Price: ₹${billingPrice.toFixed(2)}\n`;
+                        reply += `💳 Price incl. GST: ₹${priceWithGST.toFixed(2)}\n`;
+                    }
+                    reply += `\n📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
+                    await sendWhatsAppMessage(from, reply);
+                    return;
+                }
+            }
+        }
+
+        // ============================================================
+        // STEP 6: STOCK CHECK
+        // ============================================================
+        if (msgLower.includes('stock') || msgLower.includes('available')) {
+            const partNumber = extractPartNumber(cleaned);
+            if (partNumber) {
+                let product = await db.getProductExact(partNumber);
+                if (!product) product = await db.getProduct(partNumber);
+                if (product) {
+                    let reply = `📦 *Stock: ${product.part}*\n\n`;
+                    reply += `📝 ${product.description || 'N/A'}\n`;
+                    reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
+                    await sendWhatsAppMessage(from, reply);
+                    return;
+                }
+            }
+        }
+
+        // ============================================================
+        // STEP 7: SEARCH PRODUCTS - ONLY IF NO EXACT MATCH OR ORDER FOUND
+        // ============================================================
+        if (cleaned.length >= 2) {
+            const commonWords = ['i', 'need', 'want', 'for', 'my', 'the', 'a', 'an', 'me', 'please', 'from', 'to', 'of', 'with', 'have', 'has', 'is', 'are', 'was', 'were', 'and', 'or', 'but'];
+            let searchWords = cleaned.toLowerCase().split(' ').filter(w => !commonWords.includes(w) && w.length > 1).join(' ');
+            if (!searchWords) searchWords = cleaned;
+
+            console.log(`🔍 Searching for: "${searchWords}"`);
+
+            let results = await db.searchProducts(searchWords, 10);
+            
+            if (results.length === 0) {
+                console.log(`🔄 No results, trying vehicle search...`);
+                results = await db.searchByVehicle(searchWords, 10);
+            }
+
+            if (results.length === 0) {
+                console.log(`🔄 No results, trying description search...`);
+                results = await db.searchDescriptionOnly(searchWords, 10);
+            }
+
+            if (results.length === 0) {
+                console.log(`🔄 No results, trying word-by-word search...`);
+                const words = cleaned.split(' ').filter(w => w.length > 2 && !commonWords.includes(w.toLowerCase()));
+                for (const word of words) {
+                    const wordResults = await db.searchProducts(word, 5);
+                    if (wordResults.length > 0) {
+                        results = wordResults;
+                        break;
+                    }
+                }
+            }
+
+            if (results.length > 0) {
+                let reply = `🔍 Found ${results.length} result(s) for "${cleaned}"\n\n`;
+                results.slice(0, 5).forEach((p, i) => {
+                    reply += formatProductForWhatsApp(p, i);
+                    reply += `\n`;
+                });
+                if (results.length > 5) {
+                    reply += `... and ${results.length - 5} more\n\n`;
+                }
+                reply += `🛒 To order: Send part number with quantity\n`;
+                reply += `📞 Call: ${CONFIG.businessPhone}`;
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+        }
+
+        // ============================================================
+        // STEP 8: CONFIRM ORDER
         // ============================================================
         if (msgLower === 'confirm order' || msgLower === 'confirm') {
             const cart = await db.getCart(from);
@@ -1325,7 +1366,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 🗑️ CLEAR CART
+        // STEP 9: CLEAR CART
         // ============================================================
         if (msgLower === 'clear cart' || msgLower === 'clear') {
             await db.clearCart(from);
@@ -1334,7 +1375,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 🤖 GEMINI WEB SEARCH FALLBACK
+        // STEP 10: GEMINI WEB SEARCH FALLBACK
         // ============================================================
         console.log(`🔄 No product found. Trying Gemini...`);
         const geminiReply = await getGeminiWebSearch(cleaned);
@@ -1344,7 +1385,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // ❌ NO RESULTS
+        // STEP 11: NO RESULTS
         // ============================================================
         await sendWhatsAppMessage(from, 
             `🔍 No results for "${text}"\n\n` +
