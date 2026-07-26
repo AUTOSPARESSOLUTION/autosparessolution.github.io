@@ -1,129 +1,162 @@
 // ============================================================
-// 📦 CSV LOADER - Streaming Import
+// 📥 CSV LOADER - COMPLETE FIXED VERSION
+// modules/csv-loader.js
 // ============================================================
 
 const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
-const db = require('./database');
 
-function readCSV(filepath) {
+// ============================================================
+// 📥 IMPORT CSV
+// ============================================================
+
+async function importCSV(filePath) {
+    const startTime = Date.now();
+    
     return new Promise((resolve, reject) => {
         const products = [];
-        const errors = [];
-        let rowCount = 0;
-        let duplicates = [];
-        const seenParts = new Set();
+        let totalRows = 0;
+        let duplicates = 0;
+        let errors = 0;
 
-        if (!fs.existsSync(filepath)) {
-            reject(new Error(`CSV file not found: ${filepath}`));
-            return;
-        }
+        console.log(`📥 Starting CSV import from: ${filePath}`);
 
-        console.log(`📖 Reading CSV: ${filepath}`);
-
-        fs.createReadStream(filepath)
-            .pipe(csv({ skipLines: 0, strict: false, trim: true }))
-            .on('headers', (headers) => {
-                console.log(`📋 Headers: ${headers.join(', ')}`);
-            })
+        fs.createReadStream(filePath)
+            .pipe(csv())
             .on('data', (row) => {
-                rowCount++;
-                
+                totalRows++;
                 try {
-                    const part = row['Material'] || row['material'] || row['Part'] || '';
-                    if (!part || part.trim() === '') return;
+                    // ============================================================
+                    // 🔧 CORRECT COLUMN MAPPING
+                    // ============================================================
+                    const part = String(row['Material'] || '').trim().toUpperCase();
+                    if (!part) return;
 
-                    const cleanPart = part.trim();
-                    if (seenParts.has(cleanPart.toUpperCase())) {
-                        duplicates.push(cleanPart);
+                    // Check for duplicate
+                    if (products.find(p => p.part === part)) {
+                        duplicates++;
                         return;
                     }
-                    seenParts.add(cleanPart.toUpperCase());
 
-                    let description = row['Material2'] || row['Description'] || row['Product Sub Group'] || 'Auto Spare Part';
-                    description = description.trim().replace(/\s+/g, ' ').replace(/^["']|["']$/g, '');
+                    // ✅ FIX: Map all columns correctly
+                    const listPrice = parseFloat(row['LIST PRICE']) || 0;
+                    const mrpPrice = parseFloat(row['MRP PRICE']) || 0;
+                    const billingPrice = parseFloat(row['billing price']) || 0;
 
                     const product = {
-                        part: cleanPart,
-                        description: description,
-                        brand: row['brand'] || row['Brand'] || 'Unknown',
-                        make: row['Make'] || row['make'] || '',
-                        type: row['TYPE'] || row['Type'] || '',
-                        finish: row['FINISH'] || row['Finish'] || '',
-                        list_price: parseFloat(row['LIST PRICE'] || 0) || 0,
-                        mrp: parseFloat(row['MRP PRICE'] || 0) || 0,
-                        billing_price: parseFloat(row['billing price'] || 0) || 0,
-                        stock: parseInt(row['STOCK'] || 0) || 0,
-                        box_qty: parseInt(row['Box Qty'] || 0) || 0,
-                        carton: parseInt(row['Carton'] || 0) || 0,
-                        model: row['Model'] || row['model'] || '',
-                        year_start: row['Year Start'] || '',
-                        year_end: row['Year End'] || '',
-                        segment: row['Segment'] || '',
-                        hsn: row['HSN'] || row['hsn'] || '',
+                        part: part,
+                        description: String(row['Material2'] || '').trim(),
+                        brand: String(row['brand'] || '').trim(),
+                        make: String(row['Make'] || '').trim(),
+                        model: String(row['Model'] || '').trim(),
+                        application: String(row['Model'] || '').trim(),
+                        category: String(row['Product Sub Group'] || '').trim(),
+                        hsn: String(row['hsn'] || '').trim(),
+                        stock: parseInt(row['STOCK']) || 0,
+                        list_price: listPrice,
+                        billing_price: billingPrice,
+                        mrp: mrpPrice,
                         gst: 18,
-                        most_selling: row['most_selling'] === '1'
+                        box_qty: parseInt(row['Box Qty']) || 0,
+                        carton: parseInt(row['Carton']) || 0,
+                        segment: String(row['Segment'] || '').trim(),
+                        region: String(row['region'] || '').trim(),
+                        zone: String(row['zone'] || '').trim()
                     };
-
-                    if (product.billing_price === 0) {
-                        product.billing_price = product.list_price;
-                    }
 
                     products.push(product);
 
-                } catch (err) {
-                    errors.push({ row: rowCount, error: err.message });
+                } catch (error) {
+                    errors++;
+                    console.error(`❌ Error processing row: ${error.message}`);
                 }
             })
-            .on('end', () => {
+            .on('end', async () => {
                 console.log(`📊 CSV Import Summary:`);
-                console.log(`   Total rows: ${rowCount}`);
+                console.log(`   Total rows: ${totalRows}`);
                 console.log(`   Products: ${products.length}`);
-                console.log(`   Duplicates: ${duplicates.length}`);
-                console.log(`   Errors: ${errors.length}`);
-                resolve({ products, duplicates, errors, totalRows: rowCount, totalProducts: products.length });
+                console.log(`   Duplicates: ${duplicates}`);
+                console.log(`   Errors: ${errors}`);
+
+                try {
+                    // Clear existing products
+                    const db = require('./database');
+                    await new Promise((resolve, reject) => {
+                        db.db.run('DELETE FROM products', (err) => {
+                            if (err) reject(err);
+                            else resolve();
+                        });
+                    });
+                    console.log('🗑️ Cleared existing products');
+
+                    // Insert products in batches
+                    const batchSize = 500;
+                    let inserted = 0;
+
+                    for (let i = 0; i < products.length; i += batchSize) {
+                        const batch = products.slice(i, i + batchSize);
+                        const placeholders = batch.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').join(',');
+                        const values = [];
+
+                        for (const p of batch) {
+                            values.push(
+                                p.part,
+                                p.description,
+                                p.brand,
+                                p.make,
+                                p.model,
+                                p.application,
+                                p.category,
+                                p.hsn,
+                                p.stock,
+                                p.list_price,
+                                p.billing_price,
+                                p.mrp,
+                                p.gst,
+                                p.box_qty,
+                                p.carton,
+                                p.segment,
+                                p.region,
+                                p.zone,
+                                new Date().toISOString()
+                            );
+                        }
+
+                        const sql = `
+                            INSERT OR REPLACE INTO products (
+                                part, description, brand, make, model, application,
+                                category, hsn, stock, list_price, billing_price, mrp,
+                                gst, box_qty, carton, segment, region, zone, updated_at
+                            ) VALUES ${placeholders}
+                        `;
+
+                        await new Promise((resolve, reject) => {
+                            db.db.run(sql, values, (err) => {
+                                if (err) reject(err);
+                                else resolve();
+                            });
+                        });
+
+                        inserted += batch.length;
+                        console.log(`📦 Imported ${inserted}/${products.length} products`);
+                    }
+
+                    console.log(`✅ Imported ${products.length} products`);
+                    console.log(`⏱️ Import completed in ${(Date.now() - startTime) / 1000}s`);
+
+                    resolve({ imported: products.length, duplicates, errors });
+
+                } catch (error) {
+                    console.error(`❌ Import error: ${error.message}`);
+                    reject(error);
+                }
             })
             .on('error', (error) => {
-                console.error('❌ CSV read error:', error.message);
+                console.error(`❌ CSV read error: ${error.message}`);
                 reject(error);
             });
     });
 }
 
-async function importCSV(filepath) {
-    const startTime = Date.now();
-    console.log(`📥 Starting CSV import from: ${filepath}`);
-
-    try {
-        const result = await readCSV(filepath);
-        
-        if (result.products.length === 0) {
-            return { success: false, imported: 0, total: 0, duplicates: result.duplicates.length, errors: result.errors.length };
-        }
-
-        await db.clearProducts();
-        console.log('🗑️ Cleared existing products');
-
-        const importResult = await db.importProducts(result.products);
-        console.log(`✅ Imported ${importResult.imported} products`);
-
-        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-        console.log(`⏱️ Import completed in ${duration}s`);
-
-        return {
-            success: true,
-            imported: importResult.imported,
-            total: result.totalProducts,
-            duplicates: result.duplicates.length,
-            errors: result.errors.length,
-            duration: duration
-        };
-
-    } catch (error) {
-        console.error('❌ Import failed:', error.message);
-        throw error;
-    }
-}
-
-module.exports = { importCSV, readCSV };
+module.exports = { importCSV };
