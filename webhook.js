@@ -1,6 +1,7 @@
 // ============================================================
 // 🚀 ASSIST WhatsApp Webhook v3.0 - COMPLETE FIXED
 // All Features: Admin Commands, Purchase, Search, Order, Voice, Image
+// Document Processing with Gemini Vision
 // ============================================================
 
 const express = require('express');
@@ -75,7 +76,6 @@ try { deliverySystem = require('./modules/delivery-system'); } catch(e) { delive
 let vendorManagement = null;
 try { vendorManagement = require('./modules/vendor-management'); } catch(e) { vendorManagement = { getAllVendors: async () => [] }; }
 
-// Optional Excel/PDF modules
 let XLSX = null;
 try { XLSX = require('xlsx'); } catch(e) {}
 
@@ -84,6 +84,12 @@ try { ExcelJS = require('exceljs'); } catch(e) {}
 
 let PdfPrinter = null;
 try { PdfPrinter = require('pdfmake'); } catch(e) {}
+
+let pdfParse = null;
+try { pdfParse = require('pdf-parse'); } catch(e) {}
+
+let Tesseract = null;
+try { Tesseract = require('tesseract.js'); } catch(e) {}
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -114,6 +120,7 @@ console.log(`🔐 Admin Phone: ${ADMIN_PHONE}`);
 console.log(`🆔 Phone Number ID: ${CONFIG.phoneNumberId}`);
 console.log(`🔑 Token: ${CONFIG.accessToken ? '✅ Set' : '❌ Not set'}`);
 console.log(`🧠 Gemini: ${CONFIG.geminiKey ? '✅ Set' : '❌ Not set'}`);
+console.log(`📄 Document Processing: ${CONFIG.geminiKey ? '✅ Gemini Vision' : '⚠️ Limited'}`);
 console.log(`💾 Memory Limit: ${CONFIG.maxMemory}MB`);
 console.log('====================================');
 
@@ -1010,7 +1017,414 @@ function isAdmin(phone) {
 }
 
 // ============================================================
-// 📱 HANDLE WHATSAPP TEXT MESSAGE - COMPLETE FIXED
+// 📄 DOCUMENT MESSAGE HANDLER WITH GEMINI VISION
+// ============================================================
+
+async function handleDocumentMessage(message, from) {
+    try {
+        const doc = message.document;
+        const filename = doc.filename || 'document.pdf';
+        const mimeType = doc.mime_type || '';
+        const docId = doc.id;
+        
+        console.log(`📁 Processing document from ${from}: ${filename}`);
+        console.log(`📁 MIME Type: ${mimeType}`);
+        
+        const isExcel = mimeType.includes('spreadsheet') || 
+                       mimeType.includes('excel') || 
+                       filename.endsWith('.xlsx') || 
+                       filename.endsWith('.xls') || 
+                       filename.endsWith('.csv');
+        const isPDF = mimeType === 'application/pdf' || filename.endsWith('.pdf');
+        const isImage = mimeType.startsWith('image/');
+        
+        if (!isExcel && !isPDF && !isImage) {
+            await sendWhatsAppMessage(from, 
+                `📁 *Document Received!*\n\n` +
+                `We process Excel, PDF, and Image files for bulk orders.\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
+        
+        await sendWhatsAppMessage(from, 
+            `📄 *Processing Your Document...*\n\n` +
+            `🤖 Using Gemini Vision to extract part numbers...\n` +
+            `⏳ Please wait...\n\n` +
+            `📁 File: ${filename}`
+        );
+        
+        const fileBuffer = await downloadMediaWithToken(docId);
+        console.log(`📥 File downloaded: ${fileBuffer.length} bytes`);
+        
+        let extractedItems = [];
+        let extractedText = null;
+        
+        // ============================================================
+        // 🤖 USE GEMINI VISION FOR ALL DOCUMENT TYPES
+        // ============================================================
+        if (CONFIG.geminiKey) {
+            console.log(`🤖 Using Gemini Vision to extract from ${filename}`);
+            
+            const base64Data = fileBuffer.toString('base64');
+            const mimeTypeForGemini = isPDF ? 'application/pdf' : 
+                                     isExcel ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+                                     mimeType || 'image/jpeg';
+            
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${CONFIG.geminiKey}`;
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                {
+                                    text: `Extract ALL part numbers and quantities from this document.
+                                    
+INSTRUCTIONS:
+1. Look for part numbers (alphanumeric, 5-20 characters like 0801BA0285N)
+2. Look for quantities (numbers after part numbers)
+3. Extract EVERY part number you can find
+4. Return each part number on a new line
+5. Format: PART_NUMBER QTY (if quantity found)
+6. Example output:
+   0801BA0285N 2
+   0303BC0071N 1
+   0801BA0286N 5
+7. If no part numbers found, return "NO_PARTS_FOUND"
+
+Document: ${filename}`
+                                },
+                                {
+                                    inline_data: {
+                                        mime_type: mimeTypeForGemini,
+                                        data: base64Data
+                                    }
+                                }
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 500
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                console.log(`📊 Gemini response received`);
+                
+                if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    const content = data.candidates[0].content.parts[0].text.trim();
+                    console.log(`📝 Gemini extracted: "${content.substring(0, 200)}..."`);
+                    
+                    if (content !== 'NO_PARTS_FOUND' && content.length > 5) {
+                        extractedItems = parseExtractedText(content);
+                        extractedText = content;
+                        console.log(`✅ Extracted ${extractedItems.length} items via Gemini`);
+                    }
+                }
+            } catch (geminiError) {
+                console.error(`❌ Gemini error:`, geminiError.message);
+            }
+        }
+        
+        // ============================================================
+        // 🔧 FALLBACK: PDF/Excel parsing if Gemini fails
+        // ============================================================
+        if (extractedItems.length === 0) {
+            console.log(`🔄 Falling back to native parsing...`);
+            
+            if (isPDF && pdfParse) {
+                try {
+                    const data = await pdfParse(fileBuffer);
+                    const text = data.text || '';
+                    extractedItems = extractItemsFromText(text);
+                    console.log(`📄 PDF extracted ${extractedItems.length} items`);
+                } catch (e) {
+                    console.error(`❌ PDF parse error:`, e.message);
+                }
+            } else if (isExcel && XLSX) {
+                try {
+                    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const data = XLSX.utils.sheet_to_json(firstSheet);
+                    extractedItems = parseExcelData(data);
+                    console.log(`📊 Excel extracted ${extractedItems.length} items`);
+                } catch (e) {
+                    console.error(`❌ Excel parse error:`, e.message);
+                }
+            } else if (isImage && CONFIG.geminiKey) {
+                try {
+                    const base64Image = fileBuffer.toString('base64');
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${CONFIG.geminiKey}`;
+                    
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    {
+                                        text: `Extract ALL part numbers from this image.
+                                        
+INSTRUCTIONS:
+1. Look for part numbers (alphanumeric, 5-20 characters)
+2. Look for quantities (numbers after part numbers)
+3. Return each part number on a new line
+4. Format: PART_NUMBER QTY
+5. If no part numbers found, return "NO_PARTS_FOUND"`
+                                    },
+                                    {
+                                        inline_data: {
+                                            mime_type: 'image/jpeg',
+                                            data: base64Image
+                                        }
+                                    }
+                                ]
+                            }],
+                            generationConfig: {
+                                temperature: 0.1,
+                                maxOutputTokens: 300
+                            }
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                        const content = data.candidates[0].content.parts[0].text.trim();
+                        if (content !== 'NO_PARTS_FOUND' && content.length > 5) {
+                            extractedItems = parseExtractedText(content);
+                            console.log(`📸 Image extracted ${extractedItems.length} items via Gemini`);
+                        }
+                    }
+                } catch (e) {
+                    console.error(`❌ Image Gemini error:`, e.message);
+                }
+            }
+        }
+        
+        // ============================================================
+        // 📦 PROCESS EXTRACTED ITEMS
+        // ============================================================
+        if (extractedItems.length === 0) {
+            await sendWhatsAppMessage(from, 
+                `⚠️ *No valid items found in document.*\n\n` +
+                `💡 Please ensure your document contains part numbers (5-20 alphanumeric characters).\n\n` +
+                `📝 You can also type the part numbers directly.\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
+        
+        await processExtractedItems(from, extractedItems, filename);
+        
+    } catch (error) {
+        console.error(`❌ Document handler error:`, error.message);
+        await sendWhatsAppMessage(from, 
+            `❌ *Failed to process document.*\n\n` +
+            `Error: ${error.message}\n\n` +
+            `💡 Please check your file and try again.\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
+    }
+}
+
+// ============================================================
+// 📝 PARSE EXTRACTED TEXT
+// ============================================================
+
+function parseExtractedText(text) {
+    const items = [];
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
+    for (const line of lines) {
+        let match = line.match(/\b([A-Z0-9]{5,20})\s*[-/xX:]\s*(\d+)\b/i);
+        if (match) {
+            items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
+            continue;
+        }
+        
+        match = line.match(/\b([A-Z0-9]{5,20})\s+(\d+)\b/i);
+        if (match) {
+            items.push({ part: match[1].toUpperCase(), qty: parseInt(match[2]) || 1 });
+            continue;
+        }
+        
+        match = line.match(/\b([A-Z0-9]{5,20})\b/i);
+        if (match) {
+            items.push({ part: match[1].toUpperCase(), qty: 1 });
+        }
+    }
+    
+    const seen = new Set();
+    return items.filter(item => {
+        const key = item.part;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+// ============================================================
+// 📊 PARSE EXCEL DATA
+// ============================================================
+
+function parseExcelData(data) {
+    const items = [];
+    if (data.length === 0) return items;
+    
+    const headers = Object.keys(data[0] || {});
+    let partCol = null, qtyCol = null;
+    
+    for (const header of headers) {
+        const h = header.toLowerCase();
+        if (h.includes('part') || h.includes('material') || h.includes('item') || h.includes('code')) {
+            partCol = header;
+        }
+        if (h.includes('qty') || h.includes('quantity') || h.includes('count')) {
+            qtyCol = header;
+        }
+    }
+    
+    if (!partCol) {
+        for (const row of data) {
+            for (const key of Object.keys(row)) {
+                const val = String(row[key] || '').trim();
+                if (val.match(/^[A-Z0-9]{5,20}$/)) {
+                    partCol = key;
+                    break;
+                }
+            }
+            if (partCol) break;
+        }
+    }
+    
+    if (!partCol) return items;
+    
+    for (const row of data) {
+        const part = String(row[partCol] || '').trim().toUpperCase();
+        if (!part || !part.match(/^[A-Z0-9]{5,20}$/)) continue;
+        let qty = 1;
+        if (qtyCol) qty = parseInt(row[qtyCol]) || 1;
+        items.push({ part: part, qty: Math.max(qty, 1) });
+    }
+    
+    return items;
+}
+
+// ============================================================
+// 🛒 PROCESS EXTRACTED ITEMS
+// ============================================================
+
+async function processExtractedItems(from, extractedItems, filename) {
+    let foundItems = [];
+    let notFound = [];
+    let outOfStock = [];
+    let total = 0;
+    
+    for (const item of extractedItems) {
+        let product = await db.getProductExact(item.part);
+        if (!product) {
+            const results = await db.searchProducts(item.part, 1);
+            if (results && results.length > 0) {
+                product = results[0];
+            }
+        }
+        
+        if (product) {
+            const billingPrice = product.billing_price || product.list_price || 0;
+            const priceWithGST = billingPrice * 1.18;
+            
+            foundItems.push({
+                part: product.part,
+                requestedPart: item.part,
+                description: product.description,
+                qty: item.qty || 1,
+                price: priceWithGST,
+                list_price: product.list_price,
+                mrp: product.mrp,
+                billing_price: billingPrice,
+                stock: product.stock,
+                brand: product.brand,
+                make: product.make,
+                model: product.model
+            });
+            
+            total += priceWithGST * (item.qty || 1);
+            
+            if (product.stock === 0) {
+                outOfStock.push(product.part);
+                await customerLog.trackOutOfStock(from, product.part, product.description, item.qty || 1);
+            }
+        } else {
+            notFound.push(item.part);
+        }
+    }
+    
+    if (foundItems.length === 0) {
+        await sendWhatsAppMessage(from, 
+            `❌ *No products found*\n\n` +
+            `Not found: ${notFound.join(', ')}\n\n` +
+            `💡 Please check the part numbers.\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
+        return;
+    }
+    
+    const cartItems = foundItems.map(item => ({
+        part: item.part,
+        description: item.description,
+        qty: item.qty,
+        price: item.price,
+        list_price: item.list_price,
+        mrp: item.mrp,
+        billing_price: item.billing_price
+    }));
+    
+    await db.saveCart(from, cartItems, total, total);
+    
+    let reply = `📄 *DOCUMENT ORDER SUMMARY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+    reply += `📁 File: ${filename}\n`;
+    reply += `📦 Items: ${foundItems.length} valid products\n\n`;
+    
+    for (const item of foundItems) {
+        const itemTotal = item.price * item.qty;
+        reply += `*${item.part}*`;
+        if (item.requestedPart && item.requestedPart !== item.part) {
+            reply += ` (matched: ${item.requestedPart})`;
+        }
+        reply += ` x${item.qty}\n`;
+        reply += `📝 ${item.description}\n`;
+        if (item.list_price > 0) reply += `💰 LIST PRICE: ₹${item.list_price.toFixed(2)}\n`;
+        if (item.mrp > 0) reply += `💰 MRP PRICE: ₹${item.mrp.toFixed(2)}\n`;
+        reply += `💳 ₹${item.price.toFixed(2)} × ${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
+        reply += `📦 ${item.stock > 0 ? `✅ ${item.stock} pcs` : '❌ Out of Stock'}\n\n`;
+    }
+    
+    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+    reply += `💰 *Total: ₹${total.toFixed(2)}* (incl. GST)\n`;
+    reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    if (outOfStock.length > 0) {
+        reply += `⚠️ Out of Stock: ${outOfStock.join(', ')}\n`;
+        reply += `🔔 We'll notify you when available.\n\n`;
+    }
+    
+    if (notFound.length > 0) {
+        reply += `❌ Not found: ${notFound.join(', ')}\n\n`;
+    }
+    
+    reply += `✅ *Confirm order?* Reply "Confirm Order"\n`;
+    reply += `🗑️ *Clear Cart* - Start fresh\n\n`;
+    reply += `📞 Call: ${CONFIG.businessPhone}`;
+    
+    await sendWhatsAppMessage(from, reply);
+}
+
+// ============================================================
+// 📱 HANDLE WHATSAPP TEXT MESSAGE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -1023,7 +1437,7 @@ async function handleWhatsAppMessage(message, from) {
         const msgUpper = cleaned.toUpperCase().trim();
 
         // ============================================================
-        // ✅ CHECK IF ADMIN (FIXED)
+        // ✅ CHECK IF ADMIN
         // ============================================================
         const isAdminUser = isAdmin(from);
         console.log(`🔐 Is Admin: ${isAdminUser}, From: ${from}, Admin: ${ADMIN_PHONE}`);
@@ -1038,6 +1452,7 @@ async function handleWhatsAppMessage(message, from) {
                 `🔍 *Search:* Send part number or description\n` +
                 `📸 *Send Photo:* Take photo of your order list\n` +
                 `🎙️ *Send Voice:* Speak your order\n` +
+                `📄 *Send Document:* Upload Excel/PDF for bulk orders\n` +
                 `🛒 *Order:* "ORDER 0801BA0285N 2"\n` +
                 `📦 *Purchase:* "PURCHASE" (Admin only)\n` +
                 `📞 *Call:* ${CONFIG.businessPhone}\n` +
@@ -1047,14 +1462,11 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // STEP 2: ADMIN COMMANDS (FIXED - CHECKED BEFORE SEARCH)
+        // STEP 2: ADMIN COMMANDS
         // ============================================================
         if (isAdminUser) {
             console.log(`🔐 Admin command detected: ${msgUpper}`);
             
-            // ============================================================
-            // 📦 PURCHASE COMMAND
-            // ============================================================
             if (msgUpper === 'PURCHASE') {
                 console.log(`📦 Admin purchase command from ${from}`);
                 await sendWhatsAppMessage(from, 
@@ -1068,9 +1480,6 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
             
-            // ============================================================
-            // 📦 PURCHASE MANUAL
-            // ============================================================
             if (msgUpper === 'PURCHASE MANUAL') {
                 console.log(`📦 Admin manual purchase from ${from}`);
                 pendingPurchaseUpload.set(from, { step: 'awaiting_manual_entry' });
@@ -1089,9 +1498,6 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
             
-            // ============================================================
-            // ✅ CONFIRM PURCHASE
-            // ============================================================
             if (pendingPurchaseUpload.has(from)) {
                 const pending = pendingPurchaseUpload.get(from);
                 if (pending.step === 'awaiting_confirmation') {
@@ -1120,9 +1526,6 @@ async function handleWhatsAppMessage(message, from) {
                 }
             }
 
-            // ============================================================
-            // 💳 PAY SUPPLIER
-            // ============================================================
             if (msgUpper.startsWith('PAY SUPPLIER')) {
                 const result = await payment.processPaymentFromWhatsApp(from, text, db);
                 if (result && result.message) {
@@ -1131,9 +1534,6 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
 
-            // ============================================================
-            // 💳 PAY CUSTOMER
-            // ============================================================
             if (msgUpper.startsWith('PAY CUSTOMER')) {
                 const result = await payment.processPaymentFromWhatsApp(from, text, db);
                 if (result && result.message) {
@@ -1142,9 +1542,6 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
 
-            // ============================================================
-            // 📊 SUPPLIER BALANCE
-            // ============================================================
             if (msgUpper.startsWith('SUPPLIER BALANCE')) {
                 const supplierId = msgUpper.replace('SUPPLIER BALANCE', '').trim();
                 if (supplierId) {
@@ -1159,17 +1556,11 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
 
-            // ============================================================
-            // 📋 LIST SUPPLIERS
-            // ============================================================
             if (msgLower === 'suppliers' || msgLower === 'list suppliers') {
                 await handleListSuppliers(from);
                 return;
             }
 
-            // ============================================================
-            // ✅ ADMIN OK - Confirm Payment/Order
-            // ============================================================
             if (msgUpper === 'OK') {
                 console.log(`🔐 Admin OK from ${from}`);
                 const pendingOrder = await db.getPendingOrder();
@@ -1189,9 +1580,6 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
 
-            // ============================================================
-            // 📄 INVOICE TYPE SELECTION
-            // ============================================================
             if (['1', '2'].includes(msgLower) && pendingInvoiceRequests.has(from)) {
                 const pendingRequest = pendingInvoiceRequests.get(from);
                 if (pendingRequest && pendingRequest.step === 'awaiting_type') {
@@ -1244,11 +1632,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // STEP 3: CUSTOMER COMMANDS
-        // ============================================================
-
-        // ============================================================
-        // 📦 MULTI-PRODUCT DETECTION
+        // STEP 3: MULTI-PRODUCT DETECTION
         // ============================================================
         const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
         const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
@@ -1629,23 +2013,6 @@ async function handleWhatsAppMessage(message, from) {
 }
 
 // ============================================================
-// 📄 HANDLE DOCUMENT MESSAGE
-// ============================================================
-
-async function handleDocumentMessage(message, from) {
-    try {
-        const doc = message.document;
-        const filename = doc.filename || 'document.pdf';
-        console.log(`📁 Processing document from ${from}: ${filename}`);
-        await sendWhatsAppMessage(from, 
-            `📄 *Document Received!*\n\n📁 File: ${filename}\n\n💡 Please type the part numbers directly.\n📞 Call: ${CONFIG.businessPhone}`
-        );
-    } catch (error) {
-        console.error(`❌ Document handler error:`, error.message);
-    }
-}
-
-// ============================================================
 // 📍 HANDLE LOCATION MESSAGE
 // ============================================================
 
@@ -2011,6 +2378,7 @@ async function startServer() {
             console.log(`📊 Admin Dashboard: /api/admin/dashboard`);
             console.log(`🔐 Admin Commands: ✅ Active`);
             console.log(`📦 Purchase System: ✅ Active`);
+            console.log(`📄 Document Processing: ${CONFIG.geminiKey ? '✅ Gemini Vision' : '⚠️ Limited'}`);
             console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
             console.log('====================================');
         });
