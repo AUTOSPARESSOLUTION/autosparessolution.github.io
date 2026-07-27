@@ -1,5 +1,5 @@
 // ============================================================
-// 🚀 ASSIST WhatsApp Webhook v3.0 - MULTI-PRODUCT FIXED
+// 🚀 ASSIST WhatsApp Webhook v3.0 - FULLY FIXED
 // ============================================================
 
 const express = require('express');
@@ -116,7 +116,7 @@ const CONFIG = {
 const ADMIN_PHONE = process.env.ADMIN_PHONE || "9830300193";
 
 console.log('====================================');
-console.log('🚀 ASSIST WhatsApp Webhook v3.0 - MULTI-PRODUCT FIXED');
+console.log('🚀 ASSIST WhatsApp Webhook v3.0 - FULLY FIXED');
 console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
 console.log(`🔐 Admin Phone: ${ADMIN_PHONE}`);
 console.log(`🆔 Phone Number ID: ${CONFIG.phoneNumberId}`);
@@ -197,6 +197,193 @@ async function withTimeout(promise, ms = CONFIG.responseTimeout, errorMessage = 
         )
     ]);
 }
+
+// ============================================================
+// 📢 ALERT SYSTEM
+// ============================================================
+
+class AlertSystem {
+    constructor() {
+        this.alerts = [];
+        this.subscribers = new Map();
+        this.startTime = Date.now();
+    }
+
+    async sendUserAlert(phone, type, message, data = {}) {
+        try {
+            const alertKey = `${phone}-${type}-${Date.now().toString().slice(0, 10)}`;
+            if (messageCache.has(alertKey)) {
+                console.log(`⏩ Duplicate alert skipped: ${type} for ${phone}`);
+                return false;
+            }
+            messageCache.set(alertKey, true);
+
+            const formattedMessage = this.formatAlertMessage(type, message, data);
+            await sendWhatsAppMessage(phone, formattedMessage);
+            console.log(`📢 Alert sent to ${phone}: ${type}`);
+            
+            await this.storeAlert(phone, type, message, data);
+            return true;
+        } catch (error) {
+            console.error(`❌ Failed to send alert to ${phone}:`, error.message);
+            return false;
+        }
+    }
+
+    formatAlertMessage(type, message, data) {
+        const icons = {
+            orderConfirmation: '✅',
+            orderShipped: '🚚',
+            orderDelivered: '📦',
+            outOfStock: '⚠️',
+            restockNotification: '🔄',
+            paymentReceived: '💰',
+            paymentFailed: '❌',
+            deliveryAssigned: '📋',
+            deliveryCompleted: '🎯',
+            systemLoading: '⏳',
+            systemReady: '✅',
+            lowStock: '⚠️',
+            newOrder: '🆕',
+            importComplete: '✅',
+            systemError: '❌'
+        };
+
+        const icon = icons[type] || '📢';
+        const timestamp = new Date().toLocaleString('en-IN', { 
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            day: '2-digit',
+            month: 'short'
+        });
+
+        let formatted = `${icon} *${this.getAlertTitle(type)}*\n━━━━━━━━━━━━━━━━━━━━\n`;
+        formatted += `${message}\n\n`;
+        formatted += `🕐 ${timestamp}\n`;
+        formatted += `\n📞 Call: ${CONFIG.businessPhone}`;
+        return formatted;
+    }
+
+    getAlertTitle(type) {
+        const titles = {
+            orderConfirmation: 'Order Confirmed! 🎉',
+            orderShipped: 'Order Shipped! 🚚',
+            orderDelivered: 'Order Delivered! 📦',
+            outOfStock: 'Out of Stock ⚠️',
+            restockNotification: 'Back in Stock! 🔄',
+            paymentReceived: 'Payment Received 💰',
+            paymentFailed: 'Payment Failed ❌',
+            deliveryAssigned: 'Delivery Assigned 📋',
+            deliveryCompleted: 'Delivery Completed 🎯',
+            systemLoading: 'System Loading ⏳',
+            systemReady: 'System Ready ✅',
+            lowStock: 'Low Stock Alert ⚠️',
+            newOrder: 'New Order! 🆕',
+            importComplete: 'Import Complete ✅',
+            systemError: 'System Error ❌'
+        };
+        return titles[type] || 'Alert';
+    }
+
+    async storeAlert(phone, type, message, data) {
+        try {
+            await db.db.run(
+                `INSERT INTO alerts (phone, type, message, data, created_at) 
+                 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                [phone, type, message, JSON.stringify(data)]
+            );
+        } catch (error) {
+            console.error('❌ Failed to store alert:', error.message);
+        }
+    }
+
+    async getUserAlerts(phone, limit = 10) {
+        return new Promise((resolve, reject) => {
+            db.db.all(
+                `SELECT * FROM alerts WHERE phone = ? ORDER BY created_at DESC LIMIT ?`,
+                [phone, limit],
+                (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                }
+            );
+        });
+    }
+
+    async sendSystemStatus(phone, status, progress = 0) {
+        let message, type;
+        
+        if (status === 'loading') {
+            type = 'systemLoading';
+            message = `🔧 *System is Loading*\n\n` +
+                      `📦 Products being loaded: ${progress}%\n` +
+                      `⏱️ Estimated time: ${Math.ceil((100 - progress) / 3)} seconds\n\n` +
+                      `💡 Please wait a moment...`;
+        } else if (status === 'ready') {
+            type = 'systemReady';
+            const stats = await db.getStats();
+            message = `✅ *System is Ready!*\n\n` +
+                      `📦 ${stats.total_products || 0} products available\n` +
+                      `🔍 Send a part number or description to search\n` +
+                      `📸 Send a photo of your order list\n` +
+                      `🎙️ Send a voice message to order`;
+        }
+
+        await this.sendUserAlert(phone, type, message);
+    }
+
+    async sendOrderConfirmation(phone, orderId, items, total) {
+        let message = `📋 *Order #${orderId}*\n\n`;
+        message += `📝 Items:\n`;
+        items.forEach((item, index) => {
+            message += `   ${index + 1}. ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
+        });
+        message += `\n💰 *Total: ₹${total.toFixed(2)}*`;
+        
+        await this.sendUserAlert(phone, 'orderConfirmation', message, { orderId, items, total });
+    }
+
+    async sendOutOfStockAlert(phone, part, description) {
+        const message = `❌ *Out of Stock*\n\n` +
+                        `Part: ${part}\n` +
+                        `📝 ${description || 'N/A'}\n\n` +
+                        `🔔 We'll notify you when it's back in stock!`;
+        
+        await this.sendUserAlert(phone, 'outOfStock', message, { part, description });
+    }
+
+    async sendNewOrderAlert(orderId, customer, items, total) {
+        const message = `🆕 *New Order!*\n\n` +
+                        `📦 Order: ${orderId}\n` +
+                        `👤 Customer: ${customer}\n` +
+                        `📝 Items: ${items.length}\n` +
+                        `💰 Total: ₹${total.toFixed(2)}\n\n` +
+                        `✅ Process order now`;
+        
+        await this.sendUserAlert(ADMIN_PHONE, 'newOrder', message, { orderId, customer, items, total });
+    }
+
+    async sendImportCompleteAlert(products) {
+        const message = `✅ *Import Complete!*\n\n` +
+                        `📦 ${products} products loaded\n` +
+                        `⏱️ System ready for requests\n\n` +
+                        `🚀 Bot is now active`;
+        
+        await this.sendUserAlert(ADMIN_PHONE, 'importComplete', message, { products });
+    }
+}
+
+const alertSystem = new AlertSystem();
+
+// ============================================================
+// 📦 DATABASE READY FLAG
+// ============================================================
+
+let isDbReady = false;
+let dbReadyMessage = 'Loading database...';
+let importProgress = 0;
+const TOTAL_PRODUCTS = 93098;
 
 // ============================================================
 // 🗄️ DATABASE INITIALIZATION
@@ -480,6 +667,39 @@ async function initAllTables() {
         });
         console.log('✅ out_of_stock_tracking table ready');
 
+        // ✅ Alert tables
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS alerts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    data TEXT,
+                    read BOOLEAN DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ alerts table ready');
+
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    phone TEXT PRIMARY KEY,
+                    preferences TEXT NOT NULL,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ user_preferences table ready');
+
         await createIndexes();
         console.log('✅ All tables created/verified');
 
@@ -506,6 +726,8 @@ async function createIndexes() {
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_out_of_stock_part ON out_of_stock_tracking(part)');
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_out_of_stock_phone ON out_of_stock_tracking(customer_phone)');
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_out_of_stock_status ON out_of_stock_tracking(status)');
+        await db.db.run('CREATE INDEX IF NOT EXISTS idx_alerts_phone ON alerts(phone)');
+        await db.db.run('CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at)');
         console.log('✅ Indexes created');
     } catch (error) {
         console.error('❌ Index creation error:', error.message);
@@ -520,12 +742,15 @@ app.get('/health', async (req, res) => {
     try {
         const stats = await db.getStats();
         res.json({ 
-            status: 'ok', 
+            status: isDbReady ? 'ready' : 'loading',
             version: '3.0.0',
             timestamp: new Date().toISOString(),
             products: stats || { total_products: 0 },
             memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
-            cache: messageCache.size
+            cache: messageCache.size,
+            isReady: isDbReady,
+            importProgress: Math.round((importProgress / TOTAL_PRODUCTS) * 100),
+            message: dbReadyMessage
         });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
@@ -540,7 +765,7 @@ app.get('/', (req, res) => {
     res.json({
         name: 'ASSIST WhatsApp Webhook v3.0',
         version: '3.0.0',
-        status: 'running',
+        status: isDbReady ? 'ready' : 'loading',
         memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB used',
         endpoints: {
             health: '/health',
@@ -550,7 +775,8 @@ app.get('/', (req, res) => {
             invoices: '/api/invoices',
             admin: '/api/admin/dashboard',
             customers: '/api/customers',
-            suppliers: '/api/suppliers'
+            suppliers: '/api/suppliers',
+            alerts: '/api/alerts/:phone'
         }
     });
 });
@@ -621,6 +847,31 @@ app.get('/api/suppliers', async (req, res) => {
 });
 
 // ============================================================
+// 📢 ALERT API ENDPOINTS
+// ============================================================
+
+app.get('/api/alerts/:phone', async (req, res) => {
+    try {
+        const { phone } = req.params;
+        const { limit = 10 } = req.query;
+        const alerts = await alertSystem.getUserAlerts(phone, parseInt(limit));
+        res.json({ success: true, alerts, count: alerts.length });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/import-status', (req, res) => {
+    res.json({
+        isReady: isDbReady,
+        totalProducts: TOTAL_PRODUCTS,
+        loadedProducts: importProgress,
+        progress: Math.round((importProgress / TOTAL_PRODUCTS) * 100),
+        message: dbReadyMessage
+    });
+});
+
+// ============================================================
 // 📩 WEBHOOK VERIFICATION
 // ============================================================
 
@@ -665,6 +916,36 @@ app.post('/webhook', async (req, res) => {
         
         console.log(`📩 From: ${from} | Type: ${type} | ID: ${messageId}`);
         
+        // ✅ Check if database is ready
+        if (!isDbReady) {
+            const progress = Math.round((importProgress / TOTAL_PRODUCTS) * 100);
+            
+            // Send system status alert (first time only)
+            const alertKey = `${from}-system-loading`;
+            if (!messageCache.has(alertKey)) {
+                await alertSystem.sendSystemStatus(from, 'loading', progress);
+                messageCache.set(alertKey, true);
+            }
+            
+            await sendWhatsAppMessage(from, 
+                `⏳ *System is Loading...*\n\n` +
+                `📊 Progress: ${progress}%\n` +
+                `⏱️ Please wait ${Math.ceil((100 - progress) / 3)} seconds\n\n` +
+                `💡 Try again in a moment!\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            
+            markMessageProcessed(messageId);
+            return res.sendStatus(200);
+        }
+        
+        // Send system ready alert (first time only)
+        const readyKey = `${from}-system-ready`;
+        if (!messageCache.has(readyKey)) {
+            await alertSystem.sendSystemStatus(from, 'ready');
+            messageCache.set(readyKey, true);
+        }
+        
         try {
             await withTimeout(
                 processMessage(message, from, type),
@@ -673,9 +954,17 @@ app.post('/webhook', async (req, res) => {
             );
         } catch (error) {
             console.error(`❌ Processing error: ${error.message}`);
-            try {
-                await sendWhatsAppMessage(from, `⚠️ Sorry, couldn't process your message. Please try again.\n📞 Call: ${CONFIG.businessPhone}`);
-            } catch (e) {}
+            
+            await alertSystem.sendUserAlert(from, 'systemError', 
+                `❌ *Something went wrong*\n\n` +
+                `Error: ${error.message}\n\n` +
+                `💡 Please try again later.`
+            );
+            
+            await sendWhatsAppMessage(from, 
+                `⚠️ Sorry, couldn't process your message.\n` +
+                `Please try again.\n📞 Call: ${CONFIG.businessPhone}`
+            );
         } finally {
             markMessageProcessed(messageId);
         }
@@ -1474,7 +1763,7 @@ async function processExtractedItems(from, extractedItems, filename) {
 }
 
 // ============================================================
-// 📱 HANDLE WHATSAPP TEXT MESSAGE - COMPLETE FIXED FLOW
+// 📱 HANDLE WHATSAPP TEXT MESSAGE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -1503,7 +1792,57 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 2️⃣ CHECK: Is this MULTI-PRODUCT? (HIGHEST PRIORITY)
+        // 📢 ALERT COMMANDS
+        // ============================================================
+        if (msgLower === 'alerts' || msgLower === 'alert preferences') {
+            const alerts = await alertSystem.getUserAlerts(from, 5);
+            let reply = `📢 *Alert Preferences*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `📋 Recent Alerts:\n`;
+            
+            if (alerts.length === 0) {
+                reply += `   No recent alerts\n\n`;
+            } else {
+                alerts.forEach((alert, i) => {
+                    reply += `   ${i+1}. ${alert.type}\n`;
+                    reply += `      ${alert.message.substring(0, 40)}...\n`;
+                });
+                reply += `\n`;
+            }
+            
+            reply += `📝 Commands:\n`;
+            reply += `   "Alert history" - View all alerts\n`;
+            reply += `   "Enable [type]" - Enable alert\n`;
+            reply += `   "Disable [type]" - Disable alert\n\n`;
+            reply += `📞 Call: ${CONFIG.businessPhone}`;
+            
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+
+        if (msgLower === 'alert history' || msgLower === 'history') {
+            const alerts = await alertSystem.getUserAlerts(from, 10);
+            
+            if (alerts.length === 0) {
+                await sendWhatsAppMessage(from, 
+                    `📢 *No Alerts Found*\n\n` +
+                    `You haven't received any alerts yet.\n\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
+            } else {
+                let reply = `📢 *Alert History*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                alerts.forEach((alert, index) => {
+                    reply += `${index + 1}. ${alert.type}\n`;
+                    reply += `   ${alert.message.substring(0, 50)}...\n`;
+                    reply += `   🕐 ${new Date(alert.created_at).toLocaleString()}\n\n`;
+                });
+                reply += `📞 Call: ${CONFIG.businessPhone}`;
+                await sendWhatsAppMessage(from, reply);
+            }
+            return;
+        }
+
+        // ============================================================
+        // 2️⃣ CHECK: Is this MULTI-PRODUCT?
         // ============================================================
         const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
         const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
@@ -1516,7 +1855,6 @@ async function handleWhatsAppMessage(message, from) {
 
         console.log(`📋 Multi-product check: parts=${uniqueParts.length}, lines=${lines.length}`);
 
-        // ✅ If multi-product, process and RETURN immediately
         if (isMultiProduct) {
             console.log(`📋 Processing multi-product enquiry...`);
             
@@ -1533,7 +1871,7 @@ async function handleWhatsAppMessage(message, from) {
                     `📝 Example: 0801BA0285N-2\n` +
                     `📞 Call: ${CONFIG.businessPhone}`
                 );
-                return;  // ✅ RETURN HERE
+                return;
             }
             
             let foundItems = [];
@@ -1541,7 +1879,6 @@ async function handleWhatsAppMessage(message, from) {
             let outOfStock = [];
             let total = 0;
             
-            // ⚡ Process in PARALLEL
             const searchPromises = items.map(async (item) => {
                 let product = await db.getProductExact(item.part.toUpperCase());
                 if (!product) {
@@ -1579,13 +1916,14 @@ async function handleWhatsAppMessage(message, from) {
                     
                     if (product.stock === 0) {
                         outOfStock.push(product.part);
+                        await alertSystem.sendOutOfStockAlert(from, product.part, product.description);
+                        await customerLog.trackOutOfStock(from, product.part, product.description, item.qty || 1);
                     }
                 } else {
                     notFound.push(item.part);
                 }
             }
             
-            // ✅ If no items found
             if (foundItems.length === 0) {
                 let reply = `❌ *No products found*\n\n`;
                 if (notFound.length > 0) {
@@ -1594,10 +1932,9 @@ async function handleWhatsAppMessage(message, from) {
                 reply += `💡 Please check the part numbers.\n`;
                 reply += `📞 Call: ${CONFIG.businessPhone}`;
                 await sendWhatsAppMessage(from, reply);
-                return;  // ✅ RETURN HERE
+                return;
             }
             
-            // ✅ Show summary and RETURN
             const cartItems = foundItems.map(item => ({
                 part: item.part,
                 description: item.description,
@@ -1643,11 +1980,11 @@ async function handleWhatsAppMessage(message, from) {
             reply += `📞 Call: ${CONFIG.businessPhone}`;
             
             await sendWhatsAppMessage(from, reply);
-            return;  // ✅ CRITICAL: STOP HERE - DON'T CONTINUE TO SEARCH!
+            return;
         }
 
         // ============================================================
-        // 3️⃣ CHECK: Exact part number (ONLY if not multi-product)
+        // 3️⃣ CHECK: Exact part number
         // ============================================================
         const exactPartMatch = cleaned.match(/^[A-Z0-9]{5,20}$/);
         if (exactPartMatch) {
@@ -1666,7 +2003,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 4️⃣ CHECK: Part number with quantity (ONLY if not multi-product)
+        // 4️⃣ CHECK: Part number with quantity
         // ============================================================
         const partWithQty = cleaned.match(/\b([A-Z0-9]{5,20})\s*(\d+)\b/);
         if (partWithQty) {
@@ -1691,6 +2028,7 @@ async function handleWhatsAppMessage(message, from) {
                 reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
                 if (exactProduct.stock === 0) {
                     reply += `⚠️ Out of Stock\n🔔 We'll notify you when available.\n\n`;
+                    await alertSystem.sendOutOfStockAlert(from, exactProduct.part, exactProduct.description);
                 } else if (exactProduct.stock < quantity) {
                     reply += `⚠️ Only ${exactProduct.stock} available (requested ${quantity})\n\n`;
                 }
@@ -1702,7 +2040,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 5️⃣ CHECK: Part number only (without quantity)
+        // 5️⃣ CHECK: Part number only
         // ============================================================
         const partOnly = cleaned.match(/\b([A-Z0-9]{5,20})\b/);
         if (partOnly) {
@@ -1731,6 +2069,9 @@ async function handleWhatsAppMessage(message, from) {
                 await db.saveOrder(orderId, from, items, cart.total);
                 await db.clearCart(from);
                 
+                await alertSystem.sendOrderConfirmation(from, orderId, items, cart.total);
+                await alertSystem.sendNewOrderAlert(orderId, from, items, cart.total);
+                
                 let reply = `✅ *ORDER CONFIRMED!*\n\n`;
                 reply += `📦 Order ID: ${orderId}\n`;
                 reply += `📝 Items:\n`;
@@ -1740,6 +2081,7 @@ async function handleWhatsAppMessage(message, from) {
                 reply += `💰 Total: ₹${cart.total.toFixed(2)}\n`;
                 reply += `📞 *Call:* ${CONFIG.businessPhone}\n`;
                 reply += `🛒 *Shop:* https://autosparessolution.com`;
+                
                 await sendWhatsAppMessage(from, reply);
                 return;
             }
@@ -1808,7 +2150,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 🔟 SEARCH PRODUCTS (ONLY if not multi-product)
+        // 🔟 SEARCH PRODUCTS
         // ============================================================
         if (cleaned.length >= 2) {
             const commonWords = ['i', 'need', 'want', 'for', 'my', 'the', 'a', 'an', 'me', 'please', 'from', 'to', 'of', 'with', 'have', 'has', 'is', 'are', 'was', 'were', 'and', 'or', 'but'];
@@ -2099,20 +2441,36 @@ async function importCSVInBackground() {
             console.log('📥 Background CSV import started...');
             const result = await importCSV(csvPath);
             console.log(`✅ Background import completed: ${result.imported} products`);
+            importProgress = result.imported;
             csvImportCompleted = true;
+            isDbReady = true;
+            dbReadyMessage = 'Database ready';
+            
+            // Send import complete alert to admin
+            await alertSystem.sendImportCompleteAlert(result.imported);
         } else {
             console.log('⚠️ prices.csv not found, skipping import');
             csvImportCompleted = true;
+            isDbReady = true;
+            dbReadyMessage = 'Database ready (no import needed)';
         }
     } catch (error) {
         console.error('❌ Background import error:', error.message);
         csvImportCompleted = true;
+        isDbReady = true;
+        dbReadyMessage = 'Database ready (with errors)';
+        
+        await alertSystem.sendUserAlert(ADMIN_PHONE, 'systemError',
+            `❌ *Import Failed*\n\n` +
+            `Error: ${error.message}\n\n` +
+            `💡 Please check the CSV file and restart.`
+        );
     }
 }
 
 async function startServer() {
     console.log('====================================');
-    console.log('🚀 ASSIST WhatsApp Webhook v3.0 - MULTI-PRODUCT FIXED');
+    console.log('🚀 ASSIST WhatsApp Webhook v3.0 - FULLY FIXED');
     console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
     console.log(`🗄️ Database: ${process.env.DB_PATH || './db/products.db'}`);
     console.log('====================================');
@@ -2130,6 +2488,12 @@ async function startServer() {
             setImmediate(importCSVInBackground);
         } else {
             console.log(`📦 ${stats.total_products} products already in database`);
+            importProgress = stats.total_products;
+            isDbReady = true;
+            dbReadyMessage = 'Database ready';
+            
+            // Send ready alert to admin
+            await alertSystem.sendImportCompleteAlert(stats.total_products);
         }
 
         if (dealerIntelligence && dealerIntelligence.init) {
@@ -2147,9 +2511,11 @@ async function startServer() {
             console.log(`🎙️ Voice Processing: ${CONFIG.geminiKey ? '✅ Active' : '⚠️ Limited'}`);
             console.log(`📸 Image Processing: ${CONFIG.geminiKey ? '✅ Active' : '⚠️ Limited'}`);
             console.log(`📄 Document Processing: ${CONFIG.geminiKey ? '✅ Active' : '⚠️ Limited'}`);
+            console.log(`📢 Alert System: ✅ Active`);
             console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
             console.log(`⏱️ Response Timeout: ${CONFIG.responseTimeout}ms`);
             console.log(`⏱️ Gemini Timeout: ${CONFIG.geminiTimeout}ms`);
+            console.log(`📦 Database Status: ${isDbReady ? '✅ Ready' : '⏳ Loading'}`);
             console.log('====================================');
         });
 
