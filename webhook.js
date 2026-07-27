@@ -10,7 +10,7 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const compression = require('compression');
-const LRU = require('lru-cache');
+const { LRUCache } = require('lru-cache');
 
 // ============================================================
 // 📁 ENSURE DIRECTORIES EXIST
@@ -159,7 +159,7 @@ app.use('/webhook', limiter);
 // 🛡️ DUPLICATE MESSAGE DETECTION - LRU CACHE
 // ============================================================
 
-const messageCache = new LRU({
+const messageCache = new LRUCache({
     max: 5000,
     ttl: 120000
 });
@@ -1886,7 +1886,7 @@ async function handleLocationMessage(message, from) {
 // 🤖 GEMINI WEB SEARCH
 // ============================================================
 
-const geminiCache = new LRU({
+const geminiCache = new LRUCache({
     max: 1000,
     ttl: 15 * 60 * 1000
 });
