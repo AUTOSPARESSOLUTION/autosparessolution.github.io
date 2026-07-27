@@ -1559,15 +1559,34 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // 📦 MULTI-PRODUCT DETECTION - FIXED
+        // ============================================================
+// 📦 MULTI-PRODUCT DETECTION - FIXED
+// ============================================================
+
+// Get all part numbers from the text
 const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
 const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
 
+// Check for multiple lines (bulk orders)
 const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+// Check for separators
+const hasDash = text.includes('-');
+const hasCommas = text.includes(',');
+const hasSlashes = text.includes('/');
+const hasX = text.includes('x') || text.includes('X');
+
+// Check if it's multi-product:
+// 1. Multiple part numbers OR
+// 2. Multiple lines OR
+// 3. Multiple separators with different parts
 const hasMultipleParts = uniqueParts.length > 1;
 const hasMultipleLines = lines.length > 1;
+
+// Count how many parts have separators
 const separatorParts = text.match(/[A-Z0-9]{5,20}\s*[-/xX:]\s*\d+/gi);
 const hasMultipleSeparatorParts = separatorParts && separatorParts.length > 1;
+
 const isMultiProduct = hasMultipleParts || hasMultipleLines || hasMultipleSeparatorParts;
 
 console.log(`📋 Multi-product check: parts=${uniqueParts.length}, lines=${lines.length}, separators=${separatorParts ? separatorParts.length : 0}`);
@@ -1575,10 +1594,11 @@ console.log(`📋 Multi-product check: parts=${uniqueParts.length}, lines=${line
 if (isMultiProduct) {
     console.log(`📋 Processing multi-product enquiry...`);
     
+    // Use parseOrder to get all items
     const parsedResult = parseOrder(text);
     const items = parsedResult.items;
     
-    console.log(`📦 Parsed ${items.length} items`);
+    console.log(`📦 Parsed ${items.length} items:`, JSON.stringify(items, null, 2));
     
     if (items.length > 0) {
         let foundItems = [];
@@ -1586,24 +1606,20 @@ if (isMultiProduct) {
         let outOfStock = [];
         let total = 0;
         
-        // ⚡ BATCH PROCESS - Search all parts in parallel
-        const searchPromises = items.map(async (item) => {
-            let product = await db.getProductExact(item.part.toUpperCase());
+        for (const item of items) {
+            let product = await db.getProductExact(item.part);
             if (!product) {
                 const results = await db.searchProducts(item.part, 1);
                 if (results && results.length > 0) {
                     product = results[0];
                 }
             }
-            return { item, product };
-        });
-        
-        const results = await Promise.all(searchPromises);
-        
-        for (const { item, product } of results) {
+            
             if (product) {
                 const billingPrice = product.billing_price || product.list_price || 0;
                 const priceWithGST = billingPrice * 1.18;
+                const listPrice = product.list_price || 0;
+                const mrpPrice = product.mrp || 0;
                 
                 foundItems.push({
                     part: product.part,
@@ -1611,8 +1627,8 @@ if (isMultiProduct) {
                     description: product.description,
                     qty: item.qty || 1,
                     price: priceWithGST,
-                    list_price: product.list_price,
-                    mrp: product.mrp,
+                    list_price: listPrice,
+                    mrp: mrpPrice,
                     billing_price: billingPrice,
                     stock: product.stock,
                     brand: product.brand,
