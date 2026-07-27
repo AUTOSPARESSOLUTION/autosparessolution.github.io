@@ -1,7 +1,7 @@
 {
   "name": "assist-whatsapp-webhook",
-  "version": "3.0.0",
-  "description": "Complete WhatsApp Webhook System",
+  "version": "3.0.1",
+  "description": "Complete WhatsApp Webhook System - Performance Fixed",
   "main": "webhook.js",
   "scripts": {
     "start": "node webhook.js",
@@ -26,7 +26,8 @@
     "exceljs": "^4.4.0",
     "pdfmake": "^0.2.9",
     "axios": "^1.6.8",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "lru-cache": "^10.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
