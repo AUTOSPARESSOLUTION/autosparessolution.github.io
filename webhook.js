@@ -1,5 +1,6 @@
 // ============================================================
-// 🚀 ASSIST WhatsApp Webhook v3.0 - PERFORMANCE FIXED
+// 🚀 ASSIST WhatsApp Webhook v3.0 - COMPLETE FIXED VERSION
+// Priority: Fast Startup → Exact Match → Multi-Product → Search
 // ============================================================
 
 const express = require('express');
@@ -108,15 +109,15 @@ const CONFIG = {
     maxMemory: process.env.MAX_OLD_SPACE_SIZE || 512,
     cacheTTL: 120000,
     defaultPickup: process.env.DEFAULT_PICKUP || 'default',
-    geminiTimeout: 15000, // 15 seconds
-    responseTimeout: 30000, // 30 seconds
+    geminiTimeout: 15000,
+    responseTimeout: 30000,
     debug: process.env.DEBUG === 'true'
 };
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE || "9830300193";
 
 console.log('====================================');
-console.log('🚀 ASSIST WhatsApp Webhook v3.0 - PERFORMANCE FIXED');
+console.log('🚀 ASSIST WhatsApp Webhook v3.0 - COMPLETE FIXED');
 console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
 console.log(`🔐 Admin Phone: ${ADMIN_PHONE}`);
 console.log(`🆔 Phone Number ID: ${CONFIG.phoneNumberId}`);
@@ -155,7 +156,7 @@ const limiter = rateLimit({
 app.use('/webhook', limiter);
 
 // ============================================================
-// 🛡️ DUPLICATE MESSAGE DETECTION - LRU CACHE FIXED
+// 🛡️ DUPLICATE MESSAGE DETECTION - LRU CACHE
 // ============================================================
 
 const messageCache = new LRU({
@@ -496,6 +497,7 @@ async function createIndexes() {
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_products_make ON products(make)');
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_products_model ON products(model)');
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_products_stock ON products(stock)');
+        await db.db.run('CREATE INDEX IF NOT EXISTS idx_products_description ON products(description)');
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(phone)');
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
@@ -521,8 +523,8 @@ app.get('/health', async (req, res) => {
         const stats = await db.getStats();
         res.json({ 
             status: 'ok', 
-            version: '3.0.1', 
-            timestamp: new Date().toISOString(), 
+            version: '3.0.0',
+            timestamp: new Date().toISOString(),
             products: stats || { total_products: 0 },
             memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
             cache: messageCache.size
@@ -538,8 +540,8 @@ app.get('/health', async (req, res) => {
 
 app.get('/', (req, res) => {
     res.json({
-        name: 'ASSIST WhatsApp Webhook v3.0.1',
-        version: '3.0.1',
+        name: 'ASSIST WhatsApp Webhook v3.0',
+        version: '3.0.0',
         status: 'running',
         memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB used',
         endpoints: {
@@ -642,22 +644,18 @@ app.get('/webhook', (req, res) => {
 
 app.post('/webhook', async (req, res) => {
     try {
-        // Fast path: Check for status updates first
         const entry = req.body.entry?.[0];
         const change = entry?.changes?.[0];
         const value = change?.value;
         
-        // Filter status updates silently
+        // ⚡ FAST PATH: Status updates - return immediately
         if (value?.statuses) {
-            if (CONFIG.debug) {
-                console.log(`📊 Status update received - ignoring`);
-            }
+            // Silent return - no logging
             return res.sendStatus(200);
         }
         
         const message = value?.messages?.[0];
         if (!message) {
-            if (CONFIG.debug) console.log('⚠️ No message found in webhook');
             return res.sendStatus(200);
         }
         
@@ -665,14 +663,14 @@ app.post('/webhook', async (req, res) => {
         const type = message.type || 'text';
         const messageId = message.id;
         
-        // Check for duplicates
+        // Check duplicate
         if (isMessageProcessed(messageId)) {
             return res.sendStatus(200);
         }
         
         console.log(`📩 From: ${from} | Type: ${type} | ID: ${messageId}`);
         
-        // Process with timeout - DIRECTLY (no setImmediate)
+        // ⚡ PROCESS DIRECTLY (NO setImmediate)
         try {
             await withTimeout(
                 processMessage(message, from, type),
@@ -681,11 +679,10 @@ app.post('/webhook', async (req, res) => {
             );
         } catch (error) {
             console.error(`❌ Processing error: ${error.message}`);
-            await sendWhatsAppMessage(from, 
-                `⚠️ *Sorry, processing took too long.*\n\n` +
-                `💡 Please try again or send a shorter message.\n` +
-                `📞 Call: ${CONFIG.businessPhone}`
-            );
+            // Try to send error message to user
+            try {
+                await sendWhatsAppMessage(from, `⚠️ Sorry, couldn't process your message. Please try again.\n📞 Call: ${CONFIG.businessPhone}`);
+            } catch (e) {}
         } finally {
             markMessageProcessed(messageId);
         }
@@ -790,7 +787,42 @@ async function downloadMediaWithToken(mediaId) {
 }
 
 // ============================================================
-// 🎙️ VOICE MESSAGE HANDLER - FIXED: Added timeout
+// 🚀 OPTIMIZED SEARCH - PARALLEL EXECUTION
+// ============================================================
+
+async function optimizedSearch(query, limit = 10) {
+    // Try exact match first (fastest)
+    const exact = await db.getProductExact(query.toUpperCase());
+    if (exact) return [exact];
+    
+    // Run all searches in PARALLEL (not sequential)
+    try {
+        const [byPart, byVehicle, byDesc] = await Promise.all([
+            db.searchProducts(query, limit),
+            db.searchByVehicle(query, limit),
+            db.searchDescriptionOnly(query, limit)
+        ]);
+        
+        // Merge and deduplicate
+        const seen = new Set();
+        const results = [];
+        for (const arr of [byPart, byVehicle, byDesc]) {
+            for (const item of arr) {
+                if (!seen.has(item.part)) {
+                    seen.add(item.part);
+                    results.push(item);
+                }
+            }
+        }
+        return results.slice(0, limit);
+    } catch (error) {
+        console.error('❌ Optimized search error:', error.message);
+        return await db.searchProducts(query, limit);
+    }
+}
+
+// ============================================================
+// 🎙️ VOICE MESSAGE HANDLER
 // ============================================================
 
 async function handleVoiceMessage(message, from) {
@@ -860,7 +892,7 @@ async function handleVoiceMessage(message, from) {
 }
 
 // ============================================================
-// 🎤 TRANSCRIBE WITH GEMINI - FIXED: Better error handling
+// 🎤 TRANSCRIBE WITH GEMINI
 // ============================================================
 
 async function transcribeWithGemini(audioBuffer) {
@@ -921,7 +953,7 @@ IMPORTANT RULES:
 }
 
 // ============================================================
-// 📸 IMAGE HANDLER - FIXED: Added timeout
+// 📸 IMAGE HANDLER
 // ============================================================
 
 async function handleWhatsAppImage(message, from) {
@@ -989,7 +1021,7 @@ async function handleWhatsAppImage(message, from) {
 }
 
 // ============================================================
-// 🤖 PROCESS IMAGE WITH GEMINI VISION - FIXED: Better compression
+// 🤖 PROCESS IMAGE WITH GEMINI VISION
 // ============================================================
 
 async function processImageWithGemini(imageBuffer, caption) {
@@ -1091,42 +1123,7 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 🚀 OPTIMIZED SEARCH - NEW: Batched parallel search
-// ============================================================
-
-async function optimizedSearch(query, limit = 10) {
-    // Try exact match first (fastest)
-    const exact = await db.getProductExact(query.toUpperCase());
-    if (exact) return [exact];
-    
-    // Try all strategies in parallel
-    try {
-        const [byPart, byVehicle, byDesc] = await Promise.all([
-            db.searchProducts(query, limit),
-            db.searchByVehicle(query, limit),
-            db.searchDescriptionOnly(query, limit)
-        ]);
-        
-        // Merge results (deduplicate)
-        const seen = new Set();
-        const results = [];
-        for (const arr of [byPart, byVehicle, byDesc]) {
-            for (const item of arr) {
-                if (!seen.has(item.part)) {
-                    seen.add(item.part);
-                    results.push(item);
-                }
-            }
-        }
-        return results.slice(0, limit);
-    } catch (error) {
-        console.error('❌ Optimized search error:', error.message);
-        return await db.searchProducts(query, limit);
-    }
-}
-
-// ============================================================
-// 📄 DOCUMENT MESSAGE HANDLER - FIXED: Added timeout
+// 📄 DOCUMENT MESSAGE HANDLER
 // ============================================================
 
 async function handleDocumentMessage(message, from) {
@@ -1191,7 +1188,6 @@ async function handleDocumentMessage(message, from) {
                 );
                 
                 if (extracted) {
-                    // Check if it's a purchase invoice
                     if (extracted.notPurchase) {
                         console.log(`📄 Not a purchase invoice, processing as customer order`);
                     } else if (extracted.seller || extracted.invoiceNo || extracted.total) {
@@ -1279,7 +1275,7 @@ async function handleDocumentMessage(message, from) {
 }
 
 // ============================================================
-// 🧠 GEMINI VISION EXTRACTION - NEW: Extracted function
+// 🧠 GEMINI VISION EXTRACTION
 // ============================================================
 
 async function extractWithGeminiVision(base64Data, mimeType, filename) {
@@ -1349,7 +1345,6 @@ Document: ${filename}`;
             }
         } catch (parseError) {
             console.log(`⚠️ Failed to parse JSON:`, parseError.message);
-            // Fallback: Try to extract items from text
             const items = extractItemsFromText(content);
             if (items.length > 0) {
                 return { items };
@@ -1360,7 +1355,7 @@ Document: ${filename}`;
 }
 
 // ============================================================
-// 📦 EXTRACT ITEMS FROM TEXT - Helper
+// 📦 EXTRACT ITEMS FROM TEXT
 // ============================================================
 
 function extractItemsFromText(text) {
@@ -1492,7 +1487,7 @@ async function processExtractedItems(from, extractedItems, filename) {
 }
 
 // ============================================================
-// 📱 HANDLE WHATSAPP TEXT MESSAGE - FIXED: Optimized search
+// 📱 HANDLE WHATSAPP TEXT MESSAGE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -1694,10 +1689,12 @@ async function handleWhatsAppMessage(message, from) {
             if (results.length === 0) {
                 console.log(`🔄 No results, trying word-by-word search...`);
                 const words = cleaned.split(' ').filter(w => w.length > 2 && !commonWords.includes(w.toLowerCase()));
-                for (const word of words) {
-                    const wordResults = await optimizedSearch(word, 5);
-                    if (wordResults.length > 0) {
-                        results = wordResults;
+                // Try each word in parallel
+                const searchPromises = words.map(word => optimizedSearch(word, 3));
+                const allResults = await Promise.all(searchPromises);
+                for (const res of allResults) {
+                    if (res.length > 0) {
+                        results = res;
                         break;
                     }
                 }
@@ -1886,12 +1883,12 @@ async function handleLocationMessage(message, from) {
 }
 
 // ============================================================
-// 🤖 GEMINI WEB SEARCH - FIXED: Better caching
+// 🤖 GEMINI WEB SEARCH
 // ============================================================
 
 const geminiCache = new LRU({
     max: 1000,
-    ttl: 15 * 60 * 1000 // 15 minutes
+    ttl: 15 * 60 * 1000
 });
 
 async function getGeminiWebSearch(query) {
@@ -2073,44 +2070,71 @@ async function processPurchaseInvoice(adminPhone, purchaseData) {
 }
 
 // ============================================================
-// 🚀 START SERVER
+// 🚀 START SERVER - FAST STARTUP (No CSV blocking)
 // ============================================================
+
+// Track import status
+let csvImportStarted = false;
+let csvImportCompleted = false;
+
+// Background CSV import
+async function importCSVInBackground() {
+    if (csvImportStarted) return;
+    csvImportStarted = true;
+    
+    try {
+        const csvPath = path.join(__dirname, 'prices.csv');
+        if (fs.existsSync(csvPath)) {
+            console.log('📥 Background CSV import started...');
+            const result = await importCSV(csvPath);
+            console.log(`✅ Background import completed: ${result.imported} products`);
+            csvImportCompleted = true;
+        } else {
+            console.log('⚠️ prices.csv not found, skipping import');
+            csvImportCompleted = true;
+        }
+    } catch (error) {
+        console.error('❌ Background import error:', error.message);
+        csvImportCompleted = true;
+    }
+}
 
 async function startServer() {
     console.log('====================================');
-    console.log('🚀 ASSIST WhatsApp Webhook v3.0.1 - PERFORMANCE FIXED');
+    console.log('🚀 ASSIST WhatsApp Webhook v3.0 - COMPLETE FIXED');
     console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
     console.log(`🗄️ Database: ${process.env.DB_PATH || './db/products.db'}`);
     console.log('====================================');
     
     try {
+        // 1. Initialize database (fast)
         await db.initDatabase();
         console.log('✅ Database initialized');
 
+        // 2. Create tables (fast)
         await initAllTables();
         console.log('✅ All tables ready');
 
+        // 3. Check if products exist - DON'T import here (non-blocking)
         const stats = await db.getStats();
         if (stats.total_products === 0) {
-            const csvPath = path.join(__dirname, 'prices.csv');
-            if (fs.existsSync(csvPath)) {
-                console.log('📥 Importing CSV...');
-                const result = await importCSV(csvPath);
-                console.log(`✅ Imported ${result.imported} products`);
-            } else {
-                console.log('⚠️ prices.csv not found');
-            }
+            console.log('📦 No products found. Starting background import...');
+            // Start import in background (non-blocking)
+            setImmediate(importCSVInBackground);
         } else {
             console.log(`📦 ${stats.total_products} products already in database`);
         }
 
+        // 4. Initialize other modules (fast)
         if (dealerIntelligence && dealerIntelligence.init) {
             dealerIntelligence.init();
         }
 
+        // 5. Start scheduler
         scheduler.startScheduler();
         console.log('✅ Scheduler started');
 
+        // 6. ✅ START SERVER IMMEDIATELY - Don't wait for import
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server Running On Port ${PORT}`);
             console.log(`🔗 Health Check: /health`);
@@ -2122,6 +2146,7 @@ async function startServer() {
             console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
             console.log(`⏱️ Response Timeout: ${CONFIG.responseTimeout}ms`);
             console.log(`⏱️ Gemini Timeout: ${CONFIG.geminiTimeout}ms`);
+            console.log(`📦 Import Status: ${csvImportStarted ? 'In progress...' : 'Not started'}`);
             console.log('====================================');
         });
 
