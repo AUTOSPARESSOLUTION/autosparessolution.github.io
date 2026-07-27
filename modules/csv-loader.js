@@ -1,5 +1,5 @@
 // ============================================================
-// 📥 CSV LOADER - OPTIMIZED VERSION (10-30x faster)
+// 📥 CSV LOADER - FIXED VERSION (No this.pause error)
 // modules/csv-loader.js
 // ============================================================
 
@@ -30,149 +30,6 @@ async function optimizeSQLite(db) {
         });
     }
     console.log('✅ SQLite optimized for import');
-}
-
-// ============================================================
-// 📥 IMPORT CSV - OPTIMIZED
-// ============================================================
-
-async function importCSV(filePath) {
-    const startTime = Date.now();
-    const BATCH_SIZE = 1000; // Optimal batch size
-    
-    return new Promise((resolve, reject) => {
-        let totalRows = 0;
-        let duplicates = 0;
-        let errors = 0;
-        let inserted = 0;
-        
-        // ✅ FIX 1: Use Set for O(1) duplicate detection
-        const seenParts = new Set();
-        const batch = [];
-        
-        console.log(`📥 Starting optimized CSV import from: ${filePath}`);
-
-        const db = require('./database');
-        
-        // ✅ FIX 4: Optimize SQLite
-        optimizeSQLite(db).then(() => {
-            console.log('✅ SQLite optimized');
-        }).catch(err => {
-            console.warn('⚠️ SQLite optimization warning:', err.message);
-        });
-
-        // Track progress
-        let lastLogTime = Date.now();
-
-        fs.createReadStream(filePath)
-            .pipe(csv())
-            .on('data', (row) => {
-                totalRows++;
-                
-                try {
-                    // ============================================================
-                    // 🔧 CORRECT COLUMN MAPPING
-                    // ============================================================
-                    const part = String(row['Material'] || '').trim().toUpperCase();
-                    if (!part) return;
-
-                    // ✅ FIX 1: Use Set for duplicate detection
-                    if (seenParts.has(part)) {
-                        duplicates++;
-                        return;
-                    }
-                    seenParts.add(part);
-
-                    // Parse values
-                    const listPrice = parseFloat(row['LIST PRICE']) || 0;
-                    const mrpPrice = parseFloat(row['MRP PRICE']) || 0;
-                    const billingPrice = parseFloat(row['billing price']) || 0;
-                    const stock = parseInt(row['STOCK']) || 0;
-                    const boxQty = parseInt(row['Box Qty']) || 0;
-                    const carton = parseInt(row['Carton']) || 0;
-
-                    const product = {
-                        part: part,
-                        description: String(row['Material2'] || '').trim(),
-                        brand: String(row['brand'] || '').trim(),
-                        make: String(row['Make'] || '').trim(),
-                        model: String(row['Model'] || '').trim(),
-                        application: String(row['Model'] || '').trim(),
-                        category: String(row['Product Sub Group'] || '').trim(),
-                        hsn: String(row['hsn'] || '').trim(),
-                        stock: stock,
-                        list_price: listPrice,
-                        billing_price: billingPrice,
-                        mrp: mrpPrice,
-                        gst: 18,
-                        box_qty: boxQty,
-                        carton: carton,
-                        segment: String(row['Segment'] || '').trim(),
-                        region: String(row['region'] || '').trim(),
-                        zone: String(row['zone'] || '').trim()
-                    };
-
-                    batch.push(product);
-
-                    // ✅ FIX 2: Insert in batches (not all at once)
-                    if (batch.length >= BATCH_SIZE) {
-                        // Pause stream to avoid memory buildup
-                        this.pause();
-                        
-                        // Insert batch
-                        insertBatch(db, batch)
-                            .then(() => {
-                                inserted += batch.length;
-                                batch.length = 0; // Clear batch
-                                
-                                // Log progress every 5 seconds
-                                const now = Date.now();
-                                if (now - lastLogTime > 5000) {
-                                    console.log(`📦 Imported ${inserted} products (${Math.round(inserted/totalRows*100)}%)`);
-                                    lastLogTime = now;
-                                }
-                                
-                                // Resume stream
-                                this.resume();
-                            })
-                            .catch((err) => {
-                                console.error(`❌ Batch insert error: ${err.message}`);
-                                errors++;
-                                this.resume();
-                            });
-                    }
-                    
-                } catch (error) {
-                    errors++;
-                    console.error(`❌ Error processing row: ${error.message}`);
-                }
-            })
-            .on('end', async () => {
-                // ✅ Insert remaining products
-                if (batch.length > 0) {
-                    try {
-                        await insertBatch(db, batch);
-                        inserted += batch.length;
-                    } catch (err) {
-                        console.error(`❌ Final batch insert error: ${err.message}`);
-                        errors++;
-                    }
-                }
-                
-                console.log(`📊 CSV Import Summary:`);
-                console.log(`   Total rows: ${totalRows}`);
-                console.log(`   Products imported: ${inserted}`);
-                console.log(`   Duplicates skipped: ${duplicates}`);
-                console.log(`   Errors: ${errors}`);
-                console.log(`   ⏱️ Import completed in ${(Date.now() - startTime) / 1000}s`);
-                
-                resolve({ imported: inserted, duplicates, errors });
-            })
-            .on('error', (error) => {
-                console.error(`❌ CSV read error: ${error.message}`);
-                reject(error);
-            });
-    });
 }
 
 // ============================================================
@@ -217,7 +74,7 @@ async function insertBatch(db, batch) {
         ) VALUES ${placeholders}
     `;
 
-    // ✅ FIX 3: Use transaction per batch
+    // Use transaction per batch
     await new Promise((resolve, reject) => {
         db.db.run('BEGIN TRANSACTION', (err) => {
             if (err) reject(err);
@@ -248,7 +105,146 @@ async function insertBatch(db, batch) {
 }
 
 // ============================================================
-// 📥 STREAMING IMPORT (Alternative - even faster)
+// 📥 IMPORT CSV - FIXED VERSION
+// ============================================================
+
+async function importCSV(filePath) {
+    const startTime = Date.now();
+    const BATCH_SIZE = 1000;
+    
+    return new Promise((resolve, reject) => {
+        let totalRows = 0;
+        let duplicates = 0;
+        let errors = 0;
+        let inserted = 0;
+        
+        const seenParts = new Set();
+        const batch = [];
+        let isPaused = false;
+        let streamPaused = false;
+        
+        console.log(`📥 Starting optimized CSV import from: ${filePath}`);
+
+        const db = require('./database');
+        
+        // Optimize SQLite
+        optimizeSQLite(db).then(() => {
+            console.log('✅ SQLite optimized');
+        }).catch(err => {
+            console.warn('⚠️ SQLite optimization warning:', err.message);
+        });
+
+        let lastLogTime = Date.now();
+        
+        // ✅ FIX: Use function declaration (not arrow) to preserve `this`
+        const parser = fs.createReadStream(filePath)
+            .pipe(csv())
+            .on('data', function(row) {  // ✅ Regular function, not arrow
+                totalRows++;
+                
+                try {
+                    const part = String(row['Material'] || '').trim().toUpperCase();
+                    if (!part) return;
+
+                    if (seenParts.has(part)) {
+                        duplicates++;
+                        return;
+                    }
+                    seenParts.add(part);
+
+                    const listPrice = parseFloat(row['LIST PRICE']) || 0;
+                    const mrpPrice = parseFloat(row['MRP PRICE']) || 0;
+                    const billingPrice = parseFloat(row['billing price']) || 0;
+                    const stock = parseInt(row['STOCK']) || 0;
+                    const boxQty = parseInt(row['Box Qty']) || 0;
+                    const carton = parseInt(row['Carton']) || 0;
+
+                    const product = {
+                        part: part,
+                        description: String(row['Material2'] || '').trim(),
+                        brand: String(row['brand'] || '').trim(),
+                        make: String(row['Make'] || '').trim(),
+                        model: String(row['Model'] || '').trim(),
+                        application: String(row['Model'] || '').trim(),
+                        category: String(row['Product Sub Group'] || '').trim(),
+                        hsn: String(row['hsn'] || '').trim(),
+                        stock: stock,
+                        list_price: listPrice,
+                        billing_price: billingPrice,
+                        mrp: mrpPrice,
+                        gst: 18,
+                        box_qty: boxQty,
+                        carton: carton,
+                        segment: String(row['Segment'] || '').trim(),
+                        region: String(row['region'] || '').trim(),
+                        zone: String(row['zone'] || '').trim()
+                    };
+
+                    batch.push(product);
+
+                    // ✅ FIX: Use proper this reference for pause/resume
+                    if (batch.length >= BATCH_SIZE && !streamPaused) {
+                        streamPaused = true;
+                        this.pause();  // ✅ this works now
+                        
+                        // Insert batch
+                        insertBatch(db, [...batch])
+                            .then(() => {
+                                inserted += batch.length;
+                                batch.length = 0;
+                                
+                                const now = Date.now();
+                                if (now - lastLogTime > 5000) {
+                                    console.log(`📦 Imported ${inserted} products`);
+                                    lastLogTime = now;
+                                }
+                                
+                                streamPaused = false;
+                                this.resume();  // ✅ this works now
+                            })
+                            .catch((err) => {
+                                console.error(`❌ Batch insert error: ${err.message}`);
+                                errors++;
+                                streamPaused = false;
+                                this.resume();
+                            });
+                    }
+                    
+                } catch (error) {
+                    errors++;
+                    console.error(`❌ Error processing row: ${error.message}`);
+                }
+            })
+            .on('end', async () => {
+                // Insert remaining products
+                if (batch.length > 0) {
+                    try {
+                        await insertBatch(db, batch);
+                        inserted += batch.length;
+                    } catch (err) {
+                        console.error(`❌ Final batch insert error: ${err.message}`);
+                        errors++;
+                    }
+                }
+                
+                console.log(`📊 CSV Import Summary:`);
+                console.log(`   Total rows: ${totalRows}`);
+                console.log(`   Products imported: ${inserted}`);
+                console.log(`   Duplicates skipped: ${duplicates}`);
+                console.log(`   Errors: ${errors}`);
+                console.log(`   ⏱️ Import completed in ${(Date.now() - startTime) / 1000}s`);
+                
+                resolve({ imported: inserted, duplicates, errors });
+            })
+            .on('error', (error) => {
+                console.error(`❌ CSV read error: ${error.message}`);
+                reject(error);
+            });
+    });
+}
+
+// ============================================================
+// 📥 STREAMING IMPORT - ALTERNATIVE (Even faster)
 // ============================================================
 
 async function importCSVStreaming(filePath) {
