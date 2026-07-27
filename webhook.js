@@ -1559,122 +1559,127 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // 📦 MULTI-PRODUCT DETECTION
-        const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
-        const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
+        // 📦 MULTI-PRODUCT DETECTION - FIXED
+const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
+const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
 
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        const hasMultipleParts = uniqueParts.length > 1;
-        const hasMultipleLines = lines.length > 1;
-        const separatorParts = text.match(/[A-Z0-9]{5,20}\s*[-/xX:]\s*\d+/gi);
-        const hasMultipleSeparatorParts = separatorParts && separatorParts.length > 1;
-        const isMultiProduct = hasMultipleParts || hasMultipleLines || hasMultipleSeparatorParts;
+const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+const hasMultipleParts = uniqueParts.length > 1;
+const hasMultipleLines = lines.length > 1;
+const separatorParts = text.match(/[A-Z0-9]{5,20}\s*[-/xX:]\s*\d+/gi);
+const hasMultipleSeparatorParts = separatorParts && separatorParts.length > 1;
+const isMultiProduct = hasMultipleParts || hasMultipleLines || hasMultipleSeparatorParts;
 
-        console.log(`📋 Multi-product check: parts=${uniqueParts.length}, lines=${lines.length}, separators=${separatorParts ? separatorParts.length : 0}`);
+console.log(`📋 Multi-product check: parts=${uniqueParts.length}, lines=${lines.length}, separators=${separatorParts ? separatorParts.length : 0}`);
 
-        if (isMultiProduct) {
-            console.log(`📋 Processing multi-product enquiry...`);
-            
-            const parsedResult = parseOrder(text);
-            const items = parsedResult.items;
-            
-            console.log(`📦 Parsed ${items.length} items`);
-            
-            if (items.length > 0) {
-                let foundItems = [];
-                let notFound = [];
-                let outOfStock = [];
-                let total = 0;
-                
-                for (const item of items) {
-                    let product = await db.getProductExact(item.part);
-                    if (!product) {
-                        const results = await db.searchProducts(item.part, 1);
-                        if (results && results.length > 0) {
-                            product = results[0];
-                        }
-                    }
-                    
-                    if (product) {
-                        const billingPrice = product.billing_price || product.list_price || 0;
-                        const priceWithGST = billingPrice * 1.18;
-                        
-                        foundItems.push({
-                            part: product.part,
-                            requestedPart: item.part,
-                            description: product.description,
-                            qty: item.qty || 1,
-                            price: priceWithGST,
-                            list_price: product.list_price,
-                            mrp: product.mrp,
-                            billing_price: billingPrice,
-                            stock: product.stock,
-                            brand: product.brand,
-                            make: product.make,
-                            model: product.model
-                        });
-                        
-                        total += priceWithGST * (item.qty || 1);
-                        
-                        if (product.stock === 0) {
-                            outOfStock.push(product.part);
-                        }
-                    } else {
-                        notFound.push(item.part);
-                    }
-                }
-                
-                if (foundItems.length > 0) {
-                    const cartItems = foundItems.map(item => ({
-                        part: item.part,
-                        description: item.description,
-                        qty: item.qty,
-                        price: item.price,
-                        list_price: item.list_price,
-                        mrp: item.mrp,
-                        billing_price: item.billing_price
-                    }));
-                    
-                    await db.saveCart(from, cartItems, total, total);
-                    
-                    let reply = `🛒 *ORDER SUMMARY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
-                    
-                    for (const item of foundItems) {
-                        const itemTotal = item.price * item.qty;
-                        reply += `*${item.part}*`;
-                        if (item.requestedPart && item.requestedPart !== item.part) {
-                            reply += ` (matched: ${item.requestedPart})`;
-                        }
-                        reply += ` x${item.qty}\n`;
-                        reply += `📝 ${item.description}\n`;
-                        if (item.list_price > 0) reply += `💰 LIST PRICE: ₹${item.list_price.toFixed(2)}\n`;
-                        if (item.mrp > 0) reply += `💰 MRP PRICE: ₹${item.mrp.toFixed(2)}\n`;
-                        reply += `💳 ₹${item.price.toFixed(2)} × ${item.qty} = ₹${itemTotal.toFixed(2)}\n\n`;
-                    }
-                    
-                    reply += `━━━━━━━━━━━━━━━━━━━━\n`;
-                    reply += `💰 *Total: ₹${total.toFixed(2)}* (incl. GST)\n`;
-                    reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-                    
-                    if (outOfStock.length > 0) {
-                        reply += `⚠️ Out of Stock: ${outOfStock.join(', ')}\n`;
-                        reply += `🔔 We'll notify you when available.\n\n`;
-                    }
-                    
-                    if (notFound.length > 0) {
-                        reply += `❌ Not found: ${notFound.join(', ')}\n\n`;
-                    }
-                    
-                    reply += `✅ *Confirm order?* Reply "Confirm Order"\n`;
-                    reply += `🗑️ *Clear Cart* - Start fresh\n\n`;
-                    reply += `📞 Call: ${CONFIG.businessPhone}`;
-                    
-                    await sendWhatsAppMessage(from, reply);
-                    return;
+if (isMultiProduct) {
+    console.log(`📋 Processing multi-product enquiry...`);
+    
+    const parsedResult = parseOrder(text);
+    const items = parsedResult.items;
+    
+    console.log(`📦 Parsed ${items.length} items`);
+    
+    if (items.length > 0) {
+        let foundItems = [];
+        let notFound = [];
+        let outOfStock = [];
+        let total = 0;
+        
+        // ⚡ BATCH PROCESS - Search all parts in parallel
+        const searchPromises = items.map(async (item) => {
+            let product = await db.getProductExact(item.part.toUpperCase());
+            if (!product) {
+                const results = await db.searchProducts(item.part, 1);
+                if (results && results.length > 0) {
+                    product = results[0];
                 }
             }
+            return { item, product };
+        });
+        
+        const results = await Promise.all(searchPromises);
+        
+        for (const { item, product } of results) {
+            if (product) {
+                const billingPrice = product.billing_price || product.list_price || 0;
+                const priceWithGST = billingPrice * 1.18;
+                
+                foundItems.push({
+                    part: product.part,
+                    requestedPart: item.part,
+                    description: product.description,
+                    qty: item.qty || 1,
+                    price: priceWithGST,
+                    list_price: product.list_price,
+                    mrp: product.mrp,
+                    billing_price: billingPrice,
+                    stock: product.stock,
+                    brand: product.brand,
+                    make: product.make,
+                    model: product.model
+                });
+                
+                total += priceWithGST * (item.qty || 1);
+                
+                if (product.stock === 0) {
+                    outOfStock.push(product.part);
+                }
+            } else {
+                notFound.push(item.part);
+            }
         }
-
+        
+        if (foundItems.length > 0) {
+            const cartItems = foundItems.map(item => ({
+                part: item.part,
+                description: item.description,
+                qty: item.qty,
+                price: item.price,
+                list_price: item.list_price,
+                mrp: item.mrp,
+                billing_price: item.billing_price
+            }));
+            
+            await db.saveCart(from, cartItems, total, total);
+            
+            let reply = `🛒 *ORDER SUMMARY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            
+            for (const item of foundItems) {
+                const itemTotal = item.price * item.qty;
+                reply += `*${item.part}*`;
+                if (item.requestedPart && item.requestedPart !== item.part) {
+                    reply += ` (matched: ${item.requestedPart})`;
+                }
+                reply += ` x${item.qty}\n`;
+                reply += `📝 ${item.description}\n`;
+                if (item.list_price > 0) reply += `💰 LIST PRICE: ₹${item.list_price.toFixed(2)}\n`;
+                if (item.mrp > 0) reply += `💰 MRP PRICE: ₹${item.mrp.toFixed(2)}\n`;
+                reply += `💳 ₹${item.price.toFixed(2)} × ${item.qty} = ₹${itemTotal.toFixed(2)}\n\n`;
+            }
+            
+            reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+            reply += `💰 *Total: ₹${total.toFixed(2)}* (incl. GST)\n`;
+            reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+            
+            if (outOfStock.length > 0) {
+                reply += `⚠️ Out of Stock: ${outOfStock.join(', ')}\n`;
+                reply += `🔔 We'll notify you when available.\n\n`;
+            }
+            
+            if (notFound.length > 0) {
+                reply += `❌ Not found: ${notFound.join(', ')}\n\n`;
+            }
+            
+            reply += `✅ *Confirm order?* Reply "Confirm Order"\n`;
+            reply += `🗑️ *Clear Cart* - Start fresh\n\n`;
+            reply += `📞 Call: ${CONFIG.businessPhone}`;
+            
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+    }
+}
         // 🔍 SEARCH PRODUCTS - Using optimized search
         if (cleaned.length >= 2) {
             const commonWords = ['i', 'need', 'want', 'for', 'my', 'the', 'a', 'an', 'me', 'please', 'from', 'to', 'of', 'with', 'have', 'has', 'is', 'are', 'was', 'were', 'and', 'or', 'but'];
