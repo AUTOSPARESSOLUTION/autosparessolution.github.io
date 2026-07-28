@@ -128,19 +128,19 @@ async function getEnquiryStats(dateFrom, dateTo) {
 }
 
 // ============================================================
-// 🔔 TRACK OUT-OF-STOCK - FIXED
+// 🔔 TRACK OUT-OF-STOCK - COMPLETE FIX
 // ============================================================
 
 async function trackOutOfStock(phone, part, description = '', quantity = 1) {
     try {
-        // ✅ Check if already tracking this part for this customer
-        const existing = await new Promise((resolve, reject) => {
+        // Check if already tracking
+        const existing = await new Promise((resolve) => {
             db.db.get(
                 `SELECT id FROM out_of_stock_tracking 
                  WHERE part = ? AND customer_phone = ? AND status = 'waiting'`,
                 [part, phone],
                 (err, row) => {
-                    if (err) reject(err);
+                    if (err) resolve(null);
                     else resolve(row);
                 }
             );
@@ -151,10 +151,10 @@ async function trackOutOfStock(phone, part, description = '', quantity = 1) {
             return false;
         }
 
-        // ✅ Insert using customer_phone (existing column)
+        // Insert using customer_phone (existing column)
         await new Promise((resolve, reject) => {
             const sql = `
-                INSERT INTO out_of_stock_tracking 
+                INSERT OR IGNORE INTO out_of_stock_tracking 
                 (customer_phone, part, description, quantity_requested, status, created_at)
                 VALUES (?, ?, ?, ?, 'waiting', CURRENT_TIMESTAMP)
             `;
@@ -167,12 +167,14 @@ async function trackOutOfStock(phone, part, description = '', quantity = 1) {
         console.log(`✅ Tracking out of stock: ${part} for ${phone}`);
         return true;
     } catch (error) {
+        // ✅ DON'T THROW - just log and continue
         console.error('❌ trackOutOfStock error:', error.message);
         return false;
     }
 }
+
 // ============================================================
-// 🔔 GET WAITING NOTIFICATIONS - FIXED
+// 🔔 GET WAITING NOTIFICATIONS
 // ============================================================
 
 async function getWaitingNotifications(phone = null, part = null) {
@@ -181,8 +183,8 @@ async function getWaitingNotifications(phone = null, part = null) {
         const params = [];
         
         if (phone) {
-            sql += ' AND (phone = ? OR customer_phone = ?)';
-            params.push(phone, phone);
+            sql += ' AND customer_phone = ?';
+            params.push(phone);
         }
         if (part) {
             sql += ' AND part = ?';
@@ -198,7 +200,7 @@ async function getWaitingNotifications(phone = null, part = null) {
 }
 
 // ============================================================
-// 🔔 NOTIFY RESTOCK - FIXED
+// 🔔 NOTIFY RESTOCK
 // ============================================================
 
 async function notifyRestock(part) {
@@ -215,16 +217,11 @@ async function notifyRestock(part) {
 
                 for (const customer of customers) {
                     try {
-                        // Get the phone number
-                        const phone = customer.phone || customer.customer_phone;
-                        if (!phone) continue;
-
-                        // Update status
                         await markNotified(customer.id);
                         notified++;
                     } catch (error) {
                         failed++;
-                        console.error(`❌ Failed to notify ${customer.phone || customer.customer_phone}:`, error.message);
+                        console.error(`❌ Failed to notify ${customer.customer_phone}:`, error.message);
                     }
                 }
 
