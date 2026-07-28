@@ -562,6 +562,7 @@ async function initAllTables() {
                     part TEXT NOT NULL,
                     description TEXT,
                     brand TEXT,
+                    phone TEXT NOT NULL,
                     model TEXT,
                     old_stock INTEGER DEFAULT 0,
                     new_stock INTEGER DEFAULT 0,
