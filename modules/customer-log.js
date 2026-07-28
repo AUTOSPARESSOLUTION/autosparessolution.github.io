@@ -128,30 +128,12 @@ async function getEnquiryStats(dateFrom, dateTo) {
 }
 
 // ============================================================
-// 🔔 TRACK OUT-OF-STOCK - COMPLETE FIX
+// 🔔 TRACK OUT-OF-STOCK - FIXED
 // ============================================================
 
 async function trackOutOfStock(phone, part, description = '', quantity = 1) {
     try {
-        // Check if already tracking
-        const existing = await new Promise((resolve) => {
-            db.db.get(
-                `SELECT id FROM out_of_stock_tracking 
-                 WHERE part = ? AND customer_phone = ? AND status = 'waiting'`,
-                [part, phone],
-                (err, row) => {
-                    if (err) resolve(null);
-                    else resolve(row);
-                }
-            );
-        });
-
-        if (existing) {
-            console.log(`📝 Already tracking ${part} for ${phone}`);
-            return false;
-        }
-
-        // Insert using customer_phone (existing column)
+        // Try to insert using customer_phone (existing column)
         await new Promise((resolve, reject) => {
             const sql = `
                 INSERT OR IGNORE INTO out_of_stock_tracking 
@@ -167,12 +149,11 @@ async function trackOutOfStock(phone, part, description = '', quantity = 1) {
         console.log(`✅ Tracking out of stock: ${part} for ${phone}`);
         return true;
     } catch (error) {
-        // ✅ DON'T THROW - just log and continue
-        console.error('❌ trackOutOfStock error:', error.message);
+        // ✅ Just log and continue - don't break the order
+        console.error('⚠️ Track error (non-critical):', error.message);
         return false;
     }
 }
-
 // ============================================================
 // 🔔 GET WAITING NOTIFICATIONS
 // ============================================================
