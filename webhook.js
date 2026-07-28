@@ -812,7 +812,7 @@ async function initAllTables() {
 
         await createIndexes();
         console.log('✅ All tables created/verified');
-
+}
     } catch (error) {
         console.error('❌ Create tables error:', error.message);
     }
