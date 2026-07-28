@@ -137,8 +137,8 @@ async function trackOutOfStock(phone, part, description = '', quantity = 1) {
         const existing = await new Promise((resolve, reject) => {
             db.db.get(
                 `SELECT id FROM out_of_stock_tracking 
-                 WHERE part = ? AND (phone = ? OR customer_phone = ?) AND status = 'waiting'`,
-                [part, phone, phone],
+                 WHERE part = ? AND customer_phone = ? AND status = 'waiting'`,
+                [part, phone],
                 (err, row) => {
                     if (err) reject(err);
                     else resolve(row);
@@ -151,14 +151,14 @@ async function trackOutOfStock(phone, part, description = '', quantity = 1) {
             return false;
         }
 
-        // ✅ Insert with both phone and customer_phone for compatibility
+        // ✅ Insert using customer_phone (existing column)
         await new Promise((resolve, reject) => {
             const sql = `
                 INSERT INTO out_of_stock_tracking 
-                (phone, customer_phone, part, description, quantity_requested, status, created_at)
-                VALUES (?, ?, ?, ?, ?, 'waiting', CURRENT_TIMESTAMP)
+                (customer_phone, part, description, quantity_requested, status, created_at)
+                VALUES (?, ?, ?, ?, 'waiting', CURRENT_TIMESTAMP)
             `;
-            db.db.run(sql, [phone, phone, part, description, quantity], (err) => {
+            db.db.run(sql, [phone, part, description, quantity], (err) => {
                 if (err) reject(err);
                 else resolve();
             });
@@ -171,7 +171,6 @@ async function trackOutOfStock(phone, part, description = '', quantity = 1) {
         return false;
     }
 }
-
 // ============================================================
 // 🔔 GET WAITING NOTIFICATIONS - FIXED
 // ============================================================
