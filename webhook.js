@@ -517,6 +517,10 @@ async function initAllTables() {
                 else resolve();
             });
         });
+        console.log('✅ Added phone column to out_of_stock_tracking');
+} catch (error) {
+    console.log('⚠️ Phone column already exists or error:', error.message);
+}
         console.log('✅ customer_enquiries table ready');
 
         await new Promise((resolve, reject) => {
