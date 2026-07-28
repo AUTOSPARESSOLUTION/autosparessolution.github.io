@@ -1,5 +1,6 @@
 // ============================================================
-// 📊 CUSTOMER LOG & NOTIFICATION MODULE
+// 📊 CUSTOMER LOG & NOTIFICATION MODULE - FIXED
+// modules/customer-log.js
 // ============================================================
 
 const db = require('./database');
@@ -127,31 +128,63 @@ async function getEnquiryStats(dateFrom, dateTo) {
 }
 
 // ============================================================
-// 🔔 TRACK OUT-OF-STOCK
+// 🔔 TRACK OUT-OF-STOCK - FIXED
 // ============================================================
 
-async function trackOutOfStock(phone, part, productName = '', quantity = 1) {
-    return new Promise((resolve, reject) => {
-        const sql = `
-            INSERT OR REPLACE INTO out_of_stock_tracking 
-            (phone, part, product_name, quantity, status, created_at)
-            VALUES (?, ?, ?, ?, 'waiting', CURRENT_TIMESTAMP)
-        `;
-        db.db.run(sql, [phone, part, productName, quantity], (err) => {
-            if (err) reject(err);
-            else resolve();
+async function trackOutOfStock(phone, part, description = '', quantity = 1) {
+    try {
+        // ✅ Check if already tracking this part for this customer
+        const existing = await new Promise((resolve, reject) => {
+            db.db.get(
+                `SELECT id FROM out_of_stock_tracking 
+                 WHERE part = ? AND (phone = ? OR customer_phone = ?) AND status = 'waiting'`,
+                [part, phone, phone],
+                (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                }
+            );
         });
-    });
+
+        if (existing) {
+            console.log(`📝 Already tracking ${part} for ${phone}`);
+            return false;
+        }
+
+        // ✅ Insert with both phone and customer_phone for compatibility
+        await new Promise((resolve, reject) => {
+            const sql = `
+                INSERT INTO out_of_stock_tracking 
+                (phone, customer_phone, part, description, quantity_requested, status, created_at)
+                VALUES (?, ?, ?, ?, ?, 'waiting', CURRENT_TIMESTAMP)
+            `;
+            db.db.run(sql, [phone, phone, part, description, quantity], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        
+        console.log(`✅ Tracking out of stock: ${part} for ${phone}`);
+        return true;
+    } catch (error) {
+        console.error('❌ trackOutOfStock error:', error.message);
+        return false;
+    }
 }
 
 // ============================================================
-// 🔔 GET WAITING NOTIFICATIONS
+// 🔔 GET WAITING NOTIFICATIONS - FIXED
 // ============================================================
 
-async function getWaitingNotifications(part = null) {
+async function getWaitingNotifications(phone = null, part = null) {
     return new Promise((resolve, reject) => {
         let sql = `SELECT * FROM out_of_stock_tracking WHERE status = 'waiting'`;
         const params = [];
+        
+        if (phone) {
+            sql += ' AND (phone = ? OR customer_phone = ?)';
+            params.push(phone, phone);
+        }
         if (part) {
             sql += ' AND part = ?';
             params.push(part);
@@ -166,12 +199,12 @@ async function getWaitingNotifications(part = null) {
 }
 
 // ============================================================
-// 🔔 NOTIFY RESTOCK
+// 🔔 NOTIFY RESTOCK - FIXED
 // ============================================================
 
 async function notifyRestock(part) {
     return new Promise((resolve, reject) => {
-        getWaitingNotifications(part)
+        getWaitingNotifications(null, part)
             .then(async (customers) => {
                 if (customers.length === 0) {
                     resolve({ notified: 0, failed: 0, part });
@@ -183,12 +216,16 @@ async function notifyRestock(part) {
 
                 for (const customer of customers) {
                     try {
+                        // Get the phone number
+                        const phone = customer.phone || customer.customer_phone;
+                        if (!phone) continue;
+
                         // Update status
                         await markNotified(customer.id);
                         notified++;
                     } catch (error) {
                         failed++;
-                        console.error(`❌ Failed to notify ${customer.phone}:`, error.message);
+                        console.error(`❌ Failed to notify ${customer.phone || customer.customer_phone}:`, error.message);
                     }
                 }
 
@@ -212,6 +249,31 @@ async function markNotified(trackingId) {
         db.db.run(sql, [trackingId], (err) => {
             if (err) reject(err);
             else resolve();
+        });
+    });
+}
+
+// ============================================================
+// 📊 GET OUT OF STOCK SUMMARY
+// ============================================================
+
+async function getOutOfStockSummary() {
+    return new Promise((resolve, reject) => {
+        const sql = `
+            SELECT 
+                part,
+                description,
+                COUNT(*) as customer_count,
+                MIN(created_at) as first_requested,
+                MAX(created_at) as last_requested
+            FROM out_of_stock_tracking 
+            WHERE status = 'waiting'
+            GROUP BY part
+            ORDER BY customer_count DESC
+        `;
+        db.db.all(sql, [], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows || []);
         });
     });
 }
@@ -294,6 +356,7 @@ module.exports = {
     getWaitingNotifications,
     notifyRestock,
     markNotified,
+    getOutOfStockSummary,
     recordStockChange,
     getStockHistory,
     getCustomerInsights
