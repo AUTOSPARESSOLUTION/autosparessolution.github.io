@@ -470,6 +470,16 @@ class AlertSystem {
         await this.sendUserAlert(ADMIN_PHONE, 'newOrder', message, { orderId, customer, items, total });
     }
 
+    async sendAdminNotification(customerPhone, messageText, type = 'enquiry') {
+        const message = `👤 *Customer Activity*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                        `📞 Customer: ${customerPhone}\n` +
+                        `📝 Type: ${type}\n` +
+                        `💬 Message: ${messageText}\n\n` +
+                        `🕐 ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
+        
+        await this.sendUserAlert(ADMIN_PHONE, 'adminNotification', message, { customerPhone, type, messageText });
+    }
+
     async sendImportCompleteAlert(products) {
         const message = `✅ *Import Complete!*\n\n` +
                         `📦 ${products} products loaded\n` +
@@ -1112,6 +1122,14 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
         
+        // ✅ Send admin notification for customer requests
+        if (from !== ADMIN_PHONE && type === 'text') {
+            const msgText = message.text?.body || '';
+            if (msgText && !msgText.toLowerCase().includes('status') && !msgText.toLowerCase().includes('health')) {
+                await alertSystem.sendAdminNotification(from, msgText, 'customer_message');
+            }
+        }
+        
         try {
             await withTimeout(
                 processMessage(message, from, type),
@@ -1602,7 +1620,7 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📱 HANDLE WHATSAPP TEXT MESSAGE - SIMPLIFIED
+// 📱 HANDLE WHATSAPP TEXT MESSAGE - WITH ADMIN FEATURES
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -1612,6 +1630,137 @@ async function handleWhatsAppMessage(message, from) {
         
         const cleaned = text.replace(/^["']|["']$/g, '').replace(/["']/g, '').replace(/\s+/g, ' ').trim();
         const msgLower = cleaned.toLowerCase().trim();
+
+        // ============================================================
+        // 🛡️ ADMIN COMMANDS
+        // ============================================================
+        
+        if (from === ADMIN_PHONE) {
+            
+            // 📋 Admin: Show admin commands
+            if (msgLower === 'help admin' || msgLower === 'admin help') {
+                await sendWhatsAppMessage(from,
+                    `👑 *Admin Commands*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                    `📋 *Admin Orders:*\n` +
+                    `   "Admin orders" - View all pending orders\n\n` +
+                    `✅ *Confirm Customer Order:*\n` +
+                    `   "Confirm order for 919XXXXXXXXX"\n\n` +
+                    `🛒 *View Customer Cart:*\n` +
+                    `   "Customer cart 919XXXXXXXXX"\n\n` +
+                    `📞 *Call:* ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+            
+            // 📋 Admin: View all pending orders
+            if (msgLower === 'admin orders' || msgLower === 'pending orders') {
+                try {
+                    const orders = await db.getAllOrders();
+                    const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'confirmed');
+                    
+                    if (pendingOrders.length === 0) {
+                        await sendWhatsAppMessage(from, '📋 *No pending orders.*');
+                        return;
+                    }
+                    
+                    let reply = `📋 *Pending Orders*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                    pendingOrders.forEach((order, index) => {
+                        reply += `${index + 1}. *${order.order_id}*\n`;
+                        reply += `   👤 ${order.customer_phone}\n`;
+                        reply += `   💰 ₹${order.total}\n`;
+                        reply += `   📝 ${order.items ? JSON.parse(order.items).length : 0} items\n`;
+                        reply += `   🕐 ${new Date(order.created_at).toLocaleString()}\n\n`;
+                    });
+                    reply += `✅ *To confirm:* "Confirm order for [phone]"\n`;
+                    await sendWhatsAppMessage(from, reply);
+                    return;
+                } catch (error) {
+                    console.error('❌ Admin orders error:', error.message);
+                    await sendWhatsAppMessage(from, '⚠️ Error fetching orders.');
+                    return;
+                }
+            }
+            
+            // ✅ Admin: Confirm customer order
+            const confirmMatch = msgLower.match(/confirm order for (\d+)/);
+            if (confirmMatch) {
+                const customerPhone = confirmMatch[1];
+                console.log(`👑 Admin confirming order for ${customerPhone}`);
+                
+                try {
+                    // Get customer's cart
+                    const cart = await db.getCart(customerPhone);
+                    if (!cart || !cart.items) {
+                        await sendWhatsAppMessage(from, 
+                            `❌ *No cart found for ${customerPhone}*\n\n` +
+                            `Customer hasn't added any items to cart.`
+                        );
+                        return;
+                    }
+                    
+                    const items = JSON.parse(cart.items);
+                    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+                    await db.saveOrder(orderId, customerPhone, items, cart.total);
+                    await db.clearCart(customerPhone);
+                    
+                    // Send confirmation to customer
+                    await alertSystem.sendOrderConfirmation(customerPhone, orderId, items, cart.total);
+                    
+                    // Send confirmation to admin
+                    await sendWhatsAppMessage(from,
+                        `✅ *ORDER CONFIRMED ON BEHALF OF CUSTOMER!*\n\n` +
+                        `📦 Order ID: ${orderId}\n` +
+                        `👤 Customer: ${customerPhone}\n` +
+                        `📝 Items: ${items.length}\n` +
+                        `💰 Total: ₹${cart.total.toFixed(2)}\n\n` +
+                        `✅ Customer has been notified.`
+                    );
+                    
+                    // Send new order alert to admin
+                    await alertSystem.sendNewOrderAlert(orderId, customerPhone, items, cart.total);
+                    return;
+                    
+                } catch (error) {
+                    console.error('❌ Admin confirm order error:', error.message);
+                    await sendWhatsAppMessage(from,
+                        `❌ *Failed to confirm order*\n\n` +
+                        `Error: ${error.message}`
+                    );
+                    return;
+                }
+            }
+            
+            // 🛒 Admin: View customer cart
+            const cartMatch = msgLower.match(/customer cart (\d+)/);
+            if (cartMatch) {
+                const customerPhone = cartMatch[1];
+                console.log(`👑 Admin viewing cart for ${customerPhone}`);
+                
+                try {
+                    const cart = await db.getCart(customerPhone);
+                    if (!cart || !cart.items) {
+                        await sendWhatsAppMessage(from,
+                            `🛒 *Cart is empty for ${customerPhone}*`
+                        );
+                        return;
+                    }
+                    
+                    const items = JSON.parse(cart.items);
+                    let reply = `🛒 *Cart for ${customerPhone}*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                    items.forEach((item, index) => {
+                        reply += `${index + 1}. ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
+                    });
+                    reply += `\n💰 *Total: ₹${cart.total.toFixed(2)}*\n\n`;
+                    reply += `✅ *To confirm:* "Confirm order for ${customerPhone}"`;
+                    await sendWhatsAppMessage(from, reply);
+                    return;
+                } catch (error) {
+                    console.error('❌ Admin cart error:', error.message);
+                    await sendWhatsAppMessage(from, '⚠️ Error fetching cart.');
+                    return;
+                }
+            }
+        }
 
         // ============================================================
         // 1️⃣ WELCOME / HELP
@@ -2484,6 +2633,7 @@ async function startServer() {
             console.log(`📸 Image Processing: ✅ Active (with rate limiter)`);
             console.log(`🤖 Gemini Rate Limiter: ✅ Active (2s delay, 3 retries)`);
             console.log(`📢 Alert System: ✅ Active`);
+            console.log(`👑 Admin Features: ✅ Active (${ADMIN_PHONE})`);
             console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
             console.log(`⏱️ Response Timeout: ${CONFIG.responseTimeout}ms`);
             console.log(`⏱️ Gemini Timeout: ${CONFIG.geminiTimeout}ms`);
