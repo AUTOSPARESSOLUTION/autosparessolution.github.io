@@ -2180,7 +2180,7 @@ async function handleLocationMessage(message, from) {
 }
 
 // ============================================================
-// 📄 DOCUMENT MESSAGE HANDLER - ENHANCED
+// 📄 DOCUMENT MESSAGE HANDLER - COMPLETE FIX
 // ============================================================
 
 async function handleDocumentMessage(message, from) {
@@ -2211,7 +2211,6 @@ async function handleDocumentMessage(message, from) {
         
         await sendWhatsAppMessage(from, 
             `📄 *Processing Your Document...*\n\n` +
-            `🤖 Using Gemini Vision to extract...\n` +
             `⏳ Please wait...\n\n` +
             `📁 File: ${filename}`
         );
@@ -2224,55 +2223,166 @@ async function handleDocumentMessage(message, from) {
         console.log(`📥 File downloaded: ${fileBuffer.length} bytes`);
         
         // ============================================================
-        // 📊 PROCESS EXCEL FILE
+        // 📊 PROCESS EXCEL FILE - FIXED
         // ============================================================
         
         let extractedItems = [];
-        let documentMetadata = {};
         
         if (isExcel && XLSX) {
             console.log(`📊 Processing Excel file: ${filename}`);
             
             try {
-                // Read Excel file
+                // Read Excel file as array of arrays
                 const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                 
                 console.log(`📊 Found ${jsonData.length} rows in Excel`);
                 
-                // Try to find part numbers in the Excel data
-                for (const row of jsonData) {
-                    // Look for part number in any column
-                    const rowValues = Object.values(row);
-                    for (const value of rowValues) {
-                        if (typeof value === 'string') {
-                            // Check if it looks like a part number
-                            const partMatch = value.match(/\b([A-Z0-9]{5,20})\b/i);
-                            if (partMatch) {
-                                const partNumber = partMatch[1].toUpperCase();
-                                
-                                // Look for quantity in the same row
-                                let qty = 1;
-                                for (const v of rowValues) {
-                                    const num = parseFloat(v);
-                                    if (!isNaN(num) && num > 0 && num < 1000) {
-                                        qty = Math.round(num);
-                                        break;
-                                    }
-                                }
-                                
-                                extractedItems.push({
-                                    part: partNumber,
-                                    qty: qty,
-                                    row: row
-                                });
+                // Find the header row
+                let partCol = -1;
+                let qtyCol = -1;
+                let headerRow = -1;
+                
+                // Search for header row (first 20 rows)
+                for (let i = 0; i < Math.min(jsonData.length, 20); i++) {
+                    const row = jsonData[i];
+                    if (!row || row.length === 0) continue;
+                    
+                    const rowStr = row.join(' ').toLowerCase();
+                    if (rowStr.includes('prt') || rowStr.includes('part') || 
+                        rowStr.includes('no') || rowStr.includes('code') ||
+                        rowStr.includes('sku') || rowStr.includes('item') ||
+                        rowStr.includes('qty') || rowStr.includes('quantity')) {
+                        
+                        headerRow = i;
+                        for (let j = 0; j < row.length; j++) {
+                            const cell = String(row[j] || '').toLowerCase();
+                            if (cell.includes('prt') || cell.includes('part') || 
+                                cell.includes('no') || cell.includes('code') || 
+                                cell.includes('sku') || cell.includes('item') ||
+                                cell.includes('material')) {
+                                if (partCol === -1) partCol = j;
+                            }
+                            if (cell.includes('qty') || cell.includes('quantity') || 
+                                cell.includes('req') || cell.includes('order') ||
+                                cell.includes('need')) {
+                                qtyCol = j;
                             }
                         }
+                        break;
                     }
                 }
                 
-                console.log(`📊 Extracted ${extractedItems.length} items from Excel`);
+                console.log(`📊 Part column: ${partCol}, Qty column: ${qtyCol}, Header row: ${headerRow}`);
+                
+                // If no header found, scan for part numbers
+                if (partCol === -1) {
+                    for (let i = 0; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row || row.length === 0) continue;
+                        
+                        for (let j = 0; j < row.length; j++) {
+                            const cell = String(row[j] || '');
+                            if (cell.match(/\b([A-Z0-9]{5,20})\b/)) {
+                                partCol = j;
+                                if (j + 1 < row.length) {
+                                    const nextCell = String(row[j + 1] || '');
+                                    if (nextCell.match(/^\d+$/) && parseInt(nextCell) > 0 && parseInt(nextCell) < 1000) {
+                                        qtyCol = j + 1;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                        if (partCol !== -1) break;
+                    }
+                }
+                
+                console.log(`📊 Final - Part col: ${partCol}, Qty col: ${qtyCol}`);
+                
+                // Process each row
+                for (let i = 0; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    if (!row || row.length === 0) continue;
+                    
+                    // Skip header row
+                    if (i === headerRow) continue;
+                    
+                    // Extract part number
+                    let partNumber = null;
+                    if (partCol !== -1 && partCol < row.length) {
+                        const cell = String(row[partCol] || '').trim();
+                        const partMatch = cell.match(/\b([A-Z0-9]{5,20})\b/i);
+                        if (partMatch) {
+                            partNumber = partMatch[1].toUpperCase();
+                        }
+                    }
+                    
+                    if (!partNumber) continue;
+                    
+                    // Extract quantity
+                    let qty = 1;
+                    
+                    if (qtyCol !== -1 && qtyCol < row.length) {
+                        const qtyValue = row[qtyCol];
+                        if (qtyValue !== undefined && qtyValue !== null && qtyValue !== '') {
+                            if (typeof qtyValue === 'number') {
+                                qty = Math.round(qtyValue);
+                            } else if (typeof qtyValue === 'string') {
+                                const parsed = parseFloat(qtyValue);
+                                if (!isNaN(parsed) && parsed > 0 && parsed < 1000) {
+                                    qty = Math.round(parsed);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // ✅ CRITICAL FIX: If quantity is larger than 100, it's probably using row index
+                    // Check if quantity equals row number
+                    if (qty > 100) {
+                        const rowNum = i + 1; // Excel row number (1-based)
+                        // If quantity equals row number or close to it, find real quantity
+                        if (Math.abs(qty - rowNum) <= 2) {
+                            console.log(`⚠️ Quantity ${qty} looks like row index ${rowNum}. Looking for real quantity...`);
+                            
+                            // Find any number in the row that's reasonable (1-100)
+                            let foundQty = 1;
+                            for (let j = 0; j < row.length; j++) {
+                                if (j === partCol) continue;
+                                const val = row[j];
+                                if (typeof val === 'number' && val > 0 && val < 100 && Number.isInteger(val)) {
+                                    foundQty = val;
+                                    break;
+                                }
+                                if (typeof val === 'string') {
+                                    const parsed = parseFloat(val);
+                                    if (!isNaN(parsed) && parsed > 0 && parsed < 100 && Number.isInteger(parsed)) {
+                                        foundQty = parsed;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            if (foundQty !== qty) {
+                                qty = foundQty;
+                                console.log(`✅ Found real quantity: ${qty}`);
+                            }
+                        }
+                    }
+                    
+                    // ✅ Safety check: quantity should be 1-1000
+                    if (qty > 1000) qty = 1;
+                    if (qty < 1) qty = 1;
+                    
+                    // Avoid duplicates
+                    if (!extractedItems.find(item => item.part === partNumber)) {
+                        extractedItems.push({ part: partNumber, qty: qty });
+                        console.log(`📊 Extracted: ${partNumber} x${qty}`);
+                    }
+                }
+                
+                console.log(`📊 Total extracted: ${extractedItems.length} items`);
                 
             } catch (excelError) {
                 console.error('❌ Excel processing error:', excelError.message);
@@ -2280,7 +2390,7 @@ async function handleDocumentMessage(message, from) {
         }
         
         // ============================================================
-        // 🤖 USE GEMINI VISION FOR PDF/IMAGES (or fallback)
+        // 🤖 USE GEMINI VISION FOR PDF/IMAGES (fallback)
         // ============================================================
         
         if (extractedItems.length === 0 && CONFIG.geminiKey) {
@@ -2292,19 +2402,18 @@ async function handleDocumentMessage(message, from) {
                                          isExcel ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
                                          mimeType || 'image/jpeg';
                 
-                const prompt = `Extract ALL part numbers from this document.
-                
+                const prompt = `Extract ALL part numbers and quantities from this document.
+
 CRITICAL RULES:
 1. Look for PART NUMBERS (alphanumeric, 5-20 characters like 0801BA0285N)
 2. Look for QUANTITIES (numbers after part numbers)
 3. Extract EVERY part number you can find
 4. If quantity is present, include it (format: PART_NUMBER QUANTITY)
 5. If multiple parts, list each on new line
-6. DO NOT return random numbers unless they are part of a part number
 
 OUTPUT FORMAT:
-- Single part: "PART_NUMBER QUANTITY"
-- Multiple parts: "PART_NUMBER1 QUANTITY1\nPART_NUMBER2 QUANTITY2"
+PART_NUMBER1 QUANTITY1
+PART_NUMBER2 QUANTITY2
 
 Document: ${filename}`;
 
@@ -2314,7 +2423,6 @@ Document: ${filename}`;
                     const content = data.candidates[0].content.parts[0].text.trim();
                     console.log(`📝 Gemini extracted: "${content}"`);
                     
-                    // Parse Gemini output
                     const lines = content.split('\n');
                     for (const line of lines) {
                         const trimmed = line.trim();
@@ -2326,7 +2434,6 @@ Document: ${filename}`;
                             const qtyMatch = trimmed.match(/(\d+)/);
                             const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
                             
-                            // Avoid duplicates
                             if (!extractedItems.find(item => item.part === partNumber)) {
                                 extractedItems.push({ part: partNumber, qty: qty });
                             }
@@ -2490,7 +2597,6 @@ Document: ${filename}`;
         );
     }
 }
-
 // ============================================================
 // 🤖 GEMINI WEB SEARCH
 // ============================================================
