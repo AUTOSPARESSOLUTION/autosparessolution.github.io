@@ -1,7 +1,7 @@
 {
   "name": "assist-whatsapp-webhook",
-  "version": "3.0.1",
-  "description": "Complete WhatsApp Webhook System - Performance Fixed",
+  "version": "3.1.0",
+  "description": "Complete WhatsApp Webhook System - With Admin Features",
   "main": "webhook.js",
   "scripts": {
     "start": "node webhook.js",
