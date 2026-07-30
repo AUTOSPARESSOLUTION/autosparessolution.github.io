@@ -2031,7 +2031,7 @@ async function handleLocationMessage(message, from) {
 }
 
 // ============================================================
-// 📄 DOCUMENT MESSAGE HANDLER (from v2 - simplified)
+// 📄 DOCUMENT MESSAGE HANDLER - ENHANCED
 // ============================================================
 
 async function handleDocumentMessage(message, from) {
@@ -2074,15 +2074,263 @@ async function handleDocumentMessage(message, from) {
         );
         console.log(`📥 File downloaded: ${fileBuffer.length} bytes`);
         
-        // Process as customer order (simplified)
-        await sendWhatsAppMessage(from, 
-            `📄 *Document Received!*\n\n` +
-            `📁 File: ${filename}\n` +
-            `📦 Size: ${(fileBuffer.length / 1024).toFixed(1)} KB\n\n` +
-            `🔍 Processing with Gemini...\n` +
-            `⏳ Please wait...`
-        );
+        // ============================================================
+        // 📊 PROCESS EXCEL FILE
+        // ============================================================
+        
+        let extractedItems = [];
+        let documentMetadata = {};
+        
+        if (isExcel && XLSX) {
+            console.log(`📊 Processing Excel file: ${filename}`);
+            
+            try {
+                // Read Excel file
+                const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                
+                console.log(`📊 Found ${jsonData.length} rows in Excel`);
+                
+                // Try to find part numbers in the Excel data
+                for (const row of jsonData) {
+                    // Look for part number in any column
+                    const rowValues = Object.values(row);
+                    for (const value of rowValues) {
+                        if (typeof value === 'string') {
+                            // Check if it looks like a part number
+                            const partMatch = value.match(/\b([A-Z0-9]{5,20})\b/i);
+                            if (partMatch) {
+                                const partNumber = partMatch[1].toUpperCase();
+                                
+                                // Look for quantity in the same row
+                                let qty = 1;
+                                for (const v of rowValues) {
+                                    const num = parseFloat(v);
+                                    if (!isNaN(num) && num > 0 && num < 1000) {
+                                        qty = Math.round(num);
+                                        break;
+                                    }
+                                }
+                                
+                                extractedItems.push({
+                                    part: partNumber,
+                                    qty: qty,
+                                    row: row
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                console.log(`📊 Extracted ${extractedItems.length} items from Excel`);
+                
+            } catch (excelError) {
+                console.error('❌ Excel processing error:', excelError.message);
+            }
+        }
+        
+        // ============================================================
+        // 🤖 USE GEMINI VISION FOR PDF/IMAGES (or fallback)
+        // ============================================================
+        
+        if (extractedItems.length === 0 && CONFIG.geminiKey) {
+            console.log(`🤖 Using Gemini Vision for extraction`);
+            
+            try {
+                const base64Data = fileBuffer.toString('base64');
+                const mimeTypeForGemini = isPDF ? 'application/pdf' : 
+                                         isExcel ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+                                         mimeType || 'image/jpeg';
+                
+                const prompt = `Extract ALL part numbers from this document.
+                
+CRITICAL RULES:
+1. Look for PART NUMBERS (alphanumeric, 5-20 characters like 0801BA0285N)
+2. Look for QUANTITIES (numbers after part numbers)
+3. Extract EVERY part number you can find
+4. If quantity is present, include it (format: PART_NUMBER QUANTITY)
+5. If multiple parts, list each on new line
+6. DO NOT return random numbers unless they are part of a part number
 
+OUTPUT FORMAT:
+- Single part: "PART_NUMBER QUANTITY"
+- Multiple parts: "PART_NUMBER1 QUANTITY1\nPART_NUMBER2 QUANTITY2"
+
+Document: ${filename}`;
+
+                const data = await geminiRateLimiter.request(prompt, base64Data, mimeTypeForGemini);
+                
+                if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    const content = data.candidates[0].content.parts[0].text.trim();
+                    console.log(`📝 Gemini extracted: "${content}"`);
+                    
+                    // Parse Gemini output
+                    const lines = content.split('\n');
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed) continue;
+                        
+                        const partMatch = trimmed.match(/\b([A-Z0-9]{5,20})\b/i);
+                        if (partMatch) {
+                            const partNumber = partMatch[1].toUpperCase();
+                            const qtyMatch = trimmed.match(/(\d+)/);
+                            const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+                            
+                            // Avoid duplicates
+                            if (!extractedItems.find(item => item.part === partNumber)) {
+                                extractedItems.push({ part: partNumber, qty: qty });
+                            }
+                        }
+                    }
+                }
+            } catch (geminiError) {
+                console.error('❌ Gemini extraction error:', geminiError.message);
+            }
+        }
+        
+        // ============================================================
+        // 📊 PROCESS EXTRACTED ITEMS
+        // ============================================================
+        
+        if (extractedItems.length === 0) {
+            await sendWhatsAppMessage(from, 
+                `📄 *Document Processed*\n\n` +
+                `📁 File: ${filename}\n` +
+                `📦 Size: ${(fileBuffer.length / 1024).toFixed(1)} KB\n\n` +
+                `⚠️ *No part numbers found in this document.*\n\n` +
+                `💡 Please ensure your document contains part numbers (5-20 alphanumeric characters).\n` +
+                `📝 You can also type the part numbers directly.\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
+        
+        // ============================================================
+        // 🛒 CREATE ORDER FROM EXTRACTED ITEMS
+        // ============================================================
+        
+        console.log(`📦 Processing ${extractedItems.length} extracted items from document`);
+        
+        let foundItems = [];
+        let notFound = [];
+        let outOfStock = [];
+        let total = 0;
+        
+        const searchPromises = extractedItems.map(async (item) => {
+            let product = await db.getProductExact(item.part.toUpperCase());
+            if (!product) {
+                const results = await db.searchProducts(item.part, 1);
+                if (results && results.length > 0) {
+                    product = results[0];
+                }
+            }
+            return { item, product };
+        });
+        
+        const results = await Promise.all(searchPromises);
+        
+        for (const { item, product } of results) {
+            if (product) {
+                const billingPrice = product.billing_price || product.list_price || 0;
+                const priceWithGST = billingPrice * 1.18;
+                
+                foundItems.push({
+                    part: product.part,
+                    requestedPart: item.part,
+                    description: product.description,
+                    qty: item.qty || 1,
+                    price: priceWithGST,
+                    list_price: product.list_price,
+                    mrp: product.mrp,
+                    billing_price: billingPrice,
+                    stock: product.stock,
+                    brand: product.brand,
+                    make: product.make,
+                    model: product.model
+                });
+                
+                total += priceWithGST * (item.qty || 1);
+                
+                if (product.stock === 0) {
+                    outOfStock.push(product.part);
+                    await alertSystem.sendOutOfStockAlert(from, product.part, product.description);
+                    try {
+                        await customerLog.trackOutOfStock(from, product.part, product.description, item.qty || 1);
+                    } catch (trackError) {
+                        console.error('⚠️ Track error (non-critical):', trackError.message);
+                    }
+                }
+            } else {
+                notFound.push(item.part);
+            }
+        }
+        
+        if (foundItems.length === 0) {
+            let reply = `📄 *Document Processed*\n\n`;
+            reply += `📁 File: ${filename}\n`;
+            reply += `📦 ${extractedItems.length} items found\n\n`;
+            reply += `❌ *No products found*\n\n`;
+            if (notFound.length > 0) {
+                reply += `Not found: ${notFound.join(', ')}\n\n`;
+            }
+            reply += `💡 Please check the part numbers.\n`;
+            reply += `📞 Call: ${CONFIG.businessPhone}`;
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+        
+        // Save to cart
+        const cartItems = foundItems.map(item => ({
+            part: item.part,
+            description: item.description,
+            qty: item.qty,
+            price: item.price,
+            list_price: item.list_price,
+            mrp: item.mrp,
+            billing_price: item.billing_price
+        }));
+        
+        await db.saveCart(from, cartItems, total, total);
+        
+        // Build order summary
+        let reply = `📄 *DOCUMENT ORDER SUMMARY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        reply += `📁 File: ${filename}\n`;
+        reply += `📦 Items: ${foundItems.length} valid products\n\n`;
+        
+        for (const item of foundItems) {
+            const itemTotal = item.price * item.qty;
+            reply += `*${item.part}*`;
+            if (item.requestedPart && item.requestedPart !== item.part) {
+                reply += ` (matched: ${item.requestedPart})`;
+            }
+            reply += ` x${item.qty}\n`;
+            reply += `📝 ${item.description || 'N/A'}\n`;
+            if (item.list_price > 0) reply += `💰 LIST PRICE: ₹${item.list_price.toFixed(2)}\n`;
+            if (item.mrp > 0) reply += `💰 MRP PRICE: ₹${item.mrp.toFixed(2)}\n`;
+            reply += `💳 ₹${item.price.toFixed(2)} × ${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
+            reply += `📦 ${item.stock > 0 ? `✅ ${item.stock} pcs available` : '❌ Out of Stock'}\n\n`;
+        }
+        
+        reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+        reply += `💰 *Total: ₹${total.toFixed(2)}* (incl. GST)\n`;
+        reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        if (outOfStock.length > 0) {
+            reply += `⚠️ *Out of Stock:* ${outOfStock.join(', ')}\n`;
+            reply += `🔔 We'll notify you when available.\n\n`;
+        }
+        
+        if (notFound.length > 0) {
+            reply += `❌ *Not found:* ${notFound.join(', ')}\n\n`;
+        }
+        
+        reply += `✅ *Confirm order?* Reply "Confirm Order"\n`;
+        reply += `🗑️ *Clear Cart* - Start fresh\n\n`;
+        reply += `📞 Call: ${CONFIG.businessPhone}`;
+        
+        await sendWhatsAppMessage(from, reply);
+        
     } catch (error) {
         console.error(`❌ Document handler error:`, error.message);
         await sendWhatsAppMessage(from, 
