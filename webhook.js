@@ -127,6 +127,28 @@ console.log(`⏱️ Response Timeout: ${CONFIG.responseTimeout}ms`);
 console.log('====================================');
 
 // ============================================================
+// 📞 PHONE NUMBER NORMALIZATION - ADMIN FIX
+// ============================================================
+
+function normalizePhone(phone) {
+    if (!phone) return '';
+    let cleaned = phone.replace(/\D/g, '');
+    if (cleaned.startsWith('91') && cleaned.length > 10) {
+        cleaned = cleaned.substring(2);
+    }
+    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+        cleaned = cleaned.substring(2);
+    }
+    return cleaned;
+}
+
+function isAdmin(phone) {
+    const normalizedFrom = normalizePhone(phone);
+    const normalizedAdmin = normalizePhone(ADMIN_PHONE);
+    return normalizedFrom === normalizedAdmin;
+}
+
+// ============================================================
 // 🛡️ MIDDLEWARE
 // ============================================================
 
@@ -206,7 +228,7 @@ class GeminiRateLimiter {
     constructor() {
         this.queue = [];
         this.processing = false;
-        this.minDelay = 2000; // 2 seconds between requests
+        this.minDelay = 2000;
         this.lastRequest = 0;
         this.maxRetries = 3;
         this.retryDelay = 5000;
@@ -216,7 +238,6 @@ class GeminiRateLimiter {
     }
 
     async request(prompt, data, mimeType = 'image/jpeg', retries = 0) {
-        // Check rate limit
         const now = Date.now();
         if (now - this.windowStart > 60000) {
             this.requestCount = 0;
@@ -230,7 +251,6 @@ class GeminiRateLimiter {
             this.windowStart = Date.now();
         }
 
-        // Wait between requests
         const waitTime = Math.max(0, this.minDelay - (now - this.lastRequest));
         if (waitTime > 0) {
             console.log(`⏳ Waiting ${waitTime}ms before Gemini request...`);
@@ -292,7 +312,6 @@ class GeminiRateLimiter {
     }
 }
 
-// Initialize Gemini rate limiter
 const geminiRateLimiter = new GeminiRateLimiter();
 
 // ============================================================
@@ -301,11 +320,11 @@ const geminiRateLimiter = new GeminiRateLimiter();
 
 const geminiCache = new LRUCache({
     max: 100,
-    ttl: 60 * 60 * 1000 // 1 hour
+    ttl: 60 * 60 * 1000
 });
 
 // ============================================================
-// 📢 ALERT SYSTEM
+// 📢 ALERT SYSTEM - ENHANCED
 // ============================================================
 
 class AlertSystem {
@@ -440,14 +459,42 @@ class AlertSystem {
     }
 
     async sendOrderConfirmation(phone, orderId, items, total) {
-        let message = `📋 *Order #${orderId}*\n\n`;
+        let message = `✅ *ORDER CONFIRMED!*\n\n`;
+        message += `📦 Order ID: ${orderId}\n`;
         message += `📝 Items:\n`;
         items.forEach((item, index) => {
             message += `   ${index + 1}. ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
         });
-        message += `\n💰 *Total: ₹${total.toFixed(2)}*`;
+        message += `\n💰 *Total: ₹${total.toFixed(2)}*\n\n`;
+        message += `📊 *Download Options:*\n`;
+        message += `   Reply "Download Excel" or "Download PDF"\n\n`;
+        message += `📞 Call: ${CONFIG.businessPhone}`;
         
         await this.sendUserAlert(phone, 'orderConfirmation', message, { orderId, items, total });
+        
+        // Generate and send Excel
+        try {
+            const excelBuffer = await generateExcelSummary(orderId, items, total, phone);
+            if (excelBuffer) {
+                await sendDocumentMessage(phone, excelBuffer, `${orderId}_Summary.xlsx`, 
+                    `📊 Order Summary - ${orderId}`);
+            }
+        } catch (excelError) {
+            console.error('❌ Excel generation error:', excelError.message);
+        }
+        
+        // Generate and send PDF
+        try {
+            const pdfBuffer = await generatePDFSummary(orderId, items, total, phone);
+            if (pdfBuffer) {
+                await sendDocumentMessage(phone, pdfBuffer, `${orderId}_Summary.pdf`,
+                    `📄 Order Summary - ${orderId}`);
+            }
+        } catch (pdfError) {
+            console.error('❌ PDF generation error:', pdfError.message);
+        }
+        
+        return true;
     }
 
     async sendOutOfStockAlert(phone, part, description) {
@@ -460,6 +507,7 @@ class AlertSystem {
     }
 
     async sendNewOrderAlert(orderId, customer, items, total) {
+        const adminPhone = normalizePhone(ADMIN_PHONE);
         const message = `🆕 *New Order!*\n\n` +
                         `📦 Order: ${orderId}\n` +
                         `👤 Customer: ${customer}\n` +
@@ -467,30 +515,385 @@ class AlertSystem {
                         `💰 Total: ₹${total.toFixed(2)}\n\n` +
                         `✅ Process order now`;
         
-        await this.sendUserAlert(ADMIN_PHONE, 'newOrder', message, { orderId, customer, items, total });
+        await this.sendUserAlert(adminPhone, 'newOrder', message, { orderId, customer, items, total });
     }
 
     async sendAdminNotification(customerPhone, messageText, type = 'enquiry') {
+        const adminPhone = normalizePhone(ADMIN_PHONE);
         const message = `👤 *Customer Activity*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
                         `📞 Customer: ${customerPhone}\n` +
                         `📝 Type: ${type}\n` +
                         `💬 Message: ${messageText}\n\n` +
                         `🕐 ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
         
-        await this.sendUserAlert(ADMIN_PHONE, 'adminNotification', message, { customerPhone, type, messageText });
+        await this.sendUserAlert(adminPhone, 'adminNotification', message, { customerPhone, type, messageText });
     }
 
     async sendImportCompleteAlert(products) {
+        const adminPhone = normalizePhone(ADMIN_PHONE);
         const message = `✅ *Import Complete!*\n\n` +
                         `📦 ${products} products loaded\n` +
                         `⏱️ System ready for requests\n\n` +
                         `🚀 Bot is now active`;
         
-        await this.sendUserAlert(ADMIN_PHONE, 'importComplete', message, { products });
+        await this.sendUserAlert(adminPhone, 'importComplete', message, { products });
     }
 }
 
 const alertSystem = new AlertSystem();
+
+// ============================================================
+// 📊 EXCEL & PDF GENERATORS
+// ============================================================
+
+async function generateExcelSummary(orderId, items, total, customerPhone) {
+    try {
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Auto Spares Solution';
+        workbook.created = new Date();
+        
+        const sheet = workbook.addWorksheet('Order Summary');
+        
+        // Header
+        sheet.mergeCells('A1:F1');
+        const titleCell = sheet.getCell('A1');
+        titleCell.value = '🛒 AUTO SPARES SOLUTION';
+        titleCell.font = { bold: true, size: 20, color: { argb: 'FF0072B0' } };
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        sheet.getRow(1).height = 40;
+        
+        sheet.mergeCells('A2:F2');
+        const orderCell = sheet.getCell('A2');
+        orderCell.value = `Order ID: ${orderId} | Date: ${new Date().toLocaleDateString('en-IN')}`;
+        orderCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        orderCell.font = { size: 12, color: { argb: 'FF666666' } };
+        
+        sheet.mergeCells('A3:F3');
+        const customerCell = sheet.getCell('A3');
+        customerCell.value = `Customer: ${customerPhone}`;
+        customerCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        customerCell.font = { size: 10, color: { argb: 'FF666666' } };
+        
+        sheet.addRow([]);
+        
+        // Headers
+        const headers = ['#', 'Part Number', 'Description', 'Qty', 'Price (₹)', 'Total (₹)'];
+        const headerRow = sheet.addRow(headers);
+        headerRow.height = 30;
+        headerRow.eachCell((cell) => {
+            cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0072B0' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+        });
+        
+        sheet.getColumn(1).width = 6;
+        sheet.getColumn(2).width = 20;
+        sheet.getColumn(3).width = 40;
+        sheet.getColumn(4).width = 10;
+        sheet.getColumn(5).width = 15;
+        sheet.getColumn(6).width = 18;
+        
+        // Data rows
+        let rowIndex = 0;
+        for (const item of items) {
+            const itemTotal = (item.price || 0) * (item.qty || 0);
+            const row = sheet.addRow([
+                rowIndex + 1,
+                item.part || 'N/A',
+                item.description || 'N/A',
+                item.qty || 0,
+                (item.price || 0).toFixed(2),
+                itemTotal.toFixed(2)
+            ]);
+            row.height = 25;
+            row.eachCell((cell) => {
+                cell.alignment = { horizontal: 'left', vertical: 'middle' };
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+            rowIndex++;
+        }
+        
+        sheet.addRow([]);
+        
+        const totalRow = sheet.addRow(['', '', '', '', 'TOTAL:', total.toFixed(2)]);
+        totalRow.height = 30;
+        totalRow.getCell(5).font = { bold: true, size: 14 };
+        totalRow.getCell(5).alignment = { horizontal: 'right', vertical: 'middle' };
+        totalRow.getCell(6).font = { bold: true, size: 14, color: { argb: 'FF0072B0' } };
+        totalRow.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' };
+        
+        sheet.addRow([]);
+        const footerRow = sheet.addRow(['Thank you for your order!']);
+        footerRow.height = 30;
+        footerRow.getCell(1).font = { bold: true, size: 12, color: { argb: 'FF0072B0' } };
+        footerRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        sheet.mergeCells(`A${footerRow.number}:F${footerRow.number}`);
+        
+        const contactRow = sheet.addRow([`📞 Call: ${CONFIG.businessPhone} | 🛒 Shop: https://autosparessolution.com`]);
+        contactRow.height = 25;
+        contactRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        contactRow.getCell(1).font = { size: 10, color: { argb: 'FF666666' } };
+        sheet.mergeCells(`A${contactRow.number}:F${contactRow.number}`);
+        
+        const buffer = await workbook.xlsx.writeBuffer();
+        return buffer;
+        
+    } catch (error) {
+        console.error('❌ Excel generation error:', error.message);
+        return null;
+    }
+}
+
+async function generatePDFSummary(orderId, items, total, customerPhone) {
+    try {
+        const printer = new PdfPrinter({
+            Roboto: {
+                normal: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto-Regular.ttf',
+                bold: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto-Medium.ttf',
+                italics: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto-Italic.ttf',
+                bolditalics: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto-MediumItalic.ttf'
+            }
+        });
+
+        const tableBody = [
+            [
+                { text: '#', style: 'tableHeader' },
+                { text: 'Part Number', style: 'tableHeader' },
+                { text: 'Description', style: 'tableHeader' },
+                { text: 'Qty', style: 'tableHeader' },
+                { text: 'Price (₹)', style: 'tableHeader' },
+                { text: 'Total (₹)', style: 'tableHeader' }
+            ]
+        ];
+
+        let rowIndex = 0;
+        for (const item of items) {
+            const itemTotal = (item.price || 0) * (item.qty || 0);
+            tableBody.push([
+                { text: (rowIndex + 1).toString(), alignment: 'center' },
+                { text: item.part || 'N/A', bold: true },
+                { text: item.description || 'N/A' },
+                { text: (item.qty || 0).toString(), alignment: 'center' },
+                { text: (item.price || 0).toFixed(2), alignment: 'right' },
+                { text: itemTotal.toFixed(2), alignment: 'right', bold: true }
+            ]);
+            rowIndex++;
+        }
+
+        tableBody.push([
+            { text: '', colSpan: 4, border: [false, false, false, false] },
+            { text: '', colSpan: 0 },
+            { text: '', colSpan: 0 },
+            { text: '', colSpan: 0 },
+            { text: 'TOTAL:', bold: true, alignment: 'right', fontSize: 14 },
+            { text: `₹${total.toFixed(2)}`, bold: true, alignment: 'right', fontSize: 14, color: '#0072B0' }
+        ]);
+
+        const docDefinition = {
+            pageSize: 'A4',
+            pageMargins: [40, 60, 40, 60],
+            header: function() {
+                return {
+                    columns: [
+                        {
+                            text: '🛒 Auto Spares Solution',
+                            style: 'header',
+                            alignment: 'center'
+                        }
+                    ],
+                    margin: [40, 20, 40, 0]
+                };
+            },
+            content: [
+                {
+                    text: 'ORDER SUMMARY',
+                    style: 'title',
+                    alignment: 'center',
+                    margin: [0, 0, 0, 10]
+                },
+                {
+                    columns: [
+                        { text: `Order ID: ${orderId}`, width: '50%' },
+                        { text: `Date: ${new Date().toLocaleDateString('en-IN')}`, width: '50%', alignment: 'right' }
+                    ],
+                    margin: [0, 0, 0, 5]
+                },
+                {
+                    text: `Customer: ${customerPhone}`,
+                    alignment: 'center',
+                    fontSize: 10,
+                    color: '#666666',
+                    margin: [0, 0, 0, 20]
+                },
+                {
+                    table: {
+                        headerRows: 1,
+                        widths: ['5%', '20%', '35%', '8%', '15%', '17%'],
+                        body: tableBody
+                    },
+                    layout: {
+                        fillColor: function(rowIndex) {
+                            return rowIndex % 2 === 0 ? '#F5F5F5' : null;
+                        },
+                        hLineWidth: function(i) {
+                            return i === 0 || i === 1 ? 1 : 0.5;
+                        },
+                        vLineWidth: function(i) {
+                            return 0.5;
+                        },
+                        hLineColor: function(i) {
+                            return i === 0 || i === 1 ? '#0072B0' : '#CCCCCC';
+                        },
+                        vLineColor: function(i) {
+                            return '#CCCCCC';
+                        }
+                    }
+                },
+                {
+                    text: 'Thank you for your order!',
+                    style: 'footer',
+                    alignment: 'center',
+                    margin: [0, 30, 0, 0]
+                },
+                {
+                    text: `📞 Call: ${CONFIG.businessPhone} | 🛒 Shop: https://autosparessolution.com`,
+                    alignment: 'center',
+                    fontSize: 10,
+                    color: '#666666',
+                    margin: [0, 5, 0, 0]
+                }
+            ],
+            styles: {
+                header: {
+                    fontSize: 16,
+                    bold: true,
+                    color: '#0072B0'
+                },
+                title: {
+                    fontSize: 22,
+                    bold: true,
+                    color: '#0072B0'
+                },
+                tableHeader: {
+                    bold: true,
+                    fontSize: 11,
+                    color: '#FFFFFF',
+                    fillColor: '#0072B0',
+                    alignment: 'center'
+                },
+                footer: {
+                    fontSize: 14,
+                    bold: true,
+                    color: '#0072B0'
+                }
+            },
+            defaultStyle: {
+                fontSize: 10
+            }
+        };
+
+        const pdfDoc = printer.createPdfKitDocument(docDefinition);
+        return new Promise((resolve, reject) => {
+            const chunks = [];
+            pdfDoc.on('data', chunk => chunks.push(chunk));
+            pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+            pdfDoc.on('error', reject);
+            pdfDoc.end();
+        });
+
+    } catch (error) {
+        console.error('❌ PDF generation error:', error.message);
+        return null;
+    }
+}
+
+// ============================================================
+// 📤 SEND DOCUMENT MESSAGE
+// ============================================================
+
+async function sendDocumentMessage(to, buffer, filename, caption) {
+    try {
+        const normalizedPhone = to.replace(/\D/g, '');
+        
+        const formData = new FormData();
+        const blob = new Blob([buffer], { type: getMimeType(filename) });
+        formData.append('file', blob, filename);
+        formData.append('messaging_product', 'whatsapp');
+        formData.append('type', getMimeType(filename));
+        
+        const uploadUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/media`;
+        const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.accessToken}`,
+            },
+            body: formData
+        });
+        
+        const uploadResult = await uploadResponse.json();
+        
+        if (!uploadResult.id) {
+            console.error('❌ Upload failed:', uploadResult);
+            throw new Error('Failed to upload document');
+        }
+        
+        const url = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: normalizedPhone,
+                type: 'document',
+                document: {
+                    id: uploadResult.id,
+                    filename: filename,
+                    caption: caption || 'Order Summary'
+                }
+            })
+        });
+        
+        const result = await response.json();
+        console.log(`📤 Document sent to ${normalizedPhone}: ${filename}`);
+        return result;
+        
+    } catch (error) {
+        console.error('❌ Document send error:', error.message);
+        try {
+            await sendWhatsAppMessage(to, 
+                `⚠️ *Could not send document directly.*\n\n` +
+                `📊 ${filename}\n` +
+                `💡 Please download from: https://assist-whatsapp-webhook.onrender.com/download/${filename}\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+        } catch (fallbackError) {
+            console.error('❌ Fallback message failed:', fallbackError.message);
+        }
+        return null;
+    }
+}
+
+function getMimeType(filename) {
+    if (filename.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (filename.endsWith('.xls')) return 'application/vnd.ms-excel';
+    if (filename.endsWith('.pdf')) return 'application/pdf';
+    if (filename.endsWith('.csv')) return 'text/csv';
+    return 'application/octet-stream';
+}
 
 // ============================================================
 // 📦 DATABASE READY FLAG
@@ -758,10 +1161,6 @@ async function initAllTables() {
         });
         console.log('✅ delivery_locations table ready');
 
-        // ============================================================
-        // 📋 OUT OF STOCK TRACKING TABLE
-        // ============================================================
-        
         await new Promise((resolve, reject) => {
             db.db.run(`
                 CREATE TABLE IF NOT EXISTS out_of_stock_tracking (
@@ -787,10 +1186,6 @@ async function initAllTables() {
         });
         console.log('✅ out_of_stock_tracking table ready');
 
-        // ============================================================
-        // 🛠️ FIX: ADD MISSING COLUMNS - THIS IS THE CRITICAL FIX
-        // ============================================================
-        
         try {
             await new Promise((resolve, reject) => {
                 db.db.run('ALTER TABLE out_of_stock_tracking ADD COLUMN phone TEXT', (err) => {
@@ -821,10 +1216,6 @@ async function initAllTables() {
             console.log('⚠️ customer_phone column already exists:', error.message);
         }
 
-        // ============================================================
-        // 📋 ALERTS TABLE
-        // ============================================================
-        
         await new Promise((resolve, reject) => {
             db.db.run(`
                 CREATE TABLE IF NOT EXISTS alerts (
@@ -900,7 +1291,7 @@ app.get('/health', async (req, res) => {
         const stats = await db.getStats();
         res.json({ 
             status: isDbReady ? 'ready' : 'loading',
-            version: '3.0.0',
+            version: '3.1.0',
             timestamp: new Date().toISOString(),
             products: stats || { total_products: 0 },
             memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
@@ -925,8 +1316,8 @@ app.get('/health', async (req, res) => {
 
 app.get('/', (req, res) => {
     res.json({
-        name: 'ASSIST WhatsApp Webhook v3.0',
-        version: '3.0.0',
+        name: 'ASSIST WhatsApp Webhook v3.1',
+        version: '3.1.0',
         status: isDbReady ? 'ready' : 'loading',
         memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB used',
         endpoints: {
@@ -1078,7 +1469,7 @@ app.get('/webhook', (req, res) => {
 });
 
 // ============================================================
-// 📩 WEBHOOK RECEIVE
+// 📩 WEBHOOK RECEIVE - WITH AUTO-WELCOME
 // ============================================================
 
 app.post('/webhook', async (req, res) => {
@@ -1109,23 +1500,105 @@ app.post('/webhook', async (req, res) => {
         // ✅ Check if database is ready
         if (!isDbReady) {
             const progress = Math.round((importProgress / TOTAL_PRODUCTS) * 100);
+            const estimatedTime = Math.ceil((100 - progress) / 3);
             
             await sendWhatsAppMessage(from, 
                 `⏳ *System is Loading...*\n\n` +
                 `📊 Progress: ${progress}%\n` +
-                `⏱️ Please wait ${Math.ceil((100 - progress) / 3)} seconds\n\n` +
-                `💡 Try again in a moment!\n` +
+                `⏱️ Please wait ${estimatedTime} seconds\n\n` +
+                `💡 We'll notify you when the system is ready!\n` +
                 `📞 Call: ${CONFIG.businessPhone}`
             );
+            
+            // ✅ Store that this customer is waiting for welcome
+            const pendingWelcomeKey = `pending_welcome_${from}`;
+            messageCache.set(pendingWelcomeKey, true);
             
             markMessageProcessed(messageId);
             return res.sendStatus(200);
         }
         
-        // ✅ Send admin notification for customer requests
-        if (from !== ADMIN_PHONE && type === 'text') {
+        // ✅ System is ready - check if customer is waiting for welcome
+        const pendingWelcomeKey = `pending_welcome_${from}`;
+        const welcomeKey = `welcome_sent_${from}`;
+        
+        if (messageCache.has(pendingWelcomeKey) && !messageCache.has(welcomeKey)) {
+            console.log(`👋 Auto-sending welcome to ${from} (was waiting during loading)`);
+            
+            await sendWhatsAppMessage(from, 
+                `✅ *System is Now Ready!*\n\n` +
+                `👋 *Welcome to Auto Spares Solution!*\n\n` +
+                `🤖 I'm your AI Sales Assistant\n\n` +
+                `🔍 *Search:* Send part number or description\n` +
+                `📸 *Send Photo:* Take photo of your order list\n` +
+                `🎙️ *Send Voice:* Speak your order\n` +
+                `🛒 *Order:* "0801BA0285N 2"\n` +
+                `✅ *Confirm:* "Confirm Order"\n` +
+                `🗑️ *Clear:* "Clear Cart"\n\n` +
+                `📞 *Call:* ${CONFIG.businessPhone}\n` +
+                `🛒 *Shop:* https://autosparessolution.com`
+            );
+            
+            messageCache.set(welcomeKey, true);
+            messageCache.delete(pendingWelcomeKey);
+            
+            // ✅ Process the original message
+            try {
+                await withTimeout(
+                    processMessage(message, from, type),
+                    CONFIG.responseTimeout,
+                    'Message processing timed out'
+                );
+            } catch (error) {
+                console.error(`❌ Processing error: ${error.message}`);
+                await sendWhatsAppMessage(from, 
+                    `⚠️ Sorry, couldn't process your message.\n` +
+                    `Please try again.\n📞 Call: ${CONFIG.businessPhone}`
+                );
+            }
+            
+            markMessageProcessed(messageId);
+            return res.sendStatus(200);
+        }
+        
+        // ✅ First time user (no pending welcome)
+        if (!messageCache.has(welcomeKey) && type === 'text') {
             const msgText = message.text?.body || '';
-            if (msgText && !msgText.toLowerCase().includes('status') && !msgText.toLowerCase().includes('health')) {
+            const isCommand = msgText.toLowerCase().includes('admin') || 
+                             msgText.toLowerCase().includes('confirm') ||
+                             msgText.toLowerCase().includes('clear') ||
+                             msgText.toLowerCase().includes('help') ||
+                             msgText.toLowerCase().includes('hi') ||
+                             msgText.toLowerCase().includes('hello') ||
+                             msgText.toLowerCase().includes('status') ||
+                             msgText.toLowerCase().includes('health');
+            
+            if (!isCommand && !isAdmin(from) && msgText.length > 1) {
+                await sendWhatsAppMessage(from, 
+                    `👋 *Welcome to Auto Spares Solution!*\n\n` +
+                    `🤖 I'm your AI Sales Assistant\n\n` +
+                    `🔍 *Search:* Send part number or description\n` +
+                    `📸 *Send Photo:* Take photo of your order list\n` +
+                    `🎙️ *Send Voice:* Speak your order\n` +
+                    `🛒 *Order:* "0801BA0285N 2"\n` +
+                    `✅ *Confirm:* "Confirm Order"\n` +
+                    `🗑️ *Clear:* "Clear Cart"\n\n` +
+                    `📞 *Call:* ${CONFIG.businessPhone}\n` +
+                    `🛒 *Shop:* https://autosparessolution.com`
+                );
+                messageCache.set(welcomeKey, true);
+            } else {
+                messageCache.set(welcomeKey, true);
+            }
+        }
+        
+        // ✅ Send admin notification for customer requests
+        if (!isAdmin(from) && type === 'text') {
+            const msgText = message.text?.body || '';
+            if (msgText && msgText.length > 2 &&
+                !msgText.toLowerCase().includes('status') && 
+                !msgText.toLowerCase().includes('health') &&
+                !msgText.toLowerCase().includes('welcome')) {
                 await alertSystem.sendAdminNotification(from, msgText, 'customer_message');
             }
         }
@@ -1350,7 +1823,6 @@ async function handleVoiceMessage(message, from) {
 
         console.log(`🤖 Transcribing with Gemini...`);
         
-        // ✅ Use rate limiter (from v2)
         const base64Audio = audioBuffer.toString('base64');
         const prompt = `Transcribe this audio message from a customer.
         
@@ -1437,7 +1909,6 @@ async function handleWhatsAppImage(message, from) {
         );
         console.log(`📸 Image downloaded: ${imageBuffer.length} bytes`);
 
-        // ✅ Check cache first (from v2)
         const cacheKey = `image_${imageBuffer.length}_${caption}`;
         let extractedText = null;
         
@@ -1447,7 +1918,6 @@ async function handleWhatsAppImage(message, from) {
         } else {
             console.log(`🤖 Processing image with Gemini Vision...`);
             
-            // ✅ Enhance image quality (from v2)
             let buffer = imageBuffer;
             try {
                 const sharp = require('sharp');
@@ -1483,7 +1953,6 @@ Caption: "${caption || 'No caption'}"
 
 Extracted text:`;
 
-            // ✅ Use rate limiter (from v2)
             const data = await geminiRateLimiter.request(prompt, base64Image, 'image/jpeg');
             
             if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -1493,7 +1962,6 @@ Extracted text:`;
                 content = content.replace(/^["']|["']$/g, '').trim();
                 
                 if (content !== 'NO_PARTS_FOUND' && content.length > 3) {
-                    // Extract valid part numbers
                     const lines = content.split('\n');
                     const validParts = [];
                     
@@ -1521,7 +1989,6 @@ Extracted text:`;
                 }
             }
             
-            // Cache the result (from v2)
             if (extractedText) {
                 geminiCache.set(cacheKey, extractedText);
             }
@@ -1553,7 +2020,6 @@ Extracted text:`;
         } else {
             console.log(`⚠️ No text extracted from image`);
             
-            // ✅ Try Tesseract fallback if available (from v2)
             if (Tesseract) {
                 console.log(`🔄 Trying Tesseract OCR fallback...`);
                 try {
@@ -1635,7 +2101,7 @@ async function handleWhatsAppMessage(message, from) {
         // 🛡️ ADMIN COMMANDS
         // ============================================================
         
-        if (from === ADMIN_PHONE) {
+        if (isAdmin(from)) {
             
             // 📋 Admin: Show admin commands
             if (msgLower === 'help admin' || msgLower === 'admin help') {
@@ -1647,6 +2113,10 @@ async function handleWhatsAppMessage(message, from) {
                     `   "Confirm order for 919XXXXXXXXX"\n\n` +
                     `🛒 *View Customer Cart:*\n` +
                     `   "Customer cart 919XXXXXXXXX"\n\n` +
+                    `📦 *Stock Status:*\n` +
+                    `   "Stock status 0801BA0285N"\n\n` +
+                    `📢 *Admin Alerts:*\n` +
+                    `   "Admin alerts"\n\n` +
                     `📞 *Call:* ${CONFIG.businessPhone}`
                 );
                 return;
@@ -1688,7 +2158,6 @@ async function handleWhatsAppMessage(message, from) {
                 console.log(`👑 Admin confirming order for ${customerPhone}`);
                 
                 try {
-                    // Get customer's cart
                     const cart = await db.getCart(customerPhone);
                     if (!cart || !cart.items) {
                         await sendWhatsAppMessage(from, 
@@ -1703,10 +2172,8 @@ async function handleWhatsAppMessage(message, from) {
                     await db.saveOrder(orderId, customerPhone, items, cart.total);
                     await db.clearCart(customerPhone);
                     
-                    // Send confirmation to customer
                     await alertSystem.sendOrderConfirmation(customerPhone, orderId, items, cart.total);
                     
-                    // Send confirmation to admin
                     await sendWhatsAppMessage(from,
                         `✅ *ORDER CONFIRMED ON BEHALF OF CUSTOMER!*\n\n` +
                         `📦 Order ID: ${orderId}\n` +
@@ -1716,7 +2183,6 @@ async function handleWhatsAppMessage(message, from) {
                         `✅ Customer has been notified.`
                     );
                     
-                    // Send new order alert to admin
                     await alertSystem.sendNewOrderAlert(orderId, customerPhone, items, cart.total);
                     return;
                     
@@ -1760,6 +2226,44 @@ async function handleWhatsAppMessage(message, from) {
                     return;
                 }
             }
+            
+            // 📦 Stock Status
+            const stockMatch = msgLower.match(/stock status ([a-z0-9]{5,20})/);
+            if (stockMatch) {
+                const partNumber = stockMatch[1].toUpperCase();
+                const product = await db.getProductExact(partNumber);
+                if (product) {
+                    let reply = `📦 *Stock Status: ${product.part}*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                    reply += `📝 ${product.description || 'N/A'}\n`;
+                    if (product.brand) reply += `🏷️ Brand: ${product.brand}\n`;
+                    if (product.make) reply += `🚗 Make: ${product.make}\n`;
+                    if (product.model) reply += `🎯 Model: ${product.model}\n`;
+                    reply += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}`;
+                    reply += `\n💰 Price: ₹${(product.billing_price * 1.18).toFixed(2)} (incl. GST)`;
+                    await sendWhatsAppMessage(from, reply);
+                } else {
+                    await sendWhatsAppMessage(from, `❌ Part ${partNumber} not found.`);
+                }
+                return;
+            }
+            
+            // 📢 Admin Alerts
+            if (msgLower === 'admin alerts' || msgLower === 'alerts') {
+                const alerts = await alertSystem.getUserAlerts(normalizePhone(ADMIN_PHONE), 10);
+                if (alerts.length === 0) {
+                    await sendWhatsAppMessage(from, '📢 *No recent alerts.*');
+                    return;
+                }
+                let reply = `📢 *Recent Alerts*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                alerts.forEach((alert, index) => {
+                    reply += `${index + 1}. ${alert.type}\n`;
+                    reply += `   ${alert.message.substring(0, 60)}...\n`;
+                    reply += `   🕐 ${new Date(alert.created_at).toLocaleString()}\n\n`;
+                });
+                reply += `📞 Call: ${CONFIG.businessPhone}`;
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
         }
 
         // ============================================================
@@ -1772,10 +2276,44 @@ async function handleWhatsAppMessage(message, from) {
                 `🔍 *Search:* Send part number or description\n` +
                 `📸 *Send Photo:* Take photo of your order list\n` +
                 `🎙️ *Send Voice:* Speak your order\n` +
-                `🛒 *Order:* "ORDER 0801BA0285N 2"\n` +
+                `🛒 *Order:* "0801BA0285N 2"\n` +
+                `✅ *Confirm:* "Confirm Order"\n` +
+                `🗑️ *Clear:* "Clear Cart"\n\n` +
                 `📞 *Call:* ${CONFIG.businessPhone}\n` +
                 `🛒 *Shop:* https://autosparessolution.com`
             );
+            return;
+        }
+
+        // 📊 Download Excel
+        if (msgLower === 'download excel' || msgLower === 'excel') {
+            const lastOrder = await db.getLastOrder(from);
+            if (lastOrder) {
+                const items = JSON.parse(lastOrder.items);
+                const excelBuffer = await generateExcelSummary(lastOrder.order_id, items, lastOrder.total, from);
+                if (excelBuffer) {
+                    await sendDocumentMessage(from, excelBuffer, `${lastOrder.order_id}_Summary.xlsx`, 
+                        `📊 Order Summary - ${lastOrder.order_id}`);
+                }
+            } else {
+                await sendWhatsAppMessage(from, '⚠️ No recent order found.');
+            }
+            return;
+        }
+
+        // 📄 Download PDF
+        if (msgLower === 'download pdf' || msgLower === 'pdf') {
+            const lastOrder = await db.getLastOrder(from);
+            if (lastOrder) {
+                const items = JSON.parse(lastOrder.items);
+                const pdfBuffer = await generatePDFSummary(lastOrder.order_id, items, lastOrder.total, from);
+                if (pdfBuffer) {
+                    await sendDocumentMessage(from, pdfBuffer, `${lastOrder.order_id}_Summary.pdf`,
+                        `📄 Order Summary - ${lastOrder.order_id}`);
+                }
+            } else {
+                await sendWhatsAppMessage(from, '⚠️ No recent order found.');
+            }
             return;
         }
 
@@ -2014,6 +2552,7 @@ async function handleWhatsAppMessage(message, from) {
                 await alertSystem.sendOrderConfirmation(from, orderId, items, cart.total);
                 await alertSystem.sendNewOrderAlert(orderId, from, items, cart.total);
                 
+                // ✅ Also send quick text confirmation
                 let reply = `✅ *ORDER CONFIRMED!*\n\n`;
                 reply += `📦 Order ID: ${orderId}\n`;
                 reply += `📝 Items:\n`;
@@ -2023,6 +2562,7 @@ async function handleWhatsAppMessage(message, from) {
                 reply += `💰 Total: ₹${cart.total.toFixed(2)}\n`;
                 reply += `📞 *Call:* ${CONFIG.businessPhone}\n`;
                 reply += `🛒 *Shop:* https://autosparessolution.com`;
+                reply += `\n\n📊 *Download Options:* Reply "Download Excel" or "Download PDF"`;
                 
                 await sendWhatsAppMessage(from, reply);
                 return;
@@ -2232,19 +2772,16 @@ async function handleDocumentMessage(message, from) {
             console.log(`📊 Processing Excel file: ${filename}`);
             
             try {
-                // Read Excel file as array of arrays
                 const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                 
                 console.log(`📊 Found ${jsonData.length} rows in Excel`);
                 
-                // Find the header row
                 let partCol = -1;
                 let qtyCol = -1;
                 let headerRow = -1;
                 
-                // Search for header row (first 20 rows)
                 for (let i = 0; i < Math.min(jsonData.length, 20); i++) {
                     const row = jsonData[i];
                     if (!row || row.length === 0) continue;
@@ -2276,7 +2813,6 @@ async function handleDocumentMessage(message, from) {
                 
                 console.log(`📊 Part column: ${partCol}, Qty column: ${qtyCol}, Header row: ${headerRow}`);
                 
-                // If no header found, scan for part numbers
                 if (partCol === -1) {
                     for (let i = 0; i < jsonData.length; i++) {
                         const row = jsonData[i];
@@ -2301,15 +2837,12 @@ async function handleDocumentMessage(message, from) {
                 
                 console.log(`📊 Final - Part col: ${partCol}, Qty col: ${qtyCol}`);
                 
-                // Process each row
                 for (let i = 0; i < jsonData.length; i++) {
                     const row = jsonData[i];
                     if (!row || row.length === 0) continue;
                     
-                    // Skip header row
                     if (i === headerRow) continue;
                     
-                    // Extract part number
                     let partNumber = null;
                     if (partCol !== -1 && partCol < row.length) {
                         const cell = String(row[partCol] || '').trim();
@@ -2321,7 +2854,6 @@ async function handleDocumentMessage(message, from) {
                     
                     if (!partNumber) continue;
                     
-                    // Extract quantity
                     let qty = 1;
                     
                     if (qtyCol !== -1 && qtyCol < row.length) {
@@ -2338,15 +2870,12 @@ async function handleDocumentMessage(message, from) {
                         }
                     }
                     
-                    // ✅ CRITICAL FIX: If quantity is larger than 100, it's probably using row index
-                    // Check if quantity equals row number
+                    // ✅ CRITICAL FIX: If quantity is larger than 100, check if it's row index
                     if (qty > 100) {
-                        const rowNum = i + 1; // Excel row number (1-based)
-                        // If quantity equals row number or close to it, find real quantity
+                        const rowNum = i + 1;
                         if (Math.abs(qty - rowNum) <= 2) {
                             console.log(`⚠️ Quantity ${qty} looks like row index ${rowNum}. Looking for real quantity...`);
                             
-                            // Find any number in the row that's reasonable (1-100)
                             let foundQty = 1;
                             for (let j = 0; j < row.length; j++) {
                                 if (j === partCol) continue;
@@ -2371,11 +2900,9 @@ async function handleDocumentMessage(message, from) {
                         }
                     }
                     
-                    // ✅ Safety check: quantity should be 1-1000
                     if (qty > 1000) qty = 1;
                     if (qty < 1) qty = 1;
                     
-                    // Avoid duplicates
                     if (!extractedItems.find(item => item.part === partNumber)) {
                         extractedItems.push({ part: partNumber, qty: qty });
                         console.log(`📊 Extracted: ${partNumber} x${qty}`);
@@ -2462,10 +2989,6 @@ Document: ${filename}`;
             return;
         }
         
-        // ============================================================
-        // 🛒 CREATE ORDER FROM EXTRACTED ITEMS
-        // ============================================================
-        
         console.log(`📦 Processing ${extractedItems.length} extracted items from document`);
         
         let foundItems = [];
@@ -2536,7 +3059,6 @@ Document: ${filename}`;
             return;
         }
         
-        // Save to cart
         const cartItems = foundItems.map(item => ({
             part: item.part,
             description: item.description,
@@ -2549,7 +3071,6 @@ Document: ${filename}`;
         
         await db.saveCart(from, cartItems, total, total);
         
-        // Build order summary
         let reply = `📄 *DOCUMENT ORDER SUMMARY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
         reply += `📁 File: ${filename}\n`;
         reply += `📦 Items: ${foundItems.length} valid products\n\n`;
@@ -2597,6 +3118,7 @@ Document: ${filename}`;
         );
     }
 }
+
 // ============================================================
 // 🤖 GEMINI WEB SEARCH
 // ============================================================
@@ -2652,7 +3174,7 @@ IMPORTANT RULES:
 }
 
 // ============================================================
-// 🚀 START SERVER
+// 📥 IMPORT CSV IN BACKGROUND - WITH AUTO-WELCOME
 // ============================================================
 
 let csvImportStarted = false;
@@ -2673,8 +3195,48 @@ async function importCSVInBackground() {
             isDbReady = true;
             dbReadyMessage = 'Database ready';
             
-            // Send import complete alert to admin
+            // ============================================================
+            // 📨 SEND WELCOME TO ALL PENDING CUSTOMERS
+            // ============================================================
+            
+            console.log(`📨 Checking for pending customers to send welcome...`);
+            
+            const allKeys = messageCache.keys ? [...messageCache.keys()] : [];
+            const pendingKeys = allKeys.filter(key => key.startsWith('pending_welcome_'));
+            
+            console.log(`📨 Found ${pendingKeys.length} customers waiting for welcome`);
+            
+            for (const key of pendingKeys) {
+                const phone = key.replace('pending_welcome_', '');
+                const welcomeKey = `welcome_sent_${phone}`;
+                
+                if (!messageCache.has(welcomeKey)) {
+                    console.log(`👋 Auto-sending welcome to ${phone} (system just became ready)`);
+                    
+                    try {
+                        await sendWhatsAppMessage(phone, 
+                            `✅ *System is Now Ready!*\n\n` +
+                            `👋 *Welcome to Auto Spares Solution!*\n\n` +
+                            `🤖 I'm your AI Sales Assistant\n\n` +
+                            `🔍 *Search:* Send part number or description\n` +
+                            `📸 *Send Photo:* Take photo of your order list\n` +
+                            `🎙️ *Send Voice:* Speak your order\n` +
+                            `🛒 *Order:* "0801BA0285N 2"\n` +
+                            `✅ *Confirm:* "Confirm Order"\n` +
+                            `🗑️ *Clear:* "Clear Cart"\n\n` +
+                            `📞 *Call:* ${CONFIG.businessPhone}\n` +
+                            `🛒 *Shop:* https://autosparessolution.com`
+                        );
+                        messageCache.set(welcomeKey, true);
+                        messageCache.delete(key);
+                    } catch (sendError) {
+                        console.error(`❌ Failed to send welcome to ${phone}:`, sendError.message);
+                    }
+                }
+            }
+            
             await alertSystem.sendImportCompleteAlert(result.imported);
+            
         } else {
             console.log('⚠️ prices.csv not found, skipping import');
             csvImportCompleted = true;
@@ -2695,9 +3257,13 @@ async function importCSVInBackground() {
     }
 }
 
+// ============================================================
+// 🚀 START SERVER
+// ============================================================
+
 async function startServer() {
     console.log('====================================');
-    console.log('🚀 ASSIST WhatsApp Webhook v3.0 - FULLY INTEGRATED');
+    console.log('🚀 ASSIST WhatsApp Webhook v3.1 - FULLY INTEGRATED');
     console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
     console.log(`🗄️ Database: ${process.env.DB_PATH || './db/products.db'}`);
     console.log('====================================');
@@ -2719,7 +3285,6 @@ async function startServer() {
             isDbReady = true;
             dbReadyMessage = 'Database ready';
             
-            // Send ready alert to admin
             await alertSystem.sendImportCompleteAlert(stats.total_products);
         }
 
@@ -2740,6 +3305,7 @@ async function startServer() {
             console.log(`🤖 Gemini Rate Limiter: ✅ Active (2s delay, 3 retries)`);
             console.log(`📢 Alert System: ✅ Active`);
             console.log(`👑 Admin Features: ✅ Active (${ADMIN_PHONE})`);
+            console.log(`📊 Excel/PDF Export: ✅ Active`);
             console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
             console.log(`⏱️ Response Timeout: ${CONFIG.responseTimeout}ms`);
             console.log(`⏱️ Gemini Timeout: ${CONFIG.geminiTimeout}ms`);
