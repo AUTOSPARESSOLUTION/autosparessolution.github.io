@@ -371,7 +371,8 @@ class AlertSystem {
             lowStock: '⚠️',
             newOrder: '🆕',
             importComplete: '✅',
-            systemError: '❌'
+            systemError: '❌',
+            adminNotification: '👑'
         };
 
         const icon = icons[type] || '📢';
@@ -406,7 +407,8 @@ class AlertSystem {
             lowStock: 'Low Stock Alert ⚠️',
             newOrder: 'New Order! 🆕',
             importComplete: 'Import Complete ✅',
-            systemError: 'System Error ❌'
+            systemError: 'System Error ❌',
+            adminNotification: 'Admin Notification 👑'
         };
         return titles[type] || 'Alert';
     }
@@ -458,8 +460,9 @@ class AlertSystem {
         await this.sendUserAlert(phone, type, message);
     }
 
+    // ✅ FIXED: sendOrderConfirmation with outOfStock and notFound items
     async sendOrderConfirmation(phone, orderId, items, total, outOfStockItems = [], notFoundItems = []) {
-        // Send the main confirmation message
+        // Build the confirmation message
         let message = `✅ *ORDER CONFIRMED!*\n\n`;
         message += `📦 Order ID: ${orderId}\n`;
         message += `📝 Items:\n`;
@@ -467,6 +470,17 @@ class AlertSystem {
             message += `   ${index + 1}. ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
         });
         message += `\n💰 *Total: ₹${total.toFixed(2)}*\n\n`;
+        
+        // Add warnings if any
+        if (outOfStockItems && outOfStockItems.length > 0) {
+            message += `⚠️ *Out of Stock:* ${outOfStockItems.join(', ')}\n`;
+            message += `🔔 We'll notify you when available.\n\n`;
+        }
+        
+        if (notFoundItems && notFoundItems.length > 0) {
+            message += `❌ *Not Found:* ${notFoundItems.join(', ')}\n\n`;
+        }
+        
         message += `📊 *Download Options:*\n`;
         message += `   Reply "Download Excel" or "Download PDF"\n\n`;
         message += `📞 Call: ${CONFIG.businessPhone}`;
@@ -543,6 +557,123 @@ class AlertSystem {
 }
 
 const alertSystem = new AlertSystem();
+
+// ============================================================
+// 📤 SEND IMAGE MESSAGE - FIXED: Added missing function
+// ============================================================
+
+async function sendImageMessage(to, imageUrl, caption) {
+    try {
+        const normalizedPhone = to.replace(/\D/g, '');
+        
+        // Download image
+        const response = await fetch(imageUrl);
+        if (!response.ok) throw new Error(`Failed to download image: ${response.status}`);
+        const buffer = await response.arrayBuffer();
+        
+        // Upload image
+        const formData = new FormData();
+        const blob = new Blob([buffer], { type: 'image/png' });
+        formData.append('file', blob, 'logo.png');
+        formData.append('messaging_product', 'whatsapp');
+        formData.append('type', 'image/png');
+        
+        const uploadUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/media`;
+        const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.accessToken}`,
+            },
+            body: formData
+        });
+        
+        const uploadResult = await uploadResponse.json();
+        if (!uploadResult.id) {
+            throw new Error('Failed to upload image');
+        }
+        
+        // Send image
+        const sendUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
+        const sendResponse = await fetch(sendUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: normalizedPhone,
+                type: 'image',
+                image: {
+                    id: uploadResult.id,
+                    caption: caption || ''
+                }
+            })
+        });
+        
+        if (!sendResponse.ok) {
+            throw new Error(`Failed to send image: ${sendResponse.status}`);
+        }
+        
+        console.log(`📸 Image sent to ${normalizedPhone}: ${caption}`);
+        return await sendResponse.json();
+        
+    } catch (error) {
+        console.error('❌ Image send error:', error.message);
+        return null;
+    }
+}
+
+// ============================================================
+// 👋 SEND WELCOME WITH ALL BRAND LOGOS - FIXED: Added missing function
+// ============================================================
+
+async function sendWelcomeWithAllBrands(to) {
+    try {
+        // Send company logo with welcome text
+        await sendWhatsAppMessage(to, 
+            `👋 *Welcome to Auto Spares Solution!*\n\n` +
+            `🤖 I'm your AI Sales Assistant\n\n` +
+            `🔍 *Search:* Send part number or description\n` +
+            `📸 *Send Photo:* Take photo of your order list\n` +
+            `🎙️ *Send Voice:* Speak your order\n` +
+            `🛒 *Order:* "0801BA0285N 2"\n` +
+            `✅ *Confirm:* "Confirm Order"\n` +
+            `🗑️ *Clear:* "Clear Cart"\n\n` +
+            `📞 *Call:* ${CONFIG.businessPhone}\n` +
+            `🛒 *Shop:* https://autosparessolution.com`
+        );
+        
+        // Send brand logos (limited to 3 to avoid overwhelming)
+        const brands = [
+            { name: 'RANE', logo: 'https://autosparessolution.github.io/images/RANE.png' },
+            { name: 'TVS', logo: 'https://autosparessolution.github.io/images/TVS.jpg' },
+            { name: 'WABCO', logo: 'https://autosparessolution.github.io/images/brand-wabco.png' }
+        ];
+        
+        for (const brand of brands) {
+            try {
+                await sendImageMessage(to, brand.logo, `🏷️ ${brand.name}`);
+            } catch (error) {
+                console.error(`❌ Failed to send logo for ${brand.name}:`, error.message);
+            }
+        }
+        
+        // Send how-to-order instructions
+        await sendWhatsAppMessage(to,
+            `📝 *How to Order:*\n\n` +
+            `1️⃣ Send *Part Number* (e.g., "0801BA0285N")\n` +
+            `2️⃣ Add *Quantity* (e.g., "0801BA0285N 2")\n` +
+            `3️⃣ Send multiple parts in separate lines\n` +
+            `4️⃣ Reply "Confirm Order" to complete\n` +
+            `5️⃣ Get Excel & PDF summary\n\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
+        
+    } catch (error) {
+        console.error(`❌ Failed to send welcome to ${to}:`, error.message);
+    }
+}
 
 // ============================================================
 // 📊 EXCEL & PDF GENERATORS
@@ -735,6 +866,7 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
     }
 }
 
+// ✅ FIXED: PDF generator with built-in fonts (no CDN)
 async function generatePDFSummary(orderId, items, total, customerPhone) {
     try {
         // Check if PdfPrinter is available
@@ -932,6 +1064,7 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
         return null;
     }
 }
+
 // ============================================================
 // 📤 SEND DOCUMENT MESSAGE
 // ============================================================
@@ -1639,19 +1772,8 @@ app.post('/webhook', async (req, res) => {
         if (messageCache.has(pendingWelcomeKey) && !messageCache.has(welcomeKey)) {
             console.log(`👋 Auto-sending welcome to ${from} (was waiting during loading)`);
             
-            await sendWhatsAppMessage(from, 
-                `✅ *System is Now Ready!*\n\n` +
-                `👋 *Welcome to Auto Spares Solution!*\n\n` +
-                `🤖 I'm your AI Sales Assistant\n\n` +
-                `🔍 *Search:* Send part number or description\n` +
-                `📸 *Send Photo:* Take photo of your order list\n` +
-                `🎙️ *Send Voice:* Speak your order\n` +
-                `🛒 *Order:* "0801BA0285N 2"\n` +
-                `✅ *Confirm:* "Confirm Order"\n` +
-                `🗑️ *Clear:* "Clear Cart"\n\n` +
-                `📞 *Call:* ${CONFIG.businessPhone}\n` +
-                `🛒 *Shop:* https://autosparessolution.com`
-            );
+            // ✅ FIXED: Use sendWelcomeWithAllBrands function
+            await sendWelcomeWithAllBrands(from);
             
             messageCache.set(welcomeKey, true);
             messageCache.delete(pendingWelcomeKey);
@@ -1688,18 +1810,8 @@ app.post('/webhook', async (req, res) => {
                              msgText.toLowerCase().includes('health');
             
             if (!isCommand && !isAdmin(from) && msgText.length > 1) {
-                await sendWhatsAppMessage(from, 
-                    `👋 *Welcome to Auto Spares Solution!*\n\n` +
-                    `🤖 I'm your AI Sales Assistant\n\n` +
-                    `🔍 *Search:* Send part number or description\n` +
-                    `📸 *Send Photo:* Take photo of your order list\n` +
-                    `🎙️ *Send Voice:* Speak your order\n` +
-                    `🛒 *Order:* "0801BA0285N 2"\n` +
-                    `✅ *Confirm:* "Confirm Order"\n` +
-                    `🗑️ *Clear:* "Clear Cart"\n\n` +
-                    `📞 *Call:* ${CONFIG.businessPhone}\n` +
-                    `🛒 *Shop:* https://autosparessolution.com`
-                );
+                // ✅ FIXED: Use sendWelcomeWithAllBrands function
+                await sendWelcomeWithAllBrands(from);
                 messageCache.set(welcomeKey, true);
             } else {
                 messageCache.set(welcomeKey, true);
@@ -2385,18 +2497,7 @@ async function handleWhatsAppMessage(message, from) {
         // 1️⃣ WELCOME / HELP
         // ============================================================
         if (['hi', 'hello', 'help', 'start', 'menu'].includes(msgLower)) {
-            await sendWhatsAppMessage(from, 
-                `👋 *Welcome to Auto Spares Solution!*\n\n` +
-                `🤖 I'm your AI Sales Assistant\n\n` +
-                `🔍 *Search:* Send part number or description\n` +
-                `📸 *Send Photo:* Take photo of your order list\n` +
-                `🎙️ *Send Voice:* Speak your order\n` +
-                `🛒 *Order:* "0801BA0285N 2"\n` +
-                `✅ *Confirm:* "Confirm Order"\n` +
-                `🗑️ *Clear:* "Clear Cart"\n\n` +
-                `📞 *Call:* ${CONFIG.businessPhone}\n` +
-                `🛒 *Shop:* https://autosparessolution.com`
-            );
+            await sendWelcomeWithAllBrands(from);
             return;
         }
 
@@ -2433,7 +2534,7 @@ async function handleWhatsAppMessage(message, from) {
                 await alertSystem.sendOrderConfirmation(from, orderId, items, cart.total, outOfStockItems, notFoundItems);
                 await alertSystem.sendNewOrderAlert(orderId, from, items, cart.total);
                 
-                // REMOVED THE DUPLICATE CONFIRMATION MESSAGE HERE
+                // ✅ FIXED: NO duplicate confirmation message here
                 // The alertSystem.sendOrderConfirmation already sends the confirmation
                 
                 return; // Return immediately to prevent any further processing
@@ -3405,19 +3506,8 @@ async function importCSVInBackground() {
                     console.log(`👋 Auto-sending welcome to ${phone} (system just became ready)`);
                     
                     try {
-                        await sendWhatsAppMessage(phone, 
-                            `✅ *System is Now Ready!*\n\n` +
-                            `👋 *Welcome to Auto Spares Solution!*\n\n` +
-                            `🤖 I'm your AI Sales Assistant\n\n` +
-                            `🔍 *Search:* Send part number or description\n` +
-                            `📸 *Send Photo:* Take photo of your order list\n` +
-                            `🎙️ *Send Voice:* Speak your order\n` +
-                            `🛒 *Order:* "0801BA0285N 2"\n` +
-                            `✅ *Confirm:* "Confirm Order"\n` +
-                            `🗑️ *Clear:* "Clear Cart"\n\n` +
-                            `📞 *Call:* ${CONFIG.businessPhone}\n` +
-                            `🛒 *Shop:* https://autosparessolution.com`
-                        );
+                        // ✅ FIXED: Use sendWelcomeWithAllBrands function
+                        await sendWelcomeWithAllBrands(phone);
                         messageCache.set(welcomeKey, true);
                         messageCache.delete(key);
                     } catch (sendError) {
