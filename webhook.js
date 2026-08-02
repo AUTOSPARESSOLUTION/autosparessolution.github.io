@@ -1,5 +1,5 @@
 // ============================================================
-// 🚀 ASSIST WhatsApp Webhook v3.0 - FULLY INTEGRATED
+// 🚀 ASSIST WhatsApp Webhook v3.1 - COMPLETE INTEGRATED
 // ============================================================
 
 const express = require('express');
@@ -33,6 +33,23 @@ const { importCSV } = require('./modules/csv-loader');
 const { parseOrder, extractPartNumber, extractQuantity, parseOrderWithDescription } = require('./modules/order-parser');
 const scheduler = require('./modules/scheduler');
 const invoice = require('./modules/invoice');
+
+// 🎨 DYNAMIC BRAND MANAGER
+let brandManager = null;
+try {
+    brandManager = require('./modules/brand-config');
+    console.log('✅ Brand Manager loaded');
+} catch(e) {
+    console.log('⚠️ Brand Manager not found, using fallback');
+    brandManager = {
+        getActiveBrands: () => [],
+        getBrandsForWhatsApp: () => [],
+        getBrandTextList: () => 'RANE, TVS, WABCO',
+        updateBrands: async () => false,
+        brands: [],
+        getSummary: () => ({ total: 0, active: 0 })
+    };
+}
 
 // Optional modules with fallbacks
 let customerLog = null;
@@ -110,18 +127,20 @@ const CONFIG = {
     defaultPickup: process.env.DEFAULT_PICKUP || 'default',
     geminiTimeout: 30000,
     responseTimeout: 60000,
-    debug: process.env.DEBUG === 'true'
+    debug: process.env.DEBUG === 'true',
+    brandUpdateInterval: parseInt(process.env.BRAND_UPDATE_INTERVAL) || 300000 // 5 minutes
 };
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE || "9830300193";
 
 console.log('====================================');
-console.log('🚀 ASSIST WhatsApp Webhook v3.0 - FULLY INTEGRATED');
+console.log('🚀 ASSIST WhatsApp Webhook v3.1 - COMPLETE INTEGRATED');
 console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
 console.log(`🔐 Admin Phone: ${ADMIN_PHONE}`);
 console.log(`🆔 Phone Number ID: ${CONFIG.phoneNumberId}`);
 console.log(`🔑 Token: ${CONFIG.accessToken ? '✅ Set' : '❌ Not set'}`);
 console.log(`🧠 Gemini: ${CONFIG.geminiKey ? '✅ Set' : '❌ Not set'}`);
+console.log(`🎨 Brand Manager: ${brandManager ? '✅ Active' : '❌ Fallback'}`);
 console.log(`⏱️ Gemini Timeout: ${CONFIG.geminiTimeout}ms`);
 console.log(`⏱️ Response Timeout: ${CONFIG.responseTimeout}ms`);
 console.log('====================================');
@@ -372,7 +391,8 @@ class AlertSystem {
             newOrder: '🆕',
             importComplete: '✅',
             systemError: '❌',
-            adminNotification: '👑'
+            adminNotification: '👑',
+            brandUpdate: '🎨'
         };
 
         const icon = icons[type] || '📢';
@@ -408,7 +428,8 @@ class AlertSystem {
             newOrder: 'New Order! 🆕',
             importComplete: 'Import Complete ✅',
             systemError: 'System Error ❌',
-            adminNotification: 'Admin Notification 👑'
+            adminNotification: 'Admin Notification 👑',
+            brandUpdate: 'Brands Updated 🎨'
         };
         return titles[type] || 'Alert';
     }
@@ -460,9 +481,7 @@ class AlertSystem {
         await this.sendUserAlert(phone, type, message);
     }
 
-    // ✅ FIXED: sendOrderConfirmation with outOfStock and notFound items
     async sendOrderConfirmation(phone, orderId, items, total, outOfStockItems = [], notFoundItems = []) {
-        // Build the confirmation message
         let message = `✅ *ORDER CONFIRMED!*\n\n`;
         message += `📦 Order ID: ${orderId}\n`;
         message += `📝 Items:\n`;
@@ -471,7 +490,6 @@ class AlertSystem {
         });
         message += `\n💰 *Total: ₹${total.toFixed(2)}*\n\n`;
         
-        // Add warnings if any
         if (outOfStockItems && outOfStockItems.length > 0) {
             message += `⚠️ *Out of Stock:* ${outOfStockItems.join(', ')}\n`;
             message += `🔔 We'll notify you when available.\n\n`;
@@ -485,10 +503,8 @@ class AlertSystem {
         message += `   Reply "Download Excel" or "Download PDF"\n\n`;
         message += `📞 Call: ${CONFIG.businessPhone}`;
         
-        // Send the confirmation message
         await this.sendUserAlert(phone, 'orderConfirmation', message, { orderId, items, total });
         
-        // Generate and send Excel with status
         try {
             const excelBuffer = await generateExcelSummary(orderId, items, total, phone, notFoundItems, outOfStockItems);
             if (excelBuffer) {
@@ -499,7 +515,6 @@ class AlertSystem {
             console.error('❌ Excel generation error:', excelError.message);
         }
         
-        // Generate and send PDF
         try {
             const pdfBuffer = await generatePDFSummary(orderId, items, total, phone);
             if (pdfBuffer) {
@@ -559,19 +574,17 @@ class AlertSystem {
 const alertSystem = new AlertSystem();
 
 // ============================================================
-// 📤 SEND IMAGE MESSAGE - FIXED: Added missing function
+// 📤 SEND IMAGE MESSAGE
 // ============================================================
 
 async function sendImageMessage(to, imageUrl, caption) {
     try {
         const normalizedPhone = to.replace(/\D/g, '');
         
-        // Download image
         const response = await fetch(imageUrl);
         if (!response.ok) throw new Error(`Failed to download image: ${response.status}`);
         const buffer = await response.arrayBuffer();
         
-        // Upload image
         const formData = new FormData();
         const blob = new Blob([buffer], { type: 'image/png' });
         formData.append('file', blob, 'logo.png');
@@ -592,7 +605,6 @@ async function sendImageMessage(to, imageUrl, caption) {
             throw new Error('Failed to upload image');
         }
         
-        // Send image
         const sendUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
         const sendResponse = await fetch(sendUrl, {
             method: 'POST',
@@ -625,15 +637,29 @@ async function sendImageMessage(to, imageUrl, caption) {
 }
 
 // ============================================================
-// 👋 SEND WELCOME WITH ALL BRAND LOGOS - FIXED: Added missing function
+// 👋 SEND WELCOME WITH DYNAMIC BRANDS
 // ============================================================
 
 async function sendWelcomeWithAllBrands(to) {
     try {
-        // Send company logo with welcome text
+        const welcomeKey = `welcome_sent_${to}`;
+        const isReturning = messageCache.has(welcomeKey);
+        
+        // Get dynamic brands
+        const maxBrands = isReturning ? 4 : 8;
+        const brands = brandManager.getBrandsForWhatsApp ? 
+            brandManager.getBrandsForWhatsApp(maxBrands) : 
+            [];
+        
+        const brandText = brandManager.getBrandTextList ? 
+            brandManager.getBrandTextList() : 
+            'RANE, TVS, WABCO, RBL, RML, GIRLING, LMM, M&M, MTBL, STL, VF';
+        
+        // Send welcome message with brand list
         await sendWhatsAppMessage(to, 
             `👋 *Welcome to Auto Spares Solution!*\n\n` +
             `🤖 I'm your AI Sales Assistant\n\n` +
+            `🏷️ *Premium Brands:* ${brandText}\n\n` +
             `🔍 *Search:* Send part number or description\n` +
             `📸 *Send Photo:* Take photo of your order list\n` +
             `🎙️ *Send Voice:* Speak your order\n` +
@@ -644,18 +670,21 @@ async function sendWelcomeWithAllBrands(to) {
             `🛒 *Shop:* https://autosparessolution.com`
         );
         
-        // Send brand logos (limited to 3 to avoid overwhelming)
-        const brands = [
-            { name: 'RANE', logo: 'https://autosparessolution.github.io/images/RANE.png' },
-            { name: 'TVS', logo: 'https://autosparessolution.github.io/images/TVS.jpg' },
-            { name: 'WABCO', logo: 'https://autosparessolution.github.io/images/brand-wabco.png' }
-        ];
-        
-        for (const brand of brands) {
-            try {
-                await sendImageMessage(to, brand.logo, `🏷️ ${brand.name}`);
-            } catch (error) {
-                console.error(`❌ Failed to send logo for ${brand.name}:`, error.message);
+        // Send brand logos with delays
+        if (brands.length > 0) {
+            // Send first brand
+            await sendImageMessage(to, brands[0].logo, `🏷️ ${brands[0].name}`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Send remaining brands (max 5 more)
+            const remaining = brands.slice(1, 6);
+            for (const brand of remaining) {
+                try {
+                    await sendImageMessage(to, brand.logo, `🏷️ ${brand.name}`);
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                } catch (error) {
+                    console.error(`❌ Failed to send logo for ${brand.name}:`, error.message);
+                }
             }
         }
         
@@ -681,7 +710,6 @@ async function sendWelcomeWithAllBrands(to) {
 
 async function generateExcelSummary(orderId, items, total, customerPhone, notFoundItems = [], outOfStockItems = []) {
     try {
-        // Check if ExcelJS is available
         if (!ExcelJS) {
             console.error('❌ ExcelJS not available');
             return null;
@@ -693,7 +721,6 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
         
         const sheet = workbook.addWorksheet('Order Summary');
         
-        // Header
         sheet.mergeCells('A1:G1');
         const titleCell = sheet.getCell('A1');
         titleCell.value = '🛒 AUTO SPARES SOLUTION';
@@ -715,7 +742,6 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
         
         sheet.addRow([]);
         
-        // Headers with Status column
         const headers = ['#', 'Part Number', 'Description', 'Qty', 'Price (₹)', 'Total (₹)', 'Status'];
         const headerRow = sheet.addRow(headers);
         headerRow.height = 30;
@@ -731,7 +757,6 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
             };
         });
         
-        // Set column widths
         sheet.getColumn(1).width = 6;
         sheet.getColumn(2).width = 20;
         sheet.getColumn(3).width = 35;
@@ -740,31 +765,26 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
         sheet.getColumn(6).width = 18;
         sheet.getColumn(7).width = 22;
         
-        // Data rows
         let rowIndex = 0;
         for (const item of items) {
             const itemTotal = (item.price || 0) * (item.qty || 0);
             
-            // Determine status
             let status = '✅ In Stock';
-            let statusColor = 'FF00B050'; // Green
+            let statusColor = 'FF00B050';
             
-            // Check if item is out of stock
             if (outOfStockItems && outOfStockItems.includes(item.part)) {
                 status = '❌ Out of Stock';
-                statusColor = 'FFFF0000'; // Red
+                statusColor = 'FFFF0000';
             }
             
-            // Check if item was not found
             if (notFoundItems && notFoundItems.includes(item.part)) {
                 status = '⚠️ Not Found';
-                statusColor = 'FFFFA500'; // Orange
+                statusColor = 'FFFFA500';
             }
             
-            // Check if item was a partial match
             if (item.requestedPart && item.requestedPart !== item.part) {
                 status = '🔄 Matched: ' + item.requestedPart;
-                statusColor = 'FF0072B0'; // Blue
+                statusColor = 'FF0072B0';
             }
             
             const row = sheet.addRow([
@@ -786,7 +806,6 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
                     right: { style: 'thin' }
                 };
                 
-                // Color the status column
                 if (colNumber === 7) {
                     cell.font = { 
                         bold: true, 
@@ -799,7 +818,6 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
         
         sheet.addRow([]);
         
-        // Total row
         const totalRow = sheet.addRow(['', '', '', '', 'TOTAL:', total.toFixed(2), '']);
         totalRow.height = 30;
         totalRow.getCell(5).font = { bold: true, size: 14 };
@@ -808,7 +826,6 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
         totalRow.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' };
         sheet.mergeCells(`A${totalRow.number}:D${totalRow.number}`);
         
-        // Add summary section with out of stock and not found items
         let summaryRowCount = 0;
         
         if (outOfStockItems && outOfStockItems.length > 0) {
@@ -861,21 +878,17 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
         
     } catch (error) {
         console.error('❌ Excel generation error:', error.message);
-        console.error('Stack:', error.stack);
         return null;
     }
 }
 
-// ✅ FIXED: PDF generator with built-in fonts (no CDN)
 async function generatePDFSummary(orderId, items, total, customerPhone) {
     try {
-        // Check if PdfPrinter is available
         if (!PdfPrinter) {
             console.error('❌ PdfPrinter not available');
             return null;
         }
 
-        // Use built-in fonts instead of CDN URLs (which may timeout)
         const printer = new PdfPrinter({
             Roboto: {
                 normal: 'Helvetica',
@@ -923,14 +936,12 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
             pageSize: 'A4',
             pageMargins: [40, 60, 40, 60],
             content: [
-                // Company Name
                 {
                     text: 'AUTO SPARES SOLUTION',
                     style: 'companyHeader',
                     alignment: 'center',
                     margin: [0, 0, 0, 5]
                 },
-                // Decorative line
                 {
                     canvas: [
                         {
@@ -989,14 +1000,12 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
                         }
                     }
                 },
-                // Thank you message
                 {
                     text: 'Thank you for your order!',
                     style: 'footer',
                     alignment: 'center',
                     margin: [0, 25, 0, 10]
                 },
-                // Contact line 1 - Phone (NO EMOJI)
                 {
                     text: `Call: ${CONFIG.businessPhone}`,
                     alignment: 'center',
@@ -1004,7 +1013,6 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
                     color: '#333333',
                     margin: [0, 0, 0, 3]
                 },
-                // Contact line 2 - Website (NO EMOJI)
                 {
                     text: `Shop: https://autosparessolution.com`,
                     alignment: 'center',
@@ -1060,7 +1068,6 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
 
     } catch (error) {
         console.error('❌ PDF generation error:', error.message);
-        console.error('Stack:', error.stack);
         return null;
     }
 }
@@ -1530,7 +1537,7 @@ async function createIndexes() {
 }
 
 // ============================================================
-// 🏥 HEALTH CHECK - Enhanced with Gemini status (from v2)
+// 🏥 HEALTH CHECK - Enhanced with Gemini status
 // ============================================================
 
 app.get('/health', async (req, res) => {
@@ -1550,7 +1557,12 @@ app.get('/health', async (req, res) => {
                 queueLength: geminiRateLimiter.queue.length,
                 processing: geminiRateLimiter.processing,
                 cacheSize: geminiCache.size
-            }
+            },
+            brands: brandManager ? {
+                total: brandManager.brands?.length || 0,
+                active: brandManager.getActiveBrands?.().length || 0,
+                lastUpdate: brandManager.lastUpdate || null
+            } : null
         });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
@@ -1578,7 +1590,8 @@ app.get('/', (req, res) => {
             suppliers: '/api/suppliers',
             alerts: '/api/alerts/:phone',
             gemini: '/api/gemini-status',
-            import: '/api/import-status'
+            import: '/api/import-status',
+            brands: '/api/brands'
         }
     });
 });
@@ -1664,7 +1677,7 @@ app.get('/api/alerts/:phone', async (req, res) => {
 });
 
 // ============================================================
-// 🤖 GEMINI STATUS API (from v2)
+// 🤖 GEMINI STATUS API
 // ============================================================
 
 app.get('/api/gemini-status', (req, res) => {
@@ -1686,7 +1699,7 @@ app.get('/api/gemini-status', (req, res) => {
 });
 
 // ============================================================
-// 📊 IMPORT STATUS API (from v2)
+// 📊 IMPORT STATUS API
 // ============================================================
 
 app.get('/api/import-status', (req, res) => {
@@ -1697,6 +1710,100 @@ app.get('/api/import-status', (req, res) => {
         progress: Math.round((importProgress / TOTAL_PRODUCTS) * 100),
         message: dbReadyMessage
     });
+});
+
+// ============================================================
+// 🎨 BRAND API ENDPOINTS
+// ============================================================
+
+/**
+ * Get all brands
+ */
+app.get('/api/brands', async (req, res) => {
+    try {
+        const { active = 'true', limit } = req.query;
+        
+        let brands = brandManager.brands || [];
+        
+        if (active === 'true') {
+            brands = brandManager.getActiveBrands ? brandManager.getActiveBrands() : brands;
+        }
+        
+        if (limit) {
+            brands = brands.slice(0, parseInt(limit));
+        }
+        
+        res.json({
+            success: true,
+            count: brands.length,
+            total: brandManager.brands?.length || 0,
+            brands: brands.map(b => ({
+                id: b.id,
+                name: b.name,
+                logo: b.logo,
+                active: b.active !== false,
+                priority: b.priority || 999
+            })),
+            lastUpdate: brandManager.lastUpdate || null
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Force update brands from remote
+ */
+app.post('/api/brands/update', async (req, res) => {
+    try {
+        const from = req.body.from || req.query.from;
+        if (!isAdmin(from) && !req.query.admin === 'true') {
+            return res.status(403).json({
+                success: false,
+                error: 'Admin access required'
+            });
+        }
+        
+        const result = brandManager.updateBrands ? 
+            await brandManager.updateBrands(true) : false;
+        
+        res.json({
+            success: result,
+            message: result ? 'Brands updated successfully' : 'Update failed',
+            totalBrands: brandManager.brands?.length || 0,
+            activeBrands: brandManager.getActiveBrands ? 
+                brandManager.getActiveBrands().length : 0,
+            lastUpdate: brandManager.lastUpdate || null
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * Get brand summary
+ */
+app.get('/api/brands/summary', async (req, res) => {
+    try {
+        const summary = brandManager.getSummary ? 
+            brandManager.getSummary() : 
+            { total: brandManager.brands?.length || 0, active: 0 };
+        res.json({
+            success: true,
+            summary
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
 });
 
 // ============================================================
@@ -1744,7 +1851,6 @@ app.post('/webhook', async (req, res) => {
         
         console.log(`📩 From: ${from} | Type: ${type} | ID: ${messageId}`);
         
-        // ✅ Check if database is ready
         if (!isDbReady) {
             const progress = Math.round((importProgress / TOTAL_PRODUCTS) * 100);
             const estimatedTime = Math.ceil((100 - progress) / 3);
@@ -1757,7 +1863,6 @@ app.post('/webhook', async (req, res) => {
                 `📞 Call: ${CONFIG.businessPhone}`
             );
             
-            // ✅ Store that this customer is waiting for welcome
             const pendingWelcomeKey = `pending_welcome_${from}`;
             messageCache.set(pendingWelcomeKey, true);
             
@@ -1765,20 +1870,17 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
         
-        // ✅ System is ready - check if customer is waiting for welcome
         const pendingWelcomeKey = `pending_welcome_${from}`;
         const welcomeKey = `welcome_sent_${from}`;
         
         if (messageCache.has(pendingWelcomeKey) && !messageCache.has(welcomeKey)) {
             console.log(`👋 Auto-sending welcome to ${from} (was waiting during loading)`);
             
-            // ✅ FIXED: Use sendWelcomeWithAllBrands function
             await sendWelcomeWithAllBrands(from);
             
             messageCache.set(welcomeKey, true);
             messageCache.delete(pendingWelcomeKey);
             
-            // ✅ Process the original message
             try {
                 await withTimeout(
                     processMessage(message, from, type),
@@ -1797,7 +1899,6 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
         
-        // ✅ First time user (no pending welcome)
         if (!messageCache.has(welcomeKey) && type === 'text') {
             const msgText = message.text?.body || '';
             const isCommand = msgText.toLowerCase().includes('admin') || 
@@ -1810,7 +1911,6 @@ app.post('/webhook', async (req, res) => {
                              msgText.toLowerCase().includes('health');
             
             if (!isCommand && !isAdmin(from) && msgText.length > 1) {
-                // ✅ FIXED: Use sendWelcomeWithAllBrands function
                 await sendWelcomeWithAllBrands(from);
                 messageCache.set(welcomeKey, true);
             } else {
@@ -1818,7 +1918,6 @@ app.post('/webhook', async (req, res) => {
             }
         }
         
-        // ✅ Send admin notification for customer requests
         if (!isAdmin(from) && type === 'text') {
             const msgText = message.text?.body || '';
             if (msgText && msgText.length > 2 &&
@@ -1879,7 +1978,7 @@ async function processMessage(message, from, type) {
 }
 
 // ============================================================
-// 📤 SEND WHATSAPP MESSAGE - WITH RETRY LOGIC (from v2)
+// 📤 SEND WHATSAPP MESSAGE - WITH RETRY LOGIC
 // ============================================================
 
 async function sendWhatsAppMessage(to, message) {
@@ -2012,7 +2111,7 @@ async function optimizedSearch(query, limit = 10) {
 }
 
 // ============================================================
-// 🎙️ VOICE MESSAGE HANDLER - ENHANCED (from v2)
+// 🎙️ VOICE MESSAGE HANDLER
 // ============================================================
 
 async function handleVoiceMessage(message, from) {
@@ -2098,7 +2197,7 @@ IMPORTANT RULES:
 }
 
 // ============================================================
-// 📸 IMAGE HANDLER - ENHANCED (from v2)
+// 📸 IMAGE HANDLER
 // ============================================================
 
 async function handleWhatsAppImage(message, from) {
@@ -2312,7 +2411,7 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📱 HANDLE WHATSAPP TEXT MESSAGE - COMPLETE FIXED VERSION
+// 📱 HANDLE WHATSAPP TEXT MESSAGE - COMPLETE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -2324,7 +2423,7 @@ async function handleWhatsAppMessage(message, from) {
         const msgLower = cleaned.toLowerCase().trim();
 
         // ============================================================
-        // 🛡️ STEP 1: CHECK ALL COMMANDS FIRST (BEFORE PART NUMBER EXTRACTION)
+        // 🛡️ STEP 1: CHECK ALL COMMANDS FIRST
         // ============================================================
         
         // 👑 ADMIN COMMANDS
@@ -2344,6 +2443,11 @@ async function handleWhatsAppMessage(message, from) {
                     `   "Stock status 0801BA0285N"\n\n` +
                     `📢 *Admin Alerts:*\n` +
                     `   "Admin alerts"\n\n` +
+                    `🎨 *Brand Management:*\n` +
+                    `   "Brands" - List all brands\n` +
+                    `   "Update brands" - Force brand update\n` +
+                    `   "Add brand id|name|logo" - Add new brand\n` +
+                    `   "Remove brand id" - Remove brand\n\n` +
                     `📞 *Call:* ${CONFIG.businessPhone}`
                 );
                 return;
@@ -2491,6 +2595,145 @@ async function handleWhatsAppMessage(message, from) {
                 await sendWhatsAppMessage(from, reply);
                 return;
             }
+            
+            // 🎨 Brand Management Commands
+            
+            // 📋 List brands
+            if (msgLower === 'brands' || msgLower === 'list brands') {
+                const active = brandManager.getActiveBrands ? brandManager.getActiveBrands() : [];
+                const all = brandManager.brands || [];
+                
+                let reply = `🎨 *Brands*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                reply += `📊 Total: ${all.length} | Active: ${active.length}\n\n`;
+                
+                active.slice(0, 15).forEach((b, i) => {
+                    reply += `${i + 1}. *${b.name}* (${b.id})\n`;
+                    reply += `   📷 ${b.logo || 'No logo'}\n`;
+                    reply += `   🎯 Priority: ${b.priority || 999}\n\n`;
+                });
+                
+                if (active.length > 15) {
+                    reply += `... and ${active.length - 15} more\n\n`;
+                }
+                
+                reply += `📝 *Commands:*\n`;
+                reply += `   "Update brands" - Force update from remote\n`;
+                reply += `   "Add brand id|name|logo" - Add new brand\n`;
+                reply += `   "Remove brand id" - Remove brand`;
+                
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+            
+            // 🔄 Update brands
+            if (msgLower === 'update brands' || msgLower === 'refresh brands') {
+                await sendWhatsAppMessage(from, '🔄 Updating brands from remote sources...');
+                
+                const result = brandManager.updateBrands ? 
+                    await brandManager.updateBrands(true) : false;
+                
+                if (result) {
+                    const active = brandManager.getActiveBrands ? 
+                        brandManager.getActiveBrands() : [];
+                    await sendWhatsAppMessage(from,
+                        `✅ *Brands Updated!*\n\n` +
+                        `📊 Total: ${brandManager.brands?.length || 0}\n` +
+                        `✅ Active: ${active.length}\n` +
+                        `🕐 Last Update: ${brandManager.lastUpdate?.toLocaleString() || 'N/A'}\n\n` +
+                        `📋 "Brands" to view all`
+                    );
+                } else {
+                    await sendWhatsAppMessage(from, '❌ Failed to update brands. Please try again later.');
+                }
+                return;
+            }
+            
+            // ➕ Add brand
+            const addBrandMatch = msgLower.match(/add brand ([^|]+)\|([^|]+)\|([^|]+)/);
+            if (addBrandMatch) {
+                const id = addBrandMatch[1].trim().toLowerCase();
+                const name = addBrandMatch[2].trim();
+                const logo = addBrandMatch[3].trim();
+                
+                // Check if brand exists
+                const existing = brandManager.getBrandById ? 
+                    brandManager.getBrandById(id) : null;
+                
+                if (existing) {
+                    await sendWhatsAppMessage(from, `❌ Brand "${id}" already exists.`);
+                    return;
+                }
+                
+                // Add brand
+                if (brandManager.brands) {
+                    brandManager.brands.push({
+                        id,
+                        name,
+                        logo,
+                        active: true,
+                        priority: brandManager.brands.length + 1
+                    });
+                    
+                    if (brandManager.saveBrandsToFile) {
+                        brandManager.saveBrandsToFile();
+                    }
+                }
+                
+                await sendWhatsAppMessage(from,
+                    `✅ *Brand Added!*\n\n` +
+                    `🆔 ID: ${id}\n` +
+                    `📛 Name: ${name}\n` +
+                    `📷 Logo: ${logo}\n\n` +
+                    `📋 "Brands" to view all`
+                );
+                return;
+            }
+            
+            // ❌ Remove brand
+            const removeBrandMatch = msgLower.match(/remove brand ([a-z0-9-]+)/);
+            if (removeBrandMatch) {
+                const id = removeBrandMatch[1].trim().toLowerCase();
+                
+                const brand = brandManager.getBrandById ? 
+                    brandManager.getBrandById(id) : null;
+                    
+                if (!brand) {
+                    await sendWhatsAppMessage(from, `❌ Brand "${id}" not found.`);
+                    return;
+                }
+                
+                // Deactivate instead of delete
+                brand.active = false;
+                
+                if (brandManager.saveBrandsToFile) {
+                    brandManager.saveBrandsToFile();
+                }
+                
+                await sendWhatsAppMessage(from,
+                    `✅ *Brand Deactivated!*\n\n` +
+                    `🆔 ID: ${id}\n` +
+                    `📛 Name: ${brand.name}\n\n` +
+                    `💡 Use "Update brands" to reactivate from remote`
+                );
+                return;
+            }
+            
+            // 📊 Brand summary
+            if (msgLower === 'brand summary' || msgLower === 'brand stats') {
+                const summary = brandManager.getSummary ? 
+                    brandManager.getSummary() : 
+                    { total: brandManager.brands?.length || 0, active: 0 };
+                
+                let reply = `📊 *Brand Summary*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                reply += `📦 Total: ${summary.total || 0}\n`;
+                reply += `✅ Active: ${summary.active || 0}\n`;
+                reply += `❌ Inactive: ${(summary.total || 0) - (summary.active || 0)}\n`;
+                reply += `🕐 Last Update: ${summary.lastUpdate?.toLocaleString() || 'N/A'}\n\n`;
+                reply += `📋 "Brands" to view all`;
+                
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
         }
 
         // ============================================================
@@ -2502,7 +2745,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 2️⃣ ✅ CONFIRM ORDER - CRITICAL FIX! MUST BE BEFORE PART NUMBER EXTRACTION
+        // 2️⃣ ✅ CONFIRM ORDER
         // ============================================================
         if (msgLower === 'confirm order' || msgLower === 'confirm') {
             console.log(`🛒 Customer confirming order: ${from}`);
@@ -2511,13 +2754,11 @@ async function handleWhatsAppMessage(message, from) {
             if (cart && cart.items) {
                 const items = JSON.parse(cart.items);
                 
-                // Check if cart has items
                 if (items.length === 0) {
                     await sendWhatsAppMessage(from, '🛒 Your cart is empty. Add items first!');
                     return;
                 }
                 
-                // Track out of stock and not found items
                 const outOfStockItems = items
                     .filter(item => item.stock === 0 || item.stock === undefined)
                     .map(item => item.part);
@@ -2530,14 +2771,10 @@ async function handleWhatsAppMessage(message, from) {
                 await db.saveOrder(orderId, from, items, cart.total);
                 await db.clearCart(from);
                 
-                // Send confirmation via alert system (this sends one confirmation)
                 await alertSystem.sendOrderConfirmation(from, orderId, items, cart.total, outOfStockItems, notFoundItems);
                 await alertSystem.sendNewOrderAlert(orderId, from, items, cart.total);
                 
-                // ✅ FIXED: NO duplicate confirmation message here
-                // The alertSystem.sendOrderConfirmation already sends the confirmation
-                
-                return; // Return immediately to prevent any further processing
+                return;
             }
             await sendWhatsAppMessage(from, '🛒 Your cart is empty. Add items first!');
             return;
@@ -2599,7 +2836,6 @@ async function handleWhatsAppMessage(message, from) {
                         await sendDocumentMessage(from, pdfBuffer, `${lastOrder.order_id}_Summary.pdf`,
                             `📄 Order Summary - ${lastOrder.order_id}`);
                     } else {
-                        // PDF failed, try Excel as fallback
                         console.log(`📄 PDF generation failed, trying Excel fallback...`);
                         const excelBuffer = await generateExcelSummary(lastOrder.order_id, items, lastOrder.total, from);
                         if (excelBuffer) {
@@ -2633,10 +2869,10 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 🔍 STEP 2: PART NUMBER EXTRACTION (ONLY AFTER ALL COMMANDS ARE CHECKED)
+        // 🔍 STEP 2: PART NUMBER EXTRACTION
         // ============================================================
         
-        // 6️⃣ CHECK: Is this MULTI-PRODUCT?
+        // 6️⃣ CHECK: Multi-product
         const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
         const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -2796,7 +3032,6 @@ async function handleWhatsAppMessage(message, from) {
                 const priceWithGST = billingPrice * 1.18;
                 const total = priceWithGST * quantity;
                 
-                // Check if already in cart
                 const cart = await db.getCart(from);
                 let cartItems = [];
                 let cartTotal = 0;
@@ -2806,7 +3041,6 @@ async function handleWhatsAppMessage(message, from) {
                     cartTotal = cart.total || 0;
                 }
                 
-                // Add to cart
                 const newItem = {
                     part: exactProduct.part,
                     description: exactProduct.description,
@@ -3010,7 +3244,7 @@ async function handleLocationMessage(message, from) {
 }
 
 // ============================================================
-// 📄 DOCUMENT MESSAGE HANDLER - COMPLETE FIX
+// 📄 DOCUMENT MESSAGE HANDLER
 // ============================================================
 
 async function handleDocumentMessage(message, from) {
@@ -3051,10 +3285,6 @@ async function handleDocumentMessage(message, from) {
             'Document download timed out'
         );
         console.log(`📥 File downloaded: ${fileBuffer.length} bytes`);
-        
-        // ============================================================
-        // 📊 PROCESS EXCEL FILE - FIXED
-        // ============================================================
         
         let extractedItems = [];
         
@@ -3160,7 +3390,6 @@ async function handleDocumentMessage(message, from) {
                         }
                     }
                     
-                    // ✅ CRITICAL FIX: If quantity is larger than 100, check if it's row index
                     if (qty > 100) {
                         const rowNum = i + 1;
                         if (Math.abs(qty - rowNum) <= 2) {
@@ -3205,10 +3434,6 @@ async function handleDocumentMessage(message, from) {
                 console.error('❌ Excel processing error:', excelError.message);
             }
         }
-        
-        // ============================================================
-        // 🤖 USE GEMINI VISION FOR PDF/IMAGES (fallback)
-        // ============================================================
         
         if (extractedItems.length === 0 && CONFIG.geminiKey) {
             console.log(`🤖 Using Gemini Vision for extraction`);
@@ -3261,10 +3486,6 @@ Document: ${filename}`;
                 console.error('❌ Gemini extraction error:', geminiError.message);
             }
         }
-        
-        // ============================================================
-        // 📊 PROCESS EXTRACTED ITEMS
-        // ============================================================
         
         if (extractedItems.length === 0) {
             await sendWhatsAppMessage(from, 
@@ -3487,10 +3708,6 @@ async function importCSVInBackground() {
             isDbReady = true;
             dbReadyMessage = 'Database ready';
             
-            // ============================================================
-            // 📨 SEND WELCOME TO ALL PENDING CUSTOMERS
-            // ============================================================
-            
             console.log(`📨 Checking for pending customers to send welcome...`);
             
             const allKeys = messageCache.keys ? [...messageCache.keys()] : [];
@@ -3506,7 +3723,6 @@ async function importCSVInBackground() {
                     console.log(`👋 Auto-sending welcome to ${phone} (system just became ready)`);
                     
                     try {
-                        // ✅ FIXED: Use sendWelcomeWithAllBrands function
                         await sendWelcomeWithAllBrands(phone);
                         messageCache.set(welcomeKey, true);
                         messageCache.delete(key);
@@ -3544,7 +3760,7 @@ async function importCSVInBackground() {
 
 async function startServer() {
     console.log('====================================');
-    console.log('🚀 ASSIST WhatsApp Webhook v3.1 - FULLY INTEGRATED');
+    console.log('🚀 ASSIST WhatsApp Webhook v3.1 - COMPLETE INTEGRATED');
     console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
     console.log(`🗄️ Database: ${process.env.DB_PATH || './db/products.db'}`);
     console.log('====================================');
@@ -3569,6 +3785,16 @@ async function startServer() {
             await alertSystem.sendImportCompleteAlert(stats.total_products);
         }
 
+        // Initialize brand manager
+        if (brandManager && brandManager.updateBrands) {
+            try {
+                await brandManager.updateBrands();
+                console.log(`🎨 Brand Manager initialized: ${brandManager.getActiveBrands ? brandManager.getActiveBrands().length : 0} active brands`);
+            } catch (err) {
+                console.error('❌ Brand Manager init error:', err.message);
+            }
+        }
+
         if (dealerIntelligence && dealerIntelligence.init) {
             dealerIntelligence.init();
         }
@@ -3587,6 +3813,7 @@ async function startServer() {
             console.log(`📢 Alert System: ✅ Active`);
             console.log(`👑 Admin Features: ✅ Active (${ADMIN_PHONE})`);
             console.log(`📊 Excel/PDF Export: ✅ Active`);
+            console.log(`🎨 Dynamic Brands: ✅ Active (Auto-update every 5 min)`);
             console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
             console.log(`⏱️ Response Timeout: ${CONFIG.responseTimeout}ms`);
             console.log(`⏱️ Gemini Timeout: ${CONFIG.geminiTimeout}ms`);
