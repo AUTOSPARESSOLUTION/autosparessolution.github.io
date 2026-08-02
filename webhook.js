@@ -2086,7 +2086,7 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📱 HANDLE WHATSAPP TEXT MESSAGE - WITH ADMIN FEATURES
+// 📱 HANDLE WHATSAPP TEXT MESSAGE - COMPLETE FIXED VERSION
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -2098,9 +2098,10 @@ async function handleWhatsAppMessage(message, from) {
         const msgLower = cleaned.toLowerCase().trim();
 
         // ============================================================
-        // 🛡️ ADMIN COMMANDS
+        // 🛡️ STEP 1: CHECK ALL COMMANDS FIRST (BEFORE PART NUMBER EXTRACTION)
         // ============================================================
         
+        // 👑 ADMIN COMMANDS
         if (isAdmin(from)) {
             
             // 📋 Admin: Show admin commands
@@ -2285,7 +2286,59 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
 
-        // 📊 Download Excel
+        // ============================================================
+        // 2️⃣ ✅ CONFIRM ORDER - CRITICAL FIX! MUST BE BEFORE PART NUMBER EXTRACTION
+        // ============================================================
+        if (msgLower === 'confirm order' || msgLower === 'confirm') {
+            console.log(`🛒 Customer confirming order: ${from}`);
+            
+            const cart = await db.getCart(from);
+            if (cart && cart.items) {
+                const items = JSON.parse(cart.items);
+                
+                // Check if cart has items
+                if (items.length === 0) {
+                    await sendWhatsAppMessage(from, '🛒 Your cart is empty. Add items first!');
+                    return;
+                }
+                
+                const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+                await db.saveOrder(orderId, from, items, cart.total);
+                await db.clearCart(from);
+                
+                await alertSystem.sendOrderConfirmation(from, orderId, items, cart.total);
+                await alertSystem.sendNewOrderAlert(orderId, from, items, cart.total);
+                
+                let reply = `✅ *ORDER CONFIRMED!*\n\n`;
+                reply += `📦 Order ID: ${orderId}\n`;
+                reply += `📝 Items:\n`;
+                items.forEach((item, index) => {
+                    reply += `   ${index + 1}. ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
+                });
+                reply += `💰 Total: ₹${cart.total.toFixed(2)}\n`;
+                reply += `📞 *Call:* ${CONFIG.businessPhone}\n`;
+                reply += `🛒 *Shop:* https://autosparessolution.com`;
+                reply += `\n\n📊 *Download Options:* Reply "Download Excel" or "Download PDF"`;
+                
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+            await sendWhatsAppMessage(from, '🛒 Your cart is empty. Add items first!');
+            return;
+        }
+
+        // ============================================================
+        // 3️⃣ 🗑️ CLEAR CART
+        // ============================================================
+        if (msgLower === 'clear cart' || msgLower === 'clear') {
+            await db.clearCart(from);
+            await sendWhatsAppMessage(from, '🗑️ Cart cleared!');
+            return;
+        }
+
+        // ============================================================
+        // 4️⃣ 📊 DOWNLOAD EXCEL
+        // ============================================================
         if (msgLower === 'download excel' || msgLower === 'excel') {
             const lastOrder = await db.getLastOrder(from);
             if (lastOrder) {
@@ -2301,7 +2354,9 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
 
-        // 📄 Download PDF
+        // ============================================================
+        // 5️⃣ 📄 DOWNLOAD PDF
+        // ============================================================
         if (msgLower === 'download pdf' || msgLower === 'pdf') {
             const lastOrder = await db.getLastOrder(from);
             if (lastOrder) {
@@ -2318,8 +2373,10 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 2️⃣ CHECK: Is this MULTI-PRODUCT?
+        // 🔍 STEP 2: PART NUMBER EXTRACTION (ONLY AFTER ALL COMMANDS ARE CHECKED)
         // ============================================================
+        
+        // 6️⃣ CHECK: Is this MULTI-PRODUCT?
         const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
         const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -2439,7 +2496,8 @@ async function handleWhatsAppMessage(message, from) {
                 reply += `📝 ${item.description}\n`;
                 if (item.list_price > 0) reply += `💰 LIST PRICE: ₹${item.list_price.toFixed(2)}\n`;
                 if (item.mrp > 0) reply += `💰 MRP PRICE: ₹${item.mrp.toFixed(2)}\n`;
-                reply += `💳 ₹${item.price.toFixed(2)} × ${item.qty} = ₹${itemTotal.toFixed(2)}\n\n`;
+                reply += `💳 ₹${item.price.toFixed(2)} × ${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
+                reply += `📦 ${item.stock > 0 ? `✅ ${item.stock} pcs available` : '❌ Out of Stock'}\n\n`;
             }
             
             reply += `━━━━━━━━━━━━━━━━━━━━\n`;
@@ -2447,12 +2505,12 @@ async function handleWhatsAppMessage(message, from) {
             reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
             
             if (outOfStock.length > 0) {
-                reply += `⚠️ Out of Stock: ${outOfStock.join(', ')}\n`;
+                reply += `⚠️ *Out of Stock:* ${outOfStock.join(', ')}\n`;
                 reply += `🔔 We'll notify you when available.\n\n`;
             }
             
             if (notFound.length > 0) {
-                reply += `❌ Not found: ${notFound.join(', ')}\n\n`;
+                reply += `❌ *Not found:* ${notFound.join(', ')}\n\n`;
             }
             
             reply += `✅ *Confirm order?* Reply "Confirm Order"\n`;
@@ -2463,9 +2521,69 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
 
-        // ============================================================
-        // 3️⃣ CHECK: Exact part number
-        // ============================================================
+        // 7️⃣ CHECK: Part number with quantity
+        const partWithQty = cleaned.match(/\b([A-Z0-9]{5,20})\s*(\d+)\b/);
+        if (partWithQty) {
+            const partNumber = partWithQty[1];
+            const quantity = parseInt(partWithQty[2]);
+            console.log(`🔍 Part with quantity: ${partNumber} x${quantity}`);
+            
+            const exactProduct = await db.getProductExact(partNumber);
+            if (exactProduct) {
+                const billingPrice = exactProduct.billing_price || exactProduct.list_price || 0;
+                const priceWithGST = billingPrice * 1.18;
+                const total = priceWithGST * quantity;
+                
+                // Check if already in cart
+                const cart = await db.getCart(from);
+                let cartItems = [];
+                let cartTotal = 0;
+                
+                if (cart && cart.items) {
+                    cartItems = JSON.parse(cart.items);
+                    cartTotal = cart.total || 0;
+                }
+                
+                // Add to cart
+                const newItem = {
+                    part: exactProduct.part,
+                    description: exactProduct.description,
+                    qty: quantity,
+                    price: priceWithGST,
+                    list_price: exactProduct.list_price,
+                    mrp: exactProduct.mrp,
+                    billing_price: billingPrice,
+                    stock: exactProduct.stock
+                };
+                
+                cartItems.push(newItem);
+                cartTotal += total;
+                
+                await db.saveCart(from, cartItems, cartTotal, cartTotal);
+                
+                let reply = `🛒 *ADDED TO CART*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                reply += `*${exactProduct.part}* x${quantity}\n`;
+                reply += `📝 ${exactProduct.description}\n`;
+                if (exactProduct.list_price > 0) reply += `💰 LIST PRICE: ₹${exactProduct.list_price.toFixed(2)}\n`;
+                if (exactProduct.mrp > 0) reply += `💰 MRP PRICE: ₹${exactProduct.mrp.toFixed(2)}\n`;
+                reply += `💳 ₹${priceWithGST.toFixed(2)} × ${quantity} = ₹${total.toFixed(2)}\n\n`;
+                reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+                reply += `💰 *Cart Total: ₹${cartTotal.toFixed(2)}* (incl. GST)\n`;
+                reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+                if (exactProduct.stock === 0) {
+                    reply += `⚠️ Out of Stock\n🔔 We'll notify you when available.\n\n`;
+                    await alertSystem.sendOutOfStockAlert(from, exactProduct.part, exactProduct.description);
+                } else if (exactProduct.stock < quantity) {
+                    reply += `⚠️ Only ${exactProduct.stock} available (requested ${quantity})\n\n`;
+                }
+                reply += `✅ *Confirm order?* Reply "Confirm Order"\n`;
+                reply += `📞 Call: ${CONFIG.businessPhone}`;
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+        }
+
+        // 8️⃣ CHECK: Exact part number only
         const exactPartMatch = cleaned.match(/^[A-Z0-9]{5,20}$/);
         if (exactPartMatch) {
             const partNumber = exactPartMatch[0];
@@ -2482,46 +2600,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // ============================================================
-        // 4️⃣ CHECK: Part number with quantity
-        // ============================================================
-        const partWithQty = cleaned.match(/\b([A-Z0-9]{5,20})\s*(\d+)\b/);
-        if (partWithQty) {
-            const partNumber = partWithQty[1];
-            const quantity = parseInt(partWithQty[2]);
-            console.log(`🔍 Part with quantity: ${partNumber} x${quantity}`);
-            
-            const exactProduct = await db.getProductExact(partNumber);
-            if (exactProduct) {
-                const billingPrice = exactProduct.billing_price || exactProduct.list_price || 0;
-                const priceWithGST = billingPrice * 1.18;
-                const total = priceWithGST * quantity;
-                
-                let reply = `🛒 *ORDER SUMMARY*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
-                reply += `*${exactProduct.part}* x${quantity}\n`;
-                reply += `📝 ${exactProduct.description}\n`;
-                if (exactProduct.list_price > 0) reply += `💰 LIST PRICE: ₹${exactProduct.list_price.toFixed(2)}\n`;
-                if (exactProduct.mrp > 0) reply += `💰 MRP PRICE: ₹${exactProduct.mrp.toFixed(2)}\n`;
-                reply += `💳 ₹${priceWithGST.toFixed(2)} × ${quantity} = ₹${total.toFixed(2)}\n\n`;
-                reply += `━━━━━━━━━━━━━━━━━━━━\n`;
-                reply += `💰 *Total: ₹${total.toFixed(2)}* (incl. GST)\n`;
-                reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-                if (exactProduct.stock === 0) {
-                    reply += `⚠️ Out of Stock\n🔔 We'll notify you when available.\n\n`;
-                    await alertSystem.sendOutOfStockAlert(from, exactProduct.part, exactProduct.description);
-                } else if (exactProduct.stock < quantity) {
-                    reply += `⚠️ Only ${exactProduct.stock} available (requested ${quantity})\n\n`;
-                }
-                reply += `✅ *Confirm order?* Reply "Confirm Order"\n`;
-                reply += `📞 Call: ${CONFIG.businessPhone}`;
-                await sendWhatsAppMessage(from, reply);
-                return;
-            }
-        }
-
-        // ============================================================
-        // 5️⃣ CHECK: Part number only
-        // ============================================================
+        // 9️⃣ CHECK: Part number from text
         const partOnly = cleaned.match(/\b([A-Z0-9]{5,20})\b/);
         if (partOnly) {
             const partNumber = partOnly[1];
@@ -2538,51 +2617,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // ============================================================
-        // 6️⃣ CHECK: Confirm Order
-        // ============================================================
-        if (msgLower === 'confirm order' || msgLower === 'confirm') {
-            const cart = await db.getCart(from);
-            if (cart && cart.items) {
-                const items = JSON.parse(cart.items);
-                const orderId = `ORD-${Date.now().toString().slice(-6)}`;
-                await db.saveOrder(orderId, from, items, cart.total);
-                await db.clearCart(from);
-                
-                await alertSystem.sendOrderConfirmation(from, orderId, items, cart.total);
-                await alertSystem.sendNewOrderAlert(orderId, from, items, cart.total);
-                
-                // ✅ Also send quick text confirmation
-                let reply = `✅ *ORDER CONFIRMED!*\n\n`;
-                reply += `📦 Order ID: ${orderId}\n`;
-                reply += `📝 Items:\n`;
-                items.forEach((item, index) => {
-                    reply += `   ${index + 1}. ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
-                });
-                reply += `💰 Total: ₹${cart.total.toFixed(2)}\n`;
-                reply += `📞 *Call:* ${CONFIG.businessPhone}\n`;
-                reply += `🛒 *Shop:* https://autosparessolution.com`;
-                reply += `\n\n📊 *Download Options:* Reply "Download Excel" or "Download PDF"`;
-                
-                await sendWhatsAppMessage(from, reply);
-                return;
-            }
-            await sendWhatsAppMessage(from, '🛒 Your cart is empty. Add items first!');
-            return;
-        }
-
-        // ============================================================
-        // 7️⃣ CHECK: Clear Cart
-        // ============================================================
-        if (msgLower === 'clear cart' || msgLower === 'clear') {
-            await db.clearCart(from);
-            await sendWhatsAppMessage(from, '🗑️ Cart cleared!');
-            return;
-        }
-
-        // ============================================================
-        // 8️⃣ CHECK: Price Check
-        // ============================================================
+        // 🔟 CHECK: Price Check
         if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
             const partNumber = extractPartNumber(cleaned);
             if (partNumber) {
@@ -2613,9 +2648,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // ============================================================
-        // 9️⃣ CHECK: Stock Check
-        // ============================================================
+        // 1️⃣1️⃣ CHECK: Stock Check
         if (msgLower.includes('stock') || msgLower.includes('available')) {
             const partNumber = extractPartNumber(cleaned);
             if (partNumber) {
@@ -2631,9 +2664,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // ============================================================
-        // 🔟 SEARCH PRODUCTS
-        // ============================================================
+        // 1️⃣2️⃣ SEARCH PRODUCTS
         if (cleaned.length >= 2) {
             const commonWords = ['i', 'need', 'want', 'for', 'my', 'the', 'a', 'an', 'me', 'please', 'from', 'to', 'of', 'with', 'have', 'has', 'is', 'are', 'was', 'were', 'and', 'or', 'but'];
             let searchWords = cleaned.toLowerCase().split(' ').filter(w => !commonWords.includes(w) && w.length > 1).join(' ');
@@ -2672,9 +2703,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // ============================================================
-        // 1️⃣1️⃣ GEMINI FALLBACK
-        // ============================================================
+        // 1️⃣3️⃣ GEMINI FALLBACK
         console.log(`🔄 No product found. Trying Gemini...`);
         const geminiReply = await withTimeout(
             getGeminiWebSearch(cleaned),
@@ -2686,9 +2715,7 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
 
-        // ============================================================
-        // 1️⃣2️⃣ NO RESULTS
-        // ============================================================
+        // 1️⃣4️⃣ NO RESULTS
         await sendWhatsAppMessage(from, 
             `🔍 No results for "${text}"\n\n` +
             `💡 Try sending a part number like "0801BA0285N"\n` +
