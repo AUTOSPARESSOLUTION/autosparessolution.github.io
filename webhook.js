@@ -857,26 +857,27 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
                         }
                     }
                 },
-                // Footer - with proper spacing to avoid overlapping
+                // Thank you message
                 {
                     text: 'Thank you for your order!',
                     style: 'footer',
                     alignment: 'center',
-                    margin: [0, 30, 0, 10]
+                    margin: [0, 25, 0, 10]
                 },
-                // Contact info as separate lines to avoid overlapping
+                // Contact line 1 - Phone
                 {
                     text: `📞 Call: ${CONFIG.businessPhone}`,
                     alignment: 'center',
-                    fontSize: 10,
-                    color: '#666666',
+                    fontSize: 11,
+                    color: '#333333',
                     margin: [0, 0, 0, 3]
                 },
+                // Contact line 2 - Website (separate line to avoid overlapping)
                 {
                     text: `🛒 Shop: https://autosparessolution.com`,
                     alignment: 'center',
-                    fontSize: 10,
-                    color: '#666666',
+                    fontSize: 11,
+                    color: '#333333',
                     margin: [0, 0, 0, 0]
                 }
             ],
@@ -931,7 +932,6 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
         return null;
     }
 }
-
 // ============================================================
 // 📤 SEND DOCUMENT MESSAGE
 // ============================================================
