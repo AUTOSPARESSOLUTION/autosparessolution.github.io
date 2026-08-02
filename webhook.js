@@ -864,17 +864,17 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
                     alignment: 'center',
                     margin: [0, 25, 0, 10]
                 },
-                // Contact line 1 - Phone
+                // Contact line 1 - Phone (NO EMOJI)
                 {
-                    text: `📞 Call: ${CONFIG.businessPhone}`,
+                    text: `Call: ${CONFIG.businessPhone}`,
                     alignment: 'center',
                     fontSize: 11,
                     color: '#333333',
                     margin: [0, 0, 0, 3]
                 },
-                // Contact line 2 - Website (separate line to avoid overlapping)
+                // Contact line 2 - Website (NO EMOJI)
                 {
-                    text: `🛒 Shop: https://autosparessolution.com`,
+                    text: `Shop: https://autosparessolution.com`,
                     alignment: 'center',
                     fontSize: 11,
                     color: '#333333',
