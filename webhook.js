@@ -458,7 +458,7 @@ class AlertSystem {
         await this.sendUserAlert(phone, type, message);
     }
 
-    async sendOrderConfirmation(phone, orderId, items, total) {
+    async sendOrderConfirmation(phone, orderId, items, total, outOfStockItems = [], notFoundItems = []) {
         let message = `✅ *ORDER CONFIRMED!*\n\n`;
         message += `📦 Order ID: ${orderId}\n`;
         message += `📝 Items:\n`;
@@ -472,9 +472,9 @@ class AlertSystem {
         
         await this.sendUserAlert(phone, 'orderConfirmation', message, { orderId, items, total });
         
-        // Generate and send Excel
+        // Generate and send Excel with status
         try {
-            const excelBuffer = await generateExcelSummary(orderId, items, total, phone);
+            const excelBuffer = await generateExcelSummary(orderId, items, total, phone, notFoundItems, outOfStockItems);
             if (excelBuffer) {
                 await sendDocumentMessage(phone, excelBuffer, `${orderId}_Summary.xlsx`, 
                     `📊 Order Summary - ${orderId}`);
@@ -546,7 +546,7 @@ const alertSystem = new AlertSystem();
 // 📊 EXCEL & PDF GENERATORS
 // ============================================================
 
-async function generateExcelSummary(orderId, items, total, customerPhone) {
+async function generateExcelSummary(orderId, items, total, customerPhone, notFoundItems = [], outOfStockItems = []) {
     try {
         // Check if ExcelJS is available
         if (!ExcelJS) {
@@ -561,20 +561,20 @@ async function generateExcelSummary(orderId, items, total, customerPhone) {
         const sheet = workbook.addWorksheet('Order Summary');
         
         // Header
-        sheet.mergeCells('A1:F1');
+        sheet.mergeCells('A1:G1');
         const titleCell = sheet.getCell('A1');
         titleCell.value = '🛒 AUTO SPARES SOLUTION';
         titleCell.font = { bold: true, size: 20, color: { argb: 'FF0072B0' } };
         titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
         sheet.getRow(1).height = 40;
         
-        sheet.mergeCells('A2:F2');
+        sheet.mergeCells('A2:G2');
         const orderCell = sheet.getCell('A2');
         orderCell.value = `Order ID: ${orderId} | Date: ${new Date().toLocaleDateString('en-IN')}`;
         orderCell.alignment = { horizontal: 'center', vertical: 'middle' };
         orderCell.font = { size: 12, color: { argb: 'FF666666' } };
         
-        sheet.mergeCells('A3:F3');
+        sheet.mergeCells('A3:G3');
         const customerCell = sheet.getCell('A3');
         customerCell.value = `Customer: ${customerPhone}`;
         customerCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -582,8 +582,8 @@ async function generateExcelSummary(orderId, items, total, customerPhone) {
         
         sheet.addRow([]);
         
-        // Headers
-        const headers = ['#', 'Part Number', 'Description', 'Qty', 'Price (₹)', 'Total (₹)'];
+        // Headers with Status column
+        const headers = ['#', 'Part Number', 'Description', 'Qty', 'Price (₹)', 'Total (₹)', 'Status'];
         const headerRow = sheet.addRow(headers);
         headerRow.height = 30;
         headerRow.eachCell((cell) => {
@@ -598,27 +598,53 @@ async function generateExcelSummary(orderId, items, total, customerPhone) {
             };
         });
         
+        // Set column widths
         sheet.getColumn(1).width = 6;
         sheet.getColumn(2).width = 20;
-        sheet.getColumn(3).width = 40;
+        sheet.getColumn(3).width = 35;
         sheet.getColumn(4).width = 10;
         sheet.getColumn(5).width = 15;
         sheet.getColumn(6).width = 18;
+        sheet.getColumn(7).width = 22;
         
         // Data rows
         let rowIndex = 0;
         for (const item of items) {
             const itemTotal = (item.price || 0) * (item.qty || 0);
+            
+            // Determine status
+            let status = '✅ In Stock';
+            let statusColor = 'FF00B050'; // Green
+            
+            // Check if item is out of stock
+            if (outOfStockItems && outOfStockItems.includes(item.part)) {
+                status = '❌ Out of Stock';
+                statusColor = 'FFFF0000'; // Red
+            }
+            
+            // Check if item was not found
+            if (notFoundItems && notFoundItems.includes(item.part)) {
+                status = '⚠️ Not Found';
+                statusColor = 'FFFFA500'; // Orange
+            }
+            
+            // Check if item was a partial match
+            if (item.requestedPart && item.requestedPart !== item.part) {
+                status = '🔄 Matched: ' + item.requestedPart;
+                statusColor = 'FF0072B0'; // Blue
+            }
+            
             const row = sheet.addRow([
                 rowIndex + 1,
                 item.part || 'N/A',
                 item.description || 'N/A',
                 item.qty || 0,
                 (item.price || 0).toFixed(2),
-                itemTotal.toFixed(2)
+                itemTotal.toFixed(2),
+                status
             ]);
             row.height = 25;
-            row.eachCell((cell) => {
+            row.eachCell((cell, colNumber) => {
                 cell.alignment = { horizontal: 'left', vertical: 'middle' };
                 cell.border = {
                     top: { style: 'thin' },
@@ -626,37 +652,83 @@ async function generateExcelSummary(orderId, items, total, customerPhone) {
                     bottom: { style: 'thin' },
                     right: { style: 'thin' }
                 };
+                
+                // Color the status column
+                if (colNumber === 7) {
+                    cell.font = { 
+                        bold: true, 
+                        color: { argb: statusColor } 
+                    };
+                }
             });
             rowIndex++;
         }
         
         sheet.addRow([]);
         
-        const totalRow = sheet.addRow(['', '', '', '', 'TOTAL:', total.toFixed(2)]);
+        // Total row
+        const totalRow = sheet.addRow(['', '', '', '', 'TOTAL:', total.toFixed(2), '']);
         totalRow.height = 30;
         totalRow.getCell(5).font = { bold: true, size: 14 };
         totalRow.getCell(5).alignment = { horizontal: 'right', vertical: 'middle' };
         totalRow.getCell(6).font = { bold: true, size: 14, color: { argb: 'FF0072B0' } };
         totalRow.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' };
+        sheet.mergeCells(`A${totalRow.number}:D${totalRow.number}`);
+        
+        // Add summary section with out of stock and not found items
+        let summaryRowCount = 0;
+        
+        if (outOfStockItems && outOfStockItems.length > 0) {
+            sheet.addRow([]);
+            const warningRow = sheet.addRow(['⚠️ OUT OF STOCK ITEMS:']);
+            warningRow.height = 25;
+            warningRow.getCell(1).font = { bold: true, size: 12, color: { argb: 'FFFF0000' } };
+            sheet.mergeCells(`A${warningRow.number}:G${warningRow.number}`);
+            
+            const outOfStockRow = sheet.addRow([outOfStockItems.join(', ')]);
+            outOfStockRow.height = 25;
+            outOfStockRow.getCell(1).font = { color: { argb: 'FFFF0000' } };
+            sheet.mergeCells(`A${outOfStockRow.number}:G${outOfStockRow.number}`);
+            summaryRowCount += 2;
+        }
+        
+        if (notFoundItems && notFoundItems.length > 0) {
+            if (summaryRowCount > 0) {
+                sheet.addRow([]);
+            } else {
+                sheet.addRow([]);
+            }
+            const notFoundRow = sheet.addRow(['⚠️ NOT FOUND ITEMS:']);
+            notFoundRow.height = 25;
+            notFoundRow.getCell(1).font = { bold: true, size: 12, color: { argb: 'FFFFA500' } };
+            sheet.mergeCells(`A${notFoundRow.number}:G${notFoundRow.number}`);
+            
+            const notFoundListRow = sheet.addRow([notFoundItems.join(', ')]);
+            notFoundListRow.height = 25;
+            notFoundListRow.getCell(1).font = { color: { argb: 'FFFFA500' } };
+            sheet.mergeCells(`A${notFoundListRow.number}:G${notFoundListRow.number}`);
+            summaryRowCount += 2;
+        }
         
         sheet.addRow([]);
         const footerRow = sheet.addRow(['Thank you for your order!']);
         footerRow.height = 30;
         footerRow.getCell(1).font = { bold: true, size: 12, color: { argb: 'FF0072B0' } };
         footerRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-        sheet.mergeCells(`A${footerRow.number}:F${footerRow.number}`);
+        sheet.mergeCells(`A${footerRow.number}:G${footerRow.number}`);
         
         const contactRow = sheet.addRow([`📞 Call: ${CONFIG.businessPhone} | 🛒 Shop: https://autosparessolution.com`]);
         contactRow.height = 25;
         contactRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
         contactRow.getCell(1).font = { size: 10, color: { argb: 'FF666666' } };
-        sheet.mergeCells(`A${contactRow.number}:F${contactRow.number}`);
+        sheet.mergeCells(`A${contactRow.number}:G${contactRow.number}`);
         
         const buffer = await workbook.xlsx.writeBuffer();
         return buffer;
         
     } catch (error) {
         console.error('❌ Excel generation error:', error.message);
+        console.error('Stack:', error.stack);
         return null;
     }
 }
@@ -716,19 +788,29 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
         const docDefinition = {
             pageSize: 'A4',
             pageMargins: [40, 60, 40, 60],
-            header: function() {
-                return {
-                    columns: [
+            content: [
+                // Company Name - Clean header without emoji in the text
+                {
+                    text: 'AUTO SPARES SOLUTION',
+                    style: 'companyHeader',
+                    alignment: 'center',
+                    margin: [0, 0, 0, 5]
+                },
+                // Decorative line
+                {
+                    canvas: [
                         {
-                            text: '🛒 Auto Spares Solution',
-                            style: 'header',
-                            alignment: 'center'
+                            type: 'line',
+                            x1: 40,
+                            y1: 0,
+                            x2: 555,
+                            y2: 0,
+                            lineWidth: 2,
+                            color: '#0072B0'
                         }
                     ],
-                    margin: [40, 20, 40, 0]
-                };
-            },
-            content: [
+                    margin: [0, 0, 0, 15]
+                },
                 {
                     text: 'ORDER SUMMARY',
                     style: 'title',
@@ -788,15 +870,16 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
                 }
             ],
             styles: {
-                header: {
-                    fontSize: 16,
+                companyHeader: {
+                    fontSize: 20,
                     bold: true,
-                    color: '#0072B0'
+                    color: '#0072B0',
+                    alignment: 'center'
                 },
                 title: {
-                    fontSize: 22,
+                    fontSize: 16,
                     bold: true,
-                    color: '#0072B0'
+                    color: '#333333'
                 },
                 tableHeader: {
                     bold: true,
@@ -2322,11 +2405,21 @@ async function handleWhatsAppMessage(message, from) {
                     return;
                 }
                 
+                // Track out of stock and not found items
+                const outOfStockItems = items
+                    .filter(item => item.stock === 0 || item.stock === undefined)
+                    .map(item => item.part);
+                
+                const notFoundItems = items
+                    .filter(item => item.requestedPart && item.requestedPart !== item.part)
+                    .map(item => item.requestedPart);
+                
                 const orderId = `ORD-${Date.now().toString().slice(-6)}`;
                 await db.saveOrder(orderId, from, items, cart.total);
                 await db.clearCart(from);
                 
-                await alertSystem.sendOrderConfirmation(from, orderId, items, cart.total);
+                // Send confirmation with status info
+                await alertSystem.sendOrderConfirmation(from, orderId, items, cart.total, outOfStockItems, notFoundItems);
                 await alertSystem.sendNewOrderAlert(orderId, from, items, cart.total);
                 
                 let reply = `✅ *ORDER CONFIRMED!*\n\n`;
@@ -2543,7 +2636,9 @@ async function handleWhatsAppMessage(message, from) {
                 price: item.price,
                 list_price: item.list_price,
                 mrp: item.mrp,
-                billing_price: item.billing_price
+                billing_price: item.billing_price,
+                stock: item.stock,
+                requestedPart: item.requestedPart || item.part
             }));
             
             await db.saveCart(from, cartItems, total, total);
@@ -2617,7 +2712,8 @@ async function handleWhatsAppMessage(message, from) {
                     list_price: exactProduct.list_price,
                     mrp: exactProduct.mrp,
                     billing_price: billingPrice,
-                    stock: exactProduct.stock
+                    stock: exactProduct.stock,
+                    requestedPart: partNumber
                 };
                 
                 cartItems.push(newItem);
@@ -3157,7 +3253,9 @@ Document: ${filename}`;
             price: item.price,
             list_price: item.list_price,
             mrp: item.mrp,
-            billing_price: item.billing_price
+            billing_price: item.billing_price,
+            stock: item.stock,
+            requestedPart: item.requestedPart || item.part
         }));
         
         await db.saveCart(from, cartItems, total, total);
