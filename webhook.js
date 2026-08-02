@@ -548,6 +548,12 @@ const alertSystem = new AlertSystem();
 
 async function generateExcelSummary(orderId, items, total, customerPhone) {
     try {
+        // Check if ExcelJS is available
+        if (!ExcelJS) {
+            console.error('❌ ExcelJS not available');
+            return null;
+        }
+
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'Auto Spares Solution';
         workbook.created = new Date();
@@ -657,12 +663,19 @@ async function generateExcelSummary(orderId, items, total, customerPhone) {
 
 async function generatePDFSummary(orderId, items, total, customerPhone) {
     try {
+        // Check if PdfPrinter is available
+        if (!PdfPrinter) {
+            console.error('❌ PdfPrinter not available');
+            return null;
+        }
+
+        // Use built-in fonts instead of CDN URLs (which may timeout)
         const printer = new PdfPrinter({
             Roboto: {
-                normal: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto-Regular.ttf',
-                bold: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto-Medium.ttf',
-                italics: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto-Italic.ttf',
-                bolditalics: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/fonts/Roboto-MediumItalic.ttf'
+                normal: 'Helvetica',
+                bold: 'Helvetica-Bold',
+                italics: 'Helvetica-Oblique',
+                bolditalics: 'Helvetica-BoldOblique'
             }
         });
 
@@ -807,13 +820,20 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
         return new Promise((resolve, reject) => {
             const chunks = [];
             pdfDoc.on('data', chunk => chunks.push(chunk));
-            pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-            pdfDoc.on('error', reject);
+            pdfDoc.on('end', () => {
+                const buffer = Buffer.concat(chunks);
+                resolve(buffer);
+            });
+            pdfDoc.on('error', (error) => {
+                console.error('❌ PDF generation error:', error);
+                reject(error);
+            });
             pdfDoc.end();
         });
 
     } catch (error) {
         console.error('❌ PDF generation error:', error.message);
+        console.error('Stack:', error.stack);
         return null;
     }
 }
@@ -2340,16 +2360,31 @@ async function handleWhatsAppMessage(message, from) {
         // 4️⃣ 📊 DOWNLOAD EXCEL
         // ============================================================
         if (msgLower === 'download excel' || msgLower === 'excel') {
-            const lastOrder = await db.getLastOrder(from);
-            if (lastOrder) {
-                const items = JSON.parse(lastOrder.items);
-                const excelBuffer = await generateExcelSummary(lastOrder.order_id, items, lastOrder.total, from);
-                if (excelBuffer) {
-                    await sendDocumentMessage(from, excelBuffer, `${lastOrder.order_id}_Summary.xlsx`, 
-                        `📊 Order Summary - ${lastOrder.order_id}`);
+            try {
+                const lastOrder = await db.getLastOrder(from);
+                if (lastOrder) {
+                    const items = JSON.parse(lastOrder.items);
+                    const excelBuffer = await generateExcelSummary(lastOrder.order_id, items, lastOrder.total, from);
+                    if (excelBuffer) {
+                        await sendDocumentMessage(from, excelBuffer, `${lastOrder.order_id}_Summary.xlsx`, 
+                            `📊 Order Summary - ${lastOrder.order_id}`);
+                    } else {
+                        await sendWhatsAppMessage(from, 
+                            `⚠️ *Could not generate Excel.*\n\n` +
+                            `💡 Please try again later.\n` +
+                            `📞 Call: ${CONFIG.businessPhone}`
+                        );
+                    }
+                } else {
+                    await sendWhatsAppMessage(from, '⚠️ No recent order found.');
                 }
-            } else {
-                await sendWhatsAppMessage(from, '⚠️ No recent order found.');
+            } catch (error) {
+                console.error('❌ Excel download error:', error.message);
+                await sendWhatsAppMessage(from, 
+                    `⚠️ *Could not generate Excel.*\n\n` +
+                    `Error: ${error.message}\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
             }
             return;
         }
@@ -2358,16 +2393,45 @@ async function handleWhatsAppMessage(message, from) {
         // 5️⃣ 📄 DOWNLOAD PDF
         // ============================================================
         if (msgLower === 'download pdf' || msgLower === 'pdf') {
-            const lastOrder = await db.getLastOrder(from);
-            if (lastOrder) {
-                const items = JSON.parse(lastOrder.items);
-                const pdfBuffer = await generatePDFSummary(lastOrder.order_id, items, lastOrder.total, from);
-                if (pdfBuffer) {
-                    await sendDocumentMessage(from, pdfBuffer, `${lastOrder.order_id}_Summary.pdf`,
-                        `📄 Order Summary - ${lastOrder.order_id}`);
+            try {
+                console.log(`📄 PDF download requested by ${from}`);
+                const lastOrder = await db.getLastOrder(from);
+                if (lastOrder) {
+                    const items = JSON.parse(lastOrder.items);
+                    const pdfBuffer = await generatePDFSummary(lastOrder.order_id, items, lastOrder.total, from);
+                    if (pdfBuffer) {
+                        await sendDocumentMessage(from, pdfBuffer, `${lastOrder.order_id}_Summary.pdf`,
+                            `📄 Order Summary - ${lastOrder.order_id}`);
+                    } else {
+                        // PDF failed, try Excel as fallback
+                        console.log(`📄 PDF generation failed, trying Excel fallback...`);
+                        const excelBuffer = await generateExcelSummary(lastOrder.order_id, items, lastOrder.total, from);
+                        if (excelBuffer) {
+                            await sendWhatsAppMessage(from, 
+                                `⚠️ *PDF generation failed, but Excel is available.*\n\n` +
+                                `📊 Sending Excel instead...`
+                            );
+                            await sendDocumentMessage(from, excelBuffer, `${lastOrder.order_id}_Summary.xlsx`, 
+                                `📊 Order Summary - ${lastOrder.order_id}`);
+                        } else {
+                            await sendWhatsAppMessage(from, 
+                                `⚠️ *Could not generate PDF or Excel.*\n\n` +
+                                `💡 Please try again later.\n` +
+                                `📞 Call: ${CONFIG.businessPhone}`
+                            );
+                        }
+                    }
+                } else {
+                    await sendWhatsAppMessage(from, '⚠️ No recent order found.');
                 }
-            } else {
-                await sendWhatsAppMessage(from, '⚠️ No recent order found.');
+            } catch (error) {
+                console.error('❌ PDF download error:', error.message);
+                await sendWhatsAppMessage(from, 
+                    `⚠️ *Could not generate PDF.*\n\n` +
+                    `Error: ${error.message}\n` +
+                    `💡 Please try "Download Excel" instead.\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
             }
             return;
         }
