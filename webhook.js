@@ -459,6 +459,7 @@ class AlertSystem {
     }
 
     async sendOrderConfirmation(phone, orderId, items, total, outOfStockItems = [], notFoundItems = []) {
+        // Send the main confirmation message
         let message = `✅ *ORDER CONFIRMED!*\n\n`;
         message += `📦 Order ID: ${orderId}\n`;
         message += `📝 Items:\n`;
@@ -470,6 +471,7 @@ class AlertSystem {
         message += `   Reply "Download Excel" or "Download PDF"\n\n`;
         message += `📞 Call: ${CONFIG.businessPhone}`;
         
+        // Send the confirmation message
         await this.sendUserAlert(phone, 'orderConfirmation', message, { orderId, items, total });
         
         // Generate and send Excel with status
@@ -789,7 +791,7 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
             pageSize: 'A4',
             pageMargins: [40, 60, 40, 60],
             content: [
-                // Company Name - Clean header without emoji in the text
+                // Company Name
                 {
                     text: 'AUTO SPARES SOLUTION',
                     style: 'companyHeader',
@@ -855,18 +857,27 @@ async function generatePDFSummary(orderId, items, total, customerPhone) {
                         }
                     }
                 },
+                // Footer - with proper spacing to avoid overlapping
                 {
                     text: 'Thank you for your order!',
                     style: 'footer',
                     alignment: 'center',
-                    margin: [0, 30, 0, 0]
+                    margin: [0, 30, 0, 10]
                 },
+                // Contact info as separate lines to avoid overlapping
                 {
-                    text: `📞 Call: ${CONFIG.businessPhone} | 🛒 Shop: https://autosparessolution.com`,
+                    text: `📞 Call: ${CONFIG.businessPhone}`,
                     alignment: 'center',
                     fontSize: 10,
                     color: '#666666',
-                    margin: [0, 5, 0, 0]
+                    margin: [0, 0, 0, 3]
+                },
+                {
+                    text: `🛒 Shop: https://autosparessolution.com`,
+                    alignment: 'center',
+                    fontSize: 10,
+                    color: '#666666',
+                    margin: [0, 0, 0, 0]
                 }
             ],
             styles: {
@@ -2418,23 +2429,14 @@ async function handleWhatsAppMessage(message, from) {
                 await db.saveOrder(orderId, from, items, cart.total);
                 await db.clearCart(from);
                 
-                // Send confirmation with status info
+                // Send confirmation via alert system (this sends one confirmation)
                 await alertSystem.sendOrderConfirmation(from, orderId, items, cart.total, outOfStockItems, notFoundItems);
                 await alertSystem.sendNewOrderAlert(orderId, from, items, cart.total);
                 
-                let reply = `✅ *ORDER CONFIRMED!*\n\n`;
-                reply += `📦 Order ID: ${orderId}\n`;
-                reply += `📝 Items:\n`;
-                items.forEach((item, index) => {
-                    reply += `   ${index + 1}. ${item.part} x${item.qty} = ₹${(item.price * item.qty).toFixed(2)}\n`;
-                });
-                reply += `💰 Total: ₹${cart.total.toFixed(2)}\n`;
-                reply += `📞 *Call:* ${CONFIG.businessPhone}\n`;
-                reply += `🛒 *Shop:* https://autosparessolution.com`;
-                reply += `\n\n📊 *Download Options:* Reply "Download Excel" or "Download PDF"`;
+                // REMOVED THE DUPLICATE CONFIRMATION MESSAGE HERE
+                // The alertSystem.sendOrderConfirmation already sends the confirmation
                 
-                await sendWhatsAppMessage(from, reply);
-                return;
+                return; // Return immediately to prevent any further processing
             }
             await sendWhatsAppMessage(from, '🛒 Your cart is empty. Add items first!');
             return;
