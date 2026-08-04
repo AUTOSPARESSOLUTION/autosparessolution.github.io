@@ -71,7 +71,7 @@ class BrandManager {
             { id: 'rml', name: 'RML', logo: 'https://autosparessolution.github.io/images/RML.png', active: true, priority: 4 },
             { id: 'girling', name: 'GIRLING', logo: 'https://autosparessolution.github.io/images/brand-girling.png', active: true, priority: 5 },
             { id: 'lmm', name: 'LMM', logo: 'https://autosparessolution.github.io/images/brand-lmm.png', active: true, priority: 6 },
-            { id: 'mm', name: 'M&M', logo: 'https://autosparessolution.github.io/images/brand-m&m.png', active: true, priority: 7 },
+            { id: 'mm', name: 'MM', logo: 'https://autosparessolution.github.io/images/brand-m&m.png', active: true, priority: 7 },
             { id: 'mtbl', name: 'MTBL', logo: 'https://autosparessolution.github.io/images/brand-mtbl.png', active: true, priority: 8 },
             { id: 'stl', name: 'STL', logo: 'https://autosparessolution.github.io/images/brand-stl.png', active: true, priority: 9 },
             { id: 'vf', name: 'VF', logo: 'https://autosparessolution.github.io/images/brand-vf.png', active: true, priority: 10 },
