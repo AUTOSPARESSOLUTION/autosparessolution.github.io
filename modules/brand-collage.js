@@ -309,7 +309,7 @@ class DynamicBrandCollage {
             { id: 'rml', name: 'RML', active: true },
             { id: 'girling', name: 'GIRLING', active: true },
             { id: 'lmm', name: 'LMM', active: true },
-            { id: 'mm', name: 'M&M', active: true },
+            { id: 'mm', name: 'MM', active: true },
             { id: 'mtbl', name: 'MTBL', active: true },
             { id: 'stl', name: 'STL', active: true },
             { id: 'vf', name: 'VF', active: true },
