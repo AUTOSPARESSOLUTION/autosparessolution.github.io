@@ -1,88 +1,95 @@
 {
     "brands": [
         {
-            "id": "mm",
-            "name": "MM",
-            "logo": "https://autosparessolution.github.io/images/brand-m&m.png",
+            "id": "rane",
+            "name": "RANE",
+            "logo": "https://autosparessolution.github.io/images/RANE.png",
             "active": true,
             "priority": 1
-        },
-        {
-            "id": "leyparts",
-            "name": "LEYPARTS",
-            "logo": "https://autosparessolution.github.io/images/brand-leyparts.png",
-            "active": true,
-            "priority": 2
         },
         {
             "id": "tvs",
             "name": "TVS",
             "logo": "https://autosparessolution.github.io/images/TVS.jpg",
             "active": true,
-            "priority": 3
+            "priority": 2
         },
         {
             "id": "rbl",
             "name": "RBL",
             "logo": "https://autosparessolution.github.io/images/brand-rbl.png",
             "active": true,
-            "priority": 4
+            "priority": 3
         },
         {
             "id": "rml",
             "name": "RML",
             "logo": "https://autosparessolution.github.io/images/RML.png",
             "active": true,
-            "priority": 5
+            "priority": 4
         },
         {
             "id": "girling",
             "name": "GIRLING",
             "logo": "https://autosparessolution.github.io/images/brand-girling.png",
             "active": true,
-            "priority": 6
+            "priority": 5
         },
         {
             "id": "lmm",
             "name": "LMM",
             "logo": "https://autosparessolution.github.io/images/brand-lmm.png",
             "active": true,
-            "priority": 7
+            "priority": 6
         },
         {
-            "id": "greaves",
-            "name": "GREAVES",
-            "logo": "https://autosparessolution.github.io/images/brand-greaves.png",
+            "id": "mm",
+            "name": "M&M",
+            "logo": "https://autosparessolution.github.io/images/brand-m&m.png",
             "active": true,
-            "priority": 8
+            "priority": 7
         },
         {
             "id": "mtbl",
             "name": "MTBL",
             "logo": "https://autosparessolution.github.io/images/brand-mtbl.png",
             "active": true,
-            "priority": 9
+            "priority": 8
         },
         {
             "id": "stl",
             "name": "STL",
             "logo": "https://autosparessolution.github.io/images/brand-stl.png",
             "active": true,
-            "priority": 10
+            "priority": 9
         },
         {
             "id": "vf",
             "name": "VF",
             "logo": "https://autosparessolution.github.io/images/brand-vf.png",
             "active": true,
-            "priority": 11
+            "priority": 10
         },
         {
             "id": "wabco",
             "name": "WABCO",
             "logo": "https://autosparessolution.github.io/images/brand-wabco.png",
             "active": true,
+            "priority": 11
+        },
+        {
+            "id": "leyparts",
+            "name": "LEYPARTS",
+            "logo": "https://autosparessolution.github.io/images/brand-leyparts.png",
+            "active": true,
             "priority": 12
+        },
+        {
+            "id": "greaves",
+            "name": "GREAVES",
+            "logo": "https://autosparessolution.github.io/images/brand-greaves.png",
+            "active": true,
+            "priority": 13
         }
     ],
     "lastUpdated": "2024-01-15T10:30:00.000Z"
