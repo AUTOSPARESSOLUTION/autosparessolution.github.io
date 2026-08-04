@@ -2,7 +2,7 @@
     "brands": [
         {
             "id": "mm",
-            "name": "M&M",
+            "name": "MM",
             "logo": "https://autosparessolution.github.io/images/brand-m&m.png",
             "active": true,
             "priority": 1
