@@ -236,9 +236,9 @@ class DynamicBrandCollage {
             'RML': 'RML.png',
             'GIRLING': 'brand-girling.png',
             'LMM': 'brand-lmm.png',
-            'M&M': 'brand-m&m.png',
-            'M M': 'brand-m&m.png',
-            'MM': 'brand-m&m.png',
+            'MM': 'brand-M&M.png',
+            'M M': 'brand-M&M.png',
+            'MM': 'brand-M&M.png',
             'MTBL': 'brand-mtbl.png',
             'STL': 'brand-stl.png',
             'VF': 'brand-vf.png',
@@ -253,21 +253,21 @@ class DynamicBrandCollage {
         
         // Brand categories for subtitles
         const brandCategories = {
-            'RANE': 'Brakes • Steering',
-            'TVS': 'Brakes • Suspension',
-            'RBL': 'Brakes • Clutch',
-            'RML': 'Brake Linings',
+            'RANE': 'Suspension • Steering',
+            'TVS': 'Bolt • Nut',
+            'RBL': 'Brakes lining',
+            'RML': 'Suspension • Steering',
             'GIRLING': 'Brake Systems',
-            'LMM': 'Brakes • Suspension',
-            'M&M': 'Brakes • Axles',
-            'M M': 'Brakes • Axles',
-            'MM': 'Brakes • Axles',
-            'MTBL': 'Brake Linings',
-            'STL': 'Brake Components',
-            'VF': 'Brakes • Clutch',
+            'LMM': 'Mahindra suboneton',
+            'MM': 'Passenger • Commercial',
+        
+            
+            'MTBL': 'Mahindra Truck Bus',
+            'STL': 'Fasteners',
+            'VF': 'Mahindra value fit',
             'WABCO': 'Air Brakes • ABS',
             'GREAVES': 'Engine • Transmission',
-            'LEYPARTS': 'Brake Components',
+            'LEYPARTS': 'All layland spares',
             'BOSCH': 'Electrical • Fuel'
         };
         
@@ -466,7 +466,7 @@ class DynamicBrandCollage {
             { id: 'rml', name: 'RML', active: true },
             { id: 'girling', name: 'GIRLING', active: true },
             { id: 'lmm', name: 'LMM', active: true },
-            { id: 'mm', name: 'M&M', active: true },
+            { id: 'mm', name: 'MM', active: true },
             { id: 'mtbl', name: 'MTBL', active: true },
             { id: 'stl', name: 'STL', active: true },
             { id: 'vf', name: 'VF', active: true },
