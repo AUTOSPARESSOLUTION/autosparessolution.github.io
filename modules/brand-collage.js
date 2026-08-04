@@ -187,10 +187,16 @@ class DynamicBrandCollage {
         return await sharp(Buffer.from(svg)).png().toBuffer();
     }
 
+    // ============================================================
+    // ✅ FIXED: Title with proper XML escaping
+    // ============================================================
+
     async createDynamicTitle(width, brandCount, customerPhone) {
+        // ✅ ESCAPE ALL TEXT that goes into SVG
         const title = 'AUTO SPARES SOLUTION';
         const subtitle = `${brandCount} Premium Auto Brands - Trusted Quality`;
         const welcome = customerPhone ? `Welcome ${customerPhone}` : 'Welcome to Our Family!';
+        const tagline = brandCount > 10 ? '🌟 Largest Collection of Premium Auto Parts' : '✨ Curated Selection of Quality Brands';
         
         const svg = `
             <svg width="${width}" height="280">
@@ -201,13 +207,13 @@ class DynamicBrandCollage {
                 </style>
                 <circle cx="${width/2}" cy="55" r="40" fill="rgba(255,255,255,0.15)" stroke="#FFFFFF" stroke-width="2"/>
                 <text x="${width/2}" y="70" font-size="40" text-anchor="middle" fill="#FFFFFF">🚗</text>
-                <text x="${width/2}" y="125" class="title">${title}</text>
-                <text x="${width/2}" y="165" class="subtitle">${subtitle}</text>
-                <text x="${width/2}" y="200" class="welcome">${welcome}</text>
+                <text x="${width/2}" y="125" class="title">${escapeXML(title)}</text>
+                <text x="${width/2}" y="165" class="subtitle">${escapeXML(subtitle)}</text>
+                <text x="${width/2}" y="200" class="welcome">${escapeXML(welcome)}</text>
                 <line x1="${width/2-200}" y1="225" x2="${width/2+200}" y2="225" 
                       stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
                 <text x="${width/2}" y="255" font-size="12" text-anchor="middle" fill="rgba(255,255,255,0.5)">
-                    ${brandCount > 10 ? '🌟 Largest Collection of Premium Auto Parts' : '✨ Curated Selection of Quality Brands'}
+                    ${escapeXML(tagline)}
                 </text>
             </svg>
         `;
@@ -216,7 +222,7 @@ class DynamicBrandCollage {
     }
 
     // ============================================================
-    // 🎨 LOGO-BASED BROCHURE - COMPLETE FIX FOR M&M
+    // ✅ FIXED: Brand Grid with proper XML escaping
     // ============================================================
 
     async createDynamicBrandGrid(brands, width, cols, itemWidth, itemHeight) {
@@ -227,7 +233,6 @@ class DynamicBrandCollage {
         
         const LOGO_BASE_URL = 'https://autosparessolution.github.io/images/';
         
-        // Brand logo mapping - all possible variations
         const brandLogoMap = {
             'RANE': 'RANE.png',
             'TVS': 'TVS.jpg',
@@ -249,7 +254,6 @@ class DynamicBrandCollage {
         
         const DEFAULT_LOGO = 'default.png';
         
-        // Brand categories
         const brandCategories = {
             'RANE': 'Suspension • Steering',
             'TVS': 'Bolt • Nut',
@@ -298,36 +302,20 @@ class DynamicBrandCollage {
             const isActive = brand.active !== false;
             const color = colors[i % colors.length];
             
-            // ============================================================
-            // ✅ CRITICAL FIX: FULL ESCAPE FOR M&M
-            // ============================================================
-            
-            // Step 1: Normalize the brand name
-            let normalizedName = brandName;
+            // ✅ CRITICAL: Normalize and escape brand name
+            let safeName = '';
             if (brandName === 'MM' || brandName === 'M M' || brandName === 'M&M') {
-                normalizedName = 'M&amp;M';  // XML escaped version
-            }
-            
-            // Step 2: Full XML escape for all special characters
-            let safeName = String(normalizedName)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&apos;');
-            
-            // Step 3: Ensure M&M is correct
-            if (safeName === 'M&amp;amp;M') {
                 safeName = 'M&amp;M';
-            }
-            
-            // Step 4: Get logo key for mapping
-            let logoKey = brandName;
-            if (logoKey === 'MM' || logoKey === 'M M' || logoKey === 'M&amp;M' || logoKey === 'M&M') {
-                logoKey = 'MM';
+            } else {
+                safeName = escapeXML(brandName);
             }
             
             // Get logo filename
+            let logoKey = brandName;
+            if (logoKey === 'MM' || logoKey === 'M M' || logoKey === 'M&M') {
+                logoKey = 'MM';
+            }
+            
             let logoFile = brandLogoMap[logoKey] || 
                            brandLogoMap[brandName.toUpperCase()] || 
                            DEFAULT_LOGO;
@@ -336,7 +324,7 @@ class DynamicBrandCollage {
             
             // Get category with proper escaping
             let categoryKey = brandName;
-            if (categoryKey === 'MM' || categoryKey === 'M M' || categoryKey === 'M&amp;M' || categoryKey === 'M&M') {
+            if (categoryKey === 'MM' || categoryKey === 'M M' || categoryKey === 'M&M') {
                 categoryKey = 'MM';
             }
             
@@ -344,18 +332,12 @@ class DynamicBrandCollage {
                            brandCategories[brandName.toUpperCase()] || 
                            'Premium Auto Parts';
             
-            // Escape category for XML
-            let safeCategory = String(category)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&apos;');
+            let safeCategory = escapeXML(category);
             
             // Brand card background
             svg += `<rect x="${x}" y="${y}" width="${itemWidth}" height="${itemHeight}" class="brand-card"/>`;
             
-            // Colored accent bar at top
+            // Colored accent bar
             svg += `<rect x="${x + 12}" y="${y + 8}" width="${itemWidth - 24}" height="3" 
                         fill="${color}" class="brand-accent"/>`;
             
@@ -368,21 +350,21 @@ class DynamicBrandCollage {
             svg += `<circle cx="${x + itemWidth/2}" cy="${logoY + logoSize/2}" r="${logoSize/2 + 5}" 
                         fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
             
-            // Logo image from GitHub Pages
+            // Logo image
             svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" 
                         href="${logoUrl}" class="brand-logo" 
                         preserveAspectRatio="xMidYMid meet"
                         opacity="0.95"/>`;
             
-            // ⭐ Fallback text - FIRST character (always safe)
+            // ✅ Fallback text - always safe (first character only)
             const fallbackChar = safeName.charAt(0);
             svg += `<text x="${x + itemWidth/2}" y="${logoY + logoSize/2 + 5}" class="brand-fallback">${fallbackChar}</text>`;
             
-            // ⭐ Brand name - FULLY ESCAPED
+            // ✅ Brand name - FULLY ESCAPED
             const nameY = logoY + logoSize + 15;
             svg += `<text x="${x + itemWidth/2}" y="${nameY + 15}" class="brand-name">${safeName}</text>`;
             
-            // ⭐ Category - FULLY ESCAPED
+            // ✅ Category - FULLY ESCAPED
             svg += `<text x="${x + itemWidth/2}" y="${nameY + 35}" class="brand-subtitle">${safeCategory}</text>`;
             
             // Brand number
@@ -416,8 +398,8 @@ class DynamicBrandCollage {
                 </style>
                 <line x1="40" y1="15" x2="${width-40}" y2="15" 
                       stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
-                <text x="${width/2}" y="40" class="footer-text">${footerText}</text>
-                <text x="${width/2}" y="65" class="footer-highlight">📞 ${phone}</text>
+                <text x="${width/2}" y="40" class="footer-text">${escapeXML(footerText)}</text>
+                <text x="${width/2}" y="65" class="footer-highlight">📞 ${escapeXML(phone)}</text>
                 <text x="${width/2}" y="88" class="footer-text">🛒 https://autosparessolution.com</text>
                 <text x="${width/2}" y="115" class="footer-small">
                     🔄 Last Updated: ${new Date().toLocaleDateString('en-IN')} • ${brandCount} Brands
