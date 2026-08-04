@@ -1,5 +1,5 @@
 // ============================================================
-// 🎨 DYNAMIC BRAND COLLAGE GENERATOR
+// 🎨 DYNAMIC BRAND COLLAGE GENERATOR - WITH LOGOS
 // ============================================================
 
 const sharp = require('sharp');
@@ -11,6 +11,20 @@ const collageCache = new LRUCache({
     max: 50,
     ttl: 5 * 60 * 1000
 });
+
+// ============================================================
+// 🔧 XML ESCAPE FUNCTION - Prevents SVG Errors
+// ============================================================
+
+function escapeXML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+}
 
 class DynamicBrandCollage {
     constructor() {
@@ -201,17 +215,124 @@ class DynamicBrandCollage {
         return await sharp(Buffer.from(svg)).png().toBuffer();
     }
 
+    // ============================================================
+    // 🎨 LOGO-BASED BROCHURE - WITH GITHUB PAGES LOGOS
+    // ============================================================
+
     async createDynamicBrandGrid(brands, width, cols, itemWidth, itemHeight) {
         const rows = Math.ceil(brands.length / cols);
         const gridWidth = cols * (itemWidth + 20) - 20;
         const offsetX = (width - gridWidth) / 2;
         const totalHeight = rows * (itemHeight + 20) + 40;
         
-        let svg = `<svg width="${width}" height="${totalHeight}">`;
+        // ✅ YOUR GITHUB PAGES LOGO URL
+        const LOGO_BASE_URL = 'https://autosparessolution.github.io/images/';
+        
+        // Map brand names to their logo filenames
+        const brandLogoMap = {
+            'RANE': 'RANE.png',
+            'TVS': 'TVS.jpg',
+            'RBL': 'brand-rbl.png',
+            'RML': 'RML.png',
+            'GIRLING': 'brand-girling.png',
+            'LMM': 'brand-lmm.png',
+            'M&M': 'brand-m&m.png',
+            'M M': 'brand-m&m.png',
+            'MM': 'brand-m&m.png',
+            'MTBL': 'brand-mtbl.png',
+            'STL': 'brand-stl.png',
+            'VF': 'brand-vf.png',
+            'WABCO': 'brand-wabco.png',
+            'GREAVES': 'brand-greaves.png',
+            'LEYPARTS': 'brand-leyparts.png',
+            'BOSCH': 'brand-bosch.png'
+        };
+        
+        // Default logo if brand not found
+        const DEFAULT_LOGO = 'default.png';
+        
+        // Brand categories for subtitles
+        const brandCategories = {
+            'RANE': 'Brakes • Steering',
+            'TVS': 'Brakes • Suspension',
+            'RBL': 'Brakes • Clutch',
+            'RML': 'Brake Linings',
+            'GIRLING': 'Brake Systems',
+            'LMM': 'Brakes • Suspension',
+            'M&M': 'Brakes • Axles',
+            'M M': 'Brakes • Axles',
+            'MM': 'Brakes • Axles',
+            'MTBL': 'Brake Linings',
+            'STL': 'Brake Components',
+            'VF': 'Brakes • Clutch',
+            'WABCO': 'Air Brakes • ABS',
+            'GREAVES': 'Engine • Transmission',
+            'LEYPARTS': 'Brake Components',
+            'BOSCH': 'Electrical • Fuel'
+        };
+        
+        // Color palette for fallback cards
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+            '#F8C471', '#82E0AA', '#F1948A', '#73C6B6', '#5DADE2'
+        ];
+
+        let svg = `<svg width="${width}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">`;
         svg += `<style>
-            .brand-name { font-family: Arial, sans-serif; font-size: ${itemWidth > 150 ? 14 : 12}px; fill: #FFFFFF; text-anchor: middle; font-weight: bold; }
-            .brand-bg { fill: rgba(255,255,255,0.08); rx: 12; ry: 12; stroke: rgba(255,255,255,0.12); stroke-width: 1; }
-            .brand-initial { font-family: Arial, sans-serif; font-size: ${itemWidth > 150 ? 28 : 22}px; fill: #FFFFFF; text-anchor: middle; font-weight: bold; }
+            .brand-card { 
+                fill: rgba(255,255,255,0.07); 
+                rx: 14; 
+                ry: 14; 
+                stroke: rgba(255,255,255,0.1); 
+                stroke-width: 1.5;
+            }
+            .brand-name { 
+                font-family: 'Arial Black', Arial, Helvetica, sans-serif; 
+                font-size: ${itemWidth > 150 ? 18 : 14}px; 
+                fill: #FFFFFF; 
+                text-anchor: middle; 
+                font-weight: 900;
+                letter-spacing: 1px;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
+            .brand-subtitle {
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 10px;
+                fill: rgba(255,255,255,0.35);
+                text-anchor: middle;
+                letter-spacing: 0.3px;
+            }
+            .brand-logo {
+                width: ${itemWidth > 150 ? 60 : 50}px;
+                height: ${itemWidth > 150 ? 60 : 50}px;
+            }
+            .brand-logo-bg {
+                fill: rgba(255,255,255,0.05);
+                rx: 10;
+                ry: 10;
+            }
+            .brand-fallback {
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: ${itemWidth > 150 ? 28 : 22}px;
+                fill: rgba(255,255,255,0.4);
+                text-anchor: middle;
+                font-weight: bold;
+            }
+            .active-dot {
+                fill: #4CAF50;
+                opacity: 0.8;
+            }
+            .brand-number {
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 10px;
+                fill: rgba(255,255,255,0.12);
+                text-anchor: middle;
+            }
+            .brand-accent {
+                rx: 3;
+                opacity: 0.4;
+            }
         </style>`;
 
         for (let i = 0; i < brands.length; i++) {
@@ -221,33 +342,69 @@ class DynamicBrandCollage {
             const y = row * (itemHeight + 20) + 20;
             
             const brand = brands[i];
+            const brandName = brand.name || 'Brand';
             const isActive = brand.active !== false;
-            const initial = brand.name.charAt(0);
-            const bgOpacity = isActive ? '0.08' : '0.03';
-            const strokeColor = isActive ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
+            const color = colors[i % colors.length];
             
-            svg += `<rect x="${x}" y="${y}" width="${itemWidth}" height="${itemHeight}" 
-                        fill="rgba(255,255,255,${bgOpacity})" rx="12" ry="12" 
-                        stroke="${strokeColor}" stroke-width="${isActive ? 1 : 0.5}"/>`;
-            svg += `<circle cx="${x + itemWidth/2}" cy="${y + 45}" r="${itemWidth > 150 ? 30 : 25}" 
-                        fill="rgba(255,255,255,${isActive ? '0.12' : '0.05'})" 
-                        stroke="rgba(255,255,255,${isActive ? '0.2' : '0.08'})" 
-                        stroke-width="${isActive ? 2 : 1}"/>`;
-            svg += `<text x="${x + itemWidth/2}" y="${y + 55}" class="brand-initial">${initial}</text>`;
+            // Get logo filename
+            let logoFile = brandLogoMap[brandName] || 
+                           brandLogoMap[brandName.toUpperCase()] || 
+                           DEFAULT_LOGO;
             
-            const nameColor = isActive ? '#FFFFFF' : 'rgba(255,255,255,0.4)';
-            svg += `<text x="${x + itemWidth/2}" y="${y + 95}" class="brand-name" fill="${nameColor}">${brand.name}</text>`;
+            // Construct full logo URL
+            const logoUrl = `${LOGO_BASE_URL}${logoFile}`;
             
+            // Get category
+            const category = brandCategories[brandName] || 
+                            brandCategories[brandName.toUpperCase()] || 
+                            'Premium Auto Parts';
+            
+            // Brand card background
+            svg += `<rect x="${x}" y="${y}" width="${itemWidth}" height="${itemHeight}" class="brand-card"/>`;
+            
+            // Colored accent bar at top
+            svg += `<rect x="${x + 12}" y="${y + 8}" width="${itemWidth - 24}" height="3" 
+                        fill="${color}" class="brand-accent"/>`;
+            
+            // Logo container
+            const logoSize = itemWidth > 150 ? 60 : 50;
+            const logoX = x + (itemWidth - logoSize) / 2;
+            const logoY = y + 15;
+            
+            // Logo background circle
+            svg += `<circle cx="${x + itemWidth/2}" cy="${logoY + logoSize/2}" r="${logoSize/2 + 5}" 
+                        fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+            
+            // ⭐ ACTUAL LOGO IMAGE FROM GITHUB PAGES
+            svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" 
+                        href="${logoUrl}" class="brand-logo" 
+                        preserveAspectRatio="xMidYMid meet"
+                        opacity="0.95"/>`;
+            
+            // Fallback text behind image (shows if image fails)
+            svg += `<text x="${x + itemWidth/2}" y="${logoY + logoSize/2 + 5}" class="brand-fallback">${escapeXML(brandName.charAt(0))}</text>`;
+            
+            // Brand name (below logo)
+            const nameY = logoY + logoSize + 15;
+            svg += `<text x="${x + itemWidth/2}" y="${nameY + 15}" class="brand-name">${escapeXML(brandName)}</text>`;
+            
+            // Category subtitle (below brand name)
+            svg += `<text x="${x + itemWidth/2}" y="${nameY + 35}" class="brand-subtitle">${category}</text>`;
+            
+            // Brand number (small indicator)
+            svg += `<text x="${x + 15}" y="${y + itemHeight - 10}" class="brand-number">#${i + 1}</text>`;
+            
+            // Active indicator
             if (isActive) {
-                svg += `<circle cx="${x + itemWidth - 15}" cy="${y + 15}" r="4" fill="#4CAF50"/>`;
-            } else {
-                svg += `<circle cx="${x + itemWidth - 15}" cy="${y + 15}" r="4" fill="#f44336"/>`;
+                svg += `<circle cx="${x + itemWidth - 15}" cy="${y + 15}" r="4" class="active-dot"/>`;
             }
         }
 
         svg += `</svg>`;
 
-        return await sharp(Buffer.from(svg)).png().toBuffer();
+        return await sharp(Buffer.from(svg))
+            .png()
+            .toBuffer();
     }
 
     async createDynamicFooter(width, brandCount) {
@@ -309,7 +466,7 @@ class DynamicBrandCollage {
             { id: 'rml', name: 'RML', active: true },
             { id: 'girling', name: 'GIRLING', active: true },
             { id: 'lmm', name: 'LMM', active: true },
-            { id: 'mm', name: 'MM', active: true },
+            { id: 'mm', name: 'M&M', active: true },
             { id: 'mtbl', name: 'MTBL', active: true },
             { id: 'stl', name: 'STL', active: true },
             { id: 'vf', name: 'VF', active: true },
