@@ -1,5 +1,5 @@
 // ============================================================
-// 🎨 DYNAMIC BRAND COLLAGE GENERATOR v4.2 - COMPLETE FIX
+// 🎨 DYNAMIC BRAND COLLAGE GENERATOR - COMPLETE FIX
 // ============================================================
 
 const sharp = require('sharp');
@@ -13,7 +13,7 @@ const collageCache = new LRUCache({
 });
 
 // ============================================================
-// 🔧 XML ESCAPE FUNCTION
+// 🔧 XML ESCAPE FUNCTION - COMPLETE
 // ============================================================
 
 function escapeXML(value) {
@@ -26,9 +26,16 @@ function escapeXML(value) {
         .replace(/'/g, '&apos;');
 }
 
-// ============================================================
-// 🎨 DYNAMIC BRAND COLLAGE
-// ============================================================
+// ✅ NEW: Escape for HTML attributes (URLs)
+function escapeAttr(value) {
+    if (!value) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&apos;');
+}
 
 class DynamicBrandCollage {
     constructor() {
@@ -85,8 +92,11 @@ class DynamicBrandCollage {
 
             const collageBuffer = await this.createDynamicBrochure(brands, customerPhone);
             
-            collageCache.set(cacheKey, collageBuffer);
-            this.lastBrandCount = brands.length;
+            if (collageBuffer) {
+                collageCache.set(cacheKey, collageBuffer);
+                this.lastBrandCount = brands.length;
+                console.log(`✅ Brochure generated successfully (${brands.length} brands)`);
+            }
             
             return collageBuffer;
 
@@ -147,7 +157,6 @@ class DynamicBrandCollage {
             .jpeg({ quality: 92, progressive: true })
             .toBuffer();
 
-            console.log(`✅ Dynamic brochure generated successfully (${count} brands)`);
             return result;
 
         } catch (error) {
@@ -216,7 +225,7 @@ class DynamicBrandCollage {
     }
 
     // ============================================================
-    // 🎯 COMPLETE FIXED: Brand Grid with ALL Logos
+    // ✅ COMPLETE FIXED: Brand Grid
     // ============================================================
 
     async createDynamicBrandGrid(brands, width, cols, itemWidth, itemHeight) {
@@ -225,10 +234,9 @@ class DynamicBrandCollage {
         const offsetX = (width - gridWidth) / 2;
         const totalHeight = rows * (itemHeight + 20) + 40;
         
-        // ✅ CORRECT LOGO BASE URL
         const LOGO_BASE_URL = 'https://autosparessolution.github.io/images/';
         
-        // ✅ COMPLETE LOGO MAP - ALL FIXED
+        // ✅ FIXED: All logo filenames - CORRECT
         const brandLogoMap = {
             'RANE': 'RANE.png',
             'TVS': 'TVS.jpg',
@@ -236,21 +244,19 @@ class DynamicBrandCollage {
             'RML': 'RML.png',
             'GIRLING': 'brand-girling.png',
             'LMM': 'brand-lmm.png',
-            'MM': 'brand-m&m.png',
-            'M M': 'brand-m&m.png',
-            'M&M': 'brand-m&m.png',
+            'MM': 'brand-m_m.png',
+            'M M': 'brand-m_m.png',
+            'M&M': 'brand-m_m.png',
             'MTBL': 'brand-mtbl.png',
             'STL': 'brand-stl.png',
             'VF': 'brand-vf.png',
             'WABCO': 'brand-wabco.png',
             'GREAVES': 'brand-greaves.png',
-            'LEYPARTS': 'brand-leyparts.png',
-            'BOSCH': 'brand-bosch.png'
+            'LEYPARTS': 'brand-leyparts.png'
         };
         
         const DEFAULT_LOGO = 'default.png';
         
-        // ✅ COMPLETE CATEGORIES
         const brandCategories = {
             'RANE': 'Suspension • Steering',
             'TVS': 'Bolt • Nut',
@@ -266,8 +272,7 @@ class DynamicBrandCollage {
             'VF': 'Mahindra Value Fit',
             'WABCO': 'Air Brakes • ABS',
             'GREAVES': 'Engine • Transmission',
-            'LEYPARTS': 'Leyland Spares',
-            'BOSCH': 'Electrical • Fuel'
+            'LEYPARTS': 'Leyland Spares'
         };
         
         const colors = [
@@ -299,27 +304,32 @@ class DynamicBrandCollage {
             const isActive = brand.active !== false;
             const color = colors[i % colors.length];
             
-            // ✅ FIX: Normalize brand name for logo lookup
+            // ✅ Normalize brand name for logo lookup
             let logoKey = brandName.toUpperCase();
             if (logoKey === 'M M' || logoKey === 'M&M' || logoKey === 'MM') {
                 logoKey = 'MM';
             }
             
-            // ✅ FIX: Get correct logo filename
+            // ✅ Get logo filename (NO & in filename!)
             let logoFile = brandLogoMap[logoKey] || 
                            brandLogoMap[brandName] || 
                            DEFAULT_LOGO;
             
+            // ✅ IMPORTANT: Construct URL WITHOUT ampersand issues
+            // Use brand-m_m.png instead of brand-m&m.png
             const logoUrl = `${LOGO_BASE_URL}${logoFile}`;
             
-            // ✅ FIX: Get category
+            // ✅ Get category
             let category = brandCategories[logoKey] || 
                            brandCategories[brandName] || 
                            'Premium Auto Parts';
             
-            // ✅ FIX: Escape all text
+            // ✅ Escape ALL text
             const safeName = escapeXML(brandName);
             const safeCategory = escapeXML(category);
+            
+            // ✅ Escape URL for HTML attribute
+            const safeLogoUrl = escapeAttr(logoUrl);
             
             const logoSize = itemWidth > 150 ? 60 : 50;
             const logoX = x + (itemWidth - logoSize) / 2;
@@ -334,8 +344,8 @@ class DynamicBrandCollage {
             // Logo background
             svg += `<circle cx="${x + itemWidth/2}" cy="${logoY + logoSize/2}" r="${logoSize/2 + 5}" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
             
-            // ✅ LOGO IMAGE FROM GITHUB PAGES
-            svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" href="${logoUrl}" class="brand-logo" preserveAspectRatio="xMidYMid meet" opacity="0.95"/>`;
+            // ✅ LOGO IMAGE - WITH SAFE URL (NO & issues)
+            svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" href="${safeLogoUrl}" class="brand-logo" preserveAspectRatio="xMidYMid meet" opacity="0.95"/>`;
             
             // Fallback text
             const fallbackChar = safeName.charAt(0);
