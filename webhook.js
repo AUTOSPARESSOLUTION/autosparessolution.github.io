@@ -44,10 +44,23 @@ try {
     brandManager = {
         getActiveBrands: () => [],
         getBrandsForWhatsApp: () => [],
-        getBrandTextList: () => 'RANE, TVS, WABCO',
+        getBrandTextList: () => 'RANE, TVS, WABCO, RBL, RML, GIRLING, LMM, M&M, MTBL, STL, VF',
         updateBrands: async () => false,
         brands: [],
         getSummary: () => ({ total: 0, active: 0 })
+    };
+}
+
+// 🎨 BRAND COLLAGE GENERATOR
+let brandCollage = null;
+try {
+    brandCollage = require('./modules/brand-collage');
+    console.log('✅ Brand Collage Generator loaded');
+} catch(e) {
+    console.log('⚠️ Brand Collage Generator not found');
+    brandCollage = {
+        generateWelcomeBrochure: async () => null,
+        cleanupTempFiles: () => {}
     };
 }
 
@@ -128,7 +141,7 @@ const CONFIG = {
     geminiTimeout: 30000,
     responseTimeout: 60000,
     debug: process.env.DEBUG === 'true',
-    brandUpdateInterval: parseInt(process.env.BRAND_UPDATE_INTERVAL) || 300000 // 5 minutes
+    brandUpdateInterval: parseInt(process.env.BRAND_UPDATE_INTERVAL) || 300000
 };
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE || "9830300193";
@@ -141,12 +154,13 @@ console.log(`🆔 Phone Number ID: ${CONFIG.phoneNumberId}`);
 console.log(`🔑 Token: ${CONFIG.accessToken ? '✅ Set' : '❌ Not set'}`);
 console.log(`🧠 Gemini: ${CONFIG.geminiKey ? '✅ Set' : '❌ Not set'}`);
 console.log(`🎨 Brand Manager: ${brandManager ? '✅ Active' : '❌ Fallback'}`);
+console.log(`🎨 Brand Collage: ${brandCollage ? '✅ Active' : '❌ Fallback'}`);
 console.log(`⏱️ Gemini Timeout: ${CONFIG.geminiTimeout}ms`);
 console.log(`⏱️ Response Timeout: ${CONFIG.responseTimeout}ms`);
 console.log('====================================');
 
 // ============================================================
-// 📞 PHONE NUMBER NORMALIZATION - ADMIN FIX
+// 📞 PHONE NUMBER NORMALIZATION
 // ============================================================
 
 function normalizePhone(phone) {
@@ -195,7 +209,7 @@ const limiter = rateLimit({
 app.use('/webhook', limiter);
 
 // ============================================================
-// 🛡️ DUPLICATE MESSAGE DETECTION - LRU CACHE
+// 🛡️ DUPLICATE MESSAGE DETECTION
 // ============================================================
 
 const messageCache = new LRUCache({
@@ -240,7 +254,7 @@ async function withTimeout(promise, ms = CONFIG.responseTimeout, errorMessage = 
 }
 
 // ============================================================
-// 🤖 GEMINI RATE LIMITER - CRITICAL FIX (from v2)
+// 🤖 GEMINI RATE LIMITER
 // ============================================================
 
 class GeminiRateLimiter {
@@ -334,7 +348,7 @@ class GeminiRateLimiter {
 const geminiRateLimiter = new GeminiRateLimiter();
 
 // ============================================================
-// 💾 GEMINI CACHE (from v2)
+// 💾 GEMINI CACHE
 // ============================================================
 
 const geminiCache = new LRUCache({
@@ -343,7 +357,7 @@ const geminiCache = new LRUCache({
 });
 
 // ============================================================
-// 📢 ALERT SYSTEM - ENHANCED
+// 📢 ALERT SYSTEM
 // ============================================================
 
 class AlertSystem {
@@ -637,75 +651,168 @@ async function sendImageMessage(to, imageUrl, caption) {
 }
 
 // ============================================================
-// 👋 SEND WELCOME WITH DYNAMIC BRANDS
+// 📤 SEND IMAGE BUFFER (For Brochure)
 // ============================================================
 
-async function sendWelcomeWithAllBrands(to) {
+async function sendImageBuffer(to, buffer, caption) {
     try {
-        const welcomeKey = `welcome_sent_${to}`;
-        const isReturning = messageCache.has(welcomeKey);
+        const normalizedPhone = to.replace(/\D/g, '');
         
-        // Get dynamic brands
-        const maxBrands = isReturning ? 4 : 8;
-        const brands = brandManager.getBrandsForWhatsApp ? 
-            brandManager.getBrandsForWhatsApp(maxBrands) : 
-            [];
+        const formData = new FormData();
+        const blob = new Blob([buffer], { type: 'image/jpeg' });
+        formData.append('file', blob, 'welcome_brochure.jpg');
+        formData.append('messaging_product', 'whatsapp');
+        formData.append('type', 'image/jpeg');
         
-        const brandText = brandManager.getBrandTextList ? 
-            brandManager.getBrandTextList() : 
-            'RANE, TVS, WABCO, RBL, RML, GIRLING, LMM, M&M, MTBL, STL, VF';
+        const uploadUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/media`;
+        const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.accessToken}`,
+            },
+            body: formData
+        });
         
-        // Send welcome message with brand list
-        await sendWhatsAppMessage(to, 
-            `👋 *Welcome to Auto Spares Solution!*\n\n` +
-            `🤖 I'm your AI Sales Assistant\n\n` +
-            `🏷️ *Premium Brands:* ${brandText}\n\n` +
-            `🔍 *Search:* Send part number or description\n` +
-            `📸 *Send Photo:* Take photo of your order list\n` +
-            `🎙️ *Send Voice:* Speak your order\n` +
-            `🛒 *Order:* "0801BA0285N 2"\n` +
-            `✅ *Confirm:* "Confirm Order"\n` +
-            `🗑️ *Clear:* "Clear Cart"\n\n` +
-            `📞 *Call:* ${CONFIG.businessPhone}\n` +
-            `🛒 *Shop:* https://autosparessolution.com`
-        );
-        
-        // Send brand logos with delays
-        if (brands.length > 0) {
-            // Send first brand
-            await sendImageMessage(to, brands[0].logo, `🏷️ ${brands[0].name}`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Send remaining brands (max 5 more)
-            const remaining = brands.slice(1, 6);
-            for (const brand of remaining) {
-                try {
-                    await sendImageMessage(to, brand.logo, `🏷️ ${brand.name}`);
-                    await new Promise(resolve => setTimeout(resolve, 800));
-                } catch (error) {
-                    console.error(`❌ Failed to send logo for ${brand.name}:`, error.message);
-                }
-            }
+        const uploadResult = await uploadResponse.json();
+        if (!uploadResult.id) {
+            throw new Error('Failed to upload image');
         }
         
-        // Send how-to-order instructions
-        await sendWhatsAppMessage(to,
-            `📝 *How to Order:*\n\n` +
-            `1️⃣ Send *Part Number* (e.g., "0801BA0285N")\n` +
-            `2️⃣ Add *Quantity* (e.g., "0801BA0285N 2")\n` +
-            `3️⃣ Send multiple parts in separate lines\n` +
-            `4️⃣ Reply "Confirm Order" to complete\n` +
-            `5️⃣ Get Excel & PDF summary\n\n` +
-            `📞 Call: ${CONFIG.businessPhone}`
-        );
+        const sendUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
+        const sendResponse = await fetch(sendUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: normalizedPhone,
+                type: 'image',
+                image: {
+                    id: uploadResult.id,
+                    caption: caption || 'Welcome to Auto Spares Solution!'
+                }
+            })
+        });
+        
+        if (!sendResponse.ok) {
+            throw new Error(`Failed to send image: ${sendResponse.status}`);
+        }
+        
+        console.log(`📸 Brochure sent to ${normalizedPhone}`);
+        return await sendResponse.json();
         
     } catch (error) {
-        console.error(`❌ Failed to send welcome to ${to}:`, error.message);
+        console.error('❌ Image buffer send error:', error.message);
+        return null;
     }
 }
 
 // ============================================================
-// 📊 EXCEL & PDF GENERATORS
+// 👋 SEND WELCOME WITH DYNAMIC BROCHURE
+// ============================================================
+
+async function sendWelcomeWithAllBrands(to) {
+    try {
+        console.log(`🎨 Generating dynamic brochure for ${to}`);
+        
+        let allBrands = [];
+        let brandText = '';
+        
+        if (brandManager && brandManager.getActiveBrands) {
+            await brandManager.updateBrands(false);
+            allBrands = brandManager.getActiveBrands();
+            brandText = allBrands.map(b => b.name).join(' • ');
+            console.log(`📊 Retrieved ${allBrands.length} brands from manager`);
+        } else {
+            allBrands = [
+                { id: 'rane', name: 'RANE', active: true },
+                { id: 'tvs', name: 'TVS', active: true },
+                { id: 'rbl', name: 'RBL', active: true },
+                { id: 'rml', name: 'RML', active: true },
+                { id: 'girling', name: 'GIRLING', active: true },
+                { id: 'lmm', name: 'LMM', active: true },
+                { id: 'mm', name: 'M&M', active: true },
+                { id: 'mtbl', name: 'MTBL', active: true },
+                { id: 'stl', name: 'STL', active: true },
+                { id: 'vf', name: 'VF', active: true },
+                { id: 'wabco', name: 'WABCO', active: true }
+            ];
+            brandText = allBrands.map(b => b.name).join(' • ');
+        }
+        
+        // Generate brochure
+        let brochureBuffer = null;
+        try {
+            brochureBuffer = await brandCollage.generateWelcomeBrochure(allBrands, to);
+        } catch (error) {
+            console.error('❌ Brochure generation failed:', error.message);
+        }
+        
+        if (brochureBuffer) {
+            await sendImageBuffer(to, brochureBuffer, 
+                `🚗 Welcome to Auto Spares Solution!\n🏷️ ${allBrands.length} Premium Brands`
+            );
+            
+            await sendWhatsAppMessage(to,
+                `👋 *Welcome to Auto Spares Solution!*\n\n` +
+                `🤖 I'm your AI Sales Assistant\n\n` +
+                `🏷️ *${allBrands.length} Premium Brands:* ${brandText}\n\n` +
+                `🔍 *Search:* Send part number or description\n` +
+                `📸 *Send Photo:* Take photo of your order list\n` +
+                `🎙️ *Send Voice:* Speak your order\n` +
+                `🛒 *Order:* "0801BA0285N 2"\n` +
+                `✅ *Confirm:* "Confirm Order"\n` +
+                `🗑️ *Clear:* "Clear Cart"\n\n` +
+                `📞 *Call:* ${CONFIG.businessPhone}\n` +
+                `🛒 *Shop:* https://autosparessolution.com`
+            );
+            
+            await sendWhatsAppMessage(to,
+                `📝 *How to Order:*\n\n` +
+                `1️⃣ Send *Part Number* (e.g., "0801BA0285N")\n` +
+                `2️⃣ Add *Quantity* (e.g., "0801BA0285N 2")\n` +
+                `3️⃣ Send multiple parts in separate lines\n` +
+                `4️⃣ Reply "Confirm Order" to complete\n` +
+                `5️⃣ Get Excel & PDF summary\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+        } else {
+            // Fallback: Text-only
+            await sendWhatsAppMessage(to, 
+                `👋 *Welcome to Auto Spares Solution!*\n\n` +
+                `🤖 I'm your AI Sales Assistant\n\n` +
+                `🏷️ *${allBrands.length} Premium Brands:* ${brandText}\n\n` +
+                `🔍 *Search:* Send part number or description\n` +
+                `📸 *Send Photo:* Take photo of your order list\n` +
+                `🎙️ *Send Voice:* Speak your order\n` +
+                `🛒 *Order:* "0801BA0285N 2"\n` +
+                `✅ *Confirm:* "Confirm Order"\n` +
+                `🗑️ *Clear:* "Clear Cart"\n\n` +
+                `📞 *Call:* ${CONFIG.businessPhone}\n` +
+                `🛒 *Shop:* https://autosparessolution.com`
+            );
+        }
+        
+        setTimeout(() => {
+            try {
+                brandCollage.cleanupTempFiles();
+            } catch (error) {}
+        }, 5000);
+        
+    } catch (error) {
+        console.error(`❌ Failed to send welcome to ${to}:`, error.message);
+        await sendWhatsAppMessage(to, 
+            `👋 *Welcome to Auto Spares Solution!*\n\n` +
+            `📞 Call: ${CONFIG.businessPhone}\n` +
+            `🛒 Shop: https://autosparessolution.com`
+        );
+    }
+}
+
+// ============================================================
+// 📊 EXCEL GENERATOR
 // ============================================================
 
 async function generateExcelSummary(orderId, items, total, customerPhone, notFoundItems = [], outOfStockItems = []) {
@@ -881,6 +988,10 @@ async function generateExcelSummary(orderId, items, total, customerPhone, notFou
         return null;
     }
 }
+
+// ============================================================
+// 📄 PDF GENERATOR
+// ============================================================
 
 async function generatePDFSummary(orderId, items, total, customerPhone) {
     try {
@@ -1159,7 +1270,7 @@ let importProgress = 0;
 const TOTAL_PRODUCTS = 93098;
 
 // ============================================================
-// 🗄️ DATABASE INITIALIZATION - FIXED
+// 🗄️ DATABASE INITIALIZATION
 // ============================================================
 
 async function initAllTables() {
@@ -1502,6 +1613,180 @@ async function initAllTables() {
         });
         console.log('✅ user_preferences table ready');
 
+        // 🆕 Additional tables for complete system
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS customers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone TEXT NOT NULL UNIQUE,
+                    name TEXT,
+                    email TEXT,
+                    address TEXT,
+                    city TEXT,
+                    state TEXT,
+                    pincode TEXT,
+                    gstin TEXT,
+                    company_name TEXT,
+                    customer_type TEXT DEFAULT 'retail',
+                    total_orders INTEGER DEFAULT 0,
+                    total_spent REAL DEFAULT 0,
+                    last_order_at TEXT,
+                    registered_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ customers table ready');
+
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS suppliers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    phone TEXT NOT NULL,
+                    email TEXT,
+                    address TEXT,
+                    gstin TEXT,
+                    contact_person TEXT,
+                    status TEXT DEFAULT 'active',
+                    rating REAL DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ suppliers table ready');
+
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS supplier_products (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    supplier_id INTEGER NOT NULL,
+                    part TEXT NOT NULL,
+                    description TEXT,
+                    price REAL DEFAULT 0,
+                    stock INTEGER DEFAULT 0,
+                    is_primary BOOLEAN DEFAULT 0,
+                    last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+                    UNIQUE(supplier_id, part)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ supplier_products table ready');
+
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS supplier_enquiries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    supplier_id INTEGER NOT NULL,
+                    part TEXT NOT NULL,
+                    customer_phone TEXT NOT NULL,
+                    customer_name TEXT,
+                    quantity INTEGER DEFAULT 1,
+                    status TEXT DEFAULT 'pending',
+                    enquiry_text TEXT,
+                    response_text TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    responded_at TEXT,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ supplier_enquiries table ready');
+
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS purchase_invoices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    invoice_no TEXT UNIQUE NOT NULL,
+                    supplier_id INTEGER NOT NULL,
+                    supplier_name TEXT NOT NULL,
+                    supplier_gstin TEXT,
+                    invoice_date TEXT,
+                    due_date TEXT,
+                    subtotal REAL DEFAULT 0,
+                    gst_amount REAL DEFAULT 0,
+                    total_amount REAL DEFAULT 0,
+                    items TEXT,
+                    payment_status TEXT DEFAULT 'pending',
+                    payment_date TEXT,
+                    payment_method TEXT,
+                    payment_reference TEXT,
+                    notes TEXT,
+                    uploaded_by TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ purchase_invoices table ready');
+
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS purchase_order_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    purchase_invoice_id INTEGER NOT NULL,
+                    part TEXT NOT NULL,
+                    description TEXT,
+                    quantity INTEGER DEFAULT 0,
+                    unit_price REAL DEFAULT 0,
+                    total_price REAL DEFAULT 0,
+                    gst_rate REAL DEFAULT 18,
+                    gst_amount REAL DEFAULT 0,
+                    status TEXT DEFAULT 'pending',
+                    received_quantity INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (purchase_invoice_id) REFERENCES purchase_invoices(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ purchase_order_items table ready');
+
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS supplier_payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    payment_id TEXT UNIQUE NOT NULL,
+                    supplier_id INTEGER NOT NULL,
+                    supplier_name TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    payment_method TEXT NOT NULL,
+                    payment_reference TEXT,
+                    payment_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                    invoice_no TEXT,
+                    notes TEXT,
+                    status TEXT DEFAULT 'completed',
+                    created_by TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ supplier_payments table ready');
+
         await createIndexes();
         console.log('✅ All tables created/verified');
 
@@ -1530,6 +1815,9 @@ async function createIndexes() {
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_out_of_stock_status ON out_of_stock_tracking(status)');
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_alerts_phone ON alerts(phone)');
         await db.db.run('CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at)');
+        await db.db.run('CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone)');
+        await db.db.run('CREATE INDEX IF NOT EXISTS idx_suppliers_phone ON suppliers(phone)');
+        await db.db.run('CREATE INDEX IF NOT EXISTS idx_purchase_invoices_no ON purchase_invoices(invoice_no)');
         console.log('✅ Indexes created');
     } catch (error) {
         console.error('❌ Index creation error:', error.message);
@@ -1537,7 +1825,7 @@ async function createIndexes() {
 }
 
 // ============================================================
-// 🏥 HEALTH CHECK - Enhanced with Gemini status
+// 🏥 HEALTH CHECK
 // ============================================================
 
 app.get('/health', async (req, res) => {
@@ -1716,9 +2004,6 @@ app.get('/api/import-status', (req, res) => {
 // 🎨 BRAND API ENDPOINTS
 // ============================================================
 
-/**
- * Get all brands
- */
 app.get('/api/brands', async (req, res) => {
     try {
         const { active = 'true', limit } = req.query;
@@ -1754,9 +2039,6 @@ app.get('/api/brands', async (req, res) => {
     }
 });
 
-/**
- * Force update brands from remote
- */
 app.post('/api/brands/update', async (req, res) => {
     try {
         const from = req.body.from || req.query.from;
@@ -1786,9 +2068,6 @@ app.post('/api/brands/update', async (req, res) => {
     }
 });
 
-/**
- * Get brand summary
- */
 app.get('/api/brands/summary', async (req, res) => {
     try {
         const summary = brandManager.getSummary ? 
@@ -1823,7 +2102,7 @@ app.get('/webhook', (req, res) => {
 });
 
 // ============================================================
-// 📩 WEBHOOK RECEIVE - WITH AUTO-WELCOME
+// 📩 WEBHOOK RECEIVE
 // ============================================================
 
 app.post('/webhook', async (req, res) => {
@@ -1978,7 +2257,7 @@ async function processMessage(message, from, type) {
 }
 
 // ============================================================
-// 📤 SEND WHATSAPP MESSAGE - WITH RETRY LOGIC
+// 📤 SEND WHATSAPP MESSAGE
 // ============================================================
 
 async function sendWhatsAppMessage(to, message) {
@@ -2411,7 +2690,7 @@ function formatProductForWhatsApp(product, index = 0) {
 }
 
 // ============================================================
-// 📱 HANDLE WHATSAPP TEXT MESSAGE - COMPLETE
+// 📱 HANDLE WHATSAPP TEXT MESSAGE
 // ============================================================
 
 async function handleWhatsAppMessage(message, from) {
@@ -2423,10 +2702,9 @@ async function handleWhatsAppMessage(message, from) {
         const msgLower = cleaned.toLowerCase().trim();
 
         // ============================================================
-        // 🛡️ STEP 1: CHECK ALL COMMANDS FIRST
+        // 🛡️ STEP 1: ADMIN COMMANDS
         // ============================================================
         
-        // 👑 ADMIN COMMANDS
         if (isAdmin(from)) {
             
             // 📋 Admin: Show admin commands
@@ -2447,7 +2725,8 @@ async function handleWhatsAppMessage(message, from) {
                     `   "Brands" - List all brands\n` +
                     `   "Update brands" - Force brand update\n` +
                     `   "Add brand id|name|logo" - Add new brand\n` +
-                    `   "Remove brand id" - Remove brand\n\n` +
+                    `   "Remove brand id" - Remove brand\n` +
+                    `   "Refresh brochure" - Regenerate brochure\n\n` +
                     `📞 *Call:* ${CONFIG.businessPhone}`
                 );
                 return;
@@ -2619,7 +2898,8 @@ async function handleWhatsAppMessage(message, from) {
                 reply += `📝 *Commands:*\n`;
                 reply += `   "Update brands" - Force update from remote\n`;
                 reply += `   "Add brand id|name|logo" - Add new brand\n`;
-                reply += `   "Remove brand id" - Remove brand`;
+                reply += `   "Remove brand id" - Remove brand\n`;
+                reply += `   "Refresh brochure" - Regenerate brochure`;
                 
                 await sendWhatsAppMessage(from, reply);
                 return;
@@ -2648,6 +2928,34 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
             
+            // 🔄 Refresh brochure
+            if (msgLower === 'refresh brochure' || msgLower === 'update brochure') {
+                await sendWhatsAppMessage(from, '🔄 Refreshing brochure cache...');
+                
+                // Clear cache
+                if (brandCollage && brandCollage.clearCache) {
+                    brandCollage.clearCache();
+                } else {
+                    // Manually clear cache
+                    try {
+                        const { LRUCache } = require('lru-cache');
+                    } catch (e) {}
+                }
+                
+                // Force brand update
+                if (brandManager && brandManager.updateBrands) {
+                    await brandManager.updateBrands(true);
+                }
+                
+                await sendWhatsAppMessage(from,
+                    `✅ *Brochure Refreshed!*\n\n` +
+                    `📊 Total Brands: ${brandManager?.getActiveBrands?.().length || 0}\n` +
+                    `🕐 Last Updated: ${new Date().toLocaleString()}\n\n` +
+                    `📋 New users will see the updated brochure.`
+                );
+                return;
+            }
+            
             // ➕ Add brand
             const addBrandMatch = msgLower.match(/add brand ([^|]+)\|([^|]+)\|([^|]+)/);
             if (addBrandMatch) {
@@ -2655,7 +2963,6 @@ async function handleWhatsAppMessage(message, from) {
                 const name = addBrandMatch[2].trim();
                 const logo = addBrandMatch[3].trim();
                 
-                // Check if brand exists
                 const existing = brandManager.getBrandById ? 
                     brandManager.getBrandById(id) : null;
                 
@@ -2664,7 +2971,6 @@ async function handleWhatsAppMessage(message, from) {
                     return;
                 }
                 
-                // Add brand
                 if (brandManager.brands) {
                     brandManager.brands.push({
                         id,
@@ -2684,7 +2990,8 @@ async function handleWhatsAppMessage(message, from) {
                     `🆔 ID: ${id}\n` +
                     `📛 Name: ${name}\n` +
                     `📷 Logo: ${logo}\n\n` +
-                    `📋 "Brands" to view all`
+                    `📋 "Brands" to view all\n` +
+                    `🔄 "Refresh brochure" to update brochure`
                 );
                 return;
             }
@@ -2702,7 +3009,6 @@ async function handleWhatsAppMessage(message, from) {
                     return;
                 }
                 
-                // Deactivate instead of delete
                 brand.active = false;
                 
                 if (brandManager.saveBrandsToFile) {
@@ -2713,7 +3019,8 @@ async function handleWhatsAppMessage(message, from) {
                     `✅ *Brand Deactivated!*\n\n` +
                     `🆔 ID: ${id}\n` +
                     `📛 Name: ${brand.name}\n\n` +
-                    `💡 Use "Update brands" to reactivate from remote`
+                    `💡 Use "Update brands" to reactivate from remote\n` +
+                    `🔄 "Refresh brochure" to update brochure`
                 );
                 return;
             }
@@ -2745,7 +3052,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 2️⃣ ✅ CONFIRM ORDER
+        // 2️⃣ CONFIRM ORDER
         // ============================================================
         if (msgLower === 'confirm order' || msgLower === 'confirm') {
             console.log(`🛒 Customer confirming order: ${from}`);
@@ -2781,7 +3088,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 3️⃣ 🗑️ CLEAR CART
+        // 3️⃣ CLEAR CART
         // ============================================================
         if (msgLower === 'clear cart' || msgLower === 'clear') {
             await db.clearCart(from);
@@ -2790,7 +3097,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 4️⃣ 📊 DOWNLOAD EXCEL
+        // 4️⃣ DOWNLOAD EXCEL
         // ============================================================
         if (msgLower === 'download excel' || msgLower === 'excel') {
             try {
@@ -2823,7 +3130,7 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 5️⃣ 📄 DOWNLOAD PDF
+        // 5️⃣ DOWNLOAD PDF
         // ============================================================
         if (msgLower === 'download pdf' || msgLower === 'pdf') {
             try {
@@ -2872,7 +3179,7 @@ async function handleWhatsAppMessage(message, from) {
         // 🔍 STEP 2: PART NUMBER EXTRACTION
         // ============================================================
         
-        // 6️⃣ CHECK: Multi-product
+        // 6️⃣ Multi-product check
         const allParts = text.match(/\b[A-Z0-9]{5,20}\b/gi);
         const uniqueParts = allParts ? [...new Set(allParts.map(p => p.toUpperCase()))] : [];
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -3019,7 +3326,7 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
 
-        // 7️⃣ CHECK: Part number with quantity
+        // 7️⃣ Part number with quantity
         const partWithQty = cleaned.match(/\b([A-Z0-9]{5,20})\s*(\d+)\b/);
         if (partWithQty) {
             const partNumber = partWithQty[1];
@@ -3080,7 +3387,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // 8️⃣ CHECK: Exact part number only
+        // 8️⃣ Exact part number only
         const exactPartMatch = cleaned.match(/^[A-Z0-9]{5,20}$/);
         if (exactPartMatch) {
             const partNumber = exactPartMatch[0];
@@ -3097,7 +3404,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // 9️⃣ CHECK: Part number from text
+        // 9️⃣ Part number from text
         const partOnly = cleaned.match(/\b([A-Z0-9]{5,20})\b/);
         if (partOnly) {
             const partNumber = partOnly[1];
@@ -3114,7 +3421,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // 🔟 CHECK: Price Check
+        // 🔟 Price Check
         if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('rate')) {
             const partNumber = extractPartNumber(cleaned);
             if (partNumber) {
@@ -3145,7 +3452,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // 1️⃣1️⃣ CHECK: Stock Check
+        // 1️⃣1️⃣ Stock Check
         if (msgLower.includes('stock') || msgLower.includes('available')) {
             const partNumber = extractPartNumber(cleaned);
             if (partNumber) {
@@ -3161,7 +3468,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // 1️⃣2️⃣ SEARCH PRODUCTS
+        // 1️⃣2️⃣ Search Products
         if (cleaned.length >= 2) {
             const commonWords = ['i', 'need', 'want', 'for', 'my', 'the', 'a', 'an', 'me', 'please', 'from', 'to', 'of', 'with', 'have', 'has', 'is', 'are', 'was', 'were', 'and', 'or', 'but'];
             let searchWords = cleaned.toLowerCase().split(' ').filter(w => !commonWords.includes(w) && w.length > 1).join(' ');
@@ -3200,7 +3507,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
 
-        // 1️⃣3️⃣ GEMINI FALLBACK
+        // 1️⃣3️⃣ Gemini Fallback
         console.log(`🔄 No product found. Trying Gemini...`);
         const geminiReply = await withTimeout(
             getGeminiWebSearch(cleaned),
@@ -3212,7 +3519,7 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
 
-        // 1️⃣4️⃣ NO RESULTS
+        // 1️⃣4️⃣ No Results
         await sendWhatsAppMessage(from, 
             `🔍 No results for "${text}"\n\n` +
             `💡 Try sending a part number like "0801BA0285N"\n` +
@@ -3687,7 +3994,7 @@ IMPORTANT RULES:
 }
 
 // ============================================================
-// 📥 IMPORT CSV IN BACKGROUND - WITH AUTO-WELCOME
+// 📥 IMPORT CSV IN BACKGROUND
 // ============================================================
 
 let csvImportStarted = false;
@@ -3814,6 +4121,7 @@ async function startServer() {
             console.log(`👑 Admin Features: ✅ Active (${ADMIN_PHONE})`);
             console.log(`📊 Excel/PDF Export: ✅ Active`);
             console.log(`🎨 Dynamic Brands: ✅ Active (Auto-update every 5 min)`);
+            console.log(`🎨 Brand Collage: ✅ Active (All brands in one image)`);
             console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
             console.log(`⏱️ Response Timeout: ${CONFIG.responseTimeout}ms`);
             console.log(`⏱️ Gemini Timeout: ${CONFIG.geminiTimeout}ms`);
