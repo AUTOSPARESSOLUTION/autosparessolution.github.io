@@ -26,6 +26,23 @@ function escapeXML(str) {
         .replace(/'/g, '&apos;');
 }
 
+// ============================================================
+// 🔧 SAFE BRAND NAME - Handles M&M correctly
+// ============================================================
+
+function safeBrandName(name) {
+    if (!name) return '';
+    let cleaned = String(name).trim();
+    
+    // Handle M&M variations
+    if (cleaned === 'MM' || cleaned === 'M M' || cleaned === 'M&M' || cleaned === 'M&amp;M') {
+        return 'M&amp;M';
+    }
+    
+    // Escape XML
+    return escapeXML(cleaned);
+}
+
 class DynamicBrandCollage {
     constructor() {
         this.tempDir = path.join(__dirname, '../temp');
@@ -216,7 +233,7 @@ class DynamicBrandCollage {
     }
 
     // ============================================================
-    // 🎨 LOGO-BASED BROCHURE - WITH GITHUB PAGES LOGOS
+    // 🎨 LOGO-BASED BROCHURE - FIXED M&M
     // ============================================================
 
     async createDynamicBrandGrid(brands, width, cols, itemWidth, itemHeight) {
@@ -228,7 +245,7 @@ class DynamicBrandCollage {
         // ✅ YOUR GITHUB PAGES LOGO URL
         const LOGO_BASE_URL = 'https://autosparessolution.github.io/images/';
         
-        // Map brand names to their logo filenames
+        // ✅ FIXED: Map brand names to their logo filenames
         const brandLogoMap = {
             'RANE': 'RANE.png',
             'TVS': 'TVS.jpg',
@@ -236,9 +253,10 @@ class DynamicBrandCollage {
             'RML': 'RML.png',
             'GIRLING': 'brand-girling.png',
             'LMM': 'brand-lmm.png',
-            'MM': 'brand-M&M.png',
-            'M M': 'brand-M&M.png',
-            'MM': 'brand-M&M.png',
+            'MM': 'brand-m&m.png',           // ✅ FIXED: Use brand-m&m.png
+            'M M': 'brand-m&m.png',          // ✅ FIXED
+            'M&M': 'brand-m&m.png',          // ✅ FIXED
+            'M&amp;M': 'brand-m&m.png',      // ✅ FIXED
             'MTBL': 'brand-mtbl.png',
             'STL': 'brand-stl.png',
             'VF': 'brand-vf.png',
@@ -251,7 +269,7 @@ class DynamicBrandCollage {
         // Default logo if brand not found
         const DEFAULT_LOGO = 'default.png';
         
-        // Brand categories for subtitles
+        // ✅ FIXED: Brand categories
         const brandCategories = {
             'RANE': 'Suspension • Steering',
             'TVS': 'Bolt • Nut',
@@ -260,8 +278,9 @@ class DynamicBrandCollage {
             'GIRLING': 'Brake Systems',
             'LMM': 'Mahindra suboneton',
             'MM': 'Passenger • Commercial',
-        
-            
+            'M M': 'Passenger • Commercial',
+            'M&M': 'Passenger • Commercial',
+            'M&amp;M': 'Passenger • Commercial',
             'MTBL': 'Mahindra Truck Bus',
             'STL': 'Fasteners',
             'VF': 'Mahindra value fit',
@@ -346,16 +365,29 @@ class DynamicBrandCollage {
             const isActive = brand.active !== false;
             const color = colors[i % colors.length];
             
-            // Get logo filename
-            let logoFile = brandLogoMap[brandName] || 
+            // ✅ FIXED: Use safeBrandName for display
+            const displayName = safeBrandName(brandName);
+            
+            // ✅ FIXED: Get logo filename - handle M&M variations
+            let logoKey = brandName;
+            if (logoKey === 'MM' || logoKey === 'M M' || logoKey === 'M&M' || logoKey === 'M&amp;M') {
+                logoKey = 'MM';
+            }
+            
+            let logoFile = brandLogoMap[logoKey] || 
                            brandLogoMap[brandName.toUpperCase()] || 
                            DEFAULT_LOGO;
             
             // Construct full logo URL
             const logoUrl = `${LOGO_BASE_URL}${logoFile}`;
             
-            // Get category
-            const category = brandCategories[brandName] || 
+            // ✅ FIXED: Get category with proper key
+            let categoryKey = brandName;
+            if (categoryKey === 'MM' || categoryKey === 'M M' || categoryKey === 'M&M' || categoryKey === 'M&amp;M') {
+                categoryKey = 'MM';
+            }
+            
+            const category = brandCategories[categoryKey] || 
                             brandCategories[brandName.toUpperCase()] || 
                             'Premium Auto Parts';
             
@@ -381,15 +413,16 @@ class DynamicBrandCollage {
                         preserveAspectRatio="xMidYMid meet"
                         opacity="0.95"/>`;
             
-            // Fallback text behind image (shows if image fails)
-            svg += `<text x="${x + itemWidth/2}" y="${logoY + logoSize/2 + 5}" class="brand-fallback">${escapeXML(brandName.charAt(0))}</text>`;
+            // ✅ FIXED: Fallback text - use first char of display name
+            const fallbackChar = displayName.charAt(0);
+            svg += `<text x="${x + itemWidth/2}" y="${logoY + logoSize/2 + 5}" class="brand-fallback">${fallbackChar}</text>`;
             
-            // Brand name (below logo)
+            // ✅ FIXED: Brand name (below logo) - using safe display name
             const nameY = logoY + logoSize + 15;
-            svg += `<text x="${x + itemWidth/2}" y="${nameY + 15}" class="brand-name">${escapeXML(brandName)}</text>`;
+            svg += `<text x="${x + itemWidth/2}" y="${nameY + 15}" class="brand-name">${displayName}</text>`;
             
-            // Category subtitle (below brand name)
-            svg += `<text x="${x + itemWidth/2}" y="${nameY + 35}" class="brand-subtitle">${category}</text>`;
+            // ✅ FIXED: Category subtitle - properly escaped
+            svg += `<text x="${x + itemWidth/2}" y="${nameY + 35}" class="brand-subtitle">${escapeXML(category)}</text>`;
             
             // Brand number (small indicator)
             svg += `<text x="${x + 15}" y="${y + itemHeight - 10}" class="brand-number">#${i + 1}</text>`;
@@ -466,7 +499,7 @@ class DynamicBrandCollage {
             { id: 'rml', name: 'RML', active: true },
             { id: 'girling', name: 'GIRLING', active: true },
             { id: 'lmm', name: 'LMM', active: true },
-            { id: 'mm', name: 'MM', active: true },
+            { id: 'mm', name: 'M&M', active: true },  // ✅ FIXED: M&M not MM
             { id: 'mtbl', name: 'MTBL', active: true },
             { id: 'stl', name: 'STL', active: true },
             { id: 'vf', name: 'VF', active: true },
