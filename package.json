@@ -1,31 +1,38 @@
 {
-    "name": "assist-whatsapp-webhook",
-    "version": "3.1.0",
-    "description": "Complete WhatsApp Webhook with Dynamic Brand System",
-    "main": "webhook.js",
-    "scripts": {
-        "start": "node webhook.js",
-        "dev": "nodemon webhook.js"
-    },
-    "dependencies": {
-        "compression": "^1.7.4",
-        "cors": "^2.8.5",
-        "express": "^4.19.2",
-        "express-rate-limit": "^7.1.5",
-        "helmet": "^7.1.0",
-        "sqlite3": "^5.1.7",
-        "sharp": "^0.33.4",
-        "xlsx": "^0.18.5",
-        "exceljs": "^4.4.0",
-        "pdfmake": "^0.2.9",
-        "lru-cache": "^10.0.0",
-        "axios": "^1.6.8",
-        "dotenv": "^16.4.5"
-    },
-    "devDependencies": {
-        "nodemon": "^3.1.0"
-    },
-    "engines": {
-        "node": ">=18.0.0"
-    }
+  "name": "assist-whatsapp-webhook",
+  "version": "3.1.0",
+  "description": "Complete WhatsApp Webhook System - With Admin Features",
+  "main": "webhook.js",
+  "scripts": {
+    "start": "node webhook.js",
+    "dev": "nodemon webhook.js"
+  },
+  "dependencies": {
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "sqlite3": "^5.1.7",
+    "nodemailer": "^6.9.13",
+    "twilio": "^5.0.0",
+    "sharp": "^0.33.4",
+    "pdf-parse": "^1.1.1",
+    "tesseract.js": "^5.0.5",
+    "csv-parser": "^3.0.0",
+    "moment": "^2.30.1",
+    "xlsx": "^0.18.5",
+    "adm-zip": "^0.5.14",
+    "exceljs": "^4.4.0",
+    "pdfmake": "^0.2.9",
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "lru-cache": "^10.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
