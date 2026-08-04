@@ -63,21 +63,27 @@ class BrandManager {
         }
     }
 
-    getDefaultBrands() {
-        return [
-            { id: 'rane', name: 'RANE', logo: 'https://autosparessolution.github.io/images/RANE.png', active: true, priority: 1 },
-            { id: 'tvs', name: 'TVS', logo: 'https://autosparessolution.github.io/images/TVS.jpg', active: true, priority: 2 },
-            { id: 'rbl', name: 'RBL', logo: 'https://autosparessolution.github.io/images/brand-rbl.png', active: true, priority: 3 },
-            { id: 'rml', name: 'RML', logo: 'https://autosparessolution.github.io/images/RML.png', active: true, priority: 4 },
-            { id: 'girling', name: 'GIRLING', logo: 'https://autosparessolution.github.io/images/brand-girling.png', active: true, priority: 5 },
-            { id: 'lmm', name: 'LMM', logo: 'https://autosparessolution.github.io/images/brand-lmm.png', active: true, priority: 6 },
-            { id: 'mm', name: 'MM', logo: 'https://autosparessolution.github.io/images/brand-m&m.png', active: true, priority: 7 },
-            { id: 'mtbl', name: 'MTBL', logo: 'https://autosparessolution.github.io/images/brand-mtbl.png', active: true, priority: 8 },
-            { id: 'stl', name: 'STL', logo: 'https://autosparessolution.github.io/images/brand-stl.png', active: true, priority: 9 },
-            { id: 'vf', name: 'VF', logo: 'https://autosparessolution.github.io/images/brand-vf.png', active: true, priority: 10 },
-            { id: 'wabco', name: 'WABCO', logo: 'https://autosparessolution.github.io/images/brand-wabco.png', active: true, priority: 11 }
-        ];
-    }
+    // ============================================================
+// 🎨 BRAND CONFIG - FIXED getDefaultBrands
+// ============================================================
+
+getDefaultBrands() {
+    return [
+        { id: 'rane', name: 'RANE', active: true },
+        { id: 'tvs', name: 'TVS', active: true },
+        { id: 'rbl', name: 'RBL', active: true },
+        { id: 'rml', name: 'RML', active: true },
+        { id: 'girling', name: 'GIRLING', active: true },
+        { id: 'lmm', name: 'LMM', active: true },
+        { id: 'mm', name: 'M&M', active: true },    // ✅ FIXED: M&M not MM
+        { id: 'mtbl', name: 'MTBL', active: true },
+        { id: 'stl', name: 'STL', active: true },
+        { id: 'vf', name: 'VF', active: true },
+        { id: 'wabco', name: 'WABCO', active: true },
+        { id: 'leyparts', name: 'LEYPARTS', active: true },
+        { id: 'greaves', name: 'GREAVES', active: true }
+    ];
+}
 
     async fetchRemoteBrands() {
         const cacheKey = 'remote_brands';
