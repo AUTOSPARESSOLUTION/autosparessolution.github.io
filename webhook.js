@@ -85,7 +85,7 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 // ============================================================
-// 📦 DATABASE READY FLAG - FIXED
+// 📦 DATABASE READY FLAG
 // ============================================================
 
 let isDbReady = false;
@@ -150,11 +150,14 @@ app.use(compression({ threshold: 1024, level: 6 }));
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" }, contentSecurityPolicy: false }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.set('trust proxy', 1); // ✅ FIX: Add trust proxy
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 300,
-    message: 'Too many requests, please try again later.'
+    message: 'Too many requests, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 app.use('/webhook', limiter);
 
@@ -366,7 +369,7 @@ async function sendWelcomeWithAllBrands(to) {
 }
 
 // ============================================================
-// 🗄️ CREATE INDEXES - FIXED
+// 🗄️ CREATE INDEXES
 // ============================================================
 
 async function createIndexes() {
@@ -401,7 +404,7 @@ async function createIndexes() {
 }
 
 // ============================================================
-// 🗄️ DATABASE INITIALIZATION - COMPLETE FIXED
+// 🗄️ DATABASE INITIALIZATION
 // ============================================================
 
 async function initAllTables() {
@@ -508,7 +511,6 @@ async function initAllTables() {
         `);
         console.log('✅ invoice_audit table ready');
 
-        // ✅ DELIVERY BOYS TABLE
         await db.db.run(`
             CREATE TABLE IF NOT EXISTS delivery_boys (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -538,7 +540,6 @@ async function initAllTables() {
         `);
         console.log('✅ delivery_boys table ready');
 
-        // ✅ DELIVERIES TABLE
         await db.db.run(`
             CREATE TABLE IF NOT EXISTS deliveries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -593,7 +594,6 @@ async function initAllTables() {
         `);
         console.log('✅ deliveries table ready');
 
-        // ✅ DELIVERY LOCATIONS TABLE
         await db.db.run(`
             CREATE TABLE IF NOT EXISTS delivery_locations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -866,7 +866,9 @@ async function handleWhatsAppMessage(message, from) {
         if (isAdmin(from)) {
             console.log('👑 Admin mode activated');
             
-            // ✅ ADD SUPPLIER
+            // ============================================================
+            // ✅ ADD SUPPLIER - COMPLETE FIXED
+            // ============================================================
             if (msgLower.startsWith('add supplier')) {
                 console.log(`🏭 Processing add supplier: ${text}`);
                 
@@ -874,88 +876,116 @@ async function handleWhatsAppMessage(message, from) {
                 const name = parts[0]?.replace(/^add supplier\s*/i, '').trim() || 'Unknown';
                 const phone = parts[1]?.trim() || '';
                 const email = parts[2]?.trim() || '';
+                const address = parts[3]?.trim() || '';
+                const gstin = parts[4]?.trim() || '';
                 
                 if (!name || !phone) {
                     await sendWhatsAppMessage(from,
                         `❌ *Invalid Format*\n\n` +
-                        `📝 Format: Add supplier Name|Phone|Email\n` +
-                        `📝 Example: Add supplier Rane Motors|9876543210|contact@rane.com`
+                        `📝 Format: Add supplier Name|Phone|Email|Address|GSTIN\n` +
+                        `📝 Example: Add supplier Rane Motors|9876543210|contact@rane.com|123 MG Road|22ABCDE1234F1Z5\n\n` +
+                        `📞 Call: ${CONFIG.businessPhone}`
                     );
                     return;
                 }
                 
                 try {
                     const existing = await db.db.get(
-                        `SELECT * FROM suppliers WHERE phone = ? OR name = ?`,
+                        `SELECT id, name, phone, email, address, gstin, status FROM suppliers WHERE phone = ? OR name = ?`,
                         [phone, name]
                     );
                     
                     if (existing) {
                         await sendWhatsAppMessage(from,
-                            `⚠️ *Supplier Already Exists*\n\n` +
-                            `🏭 Name: ${existing.name}\n📞 Phone: ${existing.phone}\n🆔 ID: ${existing.id}`
+                            `⚠️ *Supplier Already Exists*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                            `🏭 Name: ${existing.name || 'Unknown'}\n` +
+                            `📞 Phone: ${existing.phone || 'N/A'}\n` +
+                            `🆔 ID: ${existing.id || 'N/A'}\n\n` +
+                            `💡 Use "Add product ${existing.id} [part]" to link products.`
                         );
                         return;
                     }
                     
-                    await db.db.run(
-                        `INSERT INTO suppliers (name, phone, email, status, created_at) 
-                         VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
-                        [name, phone, email]
+                    const result = await db.db.run(
+                        `INSERT INTO suppliers (name, phone, email, address, gstin, status, created_at) 
+                         VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
+                        [name, phone, email || '', address || '', gstin || '']
                     );
                     
                     const newSupplier = await db.db.get(
-                        `SELECT * FROM suppliers WHERE phone = ? ORDER BY id DESC LIMIT 1`,
-                        [phone]
+                        `SELECT id, name, phone, email, address, gstin, status FROM suppliers WHERE id = ?`,
+                        [result.lastID]
                     );
                     
                     await sendWhatsAppMessage(from,
                         `✅ *Supplier Added!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
                         `🆔 ID: ${newSupplier.id}\n` +
-                        `🏭 Name: ${name}\n` +
-                        `📞 Phone: ${phone}\n` +
-                        `📧 Email: ${email || 'N/A'}\n\n` +
-                        `📝 "Add product ${newSupplier.id} [part]" to link products.`
+                        `🏭 Name: ${newSupplier.name}\n` +
+                        `📞 Phone: ${newSupplier.phone}\n` +
+                        `📧 Email: ${newSupplier.email || 'N/A'}\n` +
+                        `📍 Address: ${newSupplier.address || 'N/A'}\n` +
+                        `🆔 GST: ${newSupplier.gstin || 'N/A'}\n\n` +
+                        `📝 *To add product:* "Add product ${newSupplier.id} [part]"\n` +
+                        `📋 *List suppliers:* "List suppliers"\n\n` +
+                        `📞 Call: ${CONFIG.businessPhone}`
                     );
                     return;
                 } catch (error) {
-                    await sendWhatsAppMessage(from, `❌ Failed to add supplier: ${error.message}`);
+                    console.error('❌ Add supplier error:', error.message);
+                    await sendWhatsAppMessage(from,
+                        `❌ *Failed to add supplier*\n\n` +
+                        `Error: ${error.message}\n\n` +
+                        `📞 Call: ${CONFIG.businessPhone}`
+                    );
                     return;
                 }
             }
             
-            // ✅ REGISTER DELIVERY BOY
+            // ============================================================
+            // ✅ REGISTER DELIVERY BOY - COMPLETE FIXED
+            // ============================================================
             if (msgLower.startsWith('register delivery') || msgLower.startsWith('add delivery boy')) {
                 console.log(`🚚 Processing register delivery: ${text}`);
                 
                 let name = '', phone = '', pincodes = '';
                 
-                const match = text.match(/register delivery\s+([^|]+)\s*[\|]?\s*(\d+)\s*[\|]?\s*(.+)/i);
-                if (match) {
-                    name = match[1]?.trim() || 'Unknown';
-                    phone = match[2]?.trim() || '';
-                    pincodes = match[3]?.trim() || '';
+                if (msgLower.startsWith('register delivery')) {
+                    const match = text.match(/register delivery\s+([^|]+)\s*[\|]?\s*(\d+)\s*[\|]?\s*(.+)/i);
+                    if (match) {
+                        name = match[1]?.trim() || 'Unknown';
+                        phone = match[2]?.trim() || '';
+                        pincodes = match[3]?.trim() || '';
+                    }
+                } else {
+                    const parts = text.split('|').map(p => p.trim());
+                    name = parts[0]?.replace(/^add delivery boy\s*/i, '').trim() || 'Unknown';
+                    phone = parts[1]?.trim() || '';
+                    pincodes = parts[2]?.trim() || '';
                 }
                 
                 if (!name || !phone) {
                     await sendWhatsAppMessage(from,
                         `❌ *Invalid Format*\n\n` +
-                        `📝 Format: Register delivery Name|Phone|Pincodes\n` +
-                        `📝 Example: Register delivery Ravi Kumar|9876543210|110001,110002`
+                        `📝 Format: Register delivery Name|Phone|Pincodes|Vehicle\n` +
+                        `📝 Example: Register delivery Ravi Kumar|9876543210|110001,110002|Bike\n\n` +
+                        `📞 Call: ${CONFIG.businessPhone}`
                     );
                     return;
                 }
                 
                 try {
                     const existing = await db.db.get(
-                        `SELECT * FROM delivery_boys WHERE phone = ?`,
+                        `SELECT boy_id, name, phone, preferred_pincodes, status, is_available FROM delivery_boys WHERE phone = ?`,
                         [phone]
                     );
                     
                     if (existing) {
                         await sendWhatsAppMessage(from,
-                            `⚠️ *Delivery Boy Already Exists*\n\n` +
-                            `👤 Name: ${existing.name}\n📞 Phone: ${existing.phone}\n🆔 ID: ${existing.boy_id}`
+                            `⚠️ *Delivery Boy Already Exists*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                            `👤 Name: ${existing.name || 'Unknown'}\n` +
+                            `📞 Phone: ${existing.phone || 'N/A'}\n` +
+                            `🆔 ID: ${existing.boy_id || 'N/A'}\n\n` +
+                            `📊 Status: ${existing.status || 'Active'}`
                         );
                         return;
                     }
@@ -968,79 +998,109 @@ async function handleWhatsAppMessage(message, from) {
                         [boyId, phone, name, pincodes]
                     );
                     
+                    const newBoy = await db.db.get(
+                        `SELECT boy_id, name, phone, preferred_pincodes, status, is_available FROM delivery_boys WHERE phone = ?`,
+                        [phone]
+                    );
+                    
                     await sendWhatsAppMessage(from,
                         `✅ *Delivery Boy Registered!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
-                        `🆔 ID: ${boyId}\n` +
-                        `👤 Name: ${name}\n` +
-                        `📞 Phone: ${phone}\n` +
-                        `📌 Pincodes: ${pincodes || 'N/A'}\n` +
-                        `✅ Status: Active & Available`
+                        `🆔 ID: ${newBoy.boy_id}\n` +
+                        `👤 Name: ${newBoy.name}\n` +
+                        `📞 Phone: ${newBoy.phone}\n` +
+                        `📌 Pincodes: ${newBoy.preferred_pincodes || 'N/A'}\n` +
+                        `✅ Status: Active & Available\n\n` +
+                        `📝 "Assign delivery for ORD-XXXXXX to ${phone}" to assign.`
+                    );
+                    
+                    await sendWhatsAppMessage(phone,
+                        `🚚 *Welcome to Auto Spares Solution Delivery!*\n\n` +
+                        `📋 Your ID: ${newBoy.boy_id}\n` +
+                        `👤 Name: ${newBoy.name}\n` +
+                        `📌 Pincodes: ${newBoy.preferred_pincodes || 'N/A'}\n\n` +
+                        `📦 You'll receive delivery assignments here.\n\n` +
+                        `📞 Call: ${CONFIG.businessPhone}`
                     );
                     return;
                 } catch (error) {
-                    await sendWhatsAppMessage(from, `❌ Failed to register delivery boy: ${error.message}`);
+                    console.error('❌ Register delivery boy error:', error.message);
+                    await sendWhatsAppMessage(from,
+                        `❌ *Failed to register delivery boy*\n\n` +
+                        `Error: ${error.message}\n\n` +
+                        `📞 Call: ${CONFIG.businessPhone}`
+                    );
                     return;
                 }
             }
             
-            // ✅ LIST SUPPLIERS
+            // ============================================================
+            // ✅ LIST SUPPLIERS - FIXED
+            // ============================================================
             if (msgLower === 'list suppliers' || msgLower === 'suppliers') {
                 try {
                     const suppliers = await db.db.all(
-                        `SELECT * FROM suppliers WHERE status = 'active' ORDER BY name`
+                        `SELECT id, name, phone, email, address, status FROM suppliers WHERE status = 'active' ORDER BY name`
                     );
                     
-                    if (suppliers.length === 0) {
-                        await sendWhatsAppMessage(from, '🏭 *No suppliers registered.*');
+                    if (!suppliers || suppliers.length === 0) {
+                        await sendWhatsAppMessage(from, '🏭 *No suppliers registered.*\n\n📝 "Add supplier Name|Phone|Email" to add one.');
                         return;
                     }
                     
                     let reply = `🏭 *Suppliers*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
                     suppliers.forEach((s, index) => {
-                        reply += `${index + 1}. *${s.name}*\n`;
+                        reply += `${index + 1}. *${s.name || 'Unknown'}*\n`;
                         reply += `   🆔 ID: ${s.id}\n`;
-                        reply += `   📞 ${s.phone}\n`;
+                        reply += `   📞 ${s.phone || 'N/A'}\n`;
                         if (s.email) reply += `   📧 ${s.email}\n`;
                         reply += `\n`;
                     });
+                    reply += `📝 "Add product [supplierId] [part]" to link products.`;
                     await sendWhatsAppMessage(from, reply);
                     return;
                 } catch (error) {
+                    console.error('❌ List suppliers error:', error.message);
                     await sendWhatsAppMessage(from, '⚠️ Error fetching suppliers.');
                     return;
                 }
             }
             
-            // ✅ LIST DELIVERY BOYS
+            // ============================================================
+            // ✅ LIST DELIVERY BOYS - FIXED
+            // ============================================================
             if (msgLower === 'list delivery boys' || msgLower === 'delivery boys') {
                 try {
                     const deliveryBoys = await db.db.all(
-                        `SELECT * FROM delivery_boys WHERE status = 'active' ORDER BY name`
+                        `SELECT boy_id, name, phone, preferred_pincodes, status, is_available FROM delivery_boys WHERE status = 'active' ORDER BY name`
                     );
                     
-                    if (deliveryBoys.length === 0) {
-                        await sendWhatsAppMessage(from, '🚚 *No delivery boys registered.*');
+                    if (!deliveryBoys || deliveryBoys.length === 0) {
+                        await sendWhatsAppMessage(from, '🚚 *No delivery boys registered.*\n\n📝 "Register delivery Name|Phone|Pincodes" to add one.');
                         return;
                     }
                     
                     let reply = `🚚 *Delivery Boys*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
                     deliveryBoys.forEach((db, index) => {
-                        reply += `${index + 1}. *${db.name}*\n`;
+                        reply += `${index + 1}. *${db.name || 'Unknown'}*\n`;
                         reply += `   🆔 ID: ${db.boy_id}\n`;
-                        reply += `   📞 ${db.phone}\n`;
+                        reply += `   📞 ${db.phone || 'N/A'}\n`;
                         reply += `   📌 ${db.preferred_pincodes || 'N/A'}\n`;
                         reply += `   ${db.is_available ? '✅ Available' : '❌ Busy'}\n`;
                         reply += `\n`;
                     });
+                    reply += `📝 "Assign delivery for ORD-XXXXXX to [phone]" to assign.`;
                     await sendWhatsAppMessage(from, reply);
                     return;
                 } catch (error) {
+                    console.error('❌ List delivery boys error:', error.message);
                     await sendWhatsAppMessage(from, '⚠️ Error fetching delivery boys.');
                     return;
                 }
             }
             
-            // ✅ ADD PRODUCT TO SUPPLIER
+            // ============================================================
+            // ✅ ADD PRODUCT TO SUPPLIER - FIXED
+            // ============================================================
             const addProductMatch = msgLower.match(/add product (\d+)\s+([a-z0-9]{5,20})/i);
             if (addProductMatch) {
                 const supplierId = parseInt(addProductMatch[1]);
@@ -1048,7 +1108,7 @@ async function handleWhatsAppMessage(message, from) {
                 
                 try {
                     const supplier = await db.db.get(
-                        `SELECT * FROM suppliers WHERE id = ? AND status = 'active'`,
+                        `SELECT id, name FROM suppliers WHERE id = ? AND status = 'active'`,
                         [supplierId]
                     );
                     
@@ -1063,18 +1123,29 @@ async function handleWhatsAppMessage(message, from) {
                         return;
                     }
                     
+                    const existing = await db.db.get(
+                        `SELECT id FROM supplier_products WHERE supplier_id = ? AND part = ?`,
+                        [supplierId, partNumber]
+                    );
+                    
+                    if (existing) {
+                        await sendWhatsAppMessage(from,
+                            `⚠️ *Already Linked*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                            `🏭 ${supplier.name}\n📦 ${partNumber}\n📝 ${product.description || 'N/A'}`
+                        );
+                        return;
+                    }
+                    
                     await db.db.run(
-                        `INSERT OR REPLACE INTO supplier_products (supplier_id, part, description, price, stock, last_updated)
+                        `INSERT INTO supplier_products (supplier_id, part, description, price, stock, last_updated)
                          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                         [supplierId, partNumber, product.description || '', product.billing_price || 0, product.stock || 0]
                     );
                     
                     await sendWhatsAppMessage(from,
                         `✅ *Product Linked!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
-                        `🏭 Supplier: ${supplier.name}\n` +
-                        `📦 Part: ${partNumber}\n` +
-                        `📝 ${product.description || 'N/A'}\n` +
-                        `💰 ₹${(product.billing_price * 1.18).toFixed(2)}`
+                        `🏭 Supplier: ${supplier.name}\n📦 Part: ${partNumber}\n📝 ${product.description || 'N/A'}\n` +
+                        `💰 Price: ₹${(product.billing_price * 1.18).toFixed(2)}\n📦 Stock: ${product.stock || 0}`
                     );
                     return;
                 } catch (error) {
@@ -1083,7 +1154,9 @@ async function handleWhatsAppMessage(message, from) {
                 }
             }
             
+            // ============================================================
             // ✅ HELP ADMIN
+            // ============================================================
             if (msgLower === 'help admin' || msgLower === 'admin help') {
                 await sendWhatsAppMessage(from,
                     `👑 *Admin Commands*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
@@ -1104,7 +1177,9 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
             
+            // ============================================================
             // ✅ ADMIN ORDERS
+            // ============================================================
             if (msgLower === 'admin orders' || msgLower === 'pending orders') {
                 try {
                     const orders = await db.getAllOrders();
@@ -1132,7 +1207,9 @@ async function handleWhatsAppMessage(message, from) {
                 }
             }
             
+            // ============================================================
             // ✅ CONFIRM ORDER (Admin)
+            // ============================================================
             const confirmMatch = msgLower.match(/confirm order for (\d+)/);
             if (confirmMatch) {
                 const customerPhone = confirmMatch[1];
@@ -1160,7 +1237,9 @@ async function handleWhatsAppMessage(message, from) {
                 }
             }
             
+            // ============================================================
             // ✅ CUSTOMER CART (Admin)
+            // ============================================================
             const cartMatch = msgLower.match(/customer cart (\d+)/);
             if (cartMatch) {
                 const customerPhone = cartMatch[1];
@@ -1187,7 +1266,9 @@ async function handleWhatsAppMessage(message, from) {
                 }
             }
             
+            // ============================================================
             // ✅ STOCK STATUS (Admin)
+            // ============================================================
             const stockMatch = msgLower.match(/stock status ([a-z0-9]{5,20})/);
             if (stockMatch) {
                 const partNumber = stockMatch[1].toUpperCase();
