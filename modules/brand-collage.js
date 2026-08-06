@@ -1,5 +1,5 @@
 // ============================================================
-// 🎨 DYNAMIC BRAND COLLAGE GENERATOR - WITH ACTUAL LOGOS
+// 🎨 DYNAMIC BRAND COLLAGE GENERATOR - COMPLETE WORKING
 // ============================================================
 
 const sharp = require('sharp');
@@ -13,54 +13,7 @@ const collageCache = new LRUCache({
 });
 
 // ============================================================
-// 📥 PRELOADED LOGOS
-// ============================================================
-
-let preloadedLogos = {};
-
-async function preloadAllLogos() {
-    const LOGO_BASE_URL = 'https://autosparessolution.github.io/images/';
-    const brands = [
-        { name: 'RANE', file: 'RANE.png' },
-        { name: 'TVS', file: 'TVS.jpg' },
-        { name: 'RBL', file: 'brand-rbl.png' },
-        { name: 'RML', file: 'RML.png' },
-        { name: 'GIRLING', file: 'brand-girling.png' },
-        { name: 'LMM', file: 'brand-lmm.png' },
-        { name: 'M&M', file: 'brand-m&m.png' },
-        { name: 'MTBL', file: 'brand-mtbl.png' },
-        { name: 'STL', file: 'brand-stl.png' },
-        { name: 'VF', file: 'brand-vf.png' },
-        { name: 'WABCO', file: 'brand-wabco.png' },
-        { name: 'GREAVES', file: 'brand-greaves.png' },
-        { name: 'LEYPARTS', file: 'brand-leyparts.png' }
-    ];
-    
-    console.log('📥 Preloading brand logos...');
-    
-    for (const brand of brands) {
-        const url = `${LOGO_BASE_URL}${brand.file}`;
-        try {
-            const response = await fetch(url);
-            if (response.ok) {
-                const buffer = await response.arrayBuffer();
-                const base64 = Buffer.from(buffer).toString('base64');
-                const mimeType = brand.file.endsWith('.jpg') ? 'image/jpeg' : 'image/png';
-                preloadedLogos[brand.name] = `data:${mimeType};base64,${base64}`;
-                console.log(`✅ Preloaded: ${brand.name}`);
-            } else {
-                console.log(`⚠️ Not found: ${brand.name} (${response.status})`);
-            }
-        } catch (error) {
-            console.log(`⚠️ Failed to preload: ${brand.name} - ${error.message}`);
-        }
-    }
-    
-    console.log(`📊 Preloaded ${Object.keys(preloadedLogos).length} logos`);
-}
-
-// ============================================================
-// 🔧 XML ESCAPE
+// 🔧 XML ESCAPE FUNCTION
 // ============================================================
 
 function escapeXML(value) {
@@ -73,12 +26,17 @@ function escapeXML(value) {
         .replace(/'/g, '&apos;');
 }
 
+// ============================================================
+// 🎨 DYNAMIC BRAND COLLAGE CLASS
+// ============================================================
+
 class DynamicBrandCollage {
     constructor() {
         this.tempDir = path.join(__dirname, '../temp');
         this.ensureTempDir();
         this.lastBrandCount = 0;
         this.brandHash = '';
+        this.logoCache = new Map(); // Cache for preloaded logos
     }
 
     ensureTempDir() {
@@ -89,6 +47,83 @@ class DynamicBrandCollage {
 
     generateBrandHash(brands) {
         return brands.map(b => `${b.id || b.name}:${b.active !== false}`).join('|');
+    }
+
+    // ============================================================
+    // 📥 PRELOAD ALL LOGOS - FIXED
+    // ============================================================
+    
+    async preloadAllLogos() {
+        const LOGO_BASE_URL = 'https://autosparessolution.github.io/images/';
+        const brands = [
+            { name: 'RANE', file: 'RANE.png' },
+            { name: 'TVS', file: 'TVS.jpg' },
+            { name: 'RBL', file: 'brand-rbl.png' },
+            { name: 'RML', file: 'RML.png' },
+            { name: 'GIRLING', file: 'brand-girling.png' },
+            { name: 'LMM', file: 'brand-lmm.png' },
+            { name: 'M&M', file: 'brand-m&m.png' },
+            { name: 'MTBL', file: 'brand-mtbl.png' },
+            { name: 'STL', file: 'brand-stl.png' },
+            { name: 'VF', file: 'brand-vf.png' },
+            { name: 'WABCO', file: 'brand-wabco.png' },
+            { name: 'GREAVES', file: 'brand-greaves.png' },
+            { name: 'LEYPARTS', file: 'brand-leyparts.png' }
+        ];
+        
+        console.log('📥 Preloading brand logos...');
+        
+        for (const brand of brands) {
+            const url = `${LOGO_BASE_URL}${brand.file}`;
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    const buffer = await response.arrayBuffer();
+                    const base64 = Buffer.from(buffer).toString('base64');
+                    const mimeType = brand.file.endsWith('.jpg') ? 'image/jpeg' : 'image/png';
+                    this.logoCache.set(brand.name, `data:${mimeType};base64,${base64}`);
+                    console.log(`✅ Preloaded: ${brand.name}`);
+                } else {
+                    console.log(`⚠️ Not found: ${brand.name} (${response.status})`);
+                }
+            } catch (error) {
+                console.log(`⚠️ Failed to preload: ${brand.name} - ${error.message}`);
+            }
+        }
+        
+        console.log(`📊 Preloaded ${this.logoCache.size} logos`);
+        return this.logoCache.size;
+    }
+
+    // ============================================================
+    // 📥 DOWNLOAD LOGO AS BASE64 (Fallback)
+    // ============================================================
+    
+    async downloadLogoAsBase64(logoUrl) {
+        if (this.logoCache.has(logoUrl)) {
+            return this.logoCache.get(logoUrl);
+        }
+        
+        try {
+            const response = await fetch(logoUrl);
+            if (!response.ok) {
+                return null;
+            }
+            
+            const buffer = await response.arrayBuffer();
+            const base64 = Buffer.from(buffer).toString('base64');
+            
+            let mimeType = 'image/png';
+            if (logoUrl.endsWith('.jpg') || logoUrl.endsWith('.jpeg')) {
+                mimeType = 'image/jpeg';
+            }
+            
+            const dataUrl = `data:${mimeType};base64,${base64}`;
+            this.logoCache.set(logoUrl, dataUrl);
+            return dataUrl;
+        } catch (error) {
+            return null;
+        }
     }
 
     async generateWelcomeBrochure(brands, customerPhone = null) {
@@ -261,7 +296,7 @@ class DynamicBrandCollage {
     }
 
     // ============================================================
-    // 🎨 BRAND GRID - WITH ACTUAL PRELOADED LOGOS
+    // 🎨 BRAND GRID - WITH PRELOADED LOGOS
     // ============================================================
 
     async createDynamicBrandGrid(brands, width, cols, itemWidth, itemHeight) {
@@ -334,9 +369,9 @@ class DynamicBrandCollage {
             svg += `<rect x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" class="brand-logo-bg" rx="8" ry="8"/>`;
             
             // ✅ USE PRELOADED LOGO
-            if (preloadedLogos[logoKey]) {
+            if (this.logoCache.has(logoKey)) {
                 svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" 
-                            href="${preloadedLogos[logoKey]}" 
+                            href="${this.logoCache.get(logoKey)}" 
                             preserveAspectRatio="xMidYMid meet" 
                             opacity="0.95"/>`;
             } else {
@@ -455,4 +490,14 @@ class DynamicBrandCollage {
     }
 }
 
-module.exports = new DynamicBrandCollage();
+// ============================================================
+// 📤 EXPORT
+// ============================================================
+
+const brandCollage = new DynamicBrandCollage();
+
+// Export the instance
+module.exports = brandCollage;
+
+// Export the preload function
+module.exports.preloadAllLogos = brandCollage.preloadAllLogos.bind(brandCollage);
