@@ -244,9 +244,9 @@ class DynamicBrandCollage {
             'RML': 'RML.png',
             'GIRLING': 'brand-girling.png',
             'LMM': 'brand-lmm.png',
-            'MM': 'brand-m_m.png',
-            'M M': 'brand-m_m.png',
-            'M&M': 'brand-m_m.png',
+            'MM': 'brand-m&m.png',
+            
+            'M&M': 'brand-m&m.png',
             'MTBL': 'brand-mtbl.png',
             'STL': 'brand-stl.png',
             'VF': 'brand-vf.png',
@@ -265,7 +265,7 @@ class DynamicBrandCollage {
             'GIRLING': 'Brake Systems',
             'LMM': 'Mahindra Sub One Ton',
             'MM': 'Passenger • Commercial',
-            'M M': 'Passenger • Commercial',
+            
             'M&M': 'Passenger • Commercial',
             'MTBL': 'Mahindra Truck Bus',
             'STL': 'Fasteners',
