@@ -435,7 +435,10 @@ class DynamicBrandCollage {
             { id: 'mtbl', name: 'MTBL', active: true },
             { id: 'stl', name: 'STL', active: true },
             { id: 'vf', name: 'VF', active: true },
-            { id: 'wabco', name: 'WABCO', active: true }
+             { id: 'wabco', name: 'WABCO', active: true },
+            { id: 'greaves', name: 'GREAVES', active: true },
+            { id: 'leylapts', name: 'LEYPARTS', active: true }
+           
         ];
     }
 
