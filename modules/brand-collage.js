@@ -265,7 +265,7 @@ class DynamicBrandCollage {
     }
 
     // ============================================================
-    // 🎨 BRAND GRID - LARGE LOGOS
+    // 🎨 BRAND GRID - LARGE LOGOS WITH ON-DEMAND DOWNLOAD
     // ============================================================
 
     async createDynamicBrandGrid(brands, width, cols, itemWidth, itemHeight) {
@@ -273,6 +273,28 @@ class DynamicBrandCollage {
         const gridWidth = cols * (itemWidth + 20) - 20;
         const offsetX = (width - gridWidth) / 2;
         const totalHeight = rows * (itemHeight + 20) + 40;
+
+        const LOGO_BASE_URL = 'https://autosparessolution.github.io/images/';
+        
+        const brandLogoMap = {
+            'RANE': 'RANE.png',
+            'TVS': 'TVS.jpg',
+            'RBL': 'brand-rbl.png',
+            'RML': 'RML.png',
+            'GIRLING': 'brand-girling.png',
+            'LMM': 'brand-lmm.png',
+            'MM': 'brand-m&m.png',
+            'M M': 'brand-m&m.png',
+            'M&M': 'brand-m&m.png',
+            'MTBL': 'brand-mtbl.png',
+            'STL': 'brand-stl.png',
+            'VF': 'brand-vf.png',
+            'WABCO': 'brand-wabco.png',
+            'GREAVES': 'brand-greaves.png',
+            'LEYPARTS': 'brand-leyparts.png'
+        };
+        
+        const DEFAULT_LOGO = 'default.png';
 
         const brandCategories = {
             'RANE': 'Suspension • Steering',
@@ -322,12 +344,8 @@ class DynamicBrandCollage {
                 text-anchor: middle; 
             }
             .brand-logo { 
-                width: ${itemWidth - 40}px; 
-                height: ${itemWidth - 40}px; 
-                min-width: 60px; 
-                min-height: 60px; 
-                max-width: 90px; 
-                max-height: 90px; 
+                width: ${Math.min(Math.max(itemWidth - 40, 60), 90)}px; 
+                height: ${Math.min(Math.max(itemWidth - 40, 60), 90)}px; 
             }
             .brand-logo-bg { 
                 fill: rgba(255,255,255,0.05); 
@@ -357,50 +375,62 @@ class DynamicBrandCollage {
             
             let logoKey = brandName.toUpperCase();
             if (logoKey === 'M M' || logoKey === 'M&M' || logoKey === 'MM') {
-                logoKey = 'M&M';
+                logoKey = 'MM';
             }
+            
+            let logoFile = brandLogoMap[logoKey] || DEFAULT_LOGO;
+            const logoUrl = `${LOGO_BASE_URL}${logoFile}`;
             
             let category = brandCategories[logoKey] || 'Premium Auto Parts';
             const safeName = escapeXML(brandName);
             const safeCategory = escapeXML(category);
             
-            // ✅ LARGE LOGO - FILL THE FRAME
             const logoSize = Math.min(Math.max(itemWidth - 40, 60), 90);
             const logoX = x + (itemWidth - logoSize) / 2;
             const logoY = y + 10;
             
-            // Brand card
             svg += `<rect x="${x}" y="${y}" width="${itemWidth}" height="${itemHeight}" class="brand-card"/>`;
-            
-            // Accent bar
             svg += `<rect x="${x + 12}" y="${y + 6}" width="${itemWidth - 24}" height="3" fill="${color}" class="brand-accent"/>`;
-            
-            // Logo background
             svg += `<rect x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" class="brand-logo-bg" rx="8" ry="8"/>`;
             
-            // ✅ USE PRELOADED LOGO - LARGE SIZE
-            if (this.logoCache.has(logoKey)) {
+            // ✅ TRY PRELOADED LOGO FIRST, THEN DOWNLOAD ON DEMAND
+            let logoData = this.logoCache.get(logoKey);
+            
+            if (!logoData) {
+                try {
+                    const response = await fetch(logoUrl);
+                    if (response.ok) {
+                        const buffer = await response.arrayBuffer();
+                        const base64 = Buffer.from(buffer).toString('base64');
+                        const mimeType = logoFile.endsWith('.jpg') ? 'image/jpeg' : 'image/png';
+                        logoData = `data:${mimeType};base64,${base64}`;
+                        this.logoCache.set(logoKey, logoData);
+                        console.log(`✅ Downloaded: ${logoKey}`);
+                    }
+                } catch (e) {
+                    console.log(`⚠️ Failed to download: ${logoKey}`);
+                }
+            }
+            
+            if (logoData) {
                 svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" 
-                            href="${this.logoCache.get(logoKey)}" 
+                            href="${logoData}" 
                             preserveAspectRatio="xMidYMid meet" 
                             opacity="0.95"/>`;
             } else {
-                // Fallback: show brand initial
+                // Fallback: brand initial
                 const initial = safeName.charAt(0);
+                svg += `<circle cx="${x + itemWidth/2}" cy="${logoY + logoSize/2}" r="${logoSize/2}" fill="${color}" opacity="0.15"/>`;
                 svg += `<text x="${x + itemWidth/2}" y="${logoY + logoSize/2 + 5}" 
-                            font-family="Arial, sans-serif" font-size="${logoSize * 0.6}" 
-                            text-anchor="middle" fill="rgba(255,255,255,0.3)" 
+                            font-family="Arial, sans-serif" font-size="${logoSize * 0.5}" 
+                            text-anchor="middle" fill="rgba(255,255,255,0.4)" 
                             font-weight="bold">${initial}</text>`;
             }
             
-            // Brand name
             const nameY = logoY + logoSize + 12;
             svg += `<text x="${x + itemWidth/2}" y="${nameY + 14}" class="brand-name">${safeName}</text>`;
-            
-            // Category
             svg += `<text x="${x + itemWidth/2}" y="${nameY + 30}" class="brand-subtitle">${safeCategory}</text>`;
             
-            // Active dot
             if (isActive) {
                 svg += `<circle cx="${x + itemWidth - 12}" cy="${y + 12}" r="4" class="active-dot"/>`;
             }
