@@ -1,5 +1,5 @@
 // ============================================================
-// 🎨 DYNAMIC BRAND COLLAGE GENERATOR - COMPLETE FIX
+// 🎨 DYNAMIC BRAND COLLAGE GENERATOR - WITH ACTUAL LOGOS
 // ============================================================
 
 const sharp = require('sharp');
@@ -26,7 +26,7 @@ function escapeXML(value) {
         .replace(/'/g, '&apos;');
 }
 
-// ✅ NEW: Escape for HTML attributes (URLs)
+// ✅ Escape for HTML attributes (URLs)
 function escapeAttr(value) {
     if (!value) return '';
     return String(value)
@@ -43,6 +43,7 @@ class DynamicBrandCollage {
         this.ensureTempDir();
         this.lastBrandCount = 0;
         this.brandHash = '';
+        this.logoCache = new Map(); // Cache downloaded logos
     }
 
     ensureTempDir() {
@@ -53,6 +54,43 @@ class DynamicBrandCollage {
 
     generateBrandHash(brands) {
         return brands.map(b => `${b.id || b.name}:${b.active !== false}`).join('|');
+    }
+
+    // ============================================================
+    // 📥 DOWNLOAD LOGO AS BASE64
+    // ============================================================
+    
+    async downloadLogoAsBase64(logoUrl) {
+        // Check cache first
+        if (this.logoCache.has(logoUrl)) {
+            return this.logoCache.get(logoUrl);
+        }
+        
+        try {
+            const response = await fetch(logoUrl);
+            if (!response.ok) {
+                console.log(`⚠️ Failed to download: ${logoUrl}`);
+                return null;
+            }
+            
+            const buffer = await response.arrayBuffer();
+            const base64 = Buffer.from(buffer).toString('base64');
+            
+            // Determine mime type from URL
+            let mimeType = 'image/png';
+            if (logoUrl.endsWith('.jpg') || logoUrl.endsWith('.jpeg')) {
+                mimeType = 'image/jpeg';
+            } else if (logoUrl.endsWith('.gif')) {
+                mimeType = 'image/gif';
+            }
+            
+            const dataUrl = `data:${mimeType};base64,${base64}`;
+            this.logoCache.set(logoUrl, dataUrl);
+            return dataUrl;
+        } catch (error) {
+            console.log(`⚠️ Error downloading ${logoUrl}: ${error.message}`);
+            return null;
+        }
     }
 
     async generateWelcomeBrochure(brands, customerPhone = null) {
@@ -80,6 +118,7 @@ class DynamicBrandCollage {
                 console.log('🔄 Brand list changed, regenerating brochure...');
                 this.brandHash = currentHash;
                 collageCache.clear();
+                this.logoCache.clear(); // Clear logo cache on brand change
             }
 
             const cacheKey = `brochure_${currentHash}_${customerPhone || 'default'}`;
@@ -225,7 +264,7 @@ class DynamicBrandCollage {
     }
 
     // ============================================================
-    // ✅ COMPLETE FIXED: Brand Grid
+    // ✅ FIXED: Brand Grid with ACTUAL LOGOS
     // ============================================================
 
     async createDynamicBrandGrid(brands, width, cols, itemWidth, itemHeight) {
@@ -236,7 +275,7 @@ class DynamicBrandCollage {
         
         const LOGO_BASE_URL = 'https://autosparessolution.github.io/images/';
         
-        // ✅ FIXED: All logo filenames - CORRECT
+        // ✅ CORRECT LOGO FILENAMES
         const brandLogoMap = {
             'RANE': 'RANE.png',
             'TVS': 'TVS.jpg',
@@ -245,7 +284,7 @@ class DynamicBrandCollage {
             'GIRLING': 'brand-girling.png',
             'LMM': 'brand-lmm.png',
             'MM': 'brand-m&m.png',
-            
+            'M M': 'brand-m&m.png',
             'M&M': 'brand-m&m.png',
             'MTBL': 'brand-mtbl.png',
             'STL': 'brand-stl.png',
@@ -265,7 +304,7 @@ class DynamicBrandCollage {
             'GIRLING': 'Brake Systems',
             'LMM': 'Mahindra Sub One Ton',
             'MM': 'Passenger • Commercial',
-            
+            'M M': 'Passenger • Commercial',
             'M&M': 'Passenger • Commercial',
             'MTBL': 'Mahindra Truck Bus',
             'STL': 'Fasteners',
@@ -281,16 +320,41 @@ class DynamicBrandCollage {
             '#F8C471', '#82E0AA', '#F1948A', '#73C6B6', '#5DADE2'
         ];
 
+        // ============================================================
+        // 📥 DOWNLOAD ALL LOGOS FIRST
+        // ============================================================
+        
+        const logoDataUrls = {};
+        
+        for (const brand of brands) {
+            const brandName = brand.name || 'Brand';
+            let logoKey = brandName.toUpperCase();
+            if (logoKey === 'M M' || logoKey === 'M&M' || logoKey === 'MM') {
+                logoKey = 'MM';
+            }
+            
+            const logoFile = brandLogoMap[logoKey] || DEFAULT_LOGO;
+            const logoUrl = `${LOGO_BASE_URL}${logoFile}`;
+            
+            const dataUrl = await this.downloadLogoAsBase64(logoUrl);
+            if (dataUrl) {
+                logoDataUrls[logoKey] = dataUrl;
+                console.log(`✅ Loaded logo: ${logoFile}`);
+            } else {
+                console.log(`⚠️ Using fallback for: ${logoFile}`);
+            }
+        }
+
         let svg = `<svg width="${width}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">`;
         svg += `<style>
-            .brand-card { fill: rgba(255,255,255,0.07); rx: 14; ry: 14; stroke: rgba(255,255,255,0.1); stroke-width: 1.5; }
-            .brand-name { font-family: 'Arial Black', Arial, sans-serif; font-size: ${itemWidth > 150 ? 18 : 14}px; fill: #FFFFFF; text-anchor: middle; font-weight: 900; letter-spacing: 1px; }
-            .brand-subtitle { font-family: Arial, sans-serif; font-size: 10px; fill: rgba(255,255,255,0.4); text-anchor: middle; }
-            .brand-logo { width: ${itemWidth > 150 ? 60 : 50}px; height: ${itemWidth > 150 ? 60 : 50}px; }
-            .brand-fallback { font-family: Arial, sans-serif; font-size: ${itemWidth > 150 ? 28 : 22}px; fill: rgba(255,255,255,0.4); text-anchor: middle; font-weight: bold; }
+            .brand-card { fill: rgba(255,255,255,0.06); rx: 12; ry: 12; stroke: rgba(255,255,255,0.08); stroke-width: 1; }
+            .brand-name { font-family: 'Arial Black', Arial, sans-serif; font-size: ${itemWidth > 150 ? 16 : 13}px; fill: #FFFFFF; text-anchor: middle; font-weight: 900; letter-spacing: 0.5px; }
+            .brand-subtitle { font-family: Arial, sans-serif; font-size: 9px; fill: rgba(255,255,255,0.35); text-anchor: middle; }
+            .brand-logo { width: ${itemWidth > 150 ? 55 : 45}px; height: ${itemWidth > 150 ? 55 : 45}px; }
+            .brand-logo-bg { fill: rgba(255,255,255,0.04); rx: 8; ry: 8; }
+            .brand-fallback { font-family: Arial, sans-serif; font-size: ${itemWidth > 150 ? 28 : 22}px; fill: rgba(255,255,255,0.3); text-anchor: middle; font-weight: bold; }
             .active-dot { fill: #4CAF50; opacity: 0.8; }
-            .brand-number { font-family: Arial, sans-serif; font-size: 10px; fill: rgba(255,255,255,0.12); text-anchor: middle; }
-            .brand-accent { rx: 3; opacity: 0.5; }
+            .brand-accent { rx: 2; opacity: 0.5; }
         </style>`;
 
         for (let i = 0; i < brands.length; i++) {
@@ -304,72 +368,63 @@ class DynamicBrandCollage {
             const isActive = brand.active !== false;
             const color = colors[i % colors.length];
             
-            // ✅ Normalize brand name for logo lookup
+            // Normalize logo key
             let logoKey = brandName.toUpperCase();
             if (logoKey === 'M M' || logoKey === 'M&M' || logoKey === 'MM') {
                 logoKey = 'MM';
             }
             
-            // ✅ Get logo filename (NO & in filename!)
-            let logoFile = brandLogoMap[logoKey] || 
-                           brandLogoMap[brandName] || 
-                           DEFAULT_LOGO;
+            // Get category
+            let category = brandCategories[logoKey] || 'Premium Auto Parts';
             
-            // ✅ IMPORTANT: Construct URL WITHOUT ampersand issues
-            // Use brand-m_m.png instead of brand-m&m.png
-            const logoUrl = `${LOGO_BASE_URL}${logoFile}`;
-            
-            // ✅ Get category
-            let category = brandCategories[logoKey] || 
-                           brandCategories[brandName] || 
-                           'Premium Auto Parts';
-            
-            // ✅ Escape ALL text
+            // Escape text
             const safeName = escapeXML(brandName);
             const safeCategory = escapeXML(category);
             
-            // ✅ Escape URL for HTML attribute
-            const safeLogoUrl = escapeAttr(logoUrl);
-            
-            const logoSize = itemWidth > 150 ? 60 : 50;
+            const logoSize = itemWidth > 150 ? 55 : 45;
             const logoX = x + (itemWidth - logoSize) / 2;
-            const logoY = y + 15;
+            const logoY = y + 12;
             
             // Brand card
             svg += `<rect x="${x}" y="${y}" width="${itemWidth}" height="${itemHeight}" class="brand-card"/>`;
             
             // Accent bar
-            svg += `<rect x="${x + 12}" y="${y + 8}" width="${itemWidth - 24}" height="3" fill="${color}" class="brand-accent"/>`;
+            svg += `<rect x="${x + 12}" y="${y + 6}" width="${itemWidth - 24}" height="2.5" fill="${color}" class="brand-accent"/>`;
             
             // Logo background
-            svg += `<circle cx="${x + itemWidth/2}" cy="${logoY + logoSize/2}" r="${logoSize/2 + 5}" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+            svg += `<rect x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" class="brand-logo-bg"/>`;
             
-            // ✅ LOGO IMAGE - WITH SAFE URL (NO & issues)
-            svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" href="${safeLogoUrl}" class="brand-logo" preserveAspectRatio="xMidYMid meet" opacity="0.95"/>`;
-            
-            // Fallback text
-            const fallbackChar = safeName.charAt(0);
-            svg += `<text x="${x + itemWidth/2}" y="${logoY + logoSize/2 + 5}" class="brand-fallback">${escapeXML(fallbackChar)}</text>`;
+            // ✅ SHOW ACTUAL LOGO (if downloaded)
+            if (logoDataUrls[logoKey]) {
+                svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" 
+                            href="${logoDataUrls[logoKey]}" 
+                            preserveAspectRatio="xMidYMid meet" 
+                            opacity="0.95"/>`;
+            } else {
+                // ✅ Fallback: Show brand initial
+                const fallbackChar = safeName.charAt(0);
+                svg += `<text x="${x + itemWidth/2}" y="${logoY + logoSize/2 + 5}" 
+                            class="brand-fallback">${fallbackChar}</text>`;
+            }
             
             // Brand name
-            const nameY = logoY + logoSize + 15;
-            svg += `<text x="${x + itemWidth/2}" y="${nameY + 15}" class="brand-name">${safeName}</text>`;
+            const nameY = logoY + logoSize + 10;
+            svg += `<text x="${x + itemWidth/2}" y="${nameY + 12}" class="brand-name">${safeName}</text>`;
             
             // Category
-            svg += `<text x="${x + itemWidth/2}" y="${nameY + 35}" class="brand-subtitle">${safeCategory}</text>`;
+            svg += `<text x="${x + itemWidth/2}" y="${nameY + 28}" class="brand-subtitle">${safeCategory}</text>`;
             
-            // Brand number
-            svg += `<text x="${x + 15}" y="${y + itemHeight - 10}" class="brand-number">#${i + 1}</text>`;
-            
-            // Active indicator
+            // Active dot
             if (isActive) {
-                svg += `<circle cx="${x + itemWidth - 15}" cy="${y + 15}" r="4" class="active-dot"/>`;
+                svg += `<circle cx="${x + itemWidth - 12}" cy="${y + 12}" r="3.5" class="active-dot"/>`;
             }
         }
 
         svg += `</svg>`;
 
-        return await sharp(Buffer.from(svg)).png().toBuffer();
+        return await sharp(Buffer.from(svg))
+            .png()
+            .toBuffer();
     }
 
     async createDynamicFooter(width, brandCount) {
@@ -435,10 +490,9 @@ class DynamicBrandCollage {
             { id: 'mtbl', name: 'MTBL', active: true },
             { id: 'stl', name: 'STL', active: true },
             { id: 'vf', name: 'VF', active: true },
-             { id: 'wabco', name: 'WABCO', active: true },
+            { id: 'wabco', name: 'WABCO', active: true },
             { id: 'greaves', name: 'GREAVES', active: true },
-            { id: 'leylapts', name: 'LEYPARTS', active: true }
-           
+            { id: 'leyparts', name: 'LEYPARTS', active: true }
         ];
     }
 
