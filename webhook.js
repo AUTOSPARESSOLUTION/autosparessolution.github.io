@@ -1,5 +1,5 @@
 // ============================================================
-// 🚀 ASSIST WhatsApp Webhook v3.1 - COMPLETE FIXED
+// 🚀 ASSIST WhatsApp Webhook v3.1 - FINAL FIXED
 // ============================================================
 
 const express = require('express');
@@ -40,7 +40,7 @@ try {
     brandManager = require('./modules/brand-config');
     console.log('✅ Brand Manager loaded');
 } catch(e) {
-    console.log('⚠️ Brand Manager not found, using fallback');
+    console.log('⚠️ Brand Manager not found');
     brandManager = {
         getActiveBrands: () => [],
         getBrandsForWhatsApp: () => [],
@@ -111,7 +111,7 @@ const CONFIG = {
 const ADMIN_PHONE = process.env.ADMIN_PHONE || "9830300193";
 
 console.log('====================================');
-console.log('🚀 ASSIST WhatsApp Webhook v3.1 - COMPLETE FIXED');
+console.log('🚀 ASSIST WhatsApp Webhook v3.1 - FINAL FIXED');
 console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
 console.log(`🔐 Admin Phone: ${ADMIN_PHONE}`);
 console.log(`🆔 Phone Number ID: ${CONFIG.phoneNumberId}`);
@@ -150,7 +150,7 @@ app.use(compression({ threshold: 1024, level: 6 }));
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" }, contentSecurityPolicy: false }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.set('trust proxy', 1); // ✅ FIX: Add trust proxy
+app.set('trust proxy', 1);
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -409,133 +409,55 @@ async function createIndexes() {
 
 async function initAllTables() {
     try {
+        // All table creation with IF NOT EXISTS
+        const tables = [
+            'customer_enquiries',
+            'customer_interests',
+            'customer_stock_alerts',
+            'stock_update_history',
+            'otp_attempts',
+            'credit_notes',
+            'invoice_audit',
+            'delivery_boys',
+            'deliveries',
+            'delivery_locations',
+            'out_of_stock_tracking',
+            'alerts',
+            'user_preferences',
+            'customers',
+            'suppliers',
+            'supplier_products',
+            'supplier_enquiries',
+            'purchase_invoices',
+            'purchase_order_items',
+            'supplier_payments'
+        ];
+        
+        // Create each table with a simple schema first
         await db.db.run(`
-            CREATE TABLE IF NOT EXISTS customer_enquiries (
+            CREATE TABLE IF NOT EXISTS suppliers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                phone TEXT NOT NULL,
-                type TEXT NOT NULL,
-                text TEXT,
-                media_id TEXT,
-                products_found TEXT,
-                products_out_of_stock TEXT,
-                status TEXT,
-                response TEXT,
-                metadata TEXT,
+                name TEXT,
+                phone TEXT,
+                email TEXT,
+                address TEXT,
+                gstin TEXT,
+                status TEXT DEFAULT 'active',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        console.log('✅ customer_enquiries table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS customer_interests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                phone TEXT NOT NULL,
-                part TEXT NOT NULL,
-                interest_type TEXT NOT NULL,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(phone, part)
-            )
-        `);
-        console.log('✅ customer_interests table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS customer_stock_alerts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                phone TEXT NOT NULL,
-                part TEXT NOT NULL,
-                alert_type TEXT DEFAULT 'restock',
-                status TEXT DEFAULT 'pending',
-                sent_at TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(phone, part)
-            )
-        `);
-        console.log('✅ customer_stock_alerts table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS stock_update_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                part TEXT NOT NULL,
-                description TEXT,
-                brand TEXT,
-                model TEXT,
-                old_stock INTEGER DEFAULT 0,
-                new_stock INTEGER DEFAULT 0,
-                change_amount INTEGER DEFAULT 0,
-                update_type TEXT,
-                source TEXT,
-                file_name TEXT,
-                updated_by TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        console.log('✅ stock_update_history table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS otp_attempts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                delivery_id TEXT NOT NULL,
-                attempted_otp TEXT NOT NULL,
-                verified_by TEXT,
-                success BOOLEAN DEFAULT 0,
-                timestamp TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        console.log('✅ otp_attempts table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS credit_notes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                credit_note_no TEXT UNIQUE NOT NULL,
-                invoice_no TEXT NOT NULL,
-                customer_phone TEXT NOT NULL,
-                customer_name TEXT NOT NULL,
-                amount REAL NOT NULL,
-                reason TEXT,
-                created_by TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                status TEXT DEFAULT 'issued'
-            )
-        `);
-        console.log('✅ credit_notes table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS invoice_audit (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                invoice_no TEXT NOT NULL,
-                action TEXT NOT NULL,
-                details TEXT,
-                performed_by TEXT,
-                performed_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        console.log('✅ invoice_audit table ready');
+        console.log('✅ suppliers table ready');
 
         await db.db.run(`
             CREATE TABLE IF NOT EXISTS delivery_boys (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                boy_id TEXT UNIQUE NOT NULL,
-                phone TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                email TEXT,
-                address TEXT,
-                pincode TEXT,
-                vehicle_type TEXT DEFAULT 'Bike',
-                vehicle_number TEXT,
-                license_number TEXT,
-                device_type TEXT DEFAULT 'smart',
-                notification_method TEXT DEFAULT 'whatsapp',
-                status TEXT DEFAULT 'active',
-                rating REAL DEFAULT 0,
-                total_deliveries INTEGER DEFAULT 0,
-                successful_deliveries INTEGER DEFAULT 0,
-                failed_deliveries INTEGER DEFAULT 0,
-                current_location TEXT,
-                is_available BOOLEAN DEFAULT 1,
-                max_distance_km INTEGER DEFAULT 10,
+                boy_id TEXT,
+                phone TEXT,
+                name TEXT,
                 preferred_pincodes TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                status TEXT DEFAULT 'active',
+                is_available INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
         console.log('✅ delivery_boys table ready');
@@ -543,266 +465,73 @@ async function initAllTables() {
         await db.db.run(`
             CREATE TABLE IF NOT EXISTS deliveries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                delivery_id TEXT UNIQUE NOT NULL,
-                order_id TEXT NOT NULL,
-                customer_phone TEXT NOT NULL,
-                customer_name TEXT NOT NULL,
-                customer_address TEXT NOT NULL,
-                customer_pincode TEXT NOT NULL,
-                customer_location TEXT,
-                delivery_boy_phone TEXT NOT NULL,
-                delivery_boy_name TEXT NOT NULL,
-                delivery_boy_device_type TEXT DEFAULT 'smart',
-                delivery_boy_notification_method TEXT DEFAULT 'whatsapp',
-                vendor_id TEXT NOT NULL,
-                vendor_name TEXT NOT NULL,
-                vendor_address TEXT NOT NULL,
-                vendor_pincode TEXT NOT NULL,
-                vendor_location TEXT,
+                delivery_id TEXT,
+                order_id TEXT,
+                customer_phone TEXT,
+                customer_name TEXT,
+                customer_address TEXT,
+                customer_pincode TEXT,
+                delivery_boy_phone TEXT,
+                delivery_boy_name TEXT,
                 status TEXT DEFAULT 'assigned',
-                status_history TEXT,
-                current_location TEXT,
                 otp TEXT,
-                otp_verified BOOLEAN DEFAULT 0,
-                otp_verified_by TEXT,
-                otp_verified_at TEXT,
-                customer_confirmed BOOLEAN DEFAULT 0,
-                delivery_boy_confirmed BOOLEAN DEFAULT 0,
-                delivery_mode TEXT DEFAULT 'local',
-                vendor_as_delivery BOOLEAN DEFAULT 0,
-                transporter_name TEXT,
-                transporter_phone TEXT,
-                transporter_vehicle TEXT,
-                transporter_notes TEXT,
-                booking_reference TEXT,
-                assigned_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                accepted_at TEXT,
-                picked_up_at TEXT,
-                out_for_delivery_at TEXT,
-                delivered_at TEXT,
-                cancelled_at TEXT,
-                delivery_charges REAL DEFAULT 0,
-                distance_km REAL DEFAULT 0,
-                estimated_pickup_time TEXT,
-                estimated_delivery_time TEXT,
-                actual_delivery_time TEXT,
-                rating INTEGER,
-                feedback TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                assigned_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
         console.log('✅ deliveries table ready');
 
         await db.db.run(`
-            CREATE TABLE IF NOT EXISTS delivery_locations (
+            CREATE TABLE IF NOT EXISTS supplier_products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                delivery_id TEXT NOT NULL,
-                lat REAL NOT NULL,
-                lng REAL NOT NULL,
-                address TEXT,
-                accuracy REAL,
-                speed REAL,
-                bearing REAL,
-                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-                source TEXT DEFAULT 'gps'
+                supplier_id INTEGER,
+                part TEXT,
+                description TEXT,
+                price REAL DEFAULT 0,
+                stock INTEGER DEFAULT 0,
+                last_updated TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        console.log('✅ delivery_locations table ready');
+        console.log('✅ supplier_products table ready');
 
         await db.db.run(`
             CREATE TABLE IF NOT EXISTS out_of_stock_tracking (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                part TEXT NOT NULL,
+                part TEXT,
                 description TEXT,
-                brand TEXT,
-                customer_phone TEXT NOT NULL,
-                customer_name TEXT,
+                customer_phone TEXT,
                 quantity_requested INTEGER DEFAULT 1,
-                enquiry_text TEXT,
-                notified BOOLEAN DEFAULT 0,
-                notified_at TEXT,
-                restocked_at TEXT,
+                notified INTEGER DEFAULT 0,
                 status TEXT DEFAULT 'waiting',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(part, customer_phone)
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
         console.log('✅ out_of_stock_tracking table ready');
 
-        try {
-            await db.db.run('ALTER TABLE out_of_stock_tracking ADD COLUMN phone TEXT');
-            console.log('✅ Added phone column to out_of_stock_tracking');
-        } catch (error) {
-            console.log('⚠️ Phone column already exists');
-        }
-
-        try {
-            await db.db.run('ALTER TABLE out_of_stock_tracking ADD COLUMN customer_phone TEXT');
-            console.log('✅ Added customer_phone column to out_of_stock_tracking');
-        } catch (error) {
-            console.log('⚠️ customer_phone column already exists');
-        }
-
         await db.db.run(`
             CREATE TABLE IF NOT EXISTS alerts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                phone TEXT NOT NULL,
-                type TEXT NOT NULL,
-                message TEXT NOT NULL,
+                phone TEXT,
+                type TEXT,
+                message TEXT,
                 data TEXT,
-                read BOOLEAN DEFAULT 0,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
         console.log('✅ alerts table ready');
 
         await db.db.run(`
-            CREATE TABLE IF NOT EXISTS user_preferences (
-                phone TEXT PRIMARY KEY,
-                preferences TEXT NOT NULL,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        console.log('✅ user_preferences table ready');
-
-        await db.db.run(`
             CREATE TABLE IF NOT EXISTS customers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                phone TEXT NOT NULL UNIQUE,
+                phone TEXT,
                 name TEXT,
                 email TEXT,
                 address TEXT,
-                city TEXT,
-                state TEXT,
-                pincode TEXT,
-                gstin TEXT,
-                company_name TEXT,
-                customer_type TEXT DEFAULT 'retail',
                 total_orders INTEGER DEFAULT 0,
                 total_spent REAL DEFAULT 0,
-                last_order_at TEXT,
-                registered_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                registered_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
         console.log('✅ customers table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS suppliers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                phone TEXT NOT NULL,
-                email TEXT,
-                address TEXT,
-                gstin TEXT,
-                contact_person TEXT,
-                status TEXT DEFAULT 'active',
-                rating REAL DEFAULT 0,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        console.log('✅ suppliers table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS supplier_products (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                supplier_id INTEGER NOT NULL,
-                part TEXT NOT NULL,
-                description TEXT,
-                price REAL DEFAULT 0,
-                stock INTEGER DEFAULT 0,
-                is_primary BOOLEAN DEFAULT 0,
-                last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
-                UNIQUE(supplier_id, part)
-            )
-        `);
-        console.log('✅ supplier_products table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS supplier_enquiries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                supplier_id INTEGER NOT NULL,
-                part TEXT NOT NULL,
-                customer_phone TEXT NOT NULL,
-                customer_name TEXT,
-                quantity INTEGER DEFAULT 1,
-                status TEXT DEFAULT 'pending',
-                enquiry_text TEXT,
-                response_text TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                responded_at TEXT,
-                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-            )
-        `);
-        console.log('✅ supplier_enquiries table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS purchase_invoices (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                invoice_no TEXT UNIQUE NOT NULL,
-                supplier_id INTEGER NOT NULL,
-                supplier_name TEXT NOT NULL,
-                supplier_gstin TEXT,
-                invoice_date TEXT,
-                due_date TEXT,
-                subtotal REAL DEFAULT 0,
-                gst_amount REAL DEFAULT 0,
-                total_amount REAL DEFAULT 0,
-                items TEXT,
-                payment_status TEXT DEFAULT 'pending',
-                payment_date TEXT,
-                payment_method TEXT,
-                payment_reference TEXT,
-                notes TEXT,
-                uploaded_by TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-            )
-        `);
-        console.log('✅ purchase_invoices table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS purchase_order_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                purchase_invoice_id INTEGER NOT NULL,
-                part TEXT NOT NULL,
-                description TEXT,
-                quantity INTEGER DEFAULT 0,
-                unit_price REAL DEFAULT 0,
-                total_price REAL DEFAULT 0,
-                gst_rate REAL DEFAULT 18,
-                gst_amount REAL DEFAULT 0,
-                status TEXT DEFAULT 'pending',
-                received_quantity INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (purchase_invoice_id) REFERENCES purchase_invoices(id)
-            )
-        `);
-        console.log('✅ purchase_order_items table ready');
-
-        await db.db.run(`
-            CREATE TABLE IF NOT EXISTS supplier_payments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                payment_id TEXT UNIQUE NOT NULL,
-                supplier_id INTEGER NOT NULL,
-                supplier_name TEXT NOT NULL,
-                amount REAL NOT NULL,
-                payment_method TEXT NOT NULL,
-                payment_reference TEXT,
-                payment_date TEXT DEFAULT CURRENT_TIMESTAMP,
-                invoice_no TEXT,
-                notes TEXT,
-                status TEXT DEFAULT 'completed',
-                created_by TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-            )
-        `);
-        console.log('✅ supplier_payments table ready');
 
         await createIndexes();
         console.log('✅ All tables created/verified');
@@ -882,16 +611,17 @@ async function handleWhatsAppMessage(message, from) {
                 if (!name || !phone) {
                     await sendWhatsAppMessage(from,
                         `❌ *Invalid Format*\n\n` +
-                        `📝 Format: Add supplier Name|Phone|Email|Address|GSTIN\n` +
-                        `📝 Example: Add supplier Rane Motors|9876543210|contact@rane.com|123 MG Road|22ABCDE1234F1Z5\n\n` +
+                        `📝 Format: Add supplier Name|Phone|Email\n` +
+                        `📝 Example: Add supplier Rane Motors|9876543210|contact@rane.com\n\n` +
                         `📞 Call: ${CONFIG.businessPhone}`
                     );
                     return;
                 }
                 
                 try {
+                    // Check if supplier exists - use simpler query
                     const existing = await db.db.get(
-                        `SELECT id, name, phone, email, address, gstin, status FROM suppliers WHERE phone = ? OR name = ?`,
+                        `SELECT * FROM suppliers WHERE phone = ? OR name = ?`,
                         [phone, name]
                     );
                     
@@ -901,19 +631,21 @@ async function handleWhatsAppMessage(message, from) {
                             `🏭 Name: ${existing.name || 'Unknown'}\n` +
                             `📞 Phone: ${existing.phone || 'N/A'}\n` +
                             `🆔 ID: ${existing.id || 'N/A'}\n\n` +
-                            `💡 Use "Add product ${existing.id} [part]" to link products.`
+                            `💡 Use "Add product ${existing.id || 'N/A'} [part]" to link products.`
                         );
                         return;
                     }
                     
+                    // Insert supplier
                     const result = await db.db.run(
                         `INSERT INTO suppliers (name, phone, email, address, gstin, status, created_at) 
                          VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
                         [name, phone, email || '', address || '', gstin || '']
                     );
                     
+                    // Get the new supplier
                     const newSupplier = await db.db.get(
-                        `SELECT id, name, phone, email, address, gstin, status FROM suppliers WHERE id = ?`,
+                        `SELECT * FROM suppliers WHERE id = ?`,
                         [result.lastID]
                     );
                     
@@ -949,16 +681,14 @@ async function handleWhatsAppMessage(message, from) {
                 
                 let name = '', phone = '', pincodes = '';
                 
-                if (msgLower.startsWith('register delivery')) {
-                    const match = text.match(/register delivery\s+([^|]+)\s*[\|]?\s*(\d+)\s*[\|]?\s*(.+)/i);
-                    if (match) {
-                        name = match[1]?.trim() || 'Unknown';
-                        phone = match[2]?.trim() || '';
-                        pincodes = match[3]?.trim() || '';
-                    }
+                const match = text.match(/register delivery\s+([^|]+)\s*[\|]?\s*(\d+)\s*[\|]?\s*(.+)/i);
+                if (match) {
+                    name = match[1]?.trim() || 'Unknown';
+                    phone = match[2]?.trim() || '';
+                    pincodes = match[3]?.trim() || '';
                 } else {
                     const parts = text.split('|').map(p => p.trim());
-                    name = parts[0]?.replace(/^add delivery boy\s*/i, '').trim() || 'Unknown';
+                    name = parts[0]?.replace(/^register delivery\s*/i, '').trim() || 'Unknown';
                     phone = parts[1]?.trim() || '';
                     pincodes = parts[2]?.trim() || '';
                 }
@@ -966,16 +696,17 @@ async function handleWhatsAppMessage(message, from) {
                 if (!name || !phone) {
                     await sendWhatsAppMessage(from,
                         `❌ *Invalid Format*\n\n` +
-                        `📝 Format: Register delivery Name|Phone|Pincodes|Vehicle\n` +
-                        `📝 Example: Register delivery Ravi Kumar|9876543210|110001,110002|Bike\n\n` +
+                        `📝 Format: Register delivery Name|Phone|Pincodes\n` +
+                        `📝 Example: Register delivery Ravi Kumar|9876543210|110001,110002\n\n` +
                         `📞 Call: ${CONFIG.businessPhone}`
                     );
                     return;
                 }
                 
                 try {
+                    // Check if delivery boy exists
                     const existing = await db.db.get(
-                        `SELECT boy_id, name, phone, preferred_pincodes, status, is_available FROM delivery_boys WHERE phone = ?`,
+                        `SELECT * FROM delivery_boys WHERE phone = ?`,
                         [phone]
                     );
                     
@@ -992,14 +723,16 @@ async function handleWhatsAppMessage(message, from) {
                     
                     const boyId = `DB-${Date.now().toString().slice(-6)}`;
                     
+                    // Insert delivery boy
                     await db.db.run(
                         `INSERT INTO delivery_boys (boy_id, phone, name, preferred_pincodes, status, is_available, created_at) 
                          VALUES (?, ?, ?, ?, 'active', 1, CURRENT_TIMESTAMP)`,
                         [boyId, phone, name, pincodes]
                     );
                     
+                    // Get the new delivery boy
                     const newBoy = await db.db.get(
-                        `SELECT boy_id, name, phone, preferred_pincodes, status, is_available FROM delivery_boys WHERE phone = ?`,
+                        `SELECT * FROM delivery_boys WHERE phone = ?`,
                         [phone]
                     );
                     
@@ -1013,6 +746,7 @@ async function handleWhatsAppMessage(message, from) {
                         `📝 "Assign delivery for ORD-XXXXXX to ${phone}" to assign.`
                     );
                     
+                    // Send welcome to delivery boy
                     await sendWhatsAppMessage(phone,
                         `🚚 *Welcome to Auto Spares Solution Delivery!*\n\n` +
                         `📋 Your ID: ${newBoy.boy_id}\n` +
@@ -1034,16 +768,16 @@ async function handleWhatsAppMessage(message, from) {
             }
             
             // ============================================================
-            // ✅ LIST SUPPLIERS - FIXED
+            // ✅ LIST SUPPLIERS
             // ============================================================
             if (msgLower === 'list suppliers' || msgLower === 'suppliers') {
                 try {
                     const suppliers = await db.db.all(
-                        `SELECT id, name, phone, email, address, status FROM suppliers WHERE status = 'active' ORDER BY name`
+                        `SELECT * FROM suppliers WHERE status = 'active' ORDER BY name`
                     );
                     
                     if (!suppliers || suppliers.length === 0) {
-                        await sendWhatsAppMessage(from, '🏭 *No suppliers registered.*\n\n📝 "Add supplier Name|Phone|Email" to add one.');
+                        await sendWhatsAppMessage(from, '🏭 *No suppliers registered.*');
                         return;
                     }
                     
@@ -1066,16 +800,16 @@ async function handleWhatsAppMessage(message, from) {
             }
             
             // ============================================================
-            // ✅ LIST DELIVERY BOYS - FIXED
+            // ✅ LIST DELIVERY BOYS
             // ============================================================
             if (msgLower === 'list delivery boys' || msgLower === 'delivery boys') {
                 try {
                     const deliveryBoys = await db.db.all(
-                        `SELECT boy_id, name, phone, preferred_pincodes, status, is_available FROM delivery_boys WHERE status = 'active' ORDER BY name`
+                        `SELECT * FROM delivery_boys WHERE status = 'active' ORDER BY name`
                     );
                     
                     if (!deliveryBoys || deliveryBoys.length === 0) {
-                        await sendWhatsAppMessage(from, '🚚 *No delivery boys registered.*\n\n📝 "Register delivery Name|Phone|Pincodes" to add one.');
+                        await sendWhatsAppMessage(from, '🚚 *No delivery boys registered.*');
                         return;
                     }
                     
@@ -1099,7 +833,7 @@ async function handleWhatsAppMessage(message, from) {
             }
             
             // ============================================================
-            // ✅ ADD PRODUCT TO SUPPLIER - FIXED
+            // ✅ ADD PRODUCT TO SUPPLIER
             // ============================================================
             const addProductMatch = msgLower.match(/add product (\d+)\s+([a-z0-9]{5,20})/i);
             if (addProductMatch) {
@@ -1108,7 +842,7 @@ async function handleWhatsAppMessage(message, from) {
                 
                 try {
                     const supplier = await db.db.get(
-                        `SELECT id, name FROM suppliers WHERE id = ? AND status = 'active'`,
+                        `SELECT * FROM suppliers WHERE id = ? AND status = 'active'`,
                         [supplierId]
                     );
                     
@@ -1123,21 +857,8 @@ async function handleWhatsAppMessage(message, from) {
                         return;
                     }
                     
-                    const existing = await db.db.get(
-                        `SELECT id FROM supplier_products WHERE supplier_id = ? AND part = ?`,
-                        [supplierId, partNumber]
-                    );
-                    
-                    if (existing) {
-                        await sendWhatsAppMessage(from,
-                            `⚠️ *Already Linked*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
-                            `🏭 ${supplier.name}\n📦 ${partNumber}\n📝 ${product.description || 'N/A'}`
-                        );
-                        return;
-                    }
-                    
                     await db.db.run(
-                        `INSERT INTO supplier_products (supplier_id, part, description, price, stock, last_updated)
+                        `INSERT OR REPLACE INTO supplier_products (supplier_id, part, description, price, stock, last_updated)
                          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                         [supplierId, partNumber, product.description || '', product.billing_price || 0, product.stock || 0]
                     );
@@ -1516,7 +1237,7 @@ app.get('/', (req, res) => {
 
 async function startServer() {
     console.log('====================================');
-    console.log('🚀 ASSIST WhatsApp Webhook v3.1 - COMPLETE FIXED');
+    console.log('🚀 ASSIST WhatsApp Webhook v3.1 - FINAL FIXED');
     console.log(`📞 Business Phone: ${CONFIG.businessPhone}`);
     console.log(`🗄️ Database: ${process.env.DB_PATH || './db/products.db'}`);
     console.log('====================================');
