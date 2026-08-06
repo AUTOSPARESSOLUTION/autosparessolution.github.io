@@ -4078,6 +4078,11 @@ async function startServer() {
 
         await initAllTables();
         console.log('✅ All tables ready');
+// ✅ ADD LOGO PRELOAD HERE - EXACT POSITION
+        console.log('📥 Preloading brand logos...');
+        const { preloadAllLogos } = require('./modules/brand-collage');
+        await preloadAllLogos();
+        console.log('✅ Brand logos preloaded');
 
         const stats = await db.getStats();
         if (stats.total_products === 0) {
