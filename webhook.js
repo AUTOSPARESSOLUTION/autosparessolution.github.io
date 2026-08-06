@@ -1124,176 +1124,551 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================
-// 📦 DATABASE INITIALIZATION
+// 🗄️ DATABASE INITIALIZATION - COMPLETE FIXED
 // ============================================================
-
-let isDbReady = false;
-let importProgress = 0;
 
 async function initAllTables() {
     try {
-        await db.initDatabase();
-        console.log('✅ Database initialized');
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            part TEXT NOT NULL UNIQUE,
-            description TEXT,
-            brand TEXT,
-            make TEXT,
-            model TEXT,
-            stock INTEGER DEFAULT 0,
-            list_price REAL DEFAULT 0,
-            mrp REAL DEFAULT 0,
-            billing_price REAL DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS customers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone TEXT NOT NULL UNIQUE,
-            name TEXT,
-            email TEXT,
-            address TEXT,
-            city TEXT,
-            state TEXT,
-            pincode TEXT,
-            total_orders INTEGER DEFAULT 0,
-            total_spent REAL DEFAULT 0,
-            registered_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS carts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone TEXT NOT NULL UNIQUE,
-            items TEXT NOT NULL,
-            total REAL NOT NULL,
-            subtotal REAL NOT NULL,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            order_id TEXT NOT NULL UNIQUE,
-            phone TEXT NOT NULL,
-            items TEXT NOT NULL,
-            total REAL NOT NULL,
-            status TEXT DEFAULT 'pending',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS invoices (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            invoice_no TEXT NOT NULL UNIQUE,
-            order_id TEXT NOT NULL,
-            customer_phone TEXT NOT NULL,
-            total REAL NOT NULL,
-            status TEXT DEFAULT 'pending',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS suppliers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            email TEXT,
-            address TEXT,
-            gstin TEXT,
-            status TEXT DEFAULT 'active',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS supplier_products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            supplier_id INTEGER NOT NULL,
-            part TEXT NOT NULL,
-            description TEXT,
-            price REAL DEFAULT 0,
-            stock INTEGER DEFAULT 0,
-            last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS delivery_boys (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            boy_id TEXT UNIQUE NOT NULL,
-            phone TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
-            preferred_pincodes TEXT,
-            vehicle_type TEXT DEFAULT 'Bike',
-            status TEXT DEFAULT 'active',
-            is_available BOOLEAN DEFAULT 1,
-            total_deliveries INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS deliveries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            delivery_id TEXT UNIQUE NOT NULL,
-            order_id TEXT NOT NULL,
-            customer_phone TEXT NOT NULL,
-            customer_name TEXT NOT NULL,
-            customer_address TEXT NOT NULL,
-            customer_pincode TEXT NOT NULL,
-            delivery_boy_phone TEXT NOT NULL,
-            delivery_boy_name TEXT NOT NULL,
-            status TEXT DEFAULT 'assigned',
-            otp TEXT,
-            otp_verified BOOLEAN DEFAULT 0,
-            assigned_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS out_of_stock_tracking (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            part TEXT NOT NULL,
-            description TEXT,
-            customer_phone TEXT NOT NULL,
-            quantity_requested INTEGER DEFAULT 1,
-            notified BOOLEAN DEFAULT 0,
-            status TEXT DEFAULT 'waiting',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone TEXT NOT NULL,
-            type TEXT NOT NULL,
-            message TEXT NOT NULL,
-            data TEXT,
-            read BOOLEAN DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        
-        await db.db.run(`CREATE INDEX IF NOT EXISTS idx_products_part ON products(part)`);
-        await db.db.run(`CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(phone)`);
-        await db.db.run(`CREATE INDEX IF NOT EXISTS idx_suppliers_phone ON suppliers(phone)`);
-        await db.db.run(`CREATE INDEX IF NOT EXISTS idx_delivery_boys_phone ON delivery_boys(phone)`);
-        
-        console.log('✅ All tables ready');
-        
-        // Check if products exist
-        const stats = await db.getStats();
-        if (stats.total_products === 0) {
-            console.log('📦 No products found. Starting import...');
-            const csvPath = path.join(__dirname, 'prices.csv');
-            if (fs.existsSync(csvPath)) {
-                const result = await importCSV(csvPath);
-                importProgress = result.imported;
-                console.log(`✅ Imported ${result.imported} products`);
-            }
-        } else {
-            importProgress = stats.total_products;
-            console.log(`📦 ${stats.total_products} products already in database`);
+        // customer_enquiries
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS customer_enquiries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    text TEXT,
+                    media_id TEXT,
+                    products_found TEXT,
+                    products_out_of_stock TEXT,
+                    status TEXT,
+                    response TEXT,
+                    metadata TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ customer_enquiries table ready');
+
+        // customer_interests
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS customer_interests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone TEXT NOT NULL,
+                    part TEXT NOT NULL,
+                    interest_type TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(phone, part)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ customer_interests table ready');
+
+        // customer_stock_alerts
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS customer_stock_alerts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone TEXT NOT NULL,
+                    part TEXT NOT NULL,
+                    alert_type TEXT DEFAULT 'restock',
+                    status TEXT DEFAULT 'pending',
+                    sent_at TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(phone, part)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ customer_stock_alerts table ready');
+
+        // stock_update_history
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS stock_update_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    part TEXT NOT NULL,
+                    description TEXT,
+                    brand TEXT,
+                    model TEXT,
+                    old_stock INTEGER DEFAULT 0,
+                    new_stock INTEGER DEFAULT 0,
+                    change_amount INTEGER DEFAULT 0,
+                    update_type TEXT,
+                    source TEXT,
+                    file_name TEXT,
+                    updated_by TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ stock_update_history table ready');
+
+        // otp_attempts
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS otp_attempts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    delivery_id TEXT NOT NULL,
+                    attempted_otp TEXT NOT NULL,
+                    verified_by TEXT,
+                    success BOOLEAN DEFAULT 0,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ otp_attempts table ready');
+
+        // credit_notes
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS credit_notes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    credit_note_no TEXT UNIQUE NOT NULL,
+                    invoice_no TEXT NOT NULL,
+                    customer_phone TEXT NOT NULL,
+                    customer_name TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    reason TEXT,
+                    created_by TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'issued'
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ credit_notes table ready');
+
+        // invoice_audit
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS invoice_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    invoice_no TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    details TEXT,
+                    performed_by TEXT,
+                    performed_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ invoice_audit table ready');
+
+        // ✅ DELIVERY BOYS TABLE - FIXED
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS delivery_boys (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    boy_id TEXT UNIQUE NOT NULL,
+                    phone TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    email TEXT,
+                    address TEXT,
+                    pincode TEXT,
+                    vehicle_type TEXT DEFAULT 'Bike',
+                    vehicle_number TEXT,
+                    license_number TEXT,
+                    device_type TEXT DEFAULT 'smart',
+                    notification_method TEXT DEFAULT 'whatsapp',
+                    status TEXT DEFAULT 'active',
+                    rating REAL DEFAULT 0,
+                    total_deliveries INTEGER DEFAULT 0,
+                    successful_deliveries INTEGER DEFAULT 0,
+                    failed_deliveries INTEGER DEFAULT 0,
+                    current_location TEXT,
+                    is_available BOOLEAN DEFAULT 1,
+                    max_distance_km INTEGER DEFAULT 10,
+                    preferred_pincodes TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ delivery_boys table ready');
+
+        // ✅ DELIVERIES TABLE - FIXED
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS deliveries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    delivery_id TEXT UNIQUE NOT NULL,
+                    order_id TEXT NOT NULL,
+                    customer_phone TEXT NOT NULL,
+                    customer_name TEXT NOT NULL,
+                    customer_address TEXT NOT NULL,
+                    customer_pincode TEXT NOT NULL,
+                    customer_location TEXT,
+                    delivery_boy_phone TEXT NOT NULL,
+                    delivery_boy_name TEXT NOT NULL,
+                    delivery_boy_device_type TEXT DEFAULT 'smart',
+                    delivery_boy_notification_method TEXT DEFAULT 'whatsapp',
+                    vendor_id TEXT NOT NULL,
+                    vendor_name TEXT NOT NULL,
+                    vendor_address TEXT NOT NULL,
+                    vendor_pincode TEXT NOT NULL,
+                    vendor_location TEXT,
+                    status TEXT DEFAULT 'assigned',
+                    status_history TEXT,
+                    current_location TEXT,
+                    otp TEXT,
+                    otp_verified BOOLEAN DEFAULT 0,
+                    otp_verified_by TEXT,
+                    otp_verified_at TEXT,
+                    customer_confirmed BOOLEAN DEFAULT 0,
+                    delivery_boy_confirmed BOOLEAN DEFAULT 0,
+                    delivery_mode TEXT DEFAULT 'local',
+                    vendor_as_delivery BOOLEAN DEFAULT 0,
+                    transporter_name TEXT,
+                    transporter_phone TEXT,
+                    transporter_vehicle TEXT,
+                    transporter_notes TEXT,
+                    booking_reference TEXT,
+                    assigned_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    accepted_at TEXT,
+                    picked_up_at TEXT,
+                    out_for_delivery_at TEXT,
+                    delivered_at TEXT,
+                    cancelled_at TEXT,
+                    delivery_charges REAL DEFAULT 0,
+                    distance_km REAL DEFAULT 0,
+                    estimated_pickup_time TEXT,
+                    estimated_delivery_time TEXT,
+                    actual_delivery_time TEXT,
+                    rating INTEGER,
+                    feedback TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ deliveries table ready');
+
+        // ✅ DELIVERY LOCATIONS TABLE - FIXED
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS delivery_locations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    delivery_id TEXT NOT NULL,
+                    lat REAL NOT NULL,
+                    lng REAL NOT NULL,
+                    address TEXT,
+                    accuracy REAL,
+                    speed REAL,
+                    bearing REAL,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                    source TEXT DEFAULT 'gps'
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ delivery_locations table ready');
+
+        // out_of_stock_tracking
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS out_of_stock_tracking (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    part TEXT NOT NULL,
+                    description TEXT,
+                    brand TEXT,
+                    customer_phone TEXT NOT NULL,
+                    customer_name TEXT,
+                    quantity_requested INTEGER DEFAULT 1,
+                    enquiry_text TEXT,
+                    notified BOOLEAN DEFAULT 0,
+                    notified_at TEXT,
+                    restocked_at TEXT,
+                    status TEXT DEFAULT 'waiting',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(part, customer_phone)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ out_of_stock_tracking table ready');
+
+        // Add missing columns
+        try {
+            await new Promise((resolve, reject) => {
+                db.db.run('ALTER TABLE out_of_stock_tracking ADD COLUMN phone TEXT', (err) => {
+                    if (err && !err.message.includes('duplicate column name')) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            console.log('✅ Added phone column to out_of_stock_tracking');
+        } catch (error) {
+            console.log('⚠️ Phone column already exists:', error.message);
         }
-        
-        isDbReady = true;
-        
+
+        try {
+            await new Promise((resolve, reject) => {
+                db.db.run('ALTER TABLE out_of_stock_tracking ADD COLUMN customer_phone TEXT', (err) => {
+                    if (err && !err.message.includes('duplicate column name')) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            console.log('✅ Added customer_phone column to out_of_stock_tracking');
+        } catch (error) {
+            console.log('⚠️ customer_phone column already exists:', error.message);
+        }
+
+        // alerts
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS alerts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    data TEXT,
+                    read BOOLEAN DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ alerts table ready');
+
+        // user_preferences
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    phone TEXT PRIMARY KEY,
+                    preferences TEXT NOT NULL,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ user_preferences table ready');
+
+        // customers
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS customers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone TEXT NOT NULL UNIQUE,
+                    name TEXT,
+                    email TEXT,
+                    address TEXT,
+                    city TEXT,
+                    state TEXT,
+                    pincode TEXT,
+                    gstin TEXT,
+                    company_name TEXT,
+                    customer_type TEXT DEFAULT 'retail',
+                    total_orders INTEGER DEFAULT 0,
+                    total_spent REAL DEFAULT 0,
+                    last_order_at TEXT,
+                    registered_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ customers table ready');
+
+        // suppliers
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS suppliers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    phone TEXT NOT NULL,
+                    email TEXT,
+                    address TEXT,
+                    gstin TEXT,
+                    contact_person TEXT,
+                    status TEXT DEFAULT 'active',
+                    rating REAL DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ suppliers table ready');
+
+        // supplier_products
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS supplier_products (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    supplier_id INTEGER NOT NULL,
+                    part TEXT NOT NULL,
+                    description TEXT,
+                    price REAL DEFAULT 0,
+                    stock INTEGER DEFAULT 0,
+                    is_primary BOOLEAN DEFAULT 0,
+                    last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+                    UNIQUE(supplier_id, part)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ supplier_products table ready');
+
+        // supplier_enquiries
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS supplier_enquiries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    supplier_id INTEGER NOT NULL,
+                    part TEXT NOT NULL,
+                    customer_phone TEXT NOT NULL,
+                    customer_name TEXT,
+                    quantity INTEGER DEFAULT 1,
+                    status TEXT DEFAULT 'pending',
+                    enquiry_text TEXT,
+                    response_text TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    responded_at TEXT,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ supplier_enquiries table ready');
+
+        // purchase_invoices
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS purchase_invoices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    invoice_no TEXT UNIQUE NOT NULL,
+                    supplier_id INTEGER NOT NULL,
+                    supplier_name TEXT NOT NULL,
+                    supplier_gstin TEXT,
+                    invoice_date TEXT,
+                    due_date TEXT,
+                    subtotal REAL DEFAULT 0,
+                    gst_amount REAL DEFAULT 0,
+                    total_amount REAL DEFAULT 0,
+                    items TEXT,
+                    payment_status TEXT DEFAULT 'pending',
+                    payment_date TEXT,
+                    payment_method TEXT,
+                    payment_reference TEXT,
+                    notes TEXT,
+                    uploaded_by TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ purchase_invoices table ready');
+
+        // purchase_order_items
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS purchase_order_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    purchase_invoice_id INTEGER NOT NULL,
+                    part TEXT NOT NULL,
+                    description TEXT,
+                    quantity INTEGER DEFAULT 0,
+                    unit_price REAL DEFAULT 0,
+                    total_price REAL DEFAULT 0,
+                    gst_rate REAL DEFAULT 18,
+                    gst_amount REAL DEFAULT 0,
+                    status TEXT DEFAULT 'pending',
+                    received_quantity INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (purchase_invoice_id) REFERENCES purchase_invoices(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ purchase_order_items table ready');
+
+        // supplier_payments
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS supplier_payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    payment_id TEXT UNIQUE NOT NULL,
+                    supplier_id INTEGER NOT NULL,
+                    supplier_name TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    payment_method TEXT NOT NULL,
+                    payment_reference TEXT,
+                    payment_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                    invoice_no TEXT,
+                    notes TEXT,
+                    status TEXT DEFAULT 'completed',
+                    created_by TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ supplier_payments table ready');
+
+        // Create indexes
+        await createIndexes();
+        console.log('✅ All tables created/verified');
+
     } catch (error) {
-        console.error('❌ Database initialization error:', error.message);
+        console.error('❌ Create tables error:', error.message);
     }
 }
-
 // ============================================================
 // 🚀 START SERVER
 // ============================================================
