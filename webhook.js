@@ -418,31 +418,27 @@ async function sendWelcomeWithAllBrands(to) {
     }
 }
 
-// ============================================================
-// 📱 HANDLE WHATSAPP MESSAGE - COMPLETE FIXED
-// ============================================================
-
 async function handleWhatsAppMessage(message, from) {
     try {
         const text = message.text?.body || '';
         const cleaned = text.replace(/^["']|["']$/g, '').trim();
         const msgLower = cleaned.toLowerCase();
         
-        console.log(`💬 Message: "${text}"`);
-        console.log(`👤 From: ${from} | Is Admin: ${isAdmin(from)}`);
+        console.log(`💬 From: ${from} | Message: "${text}"`);
+        console.log(`🔑 Is Admin: ${isAdmin(from)}`);
 
         // ============================================================
-        // 👑 ADMIN COMMANDS - CHECK FIRST!
+        // 🛑 IMMEDIATE ADMIN CHECK - BEFORE ANYTHING ELSE!
         // ============================================================
         
         if (isAdmin(from)) {
-            console.log('👑 Processing as admin command');
+            console.log('👑 Admin mode activated');
             
             // ------------------------------------------------
-            // ✅ ADD SUPPLIER - MUST BE FIRST!
+            // ✅ ADD SUPPLIER - ABSOLUTE HIGHEST PRIORITY
             // ------------------------------------------------
             if (msgLower.startsWith('add supplier')) {
-                console.log(`🏭 Admin adding supplier: ${text}`);
+                console.log(`🏭 Processing add supplier: ${text}`);
                 
                 // Parse: Add supplier Name|Phone|Email|Address|GSTIN
                 const parts = text.split('|').map(p => p.trim());
@@ -521,7 +517,7 @@ async function handleWhatsAppMessage(message, from) {
             // ✅ REGISTER DELIVERY BOY
             // ------------------------------------------------
             if (msgLower.startsWith('register delivery') || msgLower.startsWith('add delivery boy')) {
-                console.log(`🚚 Admin registering delivery boy: ${text}`);
+                console.log(`🚚 Processing register delivery: ${text}`);
                 
                 let name = '', phone = '', pincodes = '';
                 
@@ -901,22 +897,18 @@ async function handleWhatsAppMessage(message, from) {
         }
 
         // ============================================================
-        // 🛒 CUSTOMER COMMANDS (Only if not admin or admin command not matched)
+        // 🛒 CUSTOMER COMMANDS (Only if not admin OR no admin command matched)
         // ============================================================
         
         console.log('👤 Processing as customer command');
         
-        // ------------------------------------------------
         // 1️⃣ WELCOME / HELP
-        // ------------------------------------------------
         if (['hi', 'hello', 'help', 'start', 'menu'].includes(msgLower)) {
             await sendWelcomeWithAllBrands(from);
             return;
         }
         
-        // ------------------------------------------------
         // 2️⃣ CONFIRM ORDER
-        // ------------------------------------------------
         if (msgLower === 'confirm order' || msgLower === 'confirm') {
             const cart = await db.getCart(from);
             if (cart && cart.items) {
@@ -938,18 +930,14 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
         
-        // ------------------------------------------------
         // 3️⃣ CLEAR CART
-        // ------------------------------------------------
         if (msgLower === 'clear cart' || msgLower === 'clear') {
             await db.clearCart(from);
             await sendWhatsAppMessage(from, '🗑️ Cart cleared!');
             return;
         }
         
-        // ------------------------------------------------
         // 4️⃣ ORDER SUMMARY
-        // ------------------------------------------------
         if (msgLower === 'order summary' || msgLower === 'cart') {
             const cart = await db.getCart(from);
             if (cart && cart.items) {
@@ -966,9 +954,7 @@ async function handleWhatsAppMessage(message, from) {
             return;
         }
         
-        // ------------------------------------------------
         // 5️⃣ PART NUMBER SEARCH
-        // ------------------------------------------------
         const partMatch = cleaned.match(/\b([A-Z0-9]{5,20})\b/);
         if (partMatch) {
             const partNumber = partMatch[1];
@@ -989,9 +975,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
         
-        // ------------------------------------------------
         // 6️⃣ PART WITH QUANTITY
-        // ------------------------------------------------
         const partWithQty = cleaned.match(/\b([A-Z0-9]{5,20})\s*(\d+)\b/);
         if (partWithQty) {
             const partNumber = partWithQty[1];
@@ -1031,9 +1015,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
         
-        // ------------------------------------------------
         // 7️⃣ SEARCH
-        // ------------------------------------------------
         if (cleaned.length >= 2) {
             const results = await db.searchProducts(cleaned, 5);
             if (results.length > 0) {
@@ -1047,9 +1029,7 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
         
-        // ------------------------------------------------
         // 8️⃣ NO RESULTS
-        // ------------------------------------------------
         await sendWhatsAppMessage(from,
             `🔍 No results for "${text}"\n\n` +
             `💡 Send a part number like "0801BA0285N"\n` +
