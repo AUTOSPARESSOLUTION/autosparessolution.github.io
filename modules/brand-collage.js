@@ -1,5 +1,5 @@
 // ============================================================
-// 🎨 DYNAMIC BRAND COLLAGE GENERATOR - COMPLETE WORKING
+// 🎨 DYNAMIC BRAND COLLAGE GENERATOR - LARGE LOGOS
 // ============================================================
 
 const sharp = require('sharp');
@@ -36,7 +36,7 @@ class DynamicBrandCollage {
         this.ensureTempDir();
         this.lastBrandCount = 0;
         this.brandHash = '';
-        this.logoCache = new Map(); // Cache for preloaded logos
+        this.logoCache = new Map();
     }
 
     ensureTempDir() {
@@ -50,7 +50,7 @@ class DynamicBrandCollage {
     }
 
     // ============================================================
-    // 📥 PRELOAD ALL LOGOS - FIXED
+    // 📥 PRELOAD ALL LOGOS
     // ============================================================
     
     async preloadAllLogos() {
@@ -93,37 +93,6 @@ class DynamicBrandCollage {
         
         console.log(`📊 Preloaded ${this.logoCache.size} logos`);
         return this.logoCache.size;
-    }
-
-    // ============================================================
-    // 📥 DOWNLOAD LOGO AS BASE64 (Fallback)
-    // ============================================================
-    
-    async downloadLogoAsBase64(logoUrl) {
-        if (this.logoCache.has(logoUrl)) {
-            return this.logoCache.get(logoUrl);
-        }
-        
-        try {
-            const response = await fetch(logoUrl);
-            if (!response.ok) {
-                return null;
-            }
-            
-            const buffer = await response.arrayBuffer();
-            const base64 = Buffer.from(buffer).toString('base64');
-            
-            let mimeType = 'image/png';
-            if (logoUrl.endsWith('.jpg') || logoUrl.endsWith('.jpeg')) {
-                mimeType = 'image/jpeg';
-            }
-            
-            const dataUrl = `data:${mimeType};base64,${base64}`;
-            this.logoCache.set(logoUrl, dataUrl);
-            return dataUrl;
-        } catch (error) {
-            return null;
-        }
     }
 
     async generateWelcomeBrochure(brands, customerPhone = null) {
@@ -296,7 +265,7 @@ class DynamicBrandCollage {
     }
 
     // ============================================================
-    // 🎨 BRAND GRID - WITH PRELOADED LOGOS
+    // 🎨 BRAND GRID - LARGE LOGOS
     // ============================================================
 
     async createDynamicBrandGrid(brands, width, cols, itemWidth, itemHeight) {
@@ -331,13 +300,48 @@ class DynamicBrandCollage {
 
         let svg = `<svg width="${width}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">`;
         svg += `<style>
-            .brand-card { fill: rgba(255,255,255,0.07); rx: 14; ry: 14; stroke: rgba(255,255,255,0.1); stroke-width: 1.5; }
-            .brand-name { font-family: 'Arial Black', Arial, sans-serif; font-size: ${itemWidth > 150 ? 16 : 13}px; fill: #FFFFFF; text-anchor: middle; font-weight: 900; letter-spacing: 0.5px; }
-            .brand-subtitle { font-family: Arial, sans-serif; font-size: 9px; fill: rgba(255,255,255,0.4); text-anchor: middle; }
-            .brand-logo { width: ${Math.min(itemWidth - 30, 60)}px; height: ${Math.min(itemWidth - 30, 60)}px; }
-            .brand-logo-bg { fill: rgba(255,255,255,0.05); rx: 8; ry: 8; }
-            .active-dot { fill: #4CAF50; opacity: 0.8; }
-            .brand-accent { rx: 3; opacity: 0.5; }
+            .brand-card { 
+                fill: rgba(255,255,255,0.07); 
+                rx: 14; 
+                ry: 14; 
+                stroke: rgba(255,255,255,0.1); 
+                stroke-width: 1.5; 
+            }
+            .brand-name { 
+                font-family: 'Arial Black', Arial, sans-serif; 
+                font-size: ${itemWidth > 150 ? 18 : 15}px; 
+                fill: #FFFFFF; 
+                text-anchor: middle; 
+                font-weight: 900; 
+                letter-spacing: 0.5px; 
+            }
+            .brand-subtitle { 
+                font-family: Arial, sans-serif; 
+                font-size: 10px; 
+                fill: rgba(255,255,255,0.4); 
+                text-anchor: middle; 
+            }
+            .brand-logo { 
+                width: ${itemWidth - 40}px; 
+                height: ${itemWidth - 40}px; 
+                min-width: 60px; 
+                min-height: 60px; 
+                max-width: 90px; 
+                max-height: 90px; 
+            }
+            .brand-logo-bg { 
+                fill: rgba(255,255,255,0.05); 
+                rx: 10; 
+                ry: 10; 
+            }
+            .active-dot { 
+                fill: #4CAF50; 
+                opacity: 0.8; 
+            }
+            .brand-accent { 
+                rx: 3; 
+                opacity: 0.5; 
+            }
         </style>`;
 
         for (let i = 0; i < brands.length; i++) {
@@ -360,15 +364,21 @@ class DynamicBrandCollage {
             const safeName = escapeXML(brandName);
             const safeCategory = escapeXML(category);
             
-            const logoSize = Math.min(itemWidth - 30, 60);
+            // ✅ LARGE LOGO - FILL THE FRAME
+            const logoSize = Math.min(Math.max(itemWidth - 40, 60), 90);
             const logoX = x + (itemWidth - logoSize) / 2;
-            const logoY = y + 12;
+            const logoY = y + 10;
             
+            // Brand card
             svg += `<rect x="${x}" y="${y}" width="${itemWidth}" height="${itemHeight}" class="brand-card"/>`;
+            
+            // Accent bar
             svg += `<rect x="${x + 12}" y="${y + 6}" width="${itemWidth - 24}" height="3" fill="${color}" class="brand-accent"/>`;
+            
+            // Logo background
             svg += `<rect x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" class="brand-logo-bg" rx="8" ry="8"/>`;
             
-            // ✅ USE PRELOADED LOGO
+            // ✅ USE PRELOADED LOGO - LARGE SIZE
             if (this.logoCache.has(logoKey)) {
                 svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" 
                             href="${this.logoCache.get(logoKey)}" 
@@ -378,15 +388,19 @@ class DynamicBrandCollage {
                 // Fallback: show brand initial
                 const initial = safeName.charAt(0);
                 svg += `<text x="${x + itemWidth/2}" y="${logoY + logoSize/2 + 5}" 
-                            font-family="Arial, sans-serif" font-size="32" 
+                            font-family="Arial, sans-serif" font-size="${logoSize * 0.6}" 
                             text-anchor="middle" fill="rgba(255,255,255,0.3)" 
                             font-weight="bold">${initial}</text>`;
             }
             
+            // Brand name
             const nameY = logoY + logoSize + 12;
-            svg += `<text x="${x + itemWidth/2}" y="${nameY + 12}" class="brand-name">${safeName}</text>`;
-            svg += `<text x="${x + itemWidth/2}" y="${nameY + 28}" class="brand-subtitle">${safeCategory}</text>`;
+            svg += `<text x="${x + itemWidth/2}" y="${nameY + 14}" class="brand-name">${safeName}</text>`;
             
+            // Category
+            svg += `<text x="${x + itemWidth/2}" y="${nameY + 30}" class="brand-subtitle">${safeCategory}</text>`;
+            
+            // Active dot
             if (isActive) {
                 svg += `<circle cx="${x + itemWidth - 12}" cy="${y + 12}" r="4" class="active-dot"/>`;
             }
@@ -496,8 +510,5 @@ class DynamicBrandCollage {
 
 const brandCollage = new DynamicBrandCollage();
 
-// Export the instance
 module.exports = brandCollage;
-
-// Export the preload function
 module.exports.preloadAllLogos = brandCollage.preloadAllLogos.bind(brandCollage);
