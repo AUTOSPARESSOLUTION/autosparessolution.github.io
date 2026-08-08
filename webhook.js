@@ -77,6 +77,65 @@ try {
         getProcessedFiles: () => []
     };
 }
+// ============================================================
+// 🔧 ENHANCED LOADER FIX - Add importSingleFile method
+// ============================================================
+
+// Create enhanced loader with the missing method
+const enhancedLoader = {
+    importSingleFile: async function(filePath) {
+        try {
+            console.log(`📥 EnhancedLoader: Importing ${filePath}`);
+            
+            // Use the existing CSV import function
+            const { importCSV } = require('./modules/csv-loader');
+            
+            // Check if file exists
+            if (!fs.existsSync(filePath)) {
+                throw new Error(`File not found: ${filePath}`);
+            }
+            
+            // Import the file
+            const result = await importCSV(filePath);
+            
+            console.log(`✅ EnhancedLoader: Imported ${result.imported || 0} rows from ${filePath}`);
+            
+            // Update global import progress
+            if (result.imported) {
+                importProgress = result.imported;
+                isDbReady = true;
+            }
+            
+            return {
+                success: true,
+                imported: result.imported || 0,
+                errors: result.errors || 0,
+                total: result.total || 0,
+                file: filePath
+            };
+        } catch (error) {
+            console.error(`❌ EnhancedLoader: Import failed for ${filePath}:`, error.message);
+            return {
+                success: false,
+                error: error.message,
+                file: filePath,
+                imported: 0
+            };
+        }
+    },
+    
+    getImportStatus: function() {
+        return {
+            isImporting: false,
+            lastImport: null,
+            totalImported: importProgress || 0
+        };
+    }
+};
+
+// Make it globally available
+global.enhancedLoader = enhancedLoader;
+console.log('✅ EnhancedLoader initialized with importSingleFile method');
 // Optional modules with fallbacks
 let customerLog = null;
 try { customerLog = require('./modules/customer-log'); } catch(e) { 
