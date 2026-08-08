@@ -267,14 +267,37 @@ class DynamicFileWatcher extends EventEmitter {
     }
 
     // ============================================================
-    // 📥 IMPORT FILE
+    // 📥 IMPORT FILE - FIXED
     // ============================================================
     
     async importFile(filePath) {
-        const enhancedLoader = require('./csv-loader');
-        return await enhancedLoader.importSingleFile(filePath, {
-            batchSize: this.config.importBatchSize
-        });
+        try {
+            // Use the existing CSV import function directly
+            const { importCSV } = require('./csv-loader');
+            
+            console.log(`📥 Importing file: ${path.basename(filePath)}`);
+            
+            // Import the file using the existing function
+            const result = await importCSV(filePath);
+            
+            return {
+                success: true,
+                importedRows: result.imported || 0,
+                totalRows: result.total || 0,
+                failedRows: result.errors || 0,
+                file: filePath
+            };
+        } catch (error) {
+            console.error(`❌ Import error:`, error.message);
+            return {
+                success: false,
+                error: error.message,
+                importedRows: 0,
+                totalRows: 0,
+                failedRows: 1,
+                file: filePath
+            };
+        }
     }
 
     // ============================================================
@@ -284,7 +307,17 @@ class DynamicFileWatcher extends EventEmitter {
     async sendAdminNotification(file, result) {
         try {
             const adminPhone = process.env.ADMIN_PHONE || "9830300193";
-            const sendWhatsAppMessage = require('../webhook').sendWhatsAppMessage;
+            // Try to get the sendWhatsAppMessage function
+            let sendWhatsAppMessage;
+            try {
+                const webhook = require('../webhook');
+                sendWhatsAppMessage = webhook.sendWhatsAppMessage;
+            } catch (e) {
+                // If can't import, skip notification
+                return;
+            }
+            
+            if (!sendWhatsAppMessage) return;
             
             const message = `📥 *New File Imported!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
                 `📄 File: ${file}\n` +
@@ -296,7 +329,7 @@ class DynamicFileWatcher extends EventEmitter {
             
             await sendWhatsAppMessage(adminPhone, message);
         } catch (error) {
-            console.error('❌ Admin notification failed:', error.message);
+            // Silently fail - don't crash if notification fails
         }
     }
 
