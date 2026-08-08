@@ -4126,7 +4126,14 @@ async function startServer() {
 
         scheduler.startScheduler();
         console.log('✅ Scheduler started');
-
+// ✅ START DYNAMIC FILE WATCHER - ADD THIS
+if (fileWatcher && fileWatcher.startWatching) {
+    fileWatcher.startWatching({
+        scanInterval: 5000,
+        importBatchSize: 1000
+    });
+    console.log('✅ Dynamic file watcher started');
+}
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server Running On Port ${PORT}`);
             console.log(`🔗 Health Check: /health`);
