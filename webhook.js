@@ -63,7 +63,20 @@ try {
         cleanupTempFiles: () => {}
     };
 }
-
+// 🔄 DYNAMIC FILE WATCHER
+let fileWatcher = null;
+try {
+    fileWatcher = require('./modules/file-watcher');
+    console.log('✅ File Watcher loaded');
+} catch(e) {
+    console.log('⚠️ File Watcher not found');
+    fileWatcher = {
+        startWatching: () => {},
+        stopWatching: () => {},
+        getStatus: () => ({}),
+        getProcessedFiles: () => []
+    };
+}
 // Optional modules with fallbacks
 let customerLog = null;
 try { customerLog = require('./modules/customer-log'); } catch(e) { 
