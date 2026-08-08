@@ -3055,7 +3055,106 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
         }
+// ============================================================
+// 📁 FILE WATCHER COMMANDS - ADD AFTER BRAND SUMMARY
+// ============================================================
 
+// 📊 File watcher status
+if (msgLower === 'watcher status' || msgLower === 'file watcher') {
+    const status = fileWatcher.getStatus ? fileWatcher.getStatus() : {};
+    
+    let reply = `🔍 *File Watcher Status*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+    reply += `🔄 Status: ${status.isWatching ? '✅ Active' : '❌ Stopped'}\n`;
+    reply += `📁 Watching: ${status.rootDir || 'N/A'}\n`;
+    reply += `⏱️ Scan Interval: ${status.config?.scanInterval / 1000 || 5}s\n`;
+    reply += `📦 Processed: ${status.processedFiles || 0} files\n`;
+    reply += `⏳ Processing: ${status.processingFiles || 0} files\n`;
+    reply += `📥 Pending: ${status.pendingFiles || 0} files\n\n`;
+    
+    if (status.importHistory && status.importHistory.length > 0) {
+        reply += `📋 *Recent Imports:*\n`;
+        status.importHistory.slice(-5).forEach(item => {
+            const statusIcon = item.success ? '✅' : '❌';
+            reply += `   ${statusIcon} ${item.file}\n`;
+            if (item.success) {
+                reply += `      📦 ${item.rows} rows\n`;
+            }
+            reply += `      🕐 ${new Date(item.timestamp).toLocaleTimeString()}\n`;
+        });
+    }
+    
+    await sendWhatsAppMessage(from, reply);
+    return;
+}
+
+// 📥 Force scan
+if (msgLower === 'scan files' || msgLower === 'scan now') {
+    await sendWhatsAppMessage(from, '🔍 Scanning for new files...');
+    
+    if (fileWatcher.scanDirectory) {
+        fileWatcher.scanDirectory();
+    }
+    
+    const status = fileWatcher.getStatus ? fileWatcher.getStatus() : {};
+    await sendWhatsAppMessage(from,
+        `✅ *Scan Complete!*\n\n` +
+        `📦 Processed: ${status.processedFiles || 0} files\n` +
+        `⏳ Processing: ${status.processingFiles || 0} files\n` +
+        `📥 Pending: ${status.pendingFiles || 0} files\n\n` +
+        `📋 "Watcher status" for details`
+    );
+    return;
+}
+
+// 📄 List processed files
+if (msgLower === 'processed files' || msgLower === 'imported files') {
+    const files = fileWatcher.getProcessedFiles ? fileWatcher.getProcessedFiles() : [];
+    
+    if (files.length === 0) {
+        await sendWhatsAppMessage(from, '📋 No files have been processed yet.');
+        return;
+    }
+    
+    let reply = `📄 *Processed Files*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+    files.slice(-20).forEach((file, index) => {
+        reply += `${index + 1}. ${file.filename}\n`;
+        reply += `   🕐 ${file.timestamp ? new Date(file.timestamp).toLocaleString() : 'Unknown'}\n\n`;
+    });
+    
+    reply += `📊 Total: ${files.length} files`;
+    await sendWhatsAppMessage(from, reply);
+    return;
+}
+
+// ⏹️ Stop watcher
+if (msgLower === 'stop watcher') {
+    if (fileWatcher.stopWatching) {
+        fileWatcher.stopWatching();
+    }
+    await sendWhatsAppMessage(from, '🛑 File watcher stopped.');
+    return;
+}
+
+// ▶️ Start watcher
+if (msgLower === 'start watcher') {
+    if (fileWatcher.startWatching) {
+        fileWatcher.startWatching();
+    }
+    await sendWhatsAppMessage(from, '▶️ File watcher started.');
+    return;
+}
+
+// 🔄 Reset watcher
+if (msgLower === 'reset watcher') {
+    if (fileWatcher.reset) {
+        fileWatcher.reset();
+    }
+    if (fileWatcher.startWatching) {
+        fileWatcher.startWatching();
+    }
+    await sendWhatsAppMessage(from, '🔄 File watcher reset and restarted.');
+    return;
+            }
         // ============================================================
         // 1️⃣ WELCOME / HELP
         // ============================================================
