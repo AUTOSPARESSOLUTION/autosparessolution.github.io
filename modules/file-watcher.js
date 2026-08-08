@@ -1,5 +1,5 @@
 // ============================================================
-// 📁 DYNAMIC CSV FILE WATCHER
+// 📁 DYNAMIC CSV FILE WATCHER - FIXED
 // ============================================================
 
 const fs = require('fs');
@@ -15,16 +15,17 @@ class DynamicFileWatcher extends EventEmitter {
         this.watcher = null;
         this.scanInterval = null;
         this.processedFiles = new Set();
+        this.completedFiles = new Set(); // Track completed files
         this.importHistory = [];
         this.rootDir = path.join(__dirname, '..');
         
         // Configuration
         this.config = {
-            scanInterval: 5000,        // Check every 5 seconds
+            scanInterval: 5000,
             supportedExtensions: ['.csv', '.xlsx', '.xls'],
-            minFileSize: 1024,          // 1KB minimum
-            maxFileSize: 1024 * 1024 * 1024, // 1GB maximum
-            debounceDelay: 2000,        // Wait 2 seconds after file appears
+            minFileSize: 1024,
+            maxFileSize: 1024 * 1024 * 1024,
+            debounceDelay: 2000,
             importBatchSize: 1000,
             autoStart: true
         };
@@ -33,12 +34,11 @@ class DynamicFileWatcher extends EventEmitter {
         this.fileHashes = new Map();
         this.fileTimestamps = new Map();
         this.pendingFiles = new Map();
+        
+        // Files to ignore (already imported)
+        this.ignoreFiles = new Set(['prices-leyparts-hvc.csv', 'prices.csv']);
     }
 
-    // ============================================================
-    // 🚀 START WATCHING
-    // ============================================================
-    
     startWatching(options = {}) {
         if (this.isWatching) {
             console.log('⚠️ File watcher already running');
@@ -53,20 +53,16 @@ class DynamicFileWatcher extends EventEmitter {
         console.log(`⏱️ Scan interval: ${this.config.scanInterval}ms`);
         console.log(`📄 Supported: ${this.config.supportedExtensions.join(', ')}`);
 
-        // Initial scan
         this.scanDirectory();
         
-        // Start periodic scanning
         this.scanInterval = setInterval(() => {
             this.scanDirectory();
         }, this.config.scanInterval);
 
-        // Also watch for changes using fs.watch (if available)
         try {
             this.watcher = fs.watch(this.rootDir, (eventType, filename) => {
                 if (filename && this.isSupportedFile(filename)) {
                     console.log(`📝 Detected change: ${filename} (${eventType})`);
-                    // Debounce: wait a bit before processing
                     clearTimeout(this.pendingFiles.get(filename));
                     this.pendingFiles.set(filename, setTimeout(() => {
                         this.handleFileChange(filename);
@@ -81,10 +77,6 @@ class DynamicFileWatcher extends EventEmitter {
         this.emit('started', { rootDir: this.rootDir, config: this.config });
     }
 
-    // ============================================================
-    // 🛑 STOP WATCHING
-    // ============================================================
-    
     stopWatching() {
         if (!this.isWatching) return;
         
@@ -104,10 +96,6 @@ class DynamicFileWatcher extends EventEmitter {
         this.emit('stopped');
     }
 
-    // ============================================================
-    // 🔍 SCAN DIRECTORY
-    // ============================================================
-    
     scanDirectory() {
         try {
             const files = fs.readdirSync(this.rootDir);
@@ -118,12 +106,23 @@ class DynamicFileWatcher extends EventEmitter {
                     const filePath = path.join(this.rootDir, file);
                     const stats = fs.statSync(filePath);
                     
-                    // Skip if already processed
-                    if (this.processedFiles.has(filePath)) {
-                        // Check if file was modified
+                    // Skip if already completed
+                    if (this.completedFiles.has(filePath)) {
                         const lastHash = this.fileHashes.get(filePath);
                         const currentHash = this.getFileHash(filePath);
-                        
+                        if (lastHash && lastHash !== currentHash) {
+                            console.log(`🔄 File changed: ${file}`);
+                            this.completedFiles.delete(filePath);
+                            this.processedFiles.delete(filePath);
+                            this.handleFileChange(file);
+                        }
+                        continue;
+                    }
+                    
+                    // Skip if already processed
+                    if (this.processedFiles.has(filePath)) {
+                        const lastHash = this.fileHashes.get(filePath);
+                        const currentHash = this.getFileHash(filePath);
                         if (lastHash && lastHash !== currentHash) {
                             console.log(`🔄 File changed: ${file}`);
                             this.handleFileChange(file);
@@ -131,7 +130,6 @@ class DynamicFileWatcher extends EventEmitter {
                         continue;
                     }
                     
-                    // Check if file is valid
                     if (this.isValidFile(filePath, stats)) {
                         newFiles.push({ file, filePath, stats });
                     }
@@ -142,7 +140,6 @@ class DynamicFileWatcher extends EventEmitter {
                 console.log(`📦 Found ${newFiles.length} new files`);
                 this.emit('files-found', newFiles);
                 
-                // Process new files
                 for (const fileInfo of newFiles) {
                     this.processFile(fileInfo);
                 }
@@ -153,17 +150,13 @@ class DynamicFileWatcher extends EventEmitter {
         }
     }
 
-    // ============================================================
-    // 📄 HANDLE FILE CHANGE
-    // ============================================================
-    
     async handleFileChange(filename) {
         const filePath = path.join(this.rootDir, filename);
         
-        // Check if file exists
         if (!fs.existsSync(filePath)) {
             console.log(`⚠️ File removed: ${filename}`);
             this.processedFiles.delete(filePath);
+            this.completedFiles.delete(filePath);
             this.fileHashes.delete(filePath);
             return;
         }
@@ -171,21 +164,17 @@ class DynamicFileWatcher extends EventEmitter {
         try {
             const stats = fs.statSync(filePath);
             
-            // Check if valid
             if (!this.isValidFile(filePath, stats)) {
                 console.log(`⚠️ Invalid file: ${filename}`);
                 return;
             }
             
-            // Check if already processing
             if (this.processingFiles.has(filePath)) {
                 console.log(`⏳ Already processing: ${filename}`);
                 return;
             }
             
             console.log(`📥 Processing changed file: ${filename}`);
-            
-            // Process the file
             await this.processFile({ file: filename, filePath, stats });
             
         } catch (error) {
@@ -193,26 +182,16 @@ class DynamicFileWatcher extends EventEmitter {
         }
     }
 
-    // ============================================================
-    // 📊 PROCESS FILE
-    // ============================================================
-    
     async processFile(fileInfo) {
         const { file, filePath, stats } = fileInfo;
         
-        // Skip if already processing
         if (this.processingFiles.has(filePath)) {
             console.log(`⏳ Already processing: ${file}`);
             return;
         }
         
-        // Skip if already processed (and not modified)
-        if (this.processedFiles.has(filePath)) {
-            const lastHash = this.fileHashes.get(filePath);
-            const currentHash = this.getFileHash(filePath);
-            if (lastHash === currentHash) {
-                return;
-            }
+        if (this.completedFiles.has(filePath)) {
+            return;
         }
         
         try {
@@ -221,15 +200,15 @@ class DynamicFileWatcher extends EventEmitter {
             
             console.log(`📥 Importing: ${file} (${(stats.size / 1024 / 1024).toFixed(2)}MB)`);
             
-            // Import the file
             const result = await this.importFile(filePath);
             
-            // Mark as processed
+            // Mark as completed
+            this.completedFiles.add(filePath);
             this.processedFiles.add(filePath);
             this.fileHashes.set(filePath, this.getFileHash(filePath));
             this.fileTimestamps.set(filePath, stats.mtime.getTime());
             
-            // Store import history
+            // Store in history
             this.importHistory.push({
                 file,
                 timestamp: new Date(),
@@ -237,23 +216,19 @@ class DynamicFileWatcher extends EventEmitter {
                 success: result.success
             });
             
-            // Keep only last 100 entries
             if (this.importHistory.length > 100) {
                 this.importHistory = this.importHistory.slice(-100);
             }
             
             this.emit('processing-complete', { file, filePath, result });
-            
             console.log(`✅ Imported: ${file} - ${result.importedRows || 0} rows`);
             
-            // Send admin notification
             await this.sendAdminNotification(file, result);
             
         } catch (error) {
             console.error(`❌ Import failed: ${file}`, error.message);
             this.emit('processing-error', { file, filePath, error: error.message });
             
-            // Store error in history
             this.importHistory.push({
                 file,
                 timestamp: new Date(),
@@ -266,18 +241,12 @@ class DynamicFileWatcher extends EventEmitter {
         }
     }
 
-    // ============================================================
-    // 📥 IMPORT FILE - FIXED
-    // ============================================================
-    
     async importFile(filePath) {
         try {
-            // Use the existing CSV import function directly
             const { importCSV } = require('./csv-loader');
             
             console.log(`📥 Importing file: ${path.basename(filePath)}`);
             
-            // Import the file using the existing function
             const result = await importCSV(filePath);
             
             return {
@@ -300,61 +269,28 @@ class DynamicFileWatcher extends EventEmitter {
         }
     }
 
-    // ============================================================
-    // 📢 SEND ADMIN NOTIFICATION
-    // ============================================================
-    
-    async sendAdminNotification(file, result) {
-        try {
-            const adminPhone = process.env.ADMIN_PHONE || "9830300193";
-            // Try to get the sendWhatsAppMessage function
-            let sendWhatsAppMessage;
-            try {
-                const webhook = require('../webhook');
-                sendWhatsAppMessage = webhook.sendWhatsAppMessage;
-            } catch (e) {
-                // If can't import, skip notification
-                return;
-            }
-            
-            if (!sendWhatsAppMessage) return;
-            
-            const message = `📥 *New File Imported!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
-                `📄 File: ${file}\n` +
-                `📦 Rows: ${result.totalRows || 0}\n` +
-                `✅ Imported: ${result.importedRows || 0}\n` +
-                `❌ Failed: ${result.failedRows || 0}\n` +
-                `🕐 ${new Date().toLocaleString()}\n\n` +
-                `📊 System updated automatically!`;
-            
-            await sendWhatsAppMessage(adminPhone, message);
-        } catch (error) {
-            // Silently fail - don't crash if notification fails
-        }
-    }
-
-    // ============================================================
-    // 🔍 HELPER FUNCTIONS
-    // ============================================================
-    
-    isSupportedFile(filename) {
-        const ext = path.extname(filename).toLowerCase();
-        return this.config.supportedExtensions.includes(ext);
-    }
-
     isValidFile(filePath, stats) {
-        // Check size
+        const filename = path.basename(filePath);
+        
+        // Skip files that are already imported
+        if (this.completedFiles.has(filePath)) {
+            return false;
+        }
+        
+        // Skip specific large files that are already imported
+        if (this.ignoreFiles.has(filename) && this.processedFiles.has(filePath)) {
+            return false;
+        }
+        
         if (stats.size < this.config.minFileSize) {
-            console.log(`⚠️ File too small: ${path.basename(filePath)} (${stats.size} bytes)`);
             return false;
         }
         
         if (stats.size > this.config.maxFileSize) {
-            console.log(`⚠️ File too large: ${path.basename(filePath)} (${(stats.size / 1024 / 1024).toFixed(2)}MB)`);
+            console.log(`⚠️ File too large: ${filename}`);
             return false;
         }
         
-        // Check if it's a directory
         if (stats.isDirectory()) {
             return false;
         }
@@ -371,14 +307,35 @@ class DynamicFileWatcher extends EventEmitter {
         }
     }
 
-    // ============================================================
-    // 📊 GET STATUS
-    // ============================================================
-    
+    async sendAdminNotification(file, result) {
+        try {
+            const adminPhone = process.env.ADMIN_PHONE || "9830300193";
+            let sendWhatsAppMessage;
+            try {
+                const webhook = require('../webhook');
+                sendWhatsAppMessage = webhook.sendWhatsAppMessage;
+            } catch (e) {
+                return;
+            }
+            
+            if (!sendWhatsAppMessage) return;
+            
+            const message = `📥 *File Imported!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `📄 File: ${file}\n` +
+                `📦 Imported: ${result.importedRows || 0} rows\n` +
+                `🕐 ${new Date().toLocaleString()}`;
+            
+            await sendWhatsAppMessage(adminPhone, message);
+        } catch (error) {
+            // Silently fail
+        }
+    }
+
     getStatus() {
         return {
             isWatching: this.isWatching,
             processedFiles: this.processedFiles.size,
+            completedFiles: this.completedFiles.size,
             processingFiles: this.processingFiles.size,
             pendingFiles: this.pendingFiles.size,
             importHistory: this.importHistory.slice(-10),
@@ -387,13 +344,9 @@ class DynamicFileWatcher extends EventEmitter {
         };
     }
 
-    // ============================================================
-    // 📄 GET PROCESSED FILES
-    // ============================================================
-    
     getProcessedFiles() {
         const files = [];
-        for (const filePath of this.processedFiles) {
+        for (const filePath of this.completedFiles) {
             const filename = path.basename(filePath);
             const hash = this.fileHashes.get(filePath);
             const timestamp = this.fileTimestamps.get(filePath);
@@ -407,12 +360,9 @@ class DynamicFileWatcher extends EventEmitter {
         return files;
     }
 
-    // ============================================================
-    // 🔄 RESET
-    // ============================================================
-    
     reset() {
         this.processedFiles.clear();
+        this.completedFiles.clear();
         this.fileHashes.clear();
         this.fileTimestamps.clear();
         this.importHistory = [];
