@@ -2740,6 +2740,13 @@ async function handleWhatsAppMessage(message, from) {
                     `   "Add brand id|name|logo" - Add new brand\n` +
                     `   "Remove brand id" - Remove brand\n` +
                     `   "Refresh brochure" - Regenerate brochure\n\n` +
+                           `📁 *File Watcher:*\n` +
+`   "Watcher status" - Check file watcher status\n` +
+`   "Scan files" - Force scan for new files\n` +
+`   "Processed files" - List imported files\n` +
+`   "Start watcher" - Start auto-import\n` +
+`   "Stop watcher" - Stop auto-import\n` +
+`   "Reset watcher" - Reset and restart\n\n` +               
                     `📞 *Call:* ${CONFIG.businessPhone}`
                 );
                 return;
