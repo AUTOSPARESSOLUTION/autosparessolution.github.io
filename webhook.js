@@ -138,8 +138,7 @@ try { pdfParse = require('pdf-parse'); } catch(e) {}
 let Tesseract = null;
 try { Tesseract = require('tesseract.js'); } catch(e) {}
 
-const app = express();
-const PORT = process.env.PORT || 10000;
+
 // ============================================================
 // 📁 AUTO SPARES JSON IMPORT SYSTEM
 // ============================================================
@@ -667,6 +666,8 @@ async function importUsersArray(users) {
 
     return imported;
                 }
+const app = express();
+const PORT = process.env.PORT || 10000;
 // ============================================================
 // 🔧 CONFIGURATION
 // ============================================================
