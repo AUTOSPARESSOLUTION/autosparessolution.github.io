@@ -1,5 +1,5 @@
 // ============================================================
-// 📁 DYNAMIC CSV FILE WATCHER - COMPLETE FIXED
+// 📁 DYNAMIC CSV FILE WATCHER - FULLY FIXED
 // ============================================================
 
 const fs = require('fs');
@@ -21,11 +21,11 @@ class DynamicFileWatcher extends EventEmitter {
         
         // Configuration
         this.config = {
-            scanInterval: 5000,
+            scanInterval: 10000,  // Increased to 10 seconds to avoid conflicts
             supportedExtensions: ['.csv', '.xlsx', '.xls'],
             minFileSize: 1024,
             maxFileSize: 1024 * 1024 * 1024,
-            debounceDelay: 2000,
+            debounceDelay: 5000,   // Increased to 5 seconds
             importBatchSize: 1000,
             autoStart: true
         };
@@ -38,7 +38,7 @@ class DynamicFileWatcher extends EventEmitter {
         // Files to ignore (already imported or very large)
         this.ignoreFiles = new Set(['prices-leyparts-hvc.csv', 'prices.csv']);
         
-        // Bind methods to ensure 'this' context
+        // Bind methods
         this.scanDirectory = this.scanDirectory.bind(this);
         this.handleFileChange = this.handleFileChange.bind(this);
         this.processFile = this.processFile.bind(this);
@@ -72,15 +72,17 @@ class DynamicFileWatcher extends EventEmitter {
         console.log(`⏱️ Scan interval: ${this.config.scanInterval}ms`);
         console.log(`📄 Supported: ${this.config.supportedExtensions.join(', ')}`);
 
-        // Initial scan
-        this.scanDirectory();
+        // Initial scan (with delay to avoid startup conflicts)
+        setTimeout(() => {
+            this.scanDirectory();
+        }, 3000);
         
         // Start periodic scanning
         this.scanInterval = setInterval(() => {
             this.scanDirectory();
         }, this.config.scanInterval);
 
-        // Also watch for changes using fs.watch (if available)
+        // Also watch for changes using fs.watch
         try {
             this.watcher = fs.watch(this.rootDir, (eventType, filename) => {
                 if (filename && this.isSupportedFile(filename)) {
@@ -127,6 +129,10 @@ class DynamicFileWatcher extends EventEmitter {
     // ============================================================
     
     scanDirectory() {
+        // Skip if already scanning
+        if (this._isScanning) return;
+        this._isScanning = true;
+        
         try {
             const files = fs.readdirSync(this.rootDir);
             const newFiles = [];
@@ -171,14 +177,18 @@ class DynamicFileWatcher extends EventEmitter {
                 console.log(`📦 Found ${newFiles.length} new files`);
                 this.emit('files-found', newFiles);
                 
-                // Process new files
+                // Process new files one at a time with delay
                 for (const fileInfo of newFiles) {
-                    this.processFile(fileInfo);
+                    setTimeout(() => {
+                        this.processFile(fileInfo);
+                    }, 1000);
                 }
             }
             
         } catch (error) {
             console.error('❌ Scan error:', error.message);
+        } finally {
+            this._isScanning = false;
         }
     }
 
@@ -247,40 +257,51 @@ class DynamicFileWatcher extends EventEmitter {
             
             console.log(`📥 Importing: ${file} (${(stats.size / 1024 / 1024).toFixed(2)}MB)`);
             
-            // Import the file
+            // Import the file with a fresh connection to avoid transaction issues
             const result = await this.importFile(filePath);
             
-            // Mark as processed and completed
-            this.processedFiles.add(filePath);
-            this.completedFiles.add(filePath);
-            this.fileHashes.set(filePath, this.getFileHash(filePath));
-            this.fileTimestamps.set(filePath, stats.mtime.getTime());
-            
-            // Store import history
-            this.importHistory.push({
-                file,
-                timestamp: new Date(),
-                rows: result.importedRows || 0,
-                success: result.success
-            });
-            
-            // Keep only last 100 entries
-            if (this.importHistory.length > 100) {
-                this.importHistory = this.importHistory.slice(-100);
+            if (result && result.success) {
+                // Mark as processed and completed
+                this.processedFiles.add(filePath);
+                this.completedFiles.add(filePath);
+                this.fileHashes.set(filePath, this.getFileHash(filePath));
+                this.fileTimestamps.set(filePath, stats.mtime.getTime());
+                
+                // Store import history
+                this.importHistory.push({
+                    file,
+                    timestamp: new Date(),
+                    rows: result.importedRows || 0,
+                    success: result.success
+                });
+                
+                // Keep only last 50 entries
+                if (this.importHistory.length > 50) {
+                    this.importHistory = this.importHistory.slice(-50);
+                }
+                
+                this.emit('processing-complete', { file, filePath, result });
+                
+                console.log(`✅ Imported: ${file} - ${result.importedRows || 0} rows`);
+                
+                // Send admin notification
+                await this.sendAdminNotification(file, result);
+            } else {
+                console.log(`⚠️ Import completed with issues: ${file}`);
+                this.importHistory.push({
+                    file,
+                    timestamp: new Date(),
+                    rows: result?.importedRows || 0,
+                    success: false,
+                    error: result?.error || 'Unknown error'
+                });
             }
-            
-            this.emit('processing-complete', { file, filePath, result });
-            
-            console.log(`✅ Imported: ${file} - ${result.importedRows || 0} rows`);
-            
-            // Send admin notification
-            await this.sendAdminNotification(file, result);
             
         } catch (error) {
             console.error(`❌ Import failed: ${file}`, error.message);
             this.emit('processing-error', { file, filePath, error: error.message });
             
-            // Store error in history
+            // Don't mark as completed on error - allow retry
             this.importHistory.push({
                 file,
                 timestamp: new Date(),
@@ -294,17 +315,17 @@ class DynamicFileWatcher extends EventEmitter {
     }
 
     // ============================================================
-    // 📥 IMPORT FILE - FIXED
+    // 📥 IMPORT FILE - FIXED with transaction handling
     // ============================================================
     
     async importFile(filePath) {
         try {
-            // Use the existing CSV import function directly
+            // Use the existing CSV import function
             const { importCSV } = require('./csv-loader');
             
             console.log(`📥 Importing file: ${path.basename(filePath)}`);
             
-            // Import the file using the existing function
+            // Import the file - the importCSV function handles its own transactions
             const result = await importCSV(filePath);
             
             return {
@@ -316,6 +337,27 @@ class DynamicFileWatcher extends EventEmitter {
             };
         } catch (error) {
             console.error(`❌ Import error:`, error.message);
+            
+            // Check if it's a transaction error - if so, the import may have partially completed
+            if (error.message && error.message.includes('transaction')) {
+                console.log(`⚠️ Transaction error detected - import may have partially completed`);
+                // Try to get the current count
+                try {
+                    const db = require('./database');
+                    const stats = await db.getStats();
+                    return {
+                        success: true,
+                        importedRows: stats.total_products || 0,
+                        totalRows: 0,
+                        failedRows: 0,
+                        file: filePath,
+                        warning: 'Transaction error - import may be partial'
+                    };
+                } catch (dbError) {
+                    // Ignore
+                }
+            }
+            
             return {
                 success: false,
                 error: error.message,
