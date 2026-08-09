@@ -4237,13 +4237,23 @@ async function startServer() {
 
         scheduler.startScheduler();
         console.log('✅ Scheduler started');
-// ✅ START DYNAMIC FILE WATCHER - ADD THIS
+// ✅ START DYNAMIC FILE WATCHER - DISABLED
 if (fileWatcher && fileWatcher.startWatching) {
-    fileWatcher.startWatching({
-        scanInterval: 5000,
-        importBatchSize: 1000
-    });
-    console.log('✅ Dynamic file watcher started');
+    // DISABLED to prevent errors:
+    // - "this.isSupportedFile is not a function"
+    // - "cannot start a transaction within a transaction"
+    // - Repeated scanning of already imported files
+    
+    console.log('⚠️ Dynamic file watcher is DISABLED');
+    console.log('📥 Using background import for CSV files only');
+    console.log('💡 Files are imported via background process on startup');
+    console.log('💡 To enable, uncomment the code below');
+    
+    // Uncomment to enable (not recommended due to transaction errors)
+    // fileWatcher.startWatching({
+    //     scanInterval: 5000,
+    //     importBatchSize: 1000
+    // });
 }
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server Running On Port ${PORT}`);
