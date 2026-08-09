@@ -189,12 +189,35 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
         const data = fs.readFileSync(filePath, 'utf8');
         const backup = JSON.parse(data);
         
+        // Helper function to parse data (handles both stringified and array formats)
+        function parseData(data) {
+            if (!data) return [];
+            if (Array.isArray(data)) return data;
+            if (typeof data === 'string') {
+                try {
+                    return JSON.parse(data);
+                } catch (e) {
+                    return [];
+                }
+            }
+            return [];
+        }
+
+        const customers = parseData(backup.customers);
+        const suppliers = parseData(backup.suppliers);
+        const products = parseData(backup.products);
+        const invoices = parseData(backup.allInvoices);
+        const purchaseInvoices = parseData(backup.purchaseInvoices);
+        const customerPayments = parseData(backup.customerPayments);
+        const supplierPayments = parseData(backup.supplierPayments);
+        const users = parseData(backup.users);
+
         console.log(`📊 Found data:`, {
-            customers: backup.customers ? JSON.parse(backup.customers).length : 0,
-            suppliers: backup.suppliers ? JSON.parse(backup.suppliers).length : 0,
-            products: backup.products ? JSON.parse(backup.products).length : 0,
-            invoices: backup.allInvoices ? JSON.parse(backup.allInvoices).length : 0,
-            purchaseInvoices: backup.purchaseInvoices ? JSON.parse(backup.purchaseInvoices).length : 0
+            customers: customers.length,
+            suppliers: suppliers.length,
+            products: products.length,
+            invoices: invoices.length,
+            purchaseInvoices: purchaseInvoices.length
         });
 
         const results = {
@@ -209,50 +232,50 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
         };
 
         // Import Customers
-        if (backup.customers) {
-            const customers = JSON.parse(backup.customers);
+        if (customers.length > 0) {
+            console.log(`👤 Importing ${customers.length} customers...`);
             results.customers = await importCustomersArray(customers);
         }
 
         // Import Suppliers
-        if (backup.suppliers) {
-            const suppliers = JSON.parse(backup.suppliers);
+        if (suppliers.length > 0) {
+            console.log(`🏢 Importing ${suppliers.length} suppliers...`);
             results.suppliers = await importSuppliersArray(suppliers);
         }
 
         // Import Products
-        if (backup.products) {
-            const products = JSON.parse(backup.products);
+        if (products.length > 0) {
+            console.log(`📦 Importing ${products.length} products...`);
             results.products = await importProductsArray(products);
         }
 
         // Import Invoices
-        if (backup.allInvoices) {
-            const invoices = JSON.parse(backup.allInvoices);
+        if (invoices.length > 0) {
+            console.log(`📄 Importing ${invoices.length} invoices...`);
             results.invoices = await importInvoicesArray(invoices);
         }
 
         // Import Purchase Invoices
-        if (backup.purchaseInvoices) {
-            const purchaseInvoices = JSON.parse(backup.purchaseInvoices);
+        if (purchaseInvoices.length > 0) {
+            console.log(`📥 Importing ${purchaseInvoices.length} purchase invoices...`);
             results.purchaseInvoices = await importPurchaseInvoicesArray(purchaseInvoices);
         }
 
         // Import Customer Payments
-        if (backup.customerPayments) {
-            const payments = JSON.parse(backup.customerPayments);
-            results.customerPayments = await importCustomerPaymentsArray(payments);
+        if (customerPayments.length > 0) {
+            console.log(`💰 Importing ${customerPayments.length} customer payments...`);
+            results.customerPayments = await importCustomerPaymentsArray(customerPayments);
         }
 
         // Import Supplier Payments
-        if (backup.supplierPayments) {
-            const payments = JSON.parse(backup.supplierPayments);
-            results.supplierPayments = await importSupplierPaymentsArray(payments);
+        if (supplierPayments.length > 0) {
+            console.log(`💰 Importing ${supplierPayments.length} supplier payments...`);
+            results.supplierPayments = await importSupplierPaymentsArray(supplierPayments);
         }
 
         // Import Users
-        if (backup.users) {
-            const users = JSON.parse(backup.users);
+        if (users.length > 0) {
+            console.log(`👥 Importing ${users.length} users...`);
             results.users = await importUsersArray(users);
         }
 
