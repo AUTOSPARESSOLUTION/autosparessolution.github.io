@@ -304,17 +304,23 @@ async function importCustomersArray(customers) {
 
     for (const customer of customers) {
         try {
-            // Check if customer exists
+            const phone = customer.phone || customer.mobileNo;
+            if (!phone) {
+                errors++;
+                continue;
+            }
+
+            // Check if customer exists in 'customers' table
             const existing = await new Promise((resolve) => {
                 db.db.get(
-                    `SELECT phone FROM customer_master WHERE phone = ?`,
-                    [customer.phone || customer.mobileNo],
+                    `SELECT phone FROM customers WHERE phone = ?`,
+                    [phone],
                     (err, row) => resolve(row)
                 );
             });
 
             const customerData = {
-                phone: customer.phone || customer.mobileNo,
+                phone: phone,
                 name: customer.name || '',
                 email: customer.email || '',
                 address: customer.address || '',
@@ -323,18 +329,55 @@ async function importCustomersArray(customers) {
                 pincode: customer.pincode || '',
                 gstin: customer.gstin || '',
                 company_name: customer.business || '',
-                customer_type: customer.role || 'retail',
-                credit_limit: customer.creditLimit || 0,
-                total_orders: customer.totalPurchased || 0,
-                total_spent: customer.totalPurchased || 0,
-                customer_code: customer.customerCode || `CUST-${Date.now().toString().slice(-6)}`,
-                status: customer.status || 'active'
+                customer_type: customer.role || 'retail'
             };
 
             if (existing) {
-                await updateCustomerDetails(customerData.phone, customerData);
+                // Update existing
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `UPDATE customers SET 
+                            name = ?, email = ?, address = ?, city = ?, state = ?, 
+                            pincode = ?, gstin = ?, company_name = ?, customer_type = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                         WHERE phone = ?`,
+                        [
+                            customerData.name, customerData.email, customerData.address,
+                            customerData.city, customerData.state, customerData.pincode,
+                            customerData.gstin, customerData.company_name, customerData.customer_type,
+                            phone
+                        ],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
             } else {
-                await createCustomer(customerData);
+                // Insert new
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `INSERT INTO customers 
+                         (phone, name, email, address, city, state, pincode, gstin, company_name, customer_type)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [
+                            phone,
+                            customerData.name || `Customer-${phone.slice(-4)}`,
+                            customerData.email || '',
+                            customerData.address || '',
+                            customerData.city || '',
+                            customerData.state || '',
+                            customerData.pincode || '',
+                            customerData.gstin || '',
+                            customerData.company_name || '',
+                            customerData.customer_type || 'retail'
+                        ],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
             }
             imported++;
         } catch (err) {
