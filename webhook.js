@@ -3695,6 +3695,201 @@ if (msgLower === 'reset watcher') {
     return;
             }
         // ============================================================
+// 📁 JSON IMPORT COMMANDS
+// ============================================================
+
+// 1️⃣ IMPORT FULL BACKUP
+if (isAdmin(from) && (msgLower === 'import backup' || msgLower === 'import all')) {
+    try {
+        await sendWhatsAppMessage(from, '🔄 Starting full backup import... This may take a few minutes.');
+        
+        const result = await importFullBackup();
+        
+        if (result.success) {
+            let reply = `✅ *Full Backup Import Complete!*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `👤 Customers: ${result.results.customers}\n`;
+            reply += `🏢 Suppliers: ${result.results.suppliers}\n`;
+            reply += `📦 Products: ${result.results.products}\n`;
+            reply += `📄 Invoices: ${result.results.invoices}\n`;
+            reply += `📥 Purchase Invoices: ${result.results.purchaseInvoices}\n`;
+            reply += `💰 Customer Payments: ${result.results.customerPayments}\n`;
+            reply += `💰 Supplier Payments: ${result.results.supplierPayments}\n`;
+            reply += `👥 Users: ${result.results.users}\n\n`;
+            reply += `✅ All data imported successfully!`;
+            
+            await sendWhatsAppMessage(from, reply);
+        } else {
+            await sendWhatsAppMessage(from, `❌ Import failed: ${result.error || result.message}`);
+        }
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Import failed: ${error.message}`);
+        return;
+    }
+}
+
+// 2️⃣ IMPORT CUSTOMERS ONLY
+if (isAdmin(from) && msgLower === 'import customers') {
+    try {
+        await sendWhatsAppMessage(from, '🔄 Importing customers...');
+        
+        const data = fs.readFileSync(JSON_STORAGE.fullBackup, 'utf8');
+        const backup = JSON.parse(data);
+        const customers = JSON.parse(backup.customers || '[]');
+        
+        const result = await importCustomersArray(customers);
+        
+        await sendWhatsAppMessage(from,
+            `✅ *Customers Imported!*\n\n` +
+            `👤 ${result} customers imported/updated\n` +
+            `🕐 ${new Date().toLocaleString()}`
+        );
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Import failed: ${error.message}`);
+        return;
+    }
+}
+
+// 3️⃣ IMPORT SUPPLIERS ONLY
+if (isAdmin(from) && msgLower === 'import suppliers') {
+    try {
+        await sendWhatsAppMessage(from, '🔄 Importing suppliers...');
+        
+        const data = fs.readFileSync(JSON_STORAGE.fullBackup, 'utf8');
+        const backup = JSON.parse(data);
+        const suppliers = JSON.parse(backup.suppliers || '[]');
+        
+        const result = await importSuppliersArray(suppliers);
+        
+        await sendWhatsAppMessage(from,
+            `✅ *Suppliers Imported!*\n\n` +
+            `🏢 ${result} suppliers imported/updated\n` +
+            `🕐 ${new Date().toLocaleString()}`
+        );
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Import failed: ${error.message}`);
+        return;
+    }
+}
+
+// 4️⃣ IMPORT PRODUCTS ONLY
+if (isAdmin(from) && msgLower === 'import products') {
+    try {
+        await sendWhatsAppMessage(from, '🔄 Importing products...');
+        
+        const data = fs.readFileSync(JSON_STORAGE.fullBackup, 'utf8');
+        const backup = JSON.parse(data);
+        const products = JSON.parse(backup.products || '[]');
+        
+        const result = await importProductsArray(products);
+        
+        await sendWhatsAppMessage(from,
+            `✅ *Products Imported!*\n\n` +
+            `📦 ${result} products imported/updated\n` +
+            `🕐 ${new Date().toLocaleString()}`
+        );
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Import failed: ${error.message}`);
+        return;
+    }
+}
+
+// 5️⃣ EXPORT DATA TO JSON
+if (isAdmin(from) && msgLower === 'export all') {
+    try {
+        await sendWhatsAppMessage(from, '🔄 Exporting all data to JSON...');
+        
+        const exports = {};
+        
+        // Export Customers
+        const customers = await getAllCustomers(10000);
+        exports.customers = customers;
+        fs.writeFileSync(JSON_STORAGE.customers, JSON.stringify(customers, null, 2));
+        
+        // Export Suppliers
+        const suppliers = await new Promise((resolve) => {
+            db.db.all(`SELECT * FROM supplier_master`, [], (err, rows) => resolve(rows));
+        });
+        exports.suppliers = suppliers;
+        fs.writeFileSync(JSON_STORAGE.suppliers, JSON.stringify(suppliers, null, 2));
+        
+        // Export Products
+        const products = await new Promise((resolve) => {
+            db.db.all(`SELECT * FROM products`, [], (err, rows) => resolve(rows));
+        });
+        exports.products = products;
+        fs.writeFileSync(JSON_STORAGE.products, JSON.stringify(products, null, 2));
+        
+        await sendWhatsAppMessage(from,
+            `✅ *Data Exported!*\n\n` +
+            `📁 Location: /data/\n` +
+            `👤 Customers: ${customers.length}\n` +
+            `🏢 Suppliers: ${suppliers.length}\n` +
+            `📦 Products: ${products.length}\n\n` +
+            `💡 Files saved to data directory.`
+        );
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Export failed: ${error.message}`);
+        return;
+    }
+}
+
+// 6️⃣ CHECK IMPORT STATUS
+if (isAdmin(from) && (msgLower === 'import status' || msgLower === 'data status')) {
+    try {
+        const stats = await db.getStats();
+        const customerCount = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM customer_master`, [], (err, row) => {
+                resolve(row?.count || 0);
+            });
+        });
+        const supplierCount = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM supplier_master`, [], (err, row) => {
+                resolve(row?.count || 0);
+            });
+        });
+        const invoiceCount = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM order_master`, [], (err, row) => {
+                resolve(row?.count || 0);
+            });
+        });
+        const purchaseCount = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM purchase_invoices`, [], (err, row) => {
+                resolve(row?.count || 0);
+            });
+        });
+        
+        // Check if backup file exists
+        const backupExists = fs.existsSync(JSON_STORAGE.fullBackup);
+        const backupSize = backupExists ? (fs.statSync(JSON_STORAGE.fullBackup).size / 1024).toFixed(1) : 0;
+        
+        await sendWhatsAppMessage(from,
+            `📊 *Import Status*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `📦 Products: ${stats.total_products || 0}\n` +
+            `👤 Customers: ${customerCount}\n` +
+            `🏢 Suppliers: ${supplierCount}\n` +
+            `📄 Invoices: ${invoiceCount}\n` +
+            `📥 Purchase Invoices: ${purchaseCount}\n` +
+            `📁 Backup File: ${backupExists ? '✅ Yes' : '❌ No'} (${backupSize}KB)\n` +
+            `📁 Data Dir: ${dataDir}\n\n` +
+            `📝 Commands:\n` +
+            `   "import backup" - Full import\n` +
+            `   "import customers" - Customers only\n` +
+            `   "import suppliers" - Suppliers only\n` +
+            `   "import products" - Products only\n` +
+            `   "export all" - Export to JSON`
+        );
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+        // ============================================================
         // 1️⃣ WELCOME / HELP
         // ============================================================
         if (['hi', 'hello', 'help', 'start', 'menu'].includes(msgLower)) {
