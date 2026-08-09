@@ -713,28 +713,41 @@ async function importUsersArray(users) {
 
     for (const user of users) {
         try {
+            const phone = user.phone;
+            if (!phone) continue;
+
+            // Check if user exists in 'customers' table
             const existing = await new Promise((resolve) => {
                 db.db.get(
-                    `SELECT phone FROM customer_master WHERE phone = ?`,
-                    [user.phone],
+                    `SELECT phone FROM customers WHERE phone = ?`,
+                    [phone],
                     (err, row) => resolve(row)
                 );
             });
 
-            if (!existing && user.role === 'customer') {
-                await createCustomer({
-                    phone: user.phone,
-                    name: user.name || '',
-                    email: user.email || '',
-                    address: user.address || '',
-                    city: user.district || '',
-                    state: user.state || '',
-                    pincode: user.pincode || '',
-                    gstin: user.gstin || '',
-                    company_name: user.business || '',
-                    customer_type: user.role || 'retail',
-                    customer_code: `CUST-${Date.now().toString().slice(-6)}`,
-                    status: 'active'
+            if (!existing && (user.role === 'customer' || user.role === undefined)) {
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `INSERT INTO customers 
+                         (phone, name, email, address, city, state, pincode, gstin, company_name, customer_type)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [
+                            phone,
+                            user.name || `Customer-${phone.slice(-4)}`,
+                            user.email || '',
+                            user.address || '',
+                            user.district || '',
+                            user.state || '',
+                            user.pincode || '',
+                            user.gstin || '',
+                            user.business || '',
+                            user.role || 'retail'
+                        ],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
                 });
                 imported++;
             }
@@ -745,7 +758,7 @@ async function importUsersArray(users) {
     }
 
     return imported;
-                }
+}
 const app = express();
 const PORT = process.env.PORT || 10000;
 // ============================================================
