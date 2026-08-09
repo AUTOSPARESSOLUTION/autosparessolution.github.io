@@ -140,7 +140,533 @@ try { Tesseract = require('tesseract.js'); } catch(e) {}
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+// ============================================================
+// 📁 AUTO SPARES JSON IMPORT SYSTEM
+// ============================================================
 
+const fs = require('fs');
+const path = require('path');
+
+// ============================================================
+// 📁 JSON STORAGE PATHS
+// ============================================================
+
+const JSON_STORAGE = {
+    fullBackup: path.join(__dirname, 'data', 'autospares_backup.json'),
+    customers: path.join(__dirname, 'data', 'customers.json'),
+    suppliers: path.join(__dirname, 'data', 'suppliers.json'),
+    products: path.join(__dirname, 'data', 'products.json'),
+    invoices: path.join(__dirname, 'data', 'invoices.json'),
+    purchaseInvoices: path.join(__dirname, 'data', 'purchaseInvoices.json'),
+    customerPayments: path.join(__dirname, 'data', 'customerPayments.json'),
+    supplierPayments: path.join(__dirname, 'data', 'supplierPayments.json'),
+    customerLedger: path.join(__dirname, 'data', 'customerLedger.json'),
+    supplierLedger: path.join(__dirname, 'data', 'supplierLedger.json'),
+    inventoryTransactions: path.join(__dirname, 'data', 'inventoryTransactions.json'),
+    proformas: path.join(__dirname, 'data', 'proformas.json'),
+    quotations: path.join(__dirname, 'data', 'quotations.json'),
+    users: path.join(__dirname, 'data', 'users.json')
+};
+
+// Ensure data directory exists
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    console.log('📁 Created data directory');
+}
+
+// ============================================================
+// 📥 JSON IMPORT FUNCTIONS
+// ============================================================
+
+// 1️⃣ IMPORT FULL BACKUP JSON
+async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
+    try {
+        if (!fs.existsSync(filePath)) {
+            console.log(`⚠️ Backup JSON not found: ${filePath}`);
+            return { success: false, message: 'File not found' };
+        }
+
+        console.log('📥 Loading full backup JSON...');
+        const data = fs.readFileSync(filePath, 'utf8');
+        const backup = JSON.parse(data);
+        
+        console.log(`📊 Found data:`, {
+            customers: backup.customers ? JSON.parse(backup.customers).length : 0,
+            suppliers: backup.suppliers ? JSON.parse(backup.suppliers).length : 0,
+            products: backup.products ? JSON.parse(backup.products).length : 0,
+            invoices: backup.allInvoices ? JSON.parse(backup.allInvoices).length : 0,
+            purchaseInvoices: backup.purchaseInvoices ? JSON.parse(backup.purchaseInvoices).length : 0
+        });
+
+        const results = {
+            customers: 0,
+            suppliers: 0,
+            products: 0,
+            invoices: 0,
+            purchaseInvoices: 0,
+            customerPayments: 0,
+            supplierPayments: 0,
+            users: 0
+        };
+
+        // Import Customers
+        if (backup.customers) {
+            const customers = JSON.parse(backup.customers);
+            results.customers = await importCustomersArray(customers);
+        }
+
+        // Import Suppliers
+        if (backup.suppliers) {
+            const suppliers = JSON.parse(backup.suppliers);
+            results.suppliers = await importSuppliersArray(suppliers);
+        }
+
+        // Import Products
+        if (backup.products) {
+            const products = JSON.parse(backup.products);
+            results.products = await importProductsArray(products);
+        }
+
+        // Import Invoices
+        if (backup.allInvoices) {
+            const invoices = JSON.parse(backup.allInvoices);
+            results.invoices = await importInvoicesArray(invoices);
+        }
+
+        // Import Purchase Invoices
+        if (backup.purchaseInvoices) {
+            const purchaseInvoices = JSON.parse(backup.purchaseInvoices);
+            results.purchaseInvoices = await importPurchaseInvoicesArray(purchaseInvoices);
+        }
+
+        // Import Customer Payments
+        if (backup.customerPayments) {
+            const payments = JSON.parse(backup.customerPayments);
+            results.customerPayments = await importCustomerPaymentsArray(payments);
+        }
+
+        // Import Supplier Payments
+        if (backup.supplierPayments) {
+            const payments = JSON.parse(backup.supplierPayments);
+            results.supplierPayments = await importSupplierPaymentsArray(payments);
+        }
+
+        // Import Users
+        if (backup.users) {
+            const users = JSON.parse(backup.users);
+            results.users = await importUsersArray(users);
+        }
+
+        console.log('✅ Full backup import complete!');
+        console.log(`   👤 Customers: ${results.customers}`);
+        console.log(`   🏢 Suppliers: ${results.suppliers}`);
+        console.log(`   📦 Products: ${results.products}`);
+        console.log(`   📄 Invoices: ${results.invoices}`);
+        console.log(`   📥 Purchase Invoices: ${results.purchaseInvoices}`);
+        console.log(`   💰 Customer Payments: ${results.customerPayments}`);
+        console.log(`   💰 Supplier Payments: ${results.supplierPayments}`);
+        console.log(`   👥 Users: ${results.users}`);
+
+        return { success: true, results };
+
+    } catch (error) {
+        console.error('❌ Full backup import error:', error.message);
+        return { success: false, error: error.message };
+    }
+}
+
+// 2️⃣ IMPORT CUSTOMERS ARRAY
+async function importCustomersArray(customers) {
+    let imported = 0;
+    let errors = 0;
+
+    for (const customer of customers) {
+        try {
+            // Check if customer exists
+            const existing = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT phone FROM customer_master WHERE phone = ?`,
+                    [customer.phone || customer.mobileNo],
+                    (err, row) => resolve(row)
+                );
+            });
+
+            const customerData = {
+                phone: customer.phone || customer.mobileNo,
+                name: customer.name || '',
+                email: customer.email || '',
+                address: customer.address || '',
+                city: customer.district || '',
+                state: customer.state || '',
+                pincode: customer.pincode || '',
+                gstin: customer.gstin || '',
+                company_name: customer.business || '',
+                customer_type: customer.role || 'retail',
+                credit_limit: customer.creditLimit || 0,
+                total_orders: customer.totalPurchased || 0,
+                total_spent: customer.totalPurchased || 0,
+                customer_code: customer.customerCode || `CUST-${Date.now().toString().slice(-6)}`,
+                status: customer.status || 'active'
+            };
+
+            if (existing) {
+                await updateCustomerDetails(customerData.phone, customerData);
+            } else {
+                await createCustomer(customerData);
+            }
+            imported++;
+        } catch (err) {
+            console.error(`❌ Error importing customer ${customer.phone || customer.mobileNo}:`, err.message);
+            errors++;
+        }
+    }
+
+    return imported;
+}
+
+// 3️⃣ IMPORT SUPPLIERS ARRAY
+async function importSuppliersArray(suppliers) {
+    let imported = 0;
+    let errors = 0;
+
+    for (const supplier of suppliers) {
+        try {
+            const existing = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT phone FROM supplier_master WHERE phone = ?`,
+                    [supplier.phone],
+                    (err, row) => resolve(row)
+                );
+            });
+
+            const supplierData = {
+                phone: supplier.phone,
+                name: supplier.name || '',
+                email: supplier.email || '',
+                address: supplier.address || '',
+                city: supplier.city || '',
+                state: supplier.state || '',
+                pincode: supplier.pincode || '',
+                gstin: supplier.gstin || '',
+                contact_person: supplier.contactPerson || '',
+                contact_person_phone: supplier.contactPersonPhone || '',
+                supplier_code: supplier.supplierCode || `SUP-${Date.now().toString().slice(-6)}`,
+                status: supplier.status || 'active',
+                credit_limit: supplier.creditLimit || 0
+            };
+
+            if (existing) {
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `UPDATE supplier_master SET 
+                            name = ?, email = ?, address = ?, city = ?, state = ?, 
+                            pincode = ?, gstin = ?, contact_person = ?, status = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                         WHERE phone = ?`,
+                        [
+                            supplierData.name, supplierData.email, supplierData.address,
+                            supplierData.city, supplierData.state, supplierData.pincode,
+                            supplierData.gstin, supplierData.contact_person, supplierData.status,
+                            supplierData.phone
+                        ],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
+            } else {
+                await createSupplier(supplierData);
+            }
+            imported++;
+        } catch (err) {
+            console.error(`❌ Error importing supplier ${supplier.phone}:`, err.message);
+            errors++;
+        }
+    }
+
+    return imported;
+}
+
+// 4️⃣ IMPORT PRODUCTS ARRAY
+async function importProductsArray(products) {
+    let imported = 0;
+    let errors = 0;
+
+    for (const product of products) {
+        try {
+            const part = product.id || product.sku || product.part;
+            if (!part) {
+                console.warn('⚠️ Skipping product with no part number:', product);
+                errors++;
+                continue;
+            }
+
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `INSERT OR REPLACE INTO products 
+                     (part, description, brand, make, model, stock, list_price, mrp, billing_price, updated_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                    [
+                        part,
+                        product.name || product.description || '',
+                        product.brand || '',
+                        product.make || '',
+                        product.model || '',
+                        product.currentStock || product.stock || 0,
+                        product.price || product.list_price || 0,
+                        product.price || product.mrp || 0,
+                        product.billing_price || product.price || 0
+                    ],
+                    function(err) {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+            imported++;
+        } catch (err) {
+            console.error(`❌ Error importing product ${product.id || product.sku}:`, err.message);
+            errors++;
+        }
+    }
+
+    return imported;
+}
+
+// 5️⃣ IMPORT INVOICES ARRAY
+async function importInvoicesArray(invoices) {
+    let imported = 0;
+    let errors = 0;
+
+    for (const invoice of invoices) {
+        try {
+            const invoiceData = {
+                invoice_no: invoice.invoiceNo || `INV-${Date.now().toString().slice(-6)}`,
+                customer_phone: invoice.buyer?.phone || '',
+                customer_name: invoice.buyer?.name || '',
+                customer_gstin: invoice.buyer?.gstin || '',
+                customer_address: invoice.buyer?.address || '',
+                invoice_date: invoice.date || new Date().toISOString(),
+                due_date: invoice.dueDate || invoice.date || new Date().toISOString(),
+                subtotal: invoice.subtotal || 0,
+                tax_amount: (invoice.cgst || 0) + (invoice.sgst || 0) + (invoice.igst || 0),
+                total_amount: invoice.grandTotal || invoice.total || 0,
+                items: JSON.stringify(invoice.items || []),
+                payment_status: invoice.status === 'Paid' ? 'paid' : 'pending',
+                invoice_type: invoice.invoiceType || 'credit',
+                status: invoice.status || 'Pending'
+            };
+
+            if (invoiceData.customer_phone) {
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `INSERT OR REPLACE INTO order_master 
+                         (order_id, customer_phone, customer_name, delivery_address, 
+                          items, subtotal, tax_amount, total_amount, payment_status, 
+                          order_status, created_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [
+                            invoiceData.invoice_no,
+                            invoiceData.customer_phone,
+                            invoiceData.customer_name,
+                            invoiceData.customer_address || '',
+                            invoiceData.items,
+                            invoiceData.subtotal,
+                            invoiceData.tax_amount,
+                            invoiceData.total_amount,
+                            invoiceData.payment_status,
+                            invoiceData.status,
+                            invoiceData.invoice_date
+                        ],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
+                imported++;
+            } else {
+                console.warn(`⚠️ Skipping invoice ${invoiceData.invoice_no} - no customer phone`);
+                errors++;
+            }
+        } catch (err) {
+            console.error(`❌ Error importing invoice ${invoice.invoiceNo}:`, err.message);
+            errors++;
+        }
+    }
+
+    return imported;
+}
+
+// 6️⃣ IMPORT PURCHASE INVOICES ARRAY
+async function importPurchaseInvoicesArray(purchaseInvoices) {
+    let imported = 0;
+    let errors = 0;
+
+    for (const invoice of purchaseInvoices) {
+        try {
+            const supplierPhone = invoice.supplier?.phone || '';
+            const supplierName = invoice.supplier?.name || '';
+
+            if (!supplierPhone) {
+                console.warn(`⚠️ Skipping purchase invoice - no supplier phone`);
+                errors++;
+                continue;
+            }
+
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `INSERT OR REPLACE INTO purchase_invoices 
+                     (invoice_no, supplier_id, supplier_name, supplier_gstin,
+                      invoice_date, due_date, subtotal, gst_amount, total_amount,
+                      items, payment_status, notes)
+                     VALUES (?, 
+                        (SELECT id FROM supplier_master WHERE phone = ?),
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        invoice.invoiceNo || `PI-${Date.now().toString().slice(-6)}`,
+                        supplierPhone,
+                        supplierName,
+                        invoice.supplier?.gstin || '',
+                        invoice.date || new Date().toISOString(),
+                        invoice.dueDate || invoice.date || new Date().toISOString(),
+                        invoice.subtotal || 0,
+                        invoice.gst || 0,
+                        invoice.grandTotal || invoice.total || 0,
+                        JSON.stringify(invoice.items || []),
+                        'pending',
+                        invoice.notes || ''
+                    ],
+                    function(err) {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+            imported++;
+        } catch (err) {
+            console.error(`❌ Error importing purchase invoice ${invoice.invoiceNo}:`, err.message);
+            errors++;
+        }
+    }
+
+    return imported;
+}
+
+// 7️⃣ IMPORT CUSTOMER PAYMENTS
+async function importCustomerPaymentsArray(payments) {
+    let imported = 0;
+    let errors = 0;
+
+    for (const payment of payments) {
+        try {
+            const customerPhone = payment.customerEmail || '';
+            if (!customerPhone) {
+                errors++;
+                continue;
+            }
+
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `UPDATE customer_master 
+                     SET total_spent = total_spent + ?, 
+                         updated_at = CURRENT_TIMESTAMP
+                     WHERE phone = ?`,
+                    [payment.amount || 0, customerPhone],
+                    function(err) {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+            imported++;
+        } catch (err) {
+            console.error(`❌ Error importing customer payment:`, err.message);
+            errors++;
+        }
+    }
+
+    return imported;
+}
+
+// 8️⃣ IMPORT SUPPLIER PAYMENTS
+async function importSupplierPaymentsArray(payments) {
+    let imported = 0;
+    let errors = 0;
+
+    for (const payment of payments) {
+        try {
+            const supplierPhone = payment.supplierEmail || '';
+            if (!supplierPhone) {
+                errors++;
+                continue;
+            }
+
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `UPDATE supplier_master 
+                     SET outstanding = COALESCE(outstanding, 0) - ?,
+                         updated_at = CURRENT_TIMESTAMP
+                     WHERE phone = ?`,
+                    [payment.amount || 0, supplierPhone],
+                    function(err) {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+            imported++;
+        } catch (err) {
+            console.error(`❌ Error importing supplier payment:`, err.message);
+            errors++;
+        }
+    }
+
+    return imported;
+}
+
+// 9️⃣ IMPORT USERS
+async function importUsersArray(users) {
+    let imported = 0;
+    let errors = 0;
+
+    for (const user of users) {
+        try {
+            const existing = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT phone FROM customer_master WHERE phone = ?`,
+                    [user.phone],
+                    (err, row) => resolve(row)
+                );
+            });
+
+            if (!existing && user.role === 'customer') {
+                await createCustomer({
+                    phone: user.phone,
+                    name: user.name || '',
+                    email: user.email || '',
+                    address: user.address || '',
+                    city: user.district || '',
+                    state: user.state || '',
+                    pincode: user.pincode || '',
+                    gstin: user.gstin || '',
+                    company_name: user.business || '',
+                    customer_type: user.role || 'retail',
+                    customer_code: `CUST-${Date.now().toString().slice(-6)}`,
+                    status: 'active'
+                });
+                imported++;
+            }
+        } catch (err) {
+            console.error(`❌ Error importing user ${user.phone}:`, err.message);
+            errors++;
+        }
+    }
+
+    return imported;
+                }
 // ============================================================
 // 🔧 CONFIGURATION
 // ============================================================
