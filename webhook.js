@@ -4962,7 +4962,7 @@ async function startServer() {
 if (fileWatcher && fileWatcher.startWatching) {
     console.log('🔄 Starting dynamic file watcher with fixes...');
     fileWatcher.startWatching({
-        scanInterval: 10000,  // 10 seconds to avoid conflicts
+        scanInterval: 60000,  // 60 seconds to avoid conflicts
         importBatchSize: 1000
     });
     console.log('✅ Dynamic file watcher started (scan interval: 10s)');
