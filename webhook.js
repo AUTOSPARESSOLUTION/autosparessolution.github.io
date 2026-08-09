@@ -390,49 +390,44 @@ async function importCustomersArray(customers) {
 }
 
 // 3️⃣ IMPORT SUPPLIERS ARRAY
+// 3️⃣ IMPORT SUPPLIERS ARRAY
 async function importSuppliersArray(suppliers) {
     let imported = 0;
     let errors = 0;
 
     for (const supplier of suppliers) {
         try {
+            const phone = supplier.phone;
+            if (!phone) {
+                errors++;
+                continue;
+            }
+
+            // Check if supplier exists in 'suppliers' table
             const existing = await new Promise((resolve) => {
                 db.db.get(
-                    `SELECT phone FROM supplier_master WHERE phone = ?`,
-                    [supplier.phone],
+                    `SELECT phone FROM suppliers WHERE phone = ?`,
+                    [phone],
                     (err, row) => resolve(row)
                 );
             });
 
-            const supplierData = {
-                phone: supplier.phone,
-                name: supplier.name || '',
-                email: supplier.email || '',
-                address: supplier.address || '',
-                city: supplier.city || '',
-                state: supplier.state || '',
-                pincode: supplier.pincode || '',
-                gstin: supplier.gstin || '',
-                contact_person: supplier.contactPerson || '',
-                contact_person_phone: supplier.contactPersonPhone || '',
-                supplier_code: supplier.supplierCode || `SUP-${Date.now().toString().slice(-6)}`,
-                status: supplier.status || 'active',
-                credit_limit: supplier.creditLimit || 0
-            };
-
             if (existing) {
+                // Update existing
                 await new Promise((resolve, reject) => {
                     db.db.run(
-                        `UPDATE supplier_master SET 
-                            name = ?, email = ?, address = ?, city = ?, state = ?, 
-                            pincode = ?, gstin = ?, contact_person = ?, status = ?,
+                        `UPDATE suppliers SET 
+                            name = ?, email = ?, address = ?, gstin = ?, contact_person = ?, status = ?,
                             updated_at = CURRENT_TIMESTAMP
                          WHERE phone = ?`,
                         [
-                            supplierData.name, supplierData.email, supplierData.address,
-                            supplierData.city, supplierData.state, supplierData.pincode,
-                            supplierData.gstin, supplierData.contact_person, supplierData.status,
-                            supplierData.phone
+                            supplier.name || '',
+                            supplier.email || '',
+                            supplier.address || '',
+                            supplier.gstin || '',
+                            supplier.contactPerson || '',
+                            supplier.status || 'active',
+                            phone
                         ],
                         function(err) {
                             if (err) reject(err);
@@ -441,7 +436,27 @@ async function importSuppliersArray(suppliers) {
                     );
                 });
             } else {
-                await createSupplier(supplierData);
+                // Insert new
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `INSERT INTO suppliers 
+                         (name, phone, email, address, gstin, contact_person, status)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        [
+                            supplier.name || 'Unknown',
+                            phone,
+                            supplier.email || '',
+                            supplier.address || '',
+                            supplier.gstin || '',
+                            supplier.contactPerson || '',
+                            supplier.status || 'active'
+                        ],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
             }
             imported++;
         } catch (err) {
