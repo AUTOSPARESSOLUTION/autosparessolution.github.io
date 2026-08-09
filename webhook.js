@@ -143,8 +143,7 @@ try { Tesseract = require('tesseract.js'); } catch(e) {}
 // 📁 AUTO SPARES JSON IMPORT SYSTEM
 // ============================================================
 
-const fs = require('fs');
-const path = require('path');
+
 
 // ============================================================
 // 📁 JSON STORAGE PATHS
