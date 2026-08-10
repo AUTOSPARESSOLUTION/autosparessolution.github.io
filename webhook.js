@@ -786,13 +786,26 @@ async function importSupplierPaymentsArray(payments) {
 
     return imported;
 }
-// 9️⃣ IMPORT USERS
+// 9️⃣ IMPORT USERS - FIXED with dynamic column handling
 async function importUsersArray(users) {
     let imported = 0;
     let errors = 0;
     let skipped = 0;
 
     console.log(`📊 Processing ${users.length} users...`);
+
+    // Get existing columns in customers table
+    const existingColumns = await new Promise((resolve) => {
+        db.db.all(`PRAGMA table_info(customers)`, [], (err, rows) => {
+            if (err) {
+                console.error('❌ Error getting table info:', err.message);
+                resolve([]);
+            } else {
+                resolve(rows.map(r => r.name));
+            }
+        });
+    });
+    console.log(`📋 Existing columns in customers: ${existingColumns.join(', ')}`);
 
     for (const user of users) {
         try {
@@ -810,7 +823,7 @@ async function importUsersArray(users) {
                 continue;
             }
 
-            // Check if user already exists in customers table
+            // Check if user already exists
             const existing = await new Promise((resolve) => {
                 db.db.get(
                     `SELECT phone FROM customers WHERE phone = ?`,
@@ -820,52 +833,70 @@ async function importUsersArray(users) {
             });
 
             if (existing) {
-                console.log(`ℹ️ User ${cleanPhone} already exists in customers`);
+                console.log(`ℹ️ User ${cleanPhone} already exists`);
                 continue;
             }
 
-            // Only import if role is customer or undefined
             if (user.role === 'customer' || user.role === undefined) {
-                const userData = {
-                    phone: cleanPhone,
-                    name: user.name || `Customer-${cleanPhone.slice(-4)}`,
-                    email: user.email || '',
-                    address: user.address || '',
-                    city: user.district || user.city || '',
-                    state: user.state || '',
-                    pincode: user.pincode || '',
-                    gstin: user.gstin || '',
-                    company_name: user.business || '',
-                    customer_type: user.role || 'retail'
-                };
+                // Build dynamic insert based on existing columns
+                const fields = ['phone', 'name', 'email', 'address'];
+                const values = [
+                    cleanPhone,
+                    user.name || `Customer-${cleanPhone.slice(-4)}`,
+                    user.email || '',
+                    user.address || ''
+                ];
+
+                // Add columns if they exist
+                if (existingColumns.includes('city')) {
+                    fields.push('city');
+                    values.push(user.district || user.city || '');
+                }
+                if (existingColumns.includes('state')) {
+                    fields.push('state');
+                    values.push(user.state || '');
+                }
+                if (existingColumns.includes('pincode')) {
+                    fields.push('pincode');
+                    values.push(user.pincode || '');
+                }
+                if (existingColumns.includes('gstin')) {
+                    fields.push('gstin');
+                    values.push(user.gstin || '');
+                }
+                if (existingColumns.includes('company_name')) {
+                    fields.push('company_name');
+                    values.push(user.business || '');
+                }
+                if (existingColumns.includes('customer_type')) {
+                    fields.push('customer_type');
+                    values.push(user.role || 'retail');
+                }
+                if (existingColumns.includes('registered_at')) {
+                    fields.push('registered_at');
+                    values.push('CURRENT_TIMESTAMP');
+                }
+
+                const placeholders = values.map((v, i) => {
+                    if (v === 'CURRENT_TIMESTAMP') return 'CURRENT_TIMESTAMP';
+                    return '?';
+                });
+
+                const query = `INSERT INTO customers (${fields.join(', ')}) VALUES (${placeholders.join(', ')})`;
+                const finalValues = values.filter(v => v !== 'CURRENT_TIMESTAMP');
 
                 await new Promise((resolve, reject) => {
-                    db.db.run(
-                        `INSERT INTO customers 
-                         (phone, name, email, address, city, state, pincode, gstin, company_name, customer_type, registered_at)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-                        [
-                            userData.phone,
-                            userData.name,
-                            userData.email,
-                            userData.address,
-                            userData.city,
-                            userData.state,
-                            userData.pincode,
-                            userData.gstin,
-                            userData.company_name,
-                            userData.customer_type
-                        ],
-                        function(err) {
-                            if (err) reject(err);
-                            else resolve();
+                    db.db.run(query, finalValues, function(err) {
+                        if (err) {
+                            console.error(`❌ Insert error for ${cleanPhone}:`, err.message);
+                            reject(err);
+                        } else {
+                            resolve();
                         }
-                    );
+                    });
                 });
                 imported++;
-                console.log(`✅ Imported user: ${cleanPhone} - ${userData.name}`);
-            } else {
-                console.log(`ℹ️ Skipping user ${cleanPhone} - role is "${user.role}"`);
+                console.log(`✅ Imported user: ${cleanPhone}`);
             }
         } catch (err) {
             console.error(`❌ Error importing user ${user.phone}:`, err.message);
