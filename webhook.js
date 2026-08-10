@@ -190,24 +190,23 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
         const backup = JSON.parse(data);
         
         // Helper function to parse data (handles both stringified and array formats)
-function parseData(data) {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (typeof data === 'string') {
-        try {
-            // Try parsing as JSON
-            const parsed = JSON.parse(data);
-            if (Array.isArray(parsed)) {
-                return parsed;
+        function parseData(data) {
+            if (!data) return [];
+            if (Array.isArray(data)) return data;
+            if (typeof data === 'string') {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (Array.isArray(parsed)) {
+                        return parsed;
+                    }
+                    return [];
+                } catch (e) {
+                    console.log(`⚠️ Failed to parse data: ${data.substring(0, 100)}...`);
+                    return [];
+                }
             }
             return [];
-        } catch (e) {
-            console.log(`⚠️ Failed to parse data: ${data.substring(0, 100)}...`);
-            return [];
         }
-    }
-    return [];
-}
 
         const customers = parseData(backup.customers);
         const suppliers = parseData(backup.suppliers);
@@ -217,10 +216,7 @@ function parseData(data) {
         const customerPayments = parseData(backup.customerPayments);
         const supplierPayments = parseData(backup.supplierPayments);
         const users = parseData(backup.users);
-// 🔍 DEBUG: Log the first few items to verify
-console.log(`🔍 Customers sample:`, customers.length > 0 ? JSON.stringify(customers[0]).substring(0, 200) : 'No customers');
-console.log(`🔍 Suppliers sample:`, suppliers.length > 0 ? JSON.stringify(suppliers[0]).substring(0, 200) : 'No suppliers');
-console.log(`🔍 Products sample:`, products.length > 0 ? JSON.stringify(products[0]).substring(0, 200) : 'No products');
+
         console.log(`📊 Found data:`, {
             customers: customers.length,
             suppliers: suppliers.length,
@@ -228,6 +224,17 @@ console.log(`🔍 Products sample:`, products.length > 0 ? JSON.stringify(produc
             invoices: invoices.length,
             purchaseInvoices: purchaseInvoices.length
         });
+
+        // 🔍 DEBUG: Log first item samples
+        if (customers.length > 0) {
+            console.log(`🔍 First customer:`, JSON.stringify(customers[0]).substring(0, 300));
+        }
+        if (suppliers.length > 0) {
+            console.log(`🔍 First supplier:`, JSON.stringify(suppliers[0]).substring(0, 300));
+        }
+        if (products.length > 0) {
+            console.log(`🔍 First product:`, JSON.stringify(products[0]).substring(0, 300));
+        }
 
         const results = {
             customers: 0,
@@ -244,12 +251,16 @@ console.log(`🔍 Products sample:`, products.length > 0 ? JSON.stringify(produc
         if (customers.length > 0) {
             console.log(`👤 Importing ${customers.length} customers...`);
             results.customers = await importCustomersArray(customers);
+        } else {
+            console.log(`⚠️ No customers found in backup`);
         }
 
         // Import Suppliers
         if (suppliers.length > 0) {
             console.log(`🏢 Importing ${suppliers.length} suppliers...`);
             results.suppliers = await importSuppliersArray(suppliers);
+        } else {
+            console.log(`⚠️ No suppliers found in backup`);
         }
 
         // Import Products
@@ -305,7 +316,6 @@ console.log(`🔍 Products sample:`, products.length > 0 ? JSON.stringify(produc
         return { success: false, error: error.message };
     }
 }
-
 // 2️⃣ IMPORT CUSTOMERS ARRAY
 async function importCustomersArray(customers) {
     let imported = 0;
