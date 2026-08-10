@@ -2475,6 +2475,54 @@ async function initAllTables() {
             });
         });
         console.log('✅ supplier_payments table ready');
+                // ============================================================
+        // 🔧 FIX: Add missing columns to customers table
+        // ============================================================
+
+        try {
+            await new Promise((resolve, reject) => {
+                db.db.run('ALTER TABLE customers ADD COLUMN city TEXT', (err) => {
+                    if (err && !err.message.includes('duplicate column name')) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            console.log('✅ Added city column to customers');
+        } catch (error) {
+            console.log('⚠️ city column already exists:', error.message);
+        }
+
+        try {
+            await new Promise((resolve, reject) => {
+                db.db.run('ALTER TABLE customers ADD COLUMN state TEXT', (err) => {
+                    if (err && !err.message.includes('duplicate column name')) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            console.log('✅ Added state column to customers');
+        } catch (error) {
+            console.log('⚠️ state column already exists:', error.message);
+        }
+
+        try {
+            await new Promise((resolve, reject) => {
+                db.db.run('ALTER TABLE customers ADD COLUMN gstin TEXT', (err) => {
+                    if (err && !err.message.includes('duplicate column name')) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            console.log('✅ Added gstin column to customers');
+        } catch (error) {
+            console.log('⚠️ gstin column already exists:', error.message);
+        }
         // ============================================================
         // 📋 MISSING TABLES FOR ORDER MANAGEMENT SYSTEM
         // ============================================================
