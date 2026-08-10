@@ -4017,23 +4017,27 @@ async function handleWhatsAppMessage(message, from) {
             }
         }
         // ============================================================
-// 🔧 FIX: Add Missing Columns to Database
+// 🔧 FIX: Add ALL Missing Columns to Database
 // ============================================================
 
 if (isAdmin(from) && msgLower === 'fix columns') {
     try {
-        await sendWhatsAppMessage(from, '🔄 Adding missing columns to database...');
+        await sendWhatsAppMessage(from, '🔄 Adding all missing columns to database...');
         
         const results = [];
         
-        // Add columns to customers table
+        // All columns needed for customers table
         const customerColumns = [
             { name: 'pincode', type: 'TEXT' },
             { name: 'total_spent', type: 'REAL DEFAULT 0' },
             { name: 'total_orders', type: 'INTEGER DEFAULT 0' },
             { name: 'last_order_at', type: 'TEXT' },
             { name: 'credit_limit', type: 'REAL DEFAULT 0' },
-            { name: 'outstanding', type: 'REAL DEFAULT 0' }
+            { name: 'outstanding', type: 'REAL DEFAULT 0' },
+            { name: 'company_name', type: 'TEXT' },
+            { name: 'city', type: 'TEXT' },
+            { name: 'state', type: 'TEXT' },
+            { name: 'gstin', type: 'TEXT' }
         ];
         
         for (const col of customerColumns) {
@@ -4049,15 +4053,15 @@ if (isAdmin(from) && msgLower === 'fix columns') {
                 });
                 results.push(`✅ Added customer.${col.name}`);
             } catch (error) {
-                if (error.message.includes('duplicate column name')) {
+                if (error.message && error.message.includes('duplicate column name')) {
                     results.push(`⚠️ customer.${col.name} already exists`);
                 } else {
-                    results.push(`❌ Error adding customer.${col.name}: ${error.message}`);
+                    results.push(`⚠️ customer.${col.name}: ${error.message}`);
                 }
             }
         }
         
-        // Add columns to suppliers table
+        // All columns needed for suppliers table
         const supplierColumns = [
             { name: 'city', type: 'TEXT' },
             { name: 'state', type: 'TEXT' },
@@ -4080,10 +4084,10 @@ if (isAdmin(from) && msgLower === 'fix columns') {
                 });
                 results.push(`✅ Added supplier.${col.name}`);
             } catch (error) {
-                if (error.message.includes('duplicate column name')) {
+                if (error.message && error.message.includes('duplicate column name')) {
                     results.push(`⚠️ supplier.${col.name} already exists`);
                 } else {
-                    results.push(`❌ Error adding supplier.${col.name}: ${error.message}`);
+                    results.push(`⚠️ supplier.${col.name}: ${error.message}`);
                 }
             }
         }
