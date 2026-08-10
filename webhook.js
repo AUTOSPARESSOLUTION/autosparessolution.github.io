@@ -1015,20 +1015,18 @@ async function importUsersArray(users) {
 // ============================================================
 // 👤 CUSTOMER HELPER FUNCTIONS - FIXED
 // ============================================================
+// ============================================================
+// 👤 CUSTOMER HELPER FUNCTIONS - FIXED TABLE NAMES
+// ============================================================
 
 async function getCustomerByPhone(phone) {
     return new Promise((resolve, reject) => {
         db.db.get(
-            `SELECT * FROM customers WHERE phone = ?`,
-            [phone],
+            `SELECT * FROM customer_master WHERE phone = ? OR mobileNo = ?`,
+            [phone, phone],
             (err, row) => {
-                if (err) {
-                    console.error('❌ getCustomerByPhone error:', err.message);
-                    reject(err);
-                } else {
-                    console.log(`🔍 Found customer:`, row ? row.name : 'None');
-                    resolve(row);
-                }
+                if (err) reject(err);
+                else resolve(row);
             }
         );
     });
@@ -1037,16 +1035,11 @@ async function getCustomerByPhone(phone) {
 async function getAllCustomers(limit = 100) {
     return new Promise((resolve, reject) => {
         db.db.all(
-            `SELECT * FROM customers ORDER BY name LIMIT ?`,
+            `SELECT * FROM customer_master ORDER BY name LIMIT ?`,
             [limit],
             (err, rows) => {
-                if (err) {
-                    console.error('❌ getAllCustomers error:', err.message);
-                    reject(err);
-                } else {
-                    console.log(`👤 Found ${rows ? rows.length : 0} customers`);
-                    resolve(rows || []);
-                }
+                if (err) reject(err);
+                else resolve(rows || []);
             }
         );
     });
@@ -1055,31 +1048,25 @@ async function getAllCustomers(limit = 100) {
 async function getAllSuppliers() {
     return new Promise((resolve, reject) => {
         db.db.all(
-            `SELECT * FROM suppliers ORDER BY name`,
+            `SELECT * FROM supplier_master ORDER BY name`,
             [],
             (err, rows) => {
-                if (err) {
-                    console.error('❌ getAllSuppliers error:', err.message);
-                    reject(err);
-                } else {
-                    console.log(`🏢 Found ${rows ? rows.length : 0} suppliers`);
-                    resolve(rows || []);
-                }
+                if (err) reject(err);
+                else resolve(rows || []);
             }
         );
     });
 }
 
 async function getCustomerStats(phone) {
-    return new Promise((resolve, reject) => {
-        // Check if order_master table exists first
+    return new Promise((resolve) => {
+        // Check if order_master exists
         db.db.get(
             `SELECT name FROM sqlite_master WHERE type='table' AND name='order_master'`,
             [],
             (err, tableExists) => {
                 if (err || !tableExists) {
-                    console.log('ℹ️ order_master table not found, returning empty stats');
-                    resolve({ total_orders: 0, total_spent: 0, avg_order_value: 0 });
+                    resolve({ total_orders: 0, total_spent: 0, avg_order_value: 0, last_order_date: null });
                     return;
                 }
                 
@@ -1093,12 +1080,8 @@ async function getCustomerStats(phone) {
                      WHERE customer_phone = ? AND order_status != 'cancelled'`,
                     [phone],
                     (err, row) => {
-                        if (err) {
-                            console.error('❌ getCustomerStats error:', err.message);
-                            resolve({ total_orders: 0, total_spent: 0, avg_order_value: 0 });
-                        } else {
-                            resolve(row || { total_orders: 0, total_spent: 0, avg_order_value: 0 });
-                        }
+                        if (err) resolve({ total_orders: 0, total_spent: 0, avg_order_value: 0, last_order_date: null });
+                        else resolve(row || { total_orders: 0, total_spent: 0, avg_order_value: 0, last_order_date: null });
                     }
                 );
             }
@@ -1107,14 +1090,12 @@ async function getCustomerStats(phone) {
 }
 
 async function getCustomerOrderHistory(phone, limit = 5) {
-    return new Promise((resolve, reject) => {
-        // Check if order_master table exists first
+    return new Promise((resolve) => {
         db.db.get(
             `SELECT name FROM sqlite_master WHERE type='table' AND name='order_master'`,
             [],
             (err, tableExists) => {
                 if (err || !tableExists) {
-                    console.log('ℹ️ order_master table not found, returning empty history');
                     resolve([]);
                     return;
                 }
@@ -1125,18 +1106,15 @@ async function getCustomerOrderHistory(phone, limit = 5) {
                      ORDER BY created_at DESC LIMIT ?`,
                     [phone, limit],
                     (err, rows) => {
-                        if (err) {
-                            console.error('❌ getCustomerOrderHistory error:', err.message);
-                            resolve([]);
-                        } else {
-                            resolve(rows || []);
-                        }
+                        if (err) resolve([]);
+                        else resolve(rows || []);
                     }
                 );
             }
         );
     });
 }
+
 const app = express();
 const PORT = process.env.PORT || 10000;
 // ============================================================
