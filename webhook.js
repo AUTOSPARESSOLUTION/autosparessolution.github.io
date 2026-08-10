@@ -190,18 +190,24 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
         const backup = JSON.parse(data);
         
         // Helper function to parse data (handles both stringified and array formats)
-        function parseData(data) {
-            if (!data) return [];
-            if (Array.isArray(data)) return data;
-            if (typeof data === 'string') {
-                try {
-                    return JSON.parse(data);
-                } catch (e) {
-                    return [];
-                }
+function parseData(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (typeof data === 'string') {
+        try {
+            // Try parsing as JSON
+            const parsed = JSON.parse(data);
+            if (Array.isArray(parsed)) {
+                return parsed;
             }
             return [];
+        } catch (e) {
+            console.log(`⚠️ Failed to parse data: ${data.substring(0, 100)}...`);
+            return [];
         }
+    }
+    return [];
+}
 
         const customers = parseData(backup.customers);
         const suppliers = parseData(backup.suppliers);
@@ -211,7 +217,10 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
         const customerPayments = parseData(backup.customerPayments);
         const supplierPayments = parseData(backup.supplierPayments);
         const users = parseData(backup.users);
-
+// 🔍 DEBUG: Log the first few items to verify
+console.log(`🔍 Customers sample:`, customers.length > 0 ? JSON.stringify(customers[0]).substring(0, 200) : 'No customers');
+console.log(`🔍 Suppliers sample:`, suppliers.length > 0 ? JSON.stringify(suppliers[0]).substring(0, 200) : 'No suppliers');
+console.log(`🔍 Products sample:`, products.length > 0 ? JSON.stringify(products[0]).substring(0, 200) : 'No products');
         console.log(`📊 Found data:`, {
             customers: customers.length,
             suppliers: suppliers.length,
