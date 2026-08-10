@@ -310,12 +310,26 @@ console.log(`🔍 Products sample:`, products.length > 0 ? JSON.stringify(produc
 async function importCustomersArray(customers) {
     let imported = 0;
     let errors = 0;
+    let skipped = 0;
+
+    console.log(`📊 Processing ${customers.length} customers...`);
 
     for (const customer of customers) {
         try {
-            const phone = customer.phone || customer.mobileNo;
+            // Get phone from various possible field names
+            const phone = customer.phone || customer.mobileNo || customer.mobile || customer.phoneNumber;
+            
             if (!phone) {
-                errors++;
+                console.log(`⚠️ Skipping customer - no phone:`, JSON.stringify(customer).substring(0, 100));
+                skipped++;
+                continue;
+            }
+
+            // Clean phone number
+            const cleanPhone = phone.toString().replace(/\D/g, '');
+            if (cleanPhone.length < 10) {
+                console.log(`⚠️ Skipping customer - invalid phone: ${cleanPhone}`);
+                skipped++;
                 continue;
             }
 
@@ -323,22 +337,22 @@ async function importCustomersArray(customers) {
             const existing = await new Promise((resolve) => {
                 db.db.get(
                     `SELECT phone FROM customers WHERE phone = ?`,
-                    [phone],
+                    [cleanPhone],
                     (err, row) => resolve(row)
                 );
             });
 
             const customerData = {
-                phone: phone,
-                name: customer.name || '',
-                email: customer.email || '',
+                phone: cleanPhone,
+                name: customer.name || customer.customerName || `Customer-${cleanPhone.slice(-4)}`,
+                email: customer.email || customer.customerEmail || '',
                 address: customer.address || '',
-                city: customer.district || '',
+                city: customer.district || customer.city || '',
                 state: customer.state || '',
-                pincode: customer.pincode || '',
-                gstin: customer.gstin || '',
-                company_name: customer.business || '',
-                customer_type: customer.role || 'retail'
+                pincode: customer.pincode || customer.pinCode || '',
+                gstin: customer.gstin || customer.gst || '',
+                company_name: customer.business || customer.company || customer.companyName || '',
+                customer_type: customer.customer_type || customer.type || customer.role || 'retail'
             };
 
             if (existing) {
@@ -354,7 +368,7 @@ async function importCustomersArray(customers) {
                             customerData.name, customerData.email, customerData.address,
                             customerData.city, customerData.state, customerData.pincode,
                             customerData.gstin, customerData.company_name, customerData.customer_type,
-                            phone
+                            cleanPhone
                         ],
                         function(err) {
                             if (err) reject(err);
@@ -362,24 +376,25 @@ async function importCustomersArray(customers) {
                         }
                     );
                 });
+                console.log(`🔄 Updated customer: ${cleanPhone} - ${customerData.name}`);
             } else {
                 // Insert new
                 await new Promise((resolve, reject) => {
                     db.db.run(
                         `INSERT INTO customers 
-                         (phone, name, email, address, city, state, pincode, gstin, company_name, customer_type)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                         (phone, name, email, address, city, state, pincode, gstin, company_name, customer_type, registered_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                         [
-                            phone,
-                            customerData.name || `Customer-${phone.slice(-4)}`,
-                            customerData.email || '',
-                            customerData.address || '',
-                            customerData.city || '',
-                            customerData.state || '',
-                            customerData.pincode || '',
-                            customerData.gstin || '',
-                            customerData.company_name || '',
-                            customerData.customer_type || 'retail'
+                            cleanPhone,
+                            customerData.name,
+                            customerData.email,
+                            customerData.address,
+                            customerData.city,
+                            customerData.state,
+                            customerData.pincode,
+                            customerData.gstin,
+                            customerData.company_name,
+                            customerData.customer_type
                         ],
                         function(err) {
                             if (err) reject(err);
@@ -387,28 +402,42 @@ async function importCustomersArray(customers) {
                         }
                     );
                 });
+                console.log(`✅ Imported customer: ${cleanPhone} - ${customerData.name}`);
             }
             imported++;
         } catch (err) {
-            console.error(`❌ Error importing customer ${customer.phone || customer.mobileNo}:`, err.message);
+            console.error(`❌ Error importing customer:`, err.message);
+            console.error(`   Data:`, JSON.stringify(customer).substring(0, 200));
             errors++;
         }
     }
 
+    console.log(`📊 Customers: ${imported} imported, ${skipped} skipped, ${errors} errors`);
     return imported;
 }
-
 // 3️⃣ IMPORT SUPPLIERS ARRAY
 // 3️⃣ IMPORT SUPPLIERS ARRAY
 async function importSuppliersArray(suppliers) {
     let imported = 0;
     let errors = 0;
+    let skipped = 0;
+
+    console.log(`📊 Processing ${suppliers.length} suppliers...`);
 
     for (const supplier of suppliers) {
         try {
-            const phone = supplier.phone;
+            const phone = supplier.phone || supplier.phoneNumber || supplier.mobile;
+            
             if (!phone) {
-                errors++;
+                console.log(`⚠️ Skipping supplier - no phone:`, JSON.stringify(supplier).substring(0, 100));
+                skipped++;
+                continue;
+            }
+
+            const cleanPhone = phone.toString().replace(/\D/g, '');
+            if (cleanPhone.length < 10) {
+                console.log(`⚠️ Skipping supplier - invalid phone: ${cleanPhone}`);
+                skipped++;
                 continue;
             }
 
@@ -416,7 +445,7 @@ async function importSuppliersArray(suppliers) {
             const existing = await new Promise((resolve) => {
                 db.db.get(
                     `SELECT phone FROM suppliers WHERE phone = ?`,
-                    [phone],
+                    [cleanPhone],
                     (err, row) => resolve(row)
                 );
             });
@@ -430,13 +459,13 @@ async function importSuppliersArray(suppliers) {
                             updated_at = CURRENT_TIMESTAMP
                          WHERE phone = ?`,
                         [
-                            supplier.name || '',
+                            supplier.name || supplier.supplierName || 'Unknown',
                             supplier.email || '',
                             supplier.address || '',
-                            supplier.gstin || '',
-                            supplier.contactPerson || '',
+                            supplier.gstin || supplier.gst || '',
+                            supplier.contactPerson || supplier.contact_person || '',
                             supplier.status || 'active',
-                            phone
+                            cleanPhone
                         ],
                         function(err) {
                             if (err) reject(err);
@@ -444,20 +473,21 @@ async function importSuppliersArray(suppliers) {
                         }
                     );
                 });
+                console.log(`🔄 Updated supplier: ${cleanPhone}`);
             } else {
                 // Insert new
                 await new Promise((resolve, reject) => {
                     db.db.run(
                         `INSERT INTO suppliers 
-                         (name, phone, email, address, gstin, contact_person, status)
-                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                         (name, phone, email, address, gstin, contact_person, status, created_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                         [
-                            supplier.name || 'Unknown',
-                            phone,
+                            supplier.name || supplier.supplierName || 'Unknown',
+                            cleanPhone,
                             supplier.email || '',
                             supplier.address || '',
-                            supplier.gstin || '',
-                            supplier.contactPerson || '',
+                            supplier.gstin || supplier.gst || '',
+                            supplier.contactPerson || supplier.contact_person || '',
                             supplier.status || 'active'
                         ],
                         function(err) {
@@ -466,17 +496,19 @@ async function importSuppliersArray(suppliers) {
                         }
                     );
                 });
+                console.log(`✅ Imported supplier: ${cleanPhone}`);
             }
             imported++;
         } catch (err) {
-            console.error(`❌ Error importing supplier ${supplier.phone}:`, err.message);
+            console.error(`❌ Error importing supplier:`, err.message);
+            console.error(`   Data:`, JSON.stringify(supplier).substring(0, 200));
             errors++;
         }
     }
 
+    console.log(`📊 Suppliers: ${imported} imported, ${skipped} skipped, ${errors} errors`);
     return imported;
 }
-
 // 4️⃣ IMPORT PRODUCTS ARRAY
 async function importProductsArray(products) {
     let imported = 0;
