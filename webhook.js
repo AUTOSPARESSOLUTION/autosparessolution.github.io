@@ -2769,23 +2769,39 @@ app.post('/webhook', async (req, res) => {
         console.log(`📩 From: ${from} | Type: ${type} | ID: ${messageId}`);
         
         if (!isDbReady) {
-            const progress = Math.round((importProgress / TOTAL_PRODUCTS) * 100);
-            const estimatedTime = Math.ceil((100 - progress) / 3);
-            
-            await sendWhatsAppMessage(from, 
-                `⏳ *System is Loading...*\n\n` +
-                `📊 Progress: ${progress}%\n` +
-                `⏱️ Please wait ${estimatedTime} seconds\n\n` +
-                `💡 We'll notify you when the system is ready!\n` +
-                `📞 Call: ${CONFIG.businessPhone}`
-            );
-            
-            const pendingWelcomeKey = `pending_welcome_${from}`;
-            messageCache.set(pendingWelcomeKey, true);
-            
-            markMessageProcessed(messageId);
-            return res.sendStatus(200);
-        }
+    // Get actual import progress from the database
+    let actualProgress = 0;
+    let totalProducts = 0;
+    try {
+        const stats = await db.getStats();
+        totalProducts = stats.total_products || 0;
+        // Use actual imported count vs expected total
+        const expectedTotal = 174460; // Total rows in your CSV
+        actualProgress = Math.min(100, Math.round((totalProducts / expectedTotal) * 100));
+    } catch (e) {
+        // Fallback to old calculation
+        actualProgress = Math.round((importProgress / TOTAL_PRODUCTS) * 100);
+    }
+    
+    // Calculate remaining time based on actual progress
+    const remainingPercent = Math.max(0, 100 - actualProgress);
+    const estimatedTime = Math.ceil(remainingPercent / 2); // ~0.5% per second average
+    
+    await sendWhatsAppMessage(from, 
+        `⏳ *System is Loading...*\n\n` +
+        `📊 Progress: ${actualProgress}%\n` +
+        `📦 ${totalProducts.toLocaleString()} products loaded so far\n` +
+        `⏱️ Estimated wait: ${estimatedTime} seconds\n\n` +
+        `💡 We'll notify you when the system is ready!\n` +
+        `📞 Call: ${CONFIG.businessPhone}`
+    );
+    
+    const pendingWelcomeKey = `pending_welcome_${from}`;
+    messageCache.set(pendingWelcomeKey, true);
+    
+    markMessageProcessed(messageId);
+    return res.sendStatus(200);
+}
         
         const pendingWelcomeKey = `pending_welcome_${from}`;
         const welcomeKey = `welcome_sent_${from}`;
