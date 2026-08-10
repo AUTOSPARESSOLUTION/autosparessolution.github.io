@@ -4016,7 +4016,7 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
         }
-        // ============================================================
+       // ============================================================
 // 🔧 FIX: Add ALL Missing Columns to Database
 // ============================================================
 
@@ -4026,7 +4026,7 @@ if (isAdmin(from) && msgLower === 'fix columns') {
         
         const results = [];
         
-        // All columns needed for customers table
+        // ALL columns needed for customers table
         const customerColumns = [
             { name: 'pincode', type: 'TEXT' },
             { name: 'total_spent', type: 'REAL DEFAULT 0' },
@@ -4037,7 +4037,11 @@ if (isAdmin(from) && msgLower === 'fix columns') {
             { name: 'company_name', type: 'TEXT' },
             { name: 'city', type: 'TEXT' },
             { name: 'state', type: 'TEXT' },
-            { name: 'gstin', type: 'TEXT' }
+            { name: 'gstin', type: 'TEXT' },
+            { name: 'customer_type', type: 'TEXT' },
+            { name: 'registered_at', type: 'TEXT' },
+            { name: 'updated_at', type: 'TEXT' },
+            { name: 'address', type: 'TEXT' }
         ];
         
         for (const col of customerColumns) {
@@ -4061,14 +4065,15 @@ if (isAdmin(from) && msgLower === 'fix columns') {
             }
         }
         
-        // All columns needed for suppliers table
+        // ALL columns needed for suppliers table
         const supplierColumns = [
             { name: 'city', type: 'TEXT' },
             { name: 'state', type: 'TEXT' },
             { name: 'pincode', type: 'TEXT' },
             { name: 'outstanding', type: 'REAL DEFAULT 0' },
             { name: 'credit_limit', type: 'REAL DEFAULT 0' },
-            { name: 'rating', type: 'REAL DEFAULT 0' }
+            { name: 'rating', type: 'REAL DEFAULT 0' },
+            { name: 'updated_at', type: 'TEXT' }
         ];
         
         for (const col of supplierColumns) {
