@@ -763,10 +763,19 @@ async function importPurchaseInvoicesArray(purchaseInvoices) {
 
     return imported;
 }
-// 7️⃣ IMPORT CUSTOMER PAYMENTS
+// 7️⃣ IMPORT CUSTOMER PAYMENTS - FIXED
 async function importCustomerPaymentsArray(payments) {
     let imported = 0;
     let errors = 0;
+
+    // Check if total_spent column exists
+    const columns = await new Promise((resolve) => {
+        db.db.all(`PRAGMA table_info(customers)`, [], (err, rows) => {
+            if (err) resolve([]);
+            else resolve(rows.map(r => r.name));
+        });
+    });
+    const hasTotalSpent = columns.includes('total_spent');
 
     for (const payment of payments) {
         try {
@@ -776,20 +785,39 @@ async function importCustomerPaymentsArray(payments) {
                 continue;
             }
 
-            // Use 'customers' table (not 'customer_master')
-            await new Promise((resolve, reject) => {
-                db.db.run(
-                    `UPDATE customers 
-                     SET total_spent = COALESCE(total_spent, 0) + ?,
-                         updated_at = CURRENT_TIMESTAMP
-                     WHERE phone = ?`,
-                    [payment.amount || 0, customerPhone],
-                    function(err) {
-                        if (err) reject(err);
-                        else resolve();
-                    }
-                );
-            });
+            const cleanPhone = customerPhone.toString().replace(/\D/g, '');
+            if (cleanPhone.length < 10) {
+                errors++;
+                continue;
+            }
+
+            if (hasTotalSpent) {
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `UPDATE customers 
+                         SET total_spent = COALESCE(total_spent, 0) + ?,
+                             updated_at = CURRENT_TIMESTAMP
+                         WHERE phone = ?`,
+                        [payment.amount || 0, cleanPhone],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
+            } else {
+                // Just update timestamp if total_spent doesn't exist
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `UPDATE customers SET updated_at = CURRENT_TIMESTAMP WHERE phone = ?`,
+                        [cleanPhone],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
+            }
             imported++;
         } catch (err) {
             console.error(`❌ Error importing customer payment:`, err.message);
@@ -799,7 +827,6 @@ async function importCustomerPaymentsArray(payments) {
 
     return imported;
 }
-
 // 8️⃣ IMPORT SUPPLIER PAYMENTS
 async function importSupplierPaymentsArray(payments) {
     let imported = 0;
