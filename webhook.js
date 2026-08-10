@@ -4587,6 +4587,117 @@ if (isAdmin(from) && (msgLower === 'import status' || msgLower === 'data status'
     }
 }
         // ============================================================
+// 👤 CUSTOMER DETAILS COMMAND (Admin Only)
+// ============================================================
+
+if (isAdmin(from) && msgLower.startsWith('customer details')) {
+    try {
+        const phone = cleaned.replace(/customer details/i, '').trim();
+        if (!phone) {
+            await sendWhatsAppMessage(from, '📝 Format: "Customer details 9876543210"');
+            return;
+        }
+        
+        const customer = await getCustomerByPhone(phone);
+        if (!customer) {
+            await sendWhatsAppMessage(from, `❌ No customer found with phone: ${phone}`);
+            return;
+        }
+        
+        const stats = await getCustomerStats(phone);
+        const orders = await getCustomerOrderHistory(phone, 5);
+        
+        let reply = `👤 *Customer Profile*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        reply += `👤 Name: ${customer.name || 'N/A'}\n`;
+        reply += `📞 Phone: ${customer.phone}\n`;
+        reply += `📧 Email: ${customer.email || 'N/A'}\n`;
+        reply += `🏢 Company: ${customer.company_name || 'N/A'}\n`;
+        reply += `📍 Address: ${customer.address || 'N/A'}\n`;
+        reply += `🏙️ City: ${customer.city || 'N/A'}\n`;
+        reply += `📌 Pincode: ${customer.pincode || 'N/A'}\n`;
+        reply += `📋 Type: ${customer.customer_type || 'N/A'}\n`;
+        reply += `📊 Status: ${customer.status || 'Active'}\n\n`;
+        reply += `📊 *Order Statistics*\n`;
+        reply += `📦 Total Orders: ${stats.total_orders || 0}\n`;
+        reply += `💰 Total Spent: ₹${(stats.total_spent || 0).toFixed(2)}\n`;
+        reply += `💳 Avg Order: ₹${(stats.avg_order_value || 0).toFixed(2)}\n`;
+        reply += `📅 Last Order: ${stats.last_order_date ? new Date(stats.last_order_date).toLocaleDateString() : 'Never'}\n`;
+        
+        if (orders && orders.length > 0) {
+            reply += `\n📋 *Recent Orders:*\n`;
+            orders.slice(0, 3).forEach((order, i) => {
+                reply += `${i + 1}. ${order.order_id} - ₹${(order.total_amount || 0).toFixed(2)} (${order.order_status})\n`;
+            });
+        }
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ Customer details error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// ============================================================
+// 📋 LIST CUSTOMERS COMMAND (Admin Only)
+// ============================================================
+
+if (isAdmin(from) && (msgLower === 'list customers' || msgLower === 'customers list')) {
+    try {
+        const customers = await getAllCustomers(20);
+        
+        if (customers.length === 0) {
+            await sendWhatsAppMessage(from, '📋 No customers found.');
+            return;
+        }
+        
+        let reply = `👥 *Customer List (${customers.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        customers.forEach((c, i) => {
+            reply += `${i + 1}. ${c.name || 'Unknown'} (${c.phone})\n`;
+            reply += `   📍 ${c.city || 'N/A'} | 📌 ${c.pincode || 'N/A'}\n`;
+            reply += `   📊 ${c.status || 'Active'} | 📦 ${c.total_orders || 0} orders\n\n`;
+        });
+        
+        reply += `📝 To see details: "Customer details [phone]"`;
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ List customers error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// ============================================================
+// 📋 LIST SUPPLIERS COMMAND (Admin Only)
+// ============================================================
+
+if (isAdmin(from) && (msgLower === 'list suppliers' || msgLower === 'suppliers list')) {
+    try {
+        const suppliers = await getAllSuppliers();
+        
+        if (suppliers.length === 0) {
+            await sendWhatsAppMessage(from, '📋 No suppliers found.');
+            return;
+        }
+        
+        let reply = `🏢 *Supplier List (${suppliers.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        suppliers.forEach((s, i) => {
+            reply += `${i + 1}. ${s.name || 'Unknown'} (${s.phone})\n`;
+            reply += `   📍 ${s.address || 'N/A'}\n`;
+            reply += `   📊 ${s.status || 'Active'}\n\n`;
+        });
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ List suppliers error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+        // ============================================================
         // 1️⃣ WELCOME / HELP
         // ============================================================
         if (['hi', 'hello', 'help', 'start', 'menu'].includes(msgLower)) {
