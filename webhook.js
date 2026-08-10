@@ -316,7 +316,7 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
         return { success: false, error: error.message };
     }
 }
-// 2️⃣ IMPORT CUSTOMERS ARRAY
+// 2️⃣ IMPORT CUSTOMERS ARRAY - FIXED with dynamic column handling
 async function importCustomersArray(customers) {
     let imported = 0;
     let errors = 0;
@@ -324,18 +324,29 @@ async function importCustomersArray(customers) {
 
     console.log(`📊 Processing ${customers.length} customers...`);
 
+    // Get existing columns in customers table
+    const existingColumns = await new Promise((resolve) => {
+        db.db.all(`PRAGMA table_info(customers)`, [], (err, rows) => {
+            if (err) {
+                console.error('❌ Error getting table info:', err.message);
+                resolve([]);
+            } else {
+                resolve(rows.map(r => r.name));
+            }
+        });
+    });
+    console.log(`📋 Existing columns in customers: ${existingColumns.join(', ')}`);
+
     for (const customer of customers) {
         try {
-            // Get phone from various possible field names
             const phone = customer.phone || customer.mobileNo || customer.mobile || customer.phoneNumber;
             
             if (!phone) {
-                console.log(`⚠️ Skipping customer - no phone:`, JSON.stringify(customer).substring(0, 100));
+                console.log(`⚠️ Skipping customer - no phone`);
                 skipped++;
                 continue;
             }
 
-            // Clean phone number
             const cleanPhone = phone.toString().replace(/\D/g, '');
             if (cleanPhone.length < 10) {
                 console.log(`⚠️ Skipping customer - invalid phone: ${cleanPhone}`);
@@ -343,7 +354,6 @@ async function importCustomersArray(customers) {
                 continue;
             }
 
-            // Check if customer exists in 'customers' table
             const existing = await new Promise((resolve) => {
                 db.db.get(
                     `SELECT phone FROM customers WHERE phone = ?`,
@@ -366,58 +376,98 @@ async function importCustomersArray(customers) {
             };
 
             if (existing) {
-                // Update existing
-                await new Promise((resolve, reject) => {
-                    db.db.run(
-                        `UPDATE customers SET 
-                            name = ?, email = ?, address = ?, city = ?, state = ?, 
-                            pincode = ?, gstin = ?, company_name = ?, customer_type = ?,
-                            updated_at = CURRENT_TIMESTAMP
-                         WHERE phone = ?`,
-                        [
-                            customerData.name, customerData.email, customerData.address,
-                            customerData.city, customerData.state, customerData.pincode,
-                            customerData.gstin, customerData.company_name, customerData.customer_type,
-                            cleanPhone
-                        ],
-                        function(err) {
-                            if (err) reject(err);
-                            else resolve();
-                        }
-                    );
-                });
-                console.log(`🔄 Updated customer: ${cleanPhone} - ${customerData.name}`);
+                // Update - build dynamic SET clause
+                const setFields = [];
+                const setValues = [];
+                
+                const fieldMap = {
+                    name: customerData.name,
+                    email: customerData.email,
+                    address: customerData.address,
+                    city: customerData.city,
+                    state: customerData.state,
+                    pincode: customerData.pincode,
+                    gstin: customerData.gstin,
+                    company_name: customerData.company_name,
+                    customer_type: customerData.customer_type
+                };
+
+                for (const [field, value] of Object.entries(fieldMap)) {
+                    if (existingColumns.includes(field) && value) {
+                        setFields.push(`${field} = ?`);
+                        setValues.push(value);
+                    }
+                }
+
+                if (setFields.length > 0) {
+                    setFields.push('updated_at = CURRENT_TIMESTAMP');
+                    setValues.push(cleanPhone);
+
+                    await new Promise((resolve, reject) => {
+                        db.db.run(
+                            `UPDATE customers SET ${setFields.join(', ')} WHERE phone = ?`,
+                            setValues,
+                            function(err) {
+                                if (err) reject(err);
+                                else resolve();
+                            }
+                        );
+                    });
+                    console.log(`🔄 Updated customer: ${cleanPhone}`);
+                }
             } else {
-                // Insert new
+                // Insert - build dynamic INSERT
+                const fields = ['phone', 'name', 'email', 'address'];
+                const values = [cleanPhone, customerData.name, customerData.email, customerData.address];
+
+                if (existingColumns.includes('city') && customerData.city) {
+                    fields.push('city');
+                    values.push(customerData.city);
+                }
+                if (existingColumns.includes('state') && customerData.state) {
+                    fields.push('state');
+                    values.push(customerData.state);
+                }
+                if (existingColumns.includes('pincode') && customerData.pincode) {
+                    fields.push('pincode');
+                    values.push(customerData.pincode);
+                }
+                if (existingColumns.includes('gstin') && customerData.gstin) {
+                    fields.push('gstin');
+                    values.push(customerData.gstin);
+                }
+                if (existingColumns.includes('company_name') && customerData.company_name) {
+                    fields.push('company_name');
+                    values.push(customerData.company_name);
+                }
+                if (existingColumns.includes('customer_type') && customerData.customer_type) {
+                    fields.push('customer_type');
+                    values.push(customerData.customer_type);
+                }
+                if (existingColumns.includes('registered_at')) {
+                    fields.push('registered_at');
+                    values.push('CURRENT_TIMESTAMP');
+                }
+
+                const placeholders = values.map(v => v === 'CURRENT_TIMESTAMP' ? 'CURRENT_TIMESTAMP' : '?');
+                const finalValues = values.filter(v => v !== 'CURRENT_TIMESTAMP');
+                const query = `INSERT INTO customers (${fields.join(', ')}) VALUES (${placeholders.join(', ')})`;
+
                 await new Promise((resolve, reject) => {
-                    db.db.run(
-                        `INSERT INTO customers 
-                         (phone, name, email, address, city, state, pincode, gstin, company_name, customer_type, registered_at)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-                        [
-                            cleanPhone,
-                            customerData.name,
-                            customerData.email,
-                            customerData.address,
-                            customerData.city,
-                            customerData.state,
-                            customerData.pincode,
-                            customerData.gstin,
-                            customerData.company_name,
-                            customerData.customer_type
-                        ],
-                        function(err) {
-                            if (err) reject(err);
-                            else resolve();
+                    db.db.run(query, finalValues, function(err) {
+                        if (err) {
+                            console.error(`❌ Insert error for ${cleanPhone}:`, err.message);
+                            reject(err);
+                        } else {
+                            resolve();
                         }
-                    );
+                    });
                 });
-                console.log(`✅ Imported customer: ${cleanPhone} - ${customerData.name}`);
+                console.log(`✅ Imported customer: ${cleanPhone}`);
             }
             imported++;
         } catch (err) {
             console.error(`❌ Error importing customer:`, err.message);
-            console.error(`   Data:`, JSON.stringify(customer).substring(0, 200));
             errors++;
         }
     }
