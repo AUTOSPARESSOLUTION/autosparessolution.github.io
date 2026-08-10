@@ -475,7 +475,7 @@ async function importCustomersArray(customers) {
     console.log(`📊 Customers: ${imported} imported, ${skipped} skipped, ${errors} errors`);
     return imported;
 }
-// 3️⃣ IMPORT SUPPLIERS ARRAY
+// 3️⃣ IMPORT SUPPLIERS ARRAY - FIXED
 async function importSuppliersArray(suppliers) {
     let imported = 0;
     let errors = 0;
@@ -483,9 +483,21 @@ async function importSuppliersArray(suppliers) {
 
     console.log(`📊 Processing ${suppliers.length} suppliers...`);
 
+    // Get existing columns in suppliers table
+    const existingColumns = await new Promise((resolve) => {
+        db.db.all(`PRAGMA table_info(suppliers)`, [], (err, rows) => {
+            if (err) {
+                console.error('❌ Error getting table info:', err.message);
+                resolve([]);
+            } else {
+                resolve(rows.map(r => r.name));
+            }
+        });
+    });
+    console.log(`📋 Existing columns in suppliers: ${existingColumns.join(', ')}`);
+
     for (const supplier of suppliers) {
         try {
-            // Try multiple possible phone field names
             const phone = supplier.phone || 
                          supplier.phoneNumber || 
                          supplier.mobile || 
@@ -494,7 +506,7 @@ async function importSuppliersArray(suppliers) {
                          supplier.supplierPhone;
             
             if (!phone) {
-                console.log(`⚠️ Skipping supplier - no phone:`, JSON.stringify(supplier).substring(0, 100));
+                console.log(`⚠️ Skipping supplier - no phone`);
                 skipped++;
                 continue;
             }
@@ -506,7 +518,6 @@ async function importSuppliersArray(suppliers) {
                 continue;
             }
 
-            // Check if supplier exists in 'suppliers' table
             const existing = await new Promise((resolve) => {
                 db.db.get(
                     `SELECT phone FROM suppliers WHERE phone = ?`,
@@ -515,7 +526,6 @@ async function importSuppliersArray(suppliers) {
                 );
             });
 
-            // Get supplier name from various fields
             const supplierName = supplier.name || 
                                 supplier.supplierName || 
                                 supplier.business || 
@@ -523,27 +533,39 @@ async function importSuppliersArray(suppliers) {
                                 'Unknown';
 
             if (existing) {
-                // Update existing
+                // Build dynamic UPDATE
+                const setFields = [];
+                const setValues = [];
+
+                // Always include these fields
+                setFields.push('name = ?');
+                setValues.push(supplierName);
+                setFields.push('email = ?');
+                setValues.push(supplier.email || '');
+                setFields.push('address = ?');
+                setValues.push(supplier.address || '');
+                setFields.push('gstin = ?');
+                setValues.push(supplier.gstin || supplier.gst || '');
+                setFields.push('status = ?');
+                setValues.push(supplier.status || 'active');
+
+                // Only add contact_person if column exists
+                if (existingColumns.includes('contact_person')) {
+                    setFields.push('contact_person = ?');
+                    setValues.push(supplier.contactPerson || supplier.contact_person || '');
+                }
+                if (existingColumns.includes('contact_person_phone')) {
+                    setFields.push('contact_person_phone = ?');
+                    setValues.push(supplier.contactPersonPhone || supplier.contact_person_phone || '');
+                }
+
+                setFields.push('updated_at = CURRENT_TIMESTAMP');
+                setValues.push(cleanPhone);
+
                 await new Promise((resolve, reject) => {
                     db.db.run(
-                        `UPDATE suppliers SET 
-                            name = ?, 
-                            email = ?, 
-                            address = ?, 
-                            gstin = ?, 
-                            contact_person = ?, 
-                            status = ?,
-                            updated_at = CURRENT_TIMESTAMP
-                         WHERE phone = ?`,
-                        [
-                            supplierName,
-                            supplier.email || '',
-                            supplier.address || '',
-                            supplier.gstin || supplier.gst || '',
-                            supplier.contactPerson || supplier.contact_person || '',
-                            supplier.status || 'active',
-                            cleanPhone
-                        ],
+                        `UPDATE suppliers SET ${setFields.join(', ')} WHERE phone = ?`,
+                        setValues,
                         function(err) {
                             if (err) reject(err);
                             else resolve();
@@ -552,33 +574,39 @@ async function importSuppliersArray(suppliers) {
                 });
                 console.log(`🔄 Updated supplier: ${cleanPhone}`);
             } else {
-                // Insert new
+                // Build dynamic INSERT
+                const fields = ['name', 'phone', 'email', 'address', 'gstin', 'status'];
+                const values = [supplierName, cleanPhone, supplier.email || '', supplier.address || '', supplier.gstin || supplier.gst || '', supplier.status || 'active'];
+
+                if (existingColumns.includes('contact_person') && (supplier.contactPerson || supplier.contact_person)) {
+                    fields.push('contact_person');
+                    values.push(supplier.contactPerson || supplier.contact_person || '');
+                }
+                if (existingColumns.includes('contact_person_phone') && (supplier.contactPersonPhone || supplier.contact_person_phone)) {
+                    fields.push('contact_person_phone');
+                    values.push(supplier.contactPersonPhone || supplier.contact_person_phone || '');
+                }
+
+                if (existingColumns.includes('created_at')) {
+                    fields.push('created_at');
+                    values.push('CURRENT_TIMESTAMP');
+                }
+
+                const placeholders = values.map(v => v === 'CURRENT_TIMESTAMP' ? 'CURRENT_TIMESTAMP' : '?');
+                const finalValues = values.filter(v => v !== 'CURRENT_TIMESTAMP');
+                const query = `INSERT INTO suppliers (${fields.join(', ')}) VALUES (${placeholders.join(', ')})`;
+
                 await new Promise((resolve, reject) => {
-                    db.db.run(
-                        `INSERT INTO suppliers 
-                         (name, phone, email, address, gstin, contact_person, status, created_at)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-                        [
-                            supplierName,
-                            cleanPhone,
-                            supplier.email || '',
-                            supplier.address || '',
-                            supplier.gstin || supplier.gst || '',
-                            supplier.contactPerson || supplier.contact_person || '',
-                            supplier.status || 'active'
-                        ],
-                        function(err) {
-                            if (err) reject(err);
-                            else resolve();
-                        }
-                    );
+                    db.db.run(query, finalValues, function(err) {
+                        if (err) reject(err);
+                        else resolve();
+                    });
                 });
                 console.log(`✅ Imported supplier: ${cleanPhone} - ${supplierName}`);
             }
             imported++;
         } catch (err) {
             console.error(`❌ Error importing supplier:`, err.message);
-            console.error(`   Data:`, JSON.stringify(supplier).substring(0, 200));
             errors++;
         }
     }
