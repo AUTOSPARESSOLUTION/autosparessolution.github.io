@@ -4218,16 +4218,18 @@ if (isAdmin(from) && msgLower === 'fix columns') {
             }
         }
         
-        // ALL columns needed for suppliers table
-        const supplierColumns = [
-            { name: 'city', type: 'TEXT' },
-            { name: 'state', type: 'TEXT' },
-            { name: 'pincode', type: 'TEXT' },
-            { name: 'outstanding', type: 'REAL DEFAULT 0' },
-            { name: 'credit_limit', type: 'REAL DEFAULT 0' },
-            { name: 'rating', type: 'REAL DEFAULT 0' },
-            { name: 'updated_at', type: 'TEXT' }
-        ];
+       // ALL columns needed for suppliers table
+const supplierColumns = [
+    { name: 'city', type: 'TEXT' },
+    { name: 'state', type: 'TEXT' },
+    { name: 'pincode', type: 'TEXT' },
+    { name: 'outstanding', type: 'REAL DEFAULT 0' },
+    { name: 'credit_limit', type: 'REAL DEFAULT 0' },
+    { name: 'rating', type: 'REAL DEFAULT 0' },
+    { name: 'updated_at', type: 'TEXT' },
+    { name: 'contact_person', type: 'TEXT' },
+    { name: 'contact_person_phone', type: 'TEXT' }
+];
         
         for (const col of supplierColumns) {
             try {
