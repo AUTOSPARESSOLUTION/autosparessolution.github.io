@@ -4723,7 +4723,9 @@ if (isAdmin(from) && msgLower.startsWith('customer details')) {
             return;
         }
         
+        console.log(`🔍 Looking for customer: ${phone}`);
         const customer = await getCustomerByPhone(phone);
+        
         if (!customer) {
             await sendWhatsAppMessage(from, `❌ No customer found with phone: ${phone}`);
             return;
@@ -4736,11 +4738,11 @@ if (isAdmin(from) && msgLower.startsWith('customer details')) {
         reply += `👤 Name: ${customer.name || 'N/A'}\n`;
         reply += `📞 Phone: ${customer.phone}\n`;
         reply += `📧 Email: ${customer.email || 'N/A'}\n`;
-        reply += `🏢 Company: ${customer.company_name || 'N/A'}\n`;
+        reply += `🏢 Company: ${customer.company_name || customer.business || 'N/A'}\n`;
         reply += `📍 Address: ${customer.address || 'N/A'}\n`;
-        reply += `🏙️ City: ${customer.city || 'N/A'}\n`;
+        reply += `🏙️ City: ${customer.city || customer.district || 'N/A'}\n`;
         reply += `📌 Pincode: ${customer.pincode || 'N/A'}\n`;
-        reply += `📋 Type: ${customer.customer_type || 'N/A'}\n`;
+        reply += `📋 Type: ${customer.customer_type || customer.type || 'retail'}\n`;
         reply += `📊 Status: ${customer.status || 'Active'}\n\n`;
         reply += `📊 *Order Statistics*\n`;
         reply += `📦 Total Orders: ${stats.total_orders || 0}\n`;
@@ -4751,7 +4753,7 @@ if (isAdmin(from) && msgLower.startsWith('customer details')) {
         if (orders && orders.length > 0) {
             reply += `\n📋 *Recent Orders:*\n`;
             orders.slice(0, 3).forEach((order, i) => {
-                reply += `${i + 1}. ${order.order_id} - ₹${(order.total_amount || 0).toFixed(2)} (${order.order_status})\n`;
+                reply += `${i + 1}. ${order.order_id || order.id} - ₹${(order.total_amount || order.total || 0).toFixed(2)} (${order.order_status || order.status || 'N/A'})\n`;
             });
         }
         
