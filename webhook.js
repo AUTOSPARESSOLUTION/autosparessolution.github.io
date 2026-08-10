@@ -2424,7 +2424,200 @@ async function initAllTables() {
             });
         });
         console.log('✅ supplier_payments table ready');
+        // ============================================================
+        // 📋 MISSING TABLES FOR ORDER MANAGEMENT SYSTEM
+        // ============================================================
 
+        // 1️⃣ SALES INVOICES TABLE
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS sales_invoices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    invoice_no TEXT UNIQUE NOT NULL,
+                    customer_phone TEXT NOT NULL,
+                    customer_name TEXT NOT NULL,
+                    customer_gstin TEXT,
+                    customer_address TEXT,
+                    invoice_date TEXT,
+                    due_date TEXT,
+                    subtotal REAL DEFAULT 0,
+                    cgst REAL DEFAULT 0,
+                    sgst REAL DEFAULT 0,
+                    igst REAL DEFAULT 0,
+                    round_off REAL DEFAULT 0,
+                    grand_total REAL DEFAULT 0,
+                    items TEXT NOT NULL,
+                    payment_status TEXT DEFAULT 'Pending',
+                    invoice_type TEXT DEFAULT 'credit',
+                    status TEXT DEFAULT 'Pending',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ sales_invoices table ready');
+
+        // 2️⃣ CUSTOMER PAYMENTS TABLE
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS customer_payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    receipt_no TEXT UNIQUE NOT NULL,
+                    customer_phone TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    payment_mode TEXT NOT NULL,
+                    reference TEXT,
+                    remarks TEXT,
+                    payment_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ customer_payments table ready');
+
+        // 3️⃣ CUSTOMER LEDGER TABLE
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS customer_ledger (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    customer_phone TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    ref TEXT NOT NULL,
+                    debit REAL DEFAULT 0,
+                    credit REAL DEFAULT 0,
+                    balance REAL DEFAULT 0,
+                    narration TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ customer_ledger table ready');
+
+        // 4️⃣ SUPPLIER LEDGER TABLE
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS supplier_ledger (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    supplier_phone TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    ref TEXT NOT NULL,
+                    debit REAL DEFAULT 0,
+                    credit REAL DEFAULT 0,
+                    balance REAL DEFAULT 0,
+                    narration TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ supplier_ledger table ready');
+
+        // 5️⃣ PROFORMA INVOICES TABLE
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS proforma_invoices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    proforma_no TEXT UNIQUE NOT NULL,
+                    customer_phone TEXT NOT NULL,
+                    customer_name TEXT NOT NULL,
+                    customer_gstin TEXT,
+                    customer_address TEXT,
+                    date TEXT,
+                    valid_until TEXT,
+                    items TEXT NOT NULL,
+                    subtotal REAL DEFAULT 0,
+                    cgst REAL DEFAULT 0,
+                    sgst REAL DEFAULT 0,
+                    grand_total REAL DEFAULT 0,
+                    status TEXT DEFAULT 'active',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ proforma_invoices table ready');
+
+        // 6️⃣ QUOTATIONS TABLE
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS quotations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    quotation_no TEXT UNIQUE NOT NULL,
+                    customer_phone TEXT NOT NULL,
+                    customer_name TEXT NOT NULL,
+                    customer_gstin TEXT,
+                    customer_address TEXT,
+                    date TEXT,
+                    valid_until TEXT,
+                    items TEXT NOT NULL,
+                    subtotal REAL DEFAULT 0,
+                    cgst REAL DEFAULT 0,
+                    sgst REAL DEFAULT 0,
+                    grand_total REAL DEFAULT 0,
+                    status TEXT DEFAULT 'active',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ quotations table ready');
+
+        // 7️⃣ INVENTORY TRANSACTIONS TABLE
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS inventory_transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    product_part TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    quantity INTEGER NOT NULL,
+                    date TEXT NOT NULL,
+                    ref TEXT,
+                    balance_after INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ inventory_transactions table ready');
+
+        // 8️⃣ SUPPLIER CREDIT NOTES TABLE
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS supplier_credit_notes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    credit_note_no TEXT UNIQUE NOT NULL,
+                    supplier_phone TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    reason TEXT,
+                    invoice_no TEXT,
+                    status TEXT DEFAULT 'issued',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ supplier_credit_notes table ready');
         await createIndexes();
         console.log('✅ All tables created/verified');
 
