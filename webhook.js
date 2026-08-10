@@ -581,32 +581,43 @@ async function importInvoicesArray(invoices) {
                 invoice_date: invoice.date || new Date().toISOString(),
                 due_date: invoice.dueDate || invoice.date || new Date().toISOString(),
                 subtotal: invoice.subtotal || 0,
-                tax_amount: (invoice.cgst || 0) + (invoice.sgst || 0) + (invoice.igst || 0),
-                total_amount: invoice.grandTotal || invoice.total || 0,
+                cgst: invoice.cgst || 0,
+                sgst: invoice.sgst || 0,
+                igst: invoice.igst || 0,
+                round_off: invoice.roundOff || 0,
+                grand_total: invoice.grandTotal || invoice.total || 0,
                 items: JSON.stringify(invoice.items || []),
-                payment_status: invoice.status === 'Paid' ? 'paid' : 'pending',
+                payment_status: invoice.status === 'Paid' ? 'paid' : 'Pending',
                 invoice_type: invoice.invoiceType || 'credit',
                 status: invoice.status || 'Pending'
             };
 
             if (invoiceData.customer_phone) {
+                // Use 'sales_invoices' table (not 'order_master')
                 await new Promise((resolve, reject) => {
                     db.db.run(
-                        `INSERT OR REPLACE INTO order_master 
-                         (order_id, customer_phone, customer_name, delivery_address, 
-                          items, subtotal, tax_amount, total_amount, payment_status, 
-                          order_status, created_at)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        `INSERT OR REPLACE INTO sales_invoices 
+                         (invoice_no, customer_phone, customer_name, customer_gstin, customer_address,
+                          invoice_date, due_date, subtotal, cgst, sgst, igst, round_off, grand_total,
+                          items, payment_status, invoice_type, status, created_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                         [
                             invoiceData.invoice_no,
                             invoiceData.customer_phone,
                             invoiceData.customer_name,
-                            invoiceData.customer_address || '',
-                            invoiceData.items,
+                            invoiceData.customer_gstin,
+                            invoiceData.customer_address,
+                            invoiceData.invoice_date,
+                            invoiceData.due_date,
                             invoiceData.subtotal,
-                            invoiceData.tax_amount,
-                            invoiceData.total_amount,
+                            invoiceData.cgst,
+                            invoiceData.sgst,
+                            invoiceData.igst,
+                            invoiceData.round_off,
+                            invoiceData.grand_total,
+                            invoiceData.items,
                             invoiceData.payment_status,
+                            invoiceData.invoice_type,
                             invoiceData.status,
                             invoiceData.invoice_date
                         ],
@@ -629,7 +640,6 @@ async function importInvoicesArray(invoices) {
 
     return imported;
 }
-
 // 6️⃣ IMPORT PURCHASE INVOICES ARRAY
 async function importPurchaseInvoicesArray(purchaseInvoices) {
     let imported = 0;
@@ -646,15 +656,16 @@ async function importPurchaseInvoicesArray(purchaseInvoices) {
                 continue;
             }
 
+            // Use 'suppliers' table (not 'supplier_master')
             await new Promise((resolve, reject) => {
                 db.db.run(
                     `INSERT OR REPLACE INTO purchase_invoices 
                      (invoice_no, supplier_id, supplier_name, supplier_gstin,
                       invoice_date, due_date, subtotal, gst_amount, total_amount,
-                      items, payment_status, notes)
+                      items, payment_status, notes, created_at)
                      VALUES (?, 
-                        (SELECT id FROM supplier_master WHERE phone = ?),
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        (SELECT id FROM suppliers WHERE phone = ?),
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                         invoice.invoiceNo || `PI-${Date.now().toString().slice(-6)}`,
                         supplierPhone,
@@ -667,7 +678,8 @@ async function importPurchaseInvoicesArray(purchaseInvoices) {
                         invoice.grandTotal || invoice.total || 0,
                         JSON.stringify(invoice.items || []),
                         'pending',
-                        invoice.notes || ''
+                        invoice.notes || '',
+                        invoice.date || new Date().toISOString()
                     ],
                     function(err) {
                         if (err) reject(err);
@@ -684,7 +696,6 @@ async function importPurchaseInvoicesArray(purchaseInvoices) {
 
     return imported;
 }
-
 // 7️⃣ IMPORT CUSTOMER PAYMENTS
 async function importCustomerPaymentsArray(payments) {
     let imported = 0;
@@ -692,16 +703,17 @@ async function importCustomerPaymentsArray(payments) {
 
     for (const payment of payments) {
         try {
-            const customerPhone = payment.customerEmail || '';
+            const customerPhone = payment.customerEmail || payment.customer_phone || '';
             if (!customerPhone) {
                 errors++;
                 continue;
             }
 
+            // Use 'customers' table (not 'customer_master')
             await new Promise((resolve, reject) => {
                 db.db.run(
-                    `UPDATE customer_master 
-                     SET total_spent = total_spent + ?, 
+                    `UPDATE customers 
+                     SET total_spent = COALESCE(total_spent, 0) + ?,
                          updated_at = CURRENT_TIMESTAMP
                      WHERE phone = ?`,
                     [payment.amount || 0, customerPhone],
@@ -728,15 +740,16 @@ async function importSupplierPaymentsArray(payments) {
 
     for (const payment of payments) {
         try {
-            const supplierPhone = payment.supplierEmail || '';
+            const supplierPhone = payment.supplierEmail || payment.supplier_phone || '';
             if (!supplierPhone) {
                 errors++;
                 continue;
             }
 
+            // Use 'suppliers' table (not 'supplier_master')
             await new Promise((resolve, reject) => {
                 db.db.run(
-                    `UPDATE supplier_master 
+                    `UPDATE suppliers 
                      SET outstanding = COALESCE(outstanding, 0) - ?,
                          updated_at = CURRENT_TIMESTAMP
                      WHERE phone = ?`,
@@ -756,7 +769,6 @@ async function importSupplierPaymentsArray(payments) {
 
     return imported;
 }
-
 // 9️⃣ IMPORT USERS
 async function importUsersArray(users) {
     let imported = 0;
@@ -764,14 +776,23 @@ async function importUsersArray(users) {
 
     for (const user of users) {
         try {
-            const phone = user.phone;
-            if (!phone) continue;
+            const phone = user.phone || user.mobile || user.mobileNo;
+            if (!phone) {
+                errors++;
+                continue;
+            }
+
+            const cleanPhone = phone.toString().replace(/\D/g, '');
+            if (cleanPhone.length < 10) {
+                errors++;
+                continue;
+            }
 
             // Check if user exists in 'customers' table
             const existing = await new Promise((resolve) => {
                 db.db.get(
                     `SELECT phone FROM customers WHERE phone = ?`,
-                    [phone],
+                    [cleanPhone],
                     (err, row) => resolve(row)
                 );
             });
@@ -780,14 +801,14 @@ async function importUsersArray(users) {
                 await new Promise((resolve, reject) => {
                     db.db.run(
                         `INSERT INTO customers 
-                         (phone, name, email, address, city, state, pincode, gstin, company_name, customer_type)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                         (phone, name, email, address, city, state, pincode, gstin, company_name, customer_type, registered_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                         [
-                            phone,
-                            user.name || `Customer-${phone.slice(-4)}`,
+                            cleanPhone,
+                            user.name || `Customer-${cleanPhone.slice(-4)}`,
                             user.email || '',
                             user.address || '',
-                            user.district || '',
+                            user.district || user.city || '',
                             user.state || '',
                             user.pincode || '',
                             user.gstin || '',
