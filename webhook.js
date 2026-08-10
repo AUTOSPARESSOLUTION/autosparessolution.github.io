@@ -4016,6 +4016,89 @@ async function handleWhatsAppMessage(message, from) {
                 return;
             }
         }
+        // ============================================================
+// 🔧 FIX: Add Missing Columns to Database
+// ============================================================
+
+if (isAdmin(from) && msgLower === 'fix columns') {
+    try {
+        await sendWhatsAppMessage(from, '🔄 Adding missing columns to database...');
+        
+        const results = [];
+        
+        // Add columns to customers table
+        const customerColumns = [
+            { name: 'pincode', type: 'TEXT' },
+            { name: 'total_spent', type: 'REAL DEFAULT 0' },
+            { name: 'total_orders', type: 'INTEGER DEFAULT 0' },
+            { name: 'last_order_at', type: 'TEXT' },
+            { name: 'credit_limit', type: 'REAL DEFAULT 0' },
+            { name: 'outstanding', type: 'REAL DEFAULT 0' }
+        ];
+        
+        for (const col of customerColumns) {
+            try {
+                await new Promise((resolve, reject) => {
+                    db.db.run(`ALTER TABLE customers ADD COLUMN ${col.name} ${col.type}`, (err) => {
+                        if (err && !err.message.includes('duplicate column name')) {
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+                results.push(`✅ Added customer.${col.name}`);
+            } catch (error) {
+                if (error.message.includes('duplicate column name')) {
+                    results.push(`⚠️ customer.${col.name} already exists`);
+                } else {
+                    results.push(`❌ Error adding customer.${col.name}: ${error.message}`);
+                }
+            }
+        }
+        
+        // Add columns to suppliers table
+        const supplierColumns = [
+            { name: 'city', type: 'TEXT' },
+            { name: 'state', type: 'TEXT' },
+            { name: 'pincode', type: 'TEXT' },
+            { name: 'outstanding', type: 'REAL DEFAULT 0' },
+            { name: 'credit_limit', type: 'REAL DEFAULT 0' },
+            { name: 'rating', type: 'REAL DEFAULT 0' }
+        ];
+        
+        for (const col of supplierColumns) {
+            try {
+                await new Promise((resolve, reject) => {
+                    db.db.run(`ALTER TABLE suppliers ADD COLUMN ${col.name} ${col.type}`, (err) => {
+                        if (err && !err.message.includes('duplicate column name')) {
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+                results.push(`✅ Added supplier.${col.name}`);
+            } catch (error) {
+                if (error.message.includes('duplicate column name')) {
+                    results.push(`⚠️ supplier.${col.name} already exists`);
+                } else {
+                    results.push(`❌ Error adding supplier.${col.name}: ${error.message}`);
+                }
+            }
+        }
+        
+        let reply = `🔧 *Column Fix Results*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        reply += results.join('\n');
+        reply += `\n\n✅ Column fix complete!\n📝 Run "import backup" to import data.`;
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
 // ============================================================
 // 📁 FILE WATCHER COMMANDS - ADD AFTER BRAND SUMMARY
 // ============================================================
