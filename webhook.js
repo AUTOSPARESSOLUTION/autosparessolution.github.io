@@ -426,7 +426,6 @@ async function importCustomersArray(customers) {
     return imported;
 }
 // 3️⃣ IMPORT SUPPLIERS ARRAY
-// 3️⃣ IMPORT SUPPLIERS ARRAY
 async function importSuppliersArray(suppliers) {
     let imported = 0;
     let errors = 0;
@@ -436,7 +435,13 @@ async function importSuppliersArray(suppliers) {
 
     for (const supplier of suppliers) {
         try {
-            const phone = supplier.phone || supplier.phoneNumber || supplier.mobile;
+            // Try multiple possible phone field names
+            const phone = supplier.phone || 
+                         supplier.phoneNumber || 
+                         supplier.mobile || 
+                         supplier.mobileNo ||
+                         supplier.contactPhone ||
+                         supplier.supplierPhone;
             
             if (!phone) {
                 console.log(`⚠️ Skipping supplier - no phone:`, JSON.stringify(supplier).substring(0, 100));
@@ -460,16 +465,28 @@ async function importSuppliersArray(suppliers) {
                 );
             });
 
+            // Get supplier name from various fields
+            const supplierName = supplier.name || 
+                                supplier.supplierName || 
+                                supplier.business || 
+                                supplier.companyName || 
+                                'Unknown';
+
             if (existing) {
                 // Update existing
                 await new Promise((resolve, reject) => {
                     db.db.run(
                         `UPDATE suppliers SET 
-                            name = ?, email = ?, address = ?, gstin = ?, contact_person = ?, status = ?,
+                            name = ?, 
+                            email = ?, 
+                            address = ?, 
+                            gstin = ?, 
+                            contact_person = ?, 
+                            status = ?,
                             updated_at = CURRENT_TIMESTAMP
                          WHERE phone = ?`,
                         [
-                            supplier.name || supplier.supplierName || 'Unknown',
+                            supplierName,
                             supplier.email || '',
                             supplier.address || '',
                             supplier.gstin || supplier.gst || '',
@@ -492,7 +509,7 @@ async function importSuppliersArray(suppliers) {
                          (name, phone, email, address, gstin, contact_person, status, created_at)
                          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                         [
-                            supplier.name || supplier.supplierName || 'Unknown',
+                            supplierName,
                             cleanPhone,
                             supplier.email || '',
                             supplier.address || '',
@@ -506,7 +523,7 @@ async function importSuppliersArray(suppliers) {
                         }
                     );
                 });
-                console.log(`✅ Imported supplier: ${cleanPhone}`);
+                console.log(`✅ Imported supplier: ${cleanPhone} - ${supplierName}`);
             }
             imported++;
         } catch (err) {
@@ -773,22 +790,27 @@ async function importSupplierPaymentsArray(payments) {
 async function importUsersArray(users) {
     let imported = 0;
     let errors = 0;
+    let skipped = 0;
+
+    console.log(`📊 Processing ${users.length} users...`);
 
     for (const user of users) {
         try {
             const phone = user.phone || user.mobile || user.mobileNo;
             if (!phone) {
-                errors++;
+                console.log(`⚠️ Skipping user - no phone`);
+                skipped++;
                 continue;
             }
 
             const cleanPhone = phone.toString().replace(/\D/g, '');
             if (cleanPhone.length < 10) {
-                errors++;
+                console.log(`⚠️ Skipping user - invalid phone: ${cleanPhone}`);
+                skipped++;
                 continue;
             }
 
-            // Check if user exists in 'customers' table
+            // Check if user already exists in customers table
             const existing = await new Promise((resolve) => {
                 db.db.get(
                     `SELECT phone FROM customers WHERE phone = ?`,
@@ -797,23 +819,42 @@ async function importUsersArray(users) {
                 );
             });
 
-            if (!existing && (user.role === 'customer' || user.role === undefined)) {
+            if (existing) {
+                console.log(`ℹ️ User ${cleanPhone} already exists in customers`);
+                continue;
+            }
+
+            // Only import if role is customer or undefined
+            if (user.role === 'customer' || user.role === undefined) {
+                const userData = {
+                    phone: cleanPhone,
+                    name: user.name || `Customer-${cleanPhone.slice(-4)}`,
+                    email: user.email || '',
+                    address: user.address || '',
+                    city: user.district || user.city || '',
+                    state: user.state || '',
+                    pincode: user.pincode || '',
+                    gstin: user.gstin || '',
+                    company_name: user.business || '',
+                    customer_type: user.role || 'retail'
+                };
+
                 await new Promise((resolve, reject) => {
                     db.db.run(
                         `INSERT INTO customers 
                          (phone, name, email, address, city, state, pincode, gstin, company_name, customer_type, registered_at)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
                         [
-                            cleanPhone,
-                            user.name || `Customer-${cleanPhone.slice(-4)}`,
-                            user.email || '',
-                            user.address || '',
-                            user.district || user.city || '',
-                            user.state || '',
-                            user.pincode || '',
-                            user.gstin || '',
-                            user.business || '',
-                            user.role || 'retail'
+                            userData.phone,
+                            userData.name,
+                            userData.email,
+                            userData.address,
+                            userData.city,
+                            userData.state,
+                            userData.pincode,
+                            userData.gstin,
+                            userData.company_name,
+                            userData.customer_type
                         ],
                         function(err) {
                             if (err) reject(err);
@@ -822,6 +863,9 @@ async function importUsersArray(users) {
                     );
                 });
                 imported++;
+                console.log(`✅ Imported user: ${cleanPhone} - ${userData.name}`);
+            } else {
+                console.log(`ℹ️ Skipping user ${cleanPhone} - role is "${user.role}"`);
             }
         } catch (err) {
             console.error(`❌ Error importing user ${user.phone}:`, err.message);
@@ -829,6 +873,7 @@ async function importUsersArray(users) {
         }
     }
 
+    console.log(`📊 Users: ${imported} imported, ${skipped} skipped, ${errors} errors`);
     return imported;
 }
 const app = express();
