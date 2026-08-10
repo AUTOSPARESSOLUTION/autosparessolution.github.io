@@ -1012,6 +1012,82 @@ async function importUsersArray(users) {
     console.log(`📊 Users: ${imported} imported, ${skipped} skipped, ${errors} errors`);
     return imported;
 }
+// ============================================================
+// 👤 CUSTOMER HELPER FUNCTIONS
+// ============================================================
+
+async function getCustomerByPhone(phone) {
+    return new Promise((resolve, reject) => {
+        db.db.get(
+            `SELECT * FROM customers WHERE phone = ?`,
+            [phone],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            }
+        );
+    });
+}
+
+async function getAllCustomers(limit = 100) {
+    return new Promise((resolve, reject) => {
+        db.db.all(
+            `SELECT * FROM customers ORDER BY name LIMIT ?`,
+            [limit],
+            (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            }
+        );
+    });
+}
+
+async function getAllSuppliers() {
+    return new Promise((resolve, reject) => {
+        db.db.all(
+            `SELECT * FROM suppliers ORDER BY name`,
+            [],
+            (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            }
+        );
+    });
+}
+
+async function getCustomerStats(phone) {
+    return new Promise((resolve, reject) => {
+        db.db.get(
+            `SELECT 
+                COUNT(*) as total_orders,
+                SUM(total_amount) as total_spent,
+                MAX(created_at) as last_order_date,
+                AVG(total_amount) as avg_order_value
+             FROM order_master 
+             WHERE customer_phone = ? AND order_status != 'cancelled'`,
+            [phone],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row || { total_orders: 0, total_spent: 0 });
+            }
+        );
+    });
+}
+
+async function getCustomerOrderHistory(phone, limit = 5) {
+    return new Promise((resolve, reject) => {
+        db.db.all(
+            `SELECT * FROM order_master 
+             WHERE customer_phone = ? 
+             ORDER BY created_at DESC LIMIT ?`,
+            [phone, limit],
+            (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            }
+        );
+    });
+}
 const app = express();
 const PORT = process.env.PORT || 10000;
 // ============================================================
