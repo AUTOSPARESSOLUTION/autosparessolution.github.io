@@ -292,7 +292,7 @@ class DynamicBrandCollage {
             'VF': 'brand-vf.png',
             'WABCO': 'brand-wabco.png',
             'GREAVES': 'brand-greaves.png',
-            'LEYPARTS': 'brand-leyparts.png'
+            'LEYPARTS': 'brand-leyparts.png',
             'MGP': 'brand-mgp.png'
         };
         
