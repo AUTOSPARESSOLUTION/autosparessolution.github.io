@@ -81,7 +81,8 @@ getDefaultBrands() {
         { id: 'vf', name: 'VF', active: true },
         { id: 'wabco', name: 'WABCO', active: true },
         { id: 'leyparts', name: 'LEYPARTS', active: true },
-        { id: 'greaves', name: 'GREAVES', active: true }
+        { id: 'greaves', name: 'GREAVES', active: true },
+        { id: 'mgp', name: 'MGP', active: true }
     ];
 }
 
