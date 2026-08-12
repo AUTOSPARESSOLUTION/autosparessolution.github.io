@@ -90,6 +90,13 @@
             "logo": "https://autosparessolution.github.io/images/brand-greaves.png",
             "active": true,
             "priority": 13
+        },
+        {
+            "id": "mgp",
+            "name": "MGP",
+            "logo": "https://autosparessolution.github.io/images/brand-mgp.png",
+            "active": true,
+            "priority": 14
         }
     ],
     "lastUpdated": "2024-01-15T10:30:00.000Z"
