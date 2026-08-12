@@ -69,7 +69,8 @@ class DynamicBrandCollage {
             { name: 'WABCO', file: 'brand-wabco.png' },
             { name: 'GREAVES', file: 'brand-greaves.png' },
             { name: 'MGP', file: 'brand-mgp.png' },
-            { name: 'LEYPARTS', file: 'brand-leyparts.png' }
+            { name: 'LEYPARTS', file: 'brand-leyparts.png' },
+            { name: 'TATA', file: 'brand-tata.png' }
         ];
         
         console.log('📥 Preloading brand logos...');
@@ -293,7 +294,8 @@ class DynamicBrandCollage {
             'WABCO': 'brand-wabco.png',
             'GREAVES': 'brand-greaves.png',
             'LEYPARTS': 'brand-leyparts.png',
-            'MGP': 'brand-mgp.png'
+            'MGP': 'brand-mgp.png',
+            'TATA': 'brand-tata.png'
         };
         
         const DEFAULT_LOGO = 'default.png';
@@ -314,7 +316,8 @@ class DynamicBrandCollage {
             'WABCO': 'Air Brakes • ABS',
             'GREAVES': 'Engine • Transmission',
             'LEYPARTS': 'Leyland Spares',
-            'MGP': 'Maruti Spares'
+            'MGP': 'Maruti Spares',
+            'TATA': 'Telco Pcv Spares'
         };
 
         const colors = [
@@ -512,7 +515,8 @@ class DynamicBrandCollage {
             { id: 'wabco', name: 'WABCO', active: true },
             { id: 'greaves', name: 'GREAVES', active: true },
             { id: 'mgp', name: 'MGP', active: true },
-            { id: 'leyparts', name: 'LEYPARTS', active: true }
+            { id: 'leyparts', name: 'LEYPARTS', active: true },
+            { id: 'tata', name: 'TATA', active: true }
         ];
     }
 
