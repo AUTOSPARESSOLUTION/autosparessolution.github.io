@@ -313,7 +313,7 @@ class DynamicBrandCollage {
             'VF': 'Mahindra Value Fit',
             'WABCO': 'Air Brakes • ABS',
             'GREAVES': 'Engine • Transmission',
-            'LEYPARTS': 'Leyland Spares'
+            'LEYPARTS': 'Leyland Spares',
             'MGP': 'Maruti Spares'
         };
 
