@@ -97,6 +97,13 @@
             "logo": "https://autosparessolution.github.io/images/brand-mgp.png",
             "active": true,
             "priority": 14
+        },
+        {
+            "id": "tata",
+            "name": "TATA",
+            "logo": "https://autosparessolution.github.io/images/brand-tata.png",
+            "active": true,
+            "priority": 15
         }
     ],
     "lastUpdated": "2024-01-15T10:30:00.000Z"
