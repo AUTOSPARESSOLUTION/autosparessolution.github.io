@@ -70,7 +70,8 @@ class DynamicBrandCollage {
             { name: 'GREAVES', file: 'brand-greaves.png' },
             { name: 'MGP', file: 'brand-mgp.png' },
             { name: 'LEYPARTS', file: 'brand-leyparts.png' },
-            { name: 'TATA', file: 'brand-tata.png' }
+            { name: 'TATA', file: 'brand-tata.png' },
+            { name: 'BAJAJ', file: 'brand-bajaj.png' }
         ];
         
         console.log('📥 Preloading brand logos...');
@@ -295,7 +296,8 @@ class DynamicBrandCollage {
             'GREAVES': 'brand-greaves.png',
             'LEYPARTS': 'brand-leyparts.png',
             'MGP': 'brand-mgp.png',
-            'TATA': 'brand-tata.png'
+            'TATA': 'brand-tata.png',
+            'BAJAJ': 'brand-bajaj.png'
         };
         
         const DEFAULT_LOGO = 'default.png';
@@ -317,7 +319,8 @@ class DynamicBrandCollage {
             'GREAVES': 'Engine • Transmission',
             'LEYPARTS': 'Leyland Spares',
             'MGP': 'Maruti Spares',
-            'TATA': 'Telco Pcv Spares'
+            'TATA': 'Telco Pcv Spares',
+            'BAJAJ': 'Bajaj 2w 3w Spares'
         };
 
         const colors = [
@@ -516,7 +519,8 @@ class DynamicBrandCollage {
             { id: 'greaves', name: 'GREAVES', active: true },
             { id: 'mgp', name: 'MGP', active: true },
             { id: 'leyparts', name: 'LEYPARTS', active: true },
-            { id: 'tata', name: 'TATA', active: true }
+            { id: 'tata', name: 'TATA', active: true },
+             { id: 'bajaj', name: 'BAJAJ', active: true }
         ];
     }
 
