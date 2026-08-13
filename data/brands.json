@@ -104,6 +104,13 @@
             "logo": "https://autosparessolution.github.io/images/brand-tata.png",
             "active": true,
             "priority": 15
+        },
+         {
+            "id": "bajaj",
+            "name": "BAJAJ",
+            "logo": "https://autosparessolution.github.io/images/brand-bajaj.png",
+            "active": true,
+            "priority": 16
         }
     ],
     "lastUpdated": "2024-01-15T10:30:00.000Z"
