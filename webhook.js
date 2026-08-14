@@ -4604,24 +4604,50 @@ if (isAdmin(from) && msgLower === 'export all') {
         
         const exports = {};
         
-        // Export Customers
-        const customers = await getAllCustomers(10000);
+        // Export Customers from 'customers' table
+        const customers = await new Promise((resolve) => {
+            db.db.all(`SELECT * FROM customers`, [], (err, rows) => {
+                if (err) {
+                    console.error('❌ Export customers error:', err.message);
+                    resolve([]);
+                } else {
+                    resolve(rows || []);
+                }
+            });
+        });
         exports.customers = customers;
         fs.writeFileSync(JSON_STORAGE.customers, JSON.stringify(customers, null, 2));
+        console.log(`👤 Exported ${customers.length} customers`);
         
-        // Export Suppliers
+        // Export Suppliers from 'suppliers' table
         const suppliers = await new Promise((resolve) => {
-            db.db.all(`SELECT * FROM supplier_master`, [], (err, rows) => resolve(rows));
+            db.db.all(`SELECT * FROM suppliers`, [], (err, rows) => {
+                if (err) {
+                    console.error('❌ Export suppliers error:', err.message);
+                    resolve([]);
+                } else {
+                    resolve(rows || []);
+                }
+            });
         });
         exports.suppliers = suppliers;
         fs.writeFileSync(JSON_STORAGE.suppliers, JSON.stringify(suppliers, null, 2));
+        console.log(`🏢 Exported ${suppliers.length} suppliers`);
         
         // Export Products
         const products = await new Promise((resolve) => {
-            db.db.all(`SELECT * FROM products`, [], (err, rows) => resolve(rows));
+            db.db.all(`SELECT * FROM products`, [], (err, rows) => {
+                if (err) {
+                    console.error('❌ Export products error:', err.message);
+                    resolve([]);
+                } else {
+                    resolve(rows || []);
+                }
+            });
         });
         exports.products = products;
         fs.writeFileSync(JSON_STORAGE.products, JSON.stringify(products, null, 2));
+        console.log(`📦 Exported ${products.length} products`);
         
         await sendWhatsAppMessage(from,
             `✅ *Data Exported!*\n\n` +
@@ -4633,11 +4659,11 @@ if (isAdmin(from) && msgLower === 'export all') {
         );
         return;
     } catch (error) {
+        console.error('❌ Export error:', error.message);
         await sendWhatsAppMessage(from, `❌ Export failed: ${error.message}`);
         return;
     }
 }
-
 // 6️⃣ CHECK IMPORT STATUS
 if (isAdmin(from) && (msgLower === 'import status' || msgLower === 'data status')) {
     try {
