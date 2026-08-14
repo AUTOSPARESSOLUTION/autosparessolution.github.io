@@ -4960,6 +4960,268 @@ if (isAdmin(from) && (msgLower === 'list suppliers' || msgLower === 'suppliers l
     }
 }
         // ============================================================
+// 📋 LIST CUSTOMER PAYMENTS COMMAND (Admin Only)
+// ============================================================
+
+if (isAdmin(from) && (msgLower === 'customer payments' || msgLower === 'payments list')) {
+    try {
+        const payments = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT * FROM customer_payments ORDER BY payment_date DESC LIMIT 20`,
+                [],
+                (err, rows) => {
+                    if (err) {
+                        console.error('❌ Error fetching payments:', err.message);
+                        resolve([]);
+                    } else {
+                        resolve(rows || []);
+                    }
+                }
+            );
+        });
+        
+        if (payments.length === 0) {
+            await sendWhatsAppMessage(from, '📋 No customer payments found.');
+            return;
+        }
+        
+        let reply = `💰 *Customer Payments (${payments.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        payments.forEach((p, i) => {
+            reply += `${i + 1}. ₹${(p.amount || 0).toFixed(2)} - ${p.customer_phone || 'N/A'}\n`;
+            reply += `   📋 ${p.receipt_no || 'N/A'}\n`;
+            reply += `   💳 ${p.payment_mode || 'Cash'}\n`;
+            reply += `   🕐 ${p.payment_date ? new Date(p.payment_date).toLocaleDateString() : 'N/A'}\n\n`;
+        });
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ Customer payments error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// ============================================================
+// 📋 LIST SUPPLIER PAYMENTS COMMAND (Admin Only)
+// ============================================================
+
+if (isAdmin(from) && (msgLower === 'supplier payments' || msgLower === 'payments to suppliers')) {
+    try {
+        const payments = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT * FROM supplier_payments ORDER BY payment_date DESC LIMIT 20`,
+                [],
+                (err, rows) => {
+                    if (err) {
+                        console.error('❌ Error fetching supplier payments:', err.message);
+                        resolve([]);
+                    } else {
+                        resolve(rows || []);
+                    }
+                }
+            );
+        });
+        
+        if (payments.length === 0) {
+            await sendWhatsAppMessage(from, '📋 No supplier payments found.');
+            return;
+        }
+        
+        let reply = `💰 *Supplier Payments (${payments.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        payments.forEach((p, i) => {
+            reply += `${i + 1}. ₹${(p.amount || 0).toFixed(2)} - ${p.supplier_name || 'N/A'}\n`;
+            reply += `   📋 ${p.payment_id || 'N/A'}\n`;
+            reply += `   📝 ${p.payment_reference || 'N/A'}\n`;
+            reply += `   🕐 ${p.payment_date ? new Date(p.payment_date).toLocaleDateString() : 'N/A'}\n\n`;
+        });
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ Supplier payments error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// ============================================================
+// 📋 LIST INVOICES COMMAND (Admin Only)
+// ============================================================
+
+if (isAdmin(from) && (msgLower === 'list invoices' || msgLower === 'invoices list')) {
+    try {
+        const invoices = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT * FROM sales_invoices ORDER BY invoice_date DESC LIMIT 20`,
+                [],
+                (err, rows) => {
+                    if (err) {
+                        console.error('❌ Error fetching invoices:', err.message);
+                        resolve([]);
+                    } else {
+                        resolve(rows || []);
+                    }
+                }
+            );
+        });
+        
+        if (invoices.length === 0) {
+            await sendWhatsAppMessage(from, '📋 No invoices found.');
+            return;
+        }
+        
+        let reply = `📄 *Invoices (${invoices.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        invoices.forEach((inv, i) => {
+            reply += `${i + 1}. ${inv.invoice_no || 'N/A'}\n`;
+            reply += `   👤 ${inv.customer_name || 'N/A'}\n`;
+            reply += `   💰 ₹${(inv.grand_total || 0).toFixed(2)}\n`;
+            reply += `   📊 ${inv.status || 'Pending'}\n`;
+            reply += `   🕐 ${inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : 'N/A'}\n\n`;
+        });
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ List invoices error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// ============================================================
+// 📋 LIST PURCHASE INVOICES COMMAND (Admin Only)
+// ============================================================
+
+if (isAdmin(from) && (msgLower === 'purchase invoices' || msgLower === 'list purchase invoices')) {
+    try {
+        const invoices = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT * FROM purchase_invoices ORDER BY invoice_date DESC LIMIT 20`,
+                [],
+                (err, rows) => {
+                    if (err) {
+                        console.error('❌ Error fetching purchase invoices:', err.message);
+                        resolve([]);
+                    } else {
+                        resolve(rows || []);
+                    }
+                }
+            );
+        });
+        
+        if (invoices.length === 0) {
+            await sendWhatsAppMessage(from, '📋 No purchase invoices found.');
+            return;
+        }
+        
+        let reply = `📥 *Purchase Invoices (${invoices.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        invoices.forEach((inv, i) => {
+            reply += `${i + 1}. ${inv.invoice_no || 'N/A'}\n`;
+            reply += `   🏢 ${inv.supplier_name || 'N/A'}\n`;
+            reply += `   💰 ₹${(inv.total_amount || 0).toFixed(2)}\n`;
+            reply += `   📊 ${inv.payment_status || 'Pending'}\n`;
+            reply += `   🕐 ${inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : 'N/A'}\n\n`;
+        });
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ List purchase invoices error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// ============================================================
+// 📋 LIST DELETED INVOICES COMMAND (Admin Only)
+// ============================================================
+
+if (isAdmin(from) && (msgLower === 'deleted invoices' || msgLower === 'list deleted invoices')) {
+    try {
+        const deleted = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT * FROM deleted_invoice_numbers ORDER BY deleted_at DESC LIMIT 20`,
+                [],
+                (err, rows) => {
+                    if (err) {
+                        console.error('❌ Error fetching deleted invoices:', err.message);
+                        resolve([]);
+                    } else {
+                        resolve(rows || []);
+                    }
+                }
+            );
+        });
+        
+        if (deleted.length === 0) {
+            await sendWhatsAppMessage(from, '📋 No deleted invoices found.');
+            return;
+        }
+        
+        let reply = `🗑️ *Deleted Invoices (${deleted.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        deleted.forEach((d, i) => {
+            reply += `${i + 1}. ${d.invoice_type || 'N/A'} - ${d.invoice_number || 'N/A'}\n`;
+            reply += `   📅 ${d.fin_year || 'N/A'}\n`;
+            reply += `   🕐 ${d.deleted_at ? new Date(d.deleted_at).toLocaleDateString() : 'N/A'}\n\n`;
+        });
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ List deleted invoices error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// ============================================================
+// 📋 LIST USER PAYMENTS COMMAND (Admin Only)
+// ============================================================
+
+if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summary')) {
+    try {
+        // Get customer payments
+        const customerPayments = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT COUNT(*) as count, SUM(amount) as total FROM customer_payments`,
+                [],
+                (err, rows) => resolve(rows[0] || { count: 0, total: 0 })
+            );
+        });
+        
+        // Get supplier payments
+        const supplierPayments = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT COUNT(*) as count, SUM(amount) as total FROM supplier_payments`,
+                [],
+                (err, rows) => resolve(rows[0] || { count: 0, total: 0 })
+            );
+        });
+        
+        let reply = `💰 *Payments Summary*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        reply += `👤 *Customer Payments*\n`;
+        reply += `   📦 Count: ${customerPayments.count || 0}\n`;
+        reply += `   💰 Total: ₹${(customerPayments.total || 0).toFixed(2)}\n\n`;
+        reply += `🏢 *Supplier Payments*\n`;
+        reply += `   📦 Count: ${supplierPayments.count || 0}\n`;
+        reply += `   💰 Total: ₹${(supplierPayments.total || 0).toFixed(2)}\n\n`;
+        reply += `📝 Commands:\n`;
+        reply += `   "customer payments" - View customer payments\n`;
+        reply += `   "supplier payments" - View supplier payments\n`;
+        reply += `   "list invoices" - View sales invoices\n`;
+        reply += `   "purchase invoices" - View purchase invoices\n`;
+        reply += `   "deleted invoices" - View deleted invoices`;
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ Payments summary error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+        // ============================================================
         // 1️⃣ WELCOME / HELP
         // ============================================================
         if (['hi', 'hello', 'help', 'start', 'menu'].includes(msgLower)) {
