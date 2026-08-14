@@ -791,12 +791,35 @@ async function importPurchaseInvoicesArray(purchaseInvoices) {
 
     return imported;
 }
-// 7️⃣ IMPORT CUSTOMER PAYMENTS - FIXED
+// 7️⃣ IMPORT CUSTOMER PAYMENTS - FIXED FOR JSON STRUCTURE
 async function importCustomerPaymentsArray(payments) {
     let imported = 0;
     let errors = 0;
 
-    // Check if total_spent column exists
+    console.log(`💰 Importing ${payments.length} customer payments...`);
+
+    // Ensure customer_payments table exists
+    await new Promise((resolve) => {
+        db.db.run(`
+            CREATE TABLE IF NOT EXISTS customer_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                receipt_no TEXT UNIQUE NOT NULL,
+                customer_phone TEXT NOT NULL,
+                customer_email TEXT,
+                amount REAL NOT NULL,
+                payment_mode TEXT NOT NULL,
+                reference TEXT,
+                remarks TEXT,
+                payment_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `, (err) => {
+            if (err) console.error('❌ Error creating customer_payments table:', err.message);
+            resolve();
+        });
+    });
+
+    // Check customer table columns
     const columns = await new Promise((resolve) => {
         db.db.all(`PRAGMA table_info(customers)`, [], (err, rows) => {
             if (err) resolve([]);
@@ -804,21 +827,80 @@ async function importCustomerPaymentsArray(payments) {
         });
     });
     const hasTotalSpent = columns.includes('total_spent');
+    const hasTotalPurchased = columns.includes('total_purchased');
+    const hasOutstanding = columns.includes('outstanding');
 
     for (const payment of payments) {
         try {
-            const customerPhone = payment.customerEmail || payment.customer_phone || '';
-            if (!customerPhone) {
+            // Match JSON structure: customerEmail, amount, mode, reference, remarks, receiptNo, date
+            const customerEmail = payment.customerEmail || '';
+            const amount = payment.amount || 0;
+            const mode = payment.mode || payment.payment_mode || 'Cash';
+            const reference = payment.reference || payment.ref || '';
+            const remarks = payment.remarks || payment.note || '';
+            const receiptNo = payment.receiptNo || payment.receipt_no || `PR-${Date.now().toString().slice(-6)}`;
+            const paymentDate = payment.date || payment.payment_date || new Date().toISOString();
+
+            if (!customerEmail) {
+                console.warn(`⚠️ Skipping payment - no customer email/phone`);
                 errors++;
                 continue;
+            }
+
+            // Try to find customer by email first, then by phone
+            let customerPhone = customerEmail;
+            
+            // If customerEmail looks like a phone number, use it directly
+            if (customerEmail.match(/^\d+$/)) {
+                customerPhone = customerEmail;
+            } else {
+                // Try to find customer by email
+                const customerByEmail = await new Promise((resolve) => {
+                    db.db.get(
+                        `SELECT phone FROM customers WHERE email = ?`,
+                        [customerEmail],
+                        (err, row) => resolve(row)
+                    );
+                });
+                
+                if (customerByEmail) {
+                    customerPhone = customerByEmail.phone;
+                } else {
+                    // If not found by email, try to find by phone number in email (e.g., sahuja57332@gmail.com -> 57332)
+                    const phoneMatch = customerEmail.match(/(\d{10})/);
+                    if (phoneMatch) {
+                        customerPhone = phoneMatch[1];
+                    } else {
+                        console.warn(`⚠️ Could not find customer for: ${customerEmail}`);
+                        errors++;
+                        continue;
+                    }
+                }
             }
 
             const cleanPhone = customerPhone.toString().replace(/\D/g, '');
             if (cleanPhone.length < 10) {
+                console.warn(`⚠️ Invalid phone: ${cleanPhone}`);
                 errors++;
                 continue;
             }
 
+            // Check if customer exists
+            const customerExists = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT phone FROM customers WHERE phone = ?`,
+                    [cleanPhone],
+                    (err, row) => resolve(row)
+                );
+            });
+
+            if (!customerExists) {
+                console.warn(`⚠️ Customer not found: ${cleanPhone}, skipping payment`);
+                errors++;
+                continue;
+            }
+
+            // Update customer total spent/purchased
             if (hasTotalSpent) {
                 await new Promise((resolve, reject) => {
                     db.db.run(
@@ -826,19 +908,21 @@ async function importCustomerPaymentsArray(payments) {
                          SET total_spent = COALESCE(total_spent, 0) + ?,
                              updated_at = CURRENT_TIMESTAMP
                          WHERE phone = ?`,
-                        [payment.amount || 0, cleanPhone],
+                        [amount, cleanPhone],
                         function(err) {
                             if (err) reject(err);
                             else resolve();
                         }
                     );
                 });
-            } else {
-                // Just update timestamp if total_spent doesn't exist
+            } else if (hasTotalPurchased) {
                 await new Promise((resolve, reject) => {
                     db.db.run(
-                        `UPDATE customers SET updated_at = CURRENT_TIMESTAMP WHERE phone = ?`,
-                        [cleanPhone],
+                        `UPDATE customers 
+                         SET total_purchased = COALESCE(total_purchased, 0) + ?,
+                             updated_at = CURRENT_TIMESTAMP
+                         WHERE phone = ?`,
+                        [amount, cleanPhone],
                         function(err) {
                             if (err) reject(err);
                             else resolve();
@@ -846,13 +930,60 @@ async function importCustomerPaymentsArray(payments) {
                     );
                 });
             }
+
+            // Update outstanding if exists
+            if (hasOutstanding) {
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `UPDATE customers 
+                         SET outstanding = COALESCE(outstanding, 0) - ?,
+                             updated_at = CURRENT_TIMESTAMP
+                         WHERE phone = ?`,
+                        [amount, cleanPhone],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
+            }
+
+            // Insert into customer_payments table
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `INSERT OR REPLACE INTO customer_payments 
+                     (receipt_no, customer_phone, customer_email, amount, payment_mode, reference, remarks, payment_date, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                    [
+                        receiptNo,
+                        cleanPhone,
+                        customerEmail,
+                        amount,
+                        mode,
+                        reference,
+                        remarks,
+                        paymentDate
+                    ],
+                    function(err) {
+                        if (err) {
+                            console.error(`❌ Insert error:`, err.message);
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    }
+                );
+            });
+
             imported++;
+            console.log(`✅ Imported payment: ${receiptNo} - ₹${amount} for ${cleanPhone}`);
         } catch (err) {
             console.error(`❌ Error importing customer payment:`, err.message);
             errors++;
         }
     }
 
+    console.log(`📊 Customer Payments: ${imported} imported, ${errors} errors`);
     return imported;
 }
 // 8️⃣ IMPORT SUPPLIER PAYMENTS
