@@ -319,6 +319,7 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
 // 2️⃣ IMPORT CUSTOMERS ARRAY - FIXED with dynamic column handling
 
 // 2️⃣ IMPORT CUSTOMERS ARRAY - ENHANCED FOR JSON STRUCTURE
+// 2️⃣ IMPORT CUSTOMERS ARRAY - FIXED to match actual table structure
 async function importCustomersArray(customers) {
     let imported = 0;
     let errors = 0;
@@ -341,7 +342,7 @@ async function importCustomersArray(customers) {
 
     for (const customer of customers) {
         try {
-            // Try multiple possible phone field names from JSON
+            // Try multiple possible phone field names
             const phone = customer.phone || 
                          customer.mobileNo || 
                          customer.mobile || 
@@ -370,7 +371,7 @@ async function importCustomersArray(customers) {
                 );
             });
 
-            // Map JSON fields to database fields
+            // Map JSON fields to database fields - MATCH ACTUAL TABLE STRUCTURE
             const customerData = {
                 phone: cleanPhone,
                 name: customer.name || customer.customerName || `Customer-${cleanPhone.slice(-4)}`,
@@ -378,39 +379,38 @@ async function importCustomersArray(customers) {
                 address: customer.address || '',
                 city: customer.district || customer.city || '',
                 state: customer.state || '',
-                pincode: customer.pincode || customer.pinCode || '',
                 gstin: customer.gstin || customer.gst || '',
-                company_name: customer.business || customer.company || customer.companyName || '',
+                // Use the actual column names from your table
+                business: customer.business || customer.company || customer.companyName || '',
                 customer_type: customer.customer_type || customer.type || customer.role || 'retail',
                 credit_limit: customer.creditLimit || customer.credit_limit || 0,
                 customer_code: customer.customerCode || customer.customer_code || '',
                 status: customer.status || 'active',
-                total_purchased: customer.totalPurchased || customer.total_purchased || customer.total_spent || 0,
+                total_purchases: customer.totalPurchased || customer.total_purchased || customer.total_spent || 0,
+                // These might not exist in your table - check carefully
                 outstanding: customer.outstanding || 0,
                 total_orders: customer.totalOrders || customer.total_orders || 0
             };
 
             if (existing) {
-                // Update - build dynamic SET clause
+                // Build dynamic UPDATE - ONLY use columns that exist
                 const setFields = [];
                 const setValues = [];
                 
+                // Only include fields that actually exist in the table
                 const fieldMap = {
                     name: customerData.name,
                     email: customerData.email,
                     address: customerData.address,
                     city: customerData.city,
                     state: customerData.state,
-                    pincode: customerData.pincode,
                     gstin: customerData.gstin,
-                    company_name: customerData.company_name,
+                    business: customerData.business,  // Note: 'business' not 'company_name'
                     customer_type: customerData.customer_type,
                     credit_limit: customerData.credit_limit,
                     customer_code: customerData.customer_code,
                     status: customerData.status,
-                    total_purchased: customerData.total_purchased,
-                    outstanding: customerData.outstanding,
-                    total_orders: customerData.total_orders
+                    total_purchases: customerData.total_purchases  // Note: 'total_purchases' not 'total_purchased'
                 };
 
                 for (const [field, value] of Object.entries(fieldMap)) {
@@ -437,24 +437,21 @@ async function importCustomersArray(customers) {
                     console.log(`🔄 Updated customer: ${cleanPhone} - ${customerData.name}`);
                 }
             } else {
-                // Insert - build dynamic INSERT
-                const fields = ['phone', 'name', 'email', 'address', 'registered_at'];
-                const values = [cleanPhone, customerData.name, customerData.email, customerData.address, 'CURRENT_TIMESTAMP'];
+                // Build dynamic INSERT - ONLY columns that exist
+                const fields = ['phone', 'name', 'email', 'address'];
+                const values = [cleanPhone, customerData.name, customerData.email, customerData.address];
 
                 // Add optional fields if they exist and have values
                 const optionalFields = [
                     { field: 'city', value: customerData.city },
                     { field: 'state', value: customerData.state },
-                    { field: 'pincode', value: customerData.pincode },
                     { field: 'gstin', value: customerData.gstin },
-                    { field: 'company_name', value: customerData.company_name },
+                    { field: 'business', value: customerData.business },
                     { field: 'customer_type', value: customerData.customer_type || 'retail' },
                     { field: 'credit_limit', value: customerData.credit_limit },
                     { field: 'customer_code', value: customerData.customer_code },
                     { field: 'status', value: customerData.status || 'active' },
-                    { field: 'total_purchased', value: customerData.total_purchased },
-                    { field: 'outstanding', value: customerData.outstanding },
-                    { field: 'total_orders', value: customerData.total_orders }
+                    { field: 'total_purchases', value: customerData.total_purchases }
                 ];
 
                 for (const opt of optionalFields) {
@@ -462,6 +459,12 @@ async function importCustomersArray(customers) {
                         fields.push(opt.field);
                         values.push(opt.value);
                     }
+                }
+
+                // Add created_at if it exists
+                if (existingColumns.includes('created_at')) {
+                    fields.push('created_at');
+                    values.push('CURRENT_TIMESTAMP');
                 }
 
                 const placeholders = values.map(v => v === 'CURRENT_TIMESTAMP' ? 'CURRENT_TIMESTAMP' : '?');
