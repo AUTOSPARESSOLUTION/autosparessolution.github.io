@@ -4449,6 +4449,78 @@ async function handleWhatsAppMessage(message, from) {
                 await sendWhatsAppMessage(from, reply);
                 return;
             }
+            // 📊 Check database tables
+if (isAdmin(from) && msgLower === 'check tables') {
+    try {
+        const tables = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`,
+                [],
+                (err, rows) => {
+                    if (err) resolve([]);
+                    else resolve(rows || []);
+                }
+            );
+        });
+        
+        let reply = `📊 *Database Tables*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        tables.forEach((t, i) => {
+            reply += `${i + 1}. ${t.name}\n`;
+        });
+        reply += `\n📊 Total: ${tables.length} tables`;
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// 📋 Check customers table
+if (isAdmin(from) && msgLower === 'check customers') {
+    try {
+        const count = await new Promise((resolve) => {
+            db.db.get(
+                `SELECT COUNT(*) as count FROM customers`,
+                [],
+                (err, row) => {
+                    if (err) resolve(0);
+                    else resolve(row?.count || 0);
+                }
+            );
+        });
+        
+        const sample = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT * FROM customers LIMIT 3`,
+                [],
+                (err, rows) => {
+                    if (err) resolve([]);
+                    else resolve(rows || []);
+                }
+            );
+        });
+        
+        let reply = `👤 *Customers Table*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        reply += `📊 Total: ${count} customers\n\n`;
+        
+        if (sample.length > 0) {
+            reply += `📋 *Sample:*\n`;
+            sample.forEach((c, i) => {
+                reply += `${i + 1}. ${c.name || 'Unknown'} (${c.phone})\n`;
+                reply += `   📍 ${c.city || 'N/A'}\n`;
+                reply += `   📌 ${c.state || 'N/A'}\n\n`;
+            });
+        }
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
         }
        // ============================================================
 // 🔧 FIX: Add ALL Missing Columns to Database
