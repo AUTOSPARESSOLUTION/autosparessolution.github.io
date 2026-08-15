@@ -1172,8 +1172,8 @@ async function importUsersArray(users) {
 async function getCustomerByPhone(phone) {
     return new Promise((resolve, reject) => {
         db.db.get(
-            `SELECT * FROM customer_master WHERE phone = ? OR mobileNo = ?`,
-            [phone, phone],
+            `SELECT * FROM customers WHERE phone = ?`,
+            [phone],
             (err, row) => {
                 if (err) reject(err);
                 else resolve(row);
@@ -1185,7 +1185,7 @@ async function getCustomerByPhone(phone) {
 async function getAllCustomers(limit = 100) {
     return new Promise((resolve, reject) => {
         db.db.all(
-            `SELECT * FROM customer_master ORDER BY name LIMIT ?`,
+            `SELECT * FROM customers ORDER BY name LIMIT ?`,
             [limit],
             (err, rows) => {
                 if (err) reject(err);
@@ -1198,7 +1198,7 @@ async function getAllCustomers(limit = 100) {
 async function getAllSuppliers() {
     return new Promise((resolve, reject) => {
         db.db.all(
-            `SELECT * FROM supplier_master ORDER BY name`,
+            `SELECT * FROM suppliers ORDER BY name`,
             [],
             (err, rows) => {
                 if (err) reject(err);
@@ -1210,9 +1210,9 @@ async function getAllSuppliers() {
 
 async function getCustomerStats(phone) {
     return new Promise((resolve) => {
-        // Check if order_master exists
+        // Check if orders table exists
         db.db.get(
-            `SELECT name FROM sqlite_master WHERE type='table' AND name='order_master'`,
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='orders'`,
             [],
             (err, tableExists) => {
                 if (err || !tableExists) {
@@ -1223,11 +1223,11 @@ async function getCustomerStats(phone) {
                 db.db.get(
                     `SELECT 
                         COUNT(*) as total_orders,
-                        COALESCE(SUM(total_amount), 0) as total_spent,
-                        COALESCE(AVG(total_amount), 0) as avg_order_value,
+                        COALESCE(SUM(total), 0) as total_spent,
+                        COALESCE(AVG(total), 0) as avg_order_value,
                         MAX(created_at) as last_order_date
-                     FROM order_master 
-                     WHERE customer_phone = ? AND order_status != 'cancelled'`,
+                     FROM orders 
+                     WHERE customer_phone = ? AND status != 'cancelled'`,
                     [phone],
                     (err, row) => {
                         if (err) resolve({ total_orders: 0, total_spent: 0, avg_order_value: 0, last_order_date: null });
@@ -1242,7 +1242,7 @@ async function getCustomerStats(phone) {
 async function getCustomerOrderHistory(phone, limit = 5) {
     return new Promise((resolve) => {
         db.db.get(
-            `SELECT name FROM sqlite_master WHERE type='table' AND name='order_master'`,
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='orders'`,
             [],
             (err, tableExists) => {
                 if (err || !tableExists) {
@@ -1251,7 +1251,7 @@ async function getCustomerOrderHistory(phone, limit = 5) {
                 }
                 
                 db.db.all(
-                    `SELECT * FROM order_master 
+                    `SELECT * FROM orders 
                      WHERE customer_phone = ? 
                      ORDER BY created_at DESC LIMIT ?`,
                     [phone, limit],
