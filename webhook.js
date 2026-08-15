@@ -317,6 +317,8 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
     }
 }
 // 2️⃣ IMPORT CUSTOMERS ARRAY - FIXED with dynamic column handling
+
+// 2️⃣ IMPORT CUSTOMERS ARRAY - ENHANCED FOR JSON STRUCTURE
 async function importCustomersArray(customers) {
     let imported = 0;
     let errors = 0;
@@ -339,8 +341,13 @@ async function importCustomersArray(customers) {
 
     for (const customer of customers) {
         try {
-            const phone = customer.phone || customer.mobileNo || customer.mobile || customer.phoneNumber;
-            
+            // Try multiple possible phone field names from JSON
+            const phone = customer.phone || 
+                         customer.mobileNo || 
+                         customer.mobile || 
+                         customer.phoneNumber ||
+                         customer.phoneNumber;
+
             if (!phone) {
                 console.log(`⚠️ Skipping customer - no phone`);
                 skipped++;
@@ -354,6 +361,7 @@ async function importCustomersArray(customers) {
                 continue;
             }
 
+            // Check if customer exists
             const existing = await new Promise((resolve) => {
                 db.db.get(
                     `SELECT phone FROM customers WHERE phone = ?`,
@@ -362,6 +370,7 @@ async function importCustomersArray(customers) {
                 );
             });
 
+            // Map JSON fields to database fields
             const customerData = {
                 phone: cleanPhone,
                 name: customer.name || customer.customerName || `Customer-${cleanPhone.slice(-4)}`,
@@ -372,7 +381,13 @@ async function importCustomersArray(customers) {
                 pincode: customer.pincode || customer.pinCode || '',
                 gstin: customer.gstin || customer.gst || '',
                 company_name: customer.business || customer.company || customer.companyName || '',
-                customer_type: customer.customer_type || customer.type || customer.role || 'retail'
+                customer_type: customer.customer_type || customer.type || customer.role || 'retail',
+                credit_limit: customer.creditLimit || customer.credit_limit || 0,
+                customer_code: customer.customerCode || customer.customer_code || '',
+                status: customer.status || 'active',
+                total_purchased: customer.totalPurchased || customer.total_purchased || customer.total_spent || 0,
+                outstanding: customer.outstanding || 0,
+                total_orders: customer.totalOrders || customer.total_orders || 0
             };
 
             if (existing) {
@@ -389,11 +404,17 @@ async function importCustomersArray(customers) {
                     pincode: customerData.pincode,
                     gstin: customerData.gstin,
                     company_name: customerData.company_name,
-                    customer_type: customerData.customer_type
+                    customer_type: customerData.customer_type,
+                    credit_limit: customerData.credit_limit,
+                    customer_code: customerData.customer_code,
+                    status: customerData.status,
+                    total_purchased: customerData.total_purchased,
+                    outstanding: customerData.outstanding,
+                    total_orders: customerData.total_orders
                 };
 
                 for (const [field, value] of Object.entries(fieldMap)) {
-                    if (existingColumns.includes(field) && value) {
+                    if (existingColumns.includes(field) && value !== undefined && value !== null && value !== '') {
                         setFields.push(`${field} = ?`);
                         setValues.push(value);
                     }
@@ -413,40 +434,34 @@ async function importCustomersArray(customers) {
                             }
                         );
                     });
-                    console.log(`🔄 Updated customer: ${cleanPhone}`);
+                    console.log(`🔄 Updated customer: ${cleanPhone} - ${customerData.name}`);
                 }
             } else {
                 // Insert - build dynamic INSERT
-                const fields = ['phone', 'name', 'email', 'address'];
-                const values = [cleanPhone, customerData.name, customerData.email, customerData.address];
+                const fields = ['phone', 'name', 'email', 'address', 'registered_at'];
+                const values = [cleanPhone, customerData.name, customerData.email, customerData.address, 'CURRENT_TIMESTAMP'];
 
-                if (existingColumns.includes('city') && customerData.city) {
-                    fields.push('city');
-                    values.push(customerData.city);
-                }
-                if (existingColumns.includes('state') && customerData.state) {
-                    fields.push('state');
-                    values.push(customerData.state);
-                }
-                if (existingColumns.includes('pincode') && customerData.pincode) {
-                    fields.push('pincode');
-                    values.push(customerData.pincode);
-                }
-                if (existingColumns.includes('gstin') && customerData.gstin) {
-                    fields.push('gstin');
-                    values.push(customerData.gstin);
-                }
-                if (existingColumns.includes('company_name') && customerData.company_name) {
-                    fields.push('company_name');
-                    values.push(customerData.company_name);
-                }
-                if (existingColumns.includes('customer_type') && customerData.customer_type) {
-                    fields.push('customer_type');
-                    values.push(customerData.customer_type);
-                }
-                if (existingColumns.includes('registered_at')) {
-                    fields.push('registered_at');
-                    values.push('CURRENT_TIMESTAMP');
+                // Add optional fields if they exist and have values
+                const optionalFields = [
+                    { field: 'city', value: customerData.city },
+                    { field: 'state', value: customerData.state },
+                    { field: 'pincode', value: customerData.pincode },
+                    { field: 'gstin', value: customerData.gstin },
+                    { field: 'company_name', value: customerData.company_name },
+                    { field: 'customer_type', value: customerData.customer_type || 'retail' },
+                    { field: 'credit_limit', value: customerData.credit_limit },
+                    { field: 'customer_code', value: customerData.customer_code },
+                    { field: 'status', value: customerData.status || 'active' },
+                    { field: 'total_purchased', value: customerData.total_purchased },
+                    { field: 'outstanding', value: customerData.outstanding },
+                    { field: 'total_orders', value: customerData.total_orders }
+                ];
+
+                for (const opt of optionalFields) {
+                    if (existingColumns.includes(opt.field) && opt.value !== undefined && opt.value !== null && opt.value !== '') {
+                        fields.push(opt.field);
+                        values.push(opt.value);
+                    }
                 }
 
                 const placeholders = values.map(v => v === 'CURRENT_TIMESTAMP' ? 'CURRENT_TIMESTAMP' : '?');
@@ -463,7 +478,7 @@ async function importCustomersArray(customers) {
                         }
                     });
                 });
-                console.log(`✅ Imported customer: ${cleanPhone}`);
+                console.log(`✅ Imported customer: ${cleanPhone} - ${customerData.name}`);
             }
             imported++;
         } catch (err) {
@@ -475,6 +490,7 @@ async function importCustomersArray(customers) {
     console.log(`📊 Customers: ${imported} imported, ${skipped} skipped, ${errors} errors`);
     return imported;
 }
+         
 // 3️⃣ IMPORT SUPPLIERS ARRAY - FIXED
 async function importSuppliersArray(suppliers) {
     let imported = 0;
