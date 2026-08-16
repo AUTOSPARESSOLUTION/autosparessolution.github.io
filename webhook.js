@@ -5707,28 +5707,80 @@ if (isAdmin(from) && msgLower === 'export all') {
         return;
     }
 }
-// 6️⃣ CHECK IMPORT STATUS
+// 6️⃣ CHECK IMPORT STATUS - FIXED
 if (isAdmin(from) && (msgLower === 'import status' || msgLower === 'data status')) {
     try {
         const stats = await db.getStats();
+        
+        // Check customers table (not customer_master)
         const customerCount = await new Promise((resolve) => {
-            db.db.get(`SELECT COUNT(*) as count FROM customer_master`, [], (err, row) => {
-                resolve(row?.count || 0);
+            db.db.get(`SELECT COUNT(*) as count FROM customers`, [], (err, row) => {
+                if (err) {
+                    console.error('❌ Customers count error:', err.message);
+                    resolve(0);
+                } else {
+                    resolve(row?.count || 0);
+                }
             });
         });
+        
+        // Check suppliers table (not supplier_master)
         const supplierCount = await new Promise((resolve) => {
-            db.db.get(`SELECT COUNT(*) as count FROM supplier_master`, [], (err, row) => {
-                resolve(row?.count || 0);
+            db.db.get(`SELECT COUNT(*) as count FROM suppliers`, [], (err, row) => {
+                if (err) {
+                    console.error('❌ Suppliers count error:', err.message);
+                    resolve(0);
+                } else {
+                    resolve(row?.count || 0);
+                }
             });
         });
+        
+        // Check sales_invoices table
         const invoiceCount = await new Promise((resolve) => {
-            db.db.get(`SELECT COUNT(*) as count FROM order_master`, [], (err, row) => {
-                resolve(row?.count || 0);
+            db.db.get(`SELECT COUNT(*) as count FROM sales_invoices`, [], (err, row) => {
+                if (err) {
+                    console.error('❌ Invoices count error:', err.message);
+                    resolve(0);
+                } else {
+                    resolve(row?.count || 0);
+                }
             });
         });
+        
+        // Check purchase_invoices table
         const purchaseCount = await new Promise((resolve) => {
             db.db.get(`SELECT COUNT(*) as count FROM purchase_invoices`, [], (err, row) => {
-                resolve(row?.count || 0);
+                if (err) {
+                    console.error('❌ Purchase invoices count error:', err.message);
+                    resolve(0);
+                } else {
+                    resolve(row?.count || 0);
+                }
+            });
+        });
+        
+        // Check customer_payments table
+        const paymentCount = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM customer_payments`, [], (err, row) => {
+                if (err) {
+                    console.error('❌ Payments count error:', err.message);
+                    resolve(0);
+                } else {
+                    resolve(row?.count || 0);
+                }
+            });
+        });
+        
+        // Check supplier_payments table
+        const supplierPaymentCount = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM supplier_payments`, [], (err, row) => {
+                if (err) {
+                    console.error('❌ Supplier payments count error:', err.message);
+                    resolve(0);
+                } else {
+                    resolve(row?.count || 0);
+                }
             });
         });
         
@@ -5741,8 +5793,10 @@ if (isAdmin(from) && (msgLower === 'import status' || msgLower === 'data status'
             `📦 Products: ${stats.total_products || 0}\n` +
             `👤 Customers: ${customerCount}\n` +
             `🏢 Suppliers: ${supplierCount}\n` +
-            `📄 Invoices: ${invoiceCount}\n` +
+            `📄 Sales Invoices: ${invoiceCount}\n` +
             `📥 Purchase Invoices: ${purchaseCount}\n` +
+            `💰 Customer Payments: ${paymentCount}\n` +
+            `💰 Supplier Payments: ${supplierPaymentCount}\n` +
             `📁 Backup File: ${backupExists ? '✅ Yes' : '❌ No'} (${backupSize}KB)\n` +
             `📁 Data Dir: ${dataDir}\n\n` +
             `📝 Commands:\n` +
@@ -5750,10 +5804,12 @@ if (isAdmin(from) && (msgLower === 'import status' || msgLower === 'data status'
             `   "import customers" - Customers only\n` +
             `   "import suppliers" - Suppliers only\n` +
             `   "import products" - Products only\n` +
+            `   "debug customers" - Debug customer data\n` +
             `   "export all" - Export to JSON`
         );
         return;
     } catch (error) {
+        console.error('❌ Import status error:', error.message);
         await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
         return;
     }
