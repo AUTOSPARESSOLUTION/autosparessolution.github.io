@@ -5083,7 +5083,49 @@ if (isAdmin(from) && msgLower === 'check customers') {
             return;
         }
     }
-
+// 🔍 Check ALL customer tables
+if (isAdmin(from) && msgLower === 'check all customers') {
+    try {
+        let reply = `👤 *ALL Customer Tables*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        // Check customers table
+        const customersCount = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM customers`, [], (err, row) => {
+                if (err) resolve(0);
+                else resolve(row?.count || 0);
+            });
+        });
+        reply += `📊 customers: ${customersCount} rows\n`;
+        
+        // Check customer_master table
+        const customerMasterCount = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM customer_master`, [], (err, row) => {
+                if (err) resolve(0);
+                else resolve(row?.count || 0);
+            });
+        });
+        reply += `📊 customer_master: ${customerMasterCount} rows\n`;
+        
+        // Check if data exists in customers but with different column names
+        if (customersCount === 0 && customerMasterCount === 0) {
+            reply += `\n⚠️ No customer data found in any table!\n`;
+            reply += `📝 Checking if import actually worked...\n\n`;
+            
+            // Check the import function's target table
+            reply += `🔍 Check your import function:\n`;
+            reply += `   - importCustomersArray() inserts into "customers" table\n`;
+            reply += `   - But your helper functions query "customer_master"\n`;
+            reply += `   - This is a mismatch!\n\n`;
+            reply += `💡 Fix: Update your helper functions to use "customers" table`;
+        }
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
     // 💰 Check customer payments
     if (isAdmin(from) && (msgLower === 'check customer payments' || msgLower === 'check payments')) {
         try {
