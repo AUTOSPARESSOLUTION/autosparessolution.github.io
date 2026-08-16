@@ -5083,6 +5083,101 @@ if (isAdmin(from) && msgLower === 'check customers') {
             return;
         }
     }
+        // 🔍 DEBUG - Check what's in customers table with raw SQL
+if (isAdmin(from) && msgLower === 'debug customers') {
+    try {
+        // Check if table exists
+        const tableExists = await new Promise((resolve) => {
+            db.db.get(
+                `SELECT name FROM sqlite_master WHERE type='table' AND name='customers'`,
+                [],
+                (err, row) => {
+                    if (err) resolve(false);
+                    else resolve(!!row);
+                }
+            );
+        });
+        
+        let reply = `🔍 *DEBUG: Customers Table*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        reply += `📋 Table exists: ${tableExists ? '✅ Yes' : '❌ No'}\n\n`;
+        
+        if (!tableExists) {
+            reply += `❌ customers table does not exist!\n`;
+            reply += `💡 Run: "fix columns" to create it`;
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+        
+        // Get count
+        const count = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM customers`, [], (err, row) => {
+                if (err) {
+                    console.error('❌ Count error:', err.message);
+                    resolve({ error: err.message });
+                } else {
+                    resolve(row);
+                }
+            });
+        });
+        
+        if (count && count.error) {
+            reply += `❌ Error: ${count.error}\n`;
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+        
+        reply += `📊 Total rows: ${count?.count || 0}\n\n`;
+        
+        // Get all data
+        const allData = await new Promise((resolve) => {
+            db.db.all(`SELECT * FROM customers LIMIT 5`, [], (err, rows) => {
+                if (err) resolve([]);
+                else resolve(rows || []);
+            });
+        });
+        
+        if (allData.length > 0) {
+            reply += `📋 *Data Found:*\n`;
+            allData.forEach((row, i) => {
+                reply += `${i + 1}. Phone: ${row.phone || 'N/A'}\n`;
+                reply += `   Name: ${row.name || 'N/A'}\n`;
+                reply += `   Email: ${row.email || 'N/A'}\n`;
+                reply += `   City: ${row.city || 'N/A'}\n`;
+                reply += `   State: ${row.state || 'N/A'}\n`;
+                reply += `   Business: ${row.business || 'N/A'}\n\n`;
+            });
+        } else {
+            reply += `❌ No data found in customers table\n\n`;
+            reply += `💡 Try running: "import customers" to import data\n`;
+            reply += `💡 Or check if data is in "customer_master" table`;
+        }
+        
+        // Also check customer_master
+        const masterExists = await new Promise((resolve) => {
+            db.db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='customer_master'`, [], (err, row) => {
+                if (err) resolve(false);
+                else resolve(!!row);
+            });
+        });
+        
+        if (masterExists) {
+            const masterCount = await new Promise((resolve) => {
+                db.db.get(`SELECT COUNT(*) as count FROM customer_master`, [], (err, row) => {
+                    if (err) resolve(0);
+                    else resolve(row?.count || 0);
+                });
+            });
+            reply += `\n📊 customer_master: ${masterCount} rows\n`;
+        }
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ Debug error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
 // 🔍 Check ALL customer tables
 if (isAdmin(from) && msgLower === 'check all customers') {
     try {
