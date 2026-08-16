@@ -4936,6 +4936,276 @@ if (isAdmin(from) && msgLower === 'check customers') {
     }
 }
         }
+            // 🔍 Find customer by phone or email
+    if (msgLower.startsWith('find customer')) {
+        try {
+            const searchTerm = cleaned.replace(/find customer/i, '').trim();
+            if (!searchTerm) {
+                await sendWhatsAppMessage(from, '📝 Format: "Find customer 9933478238" or "Find customer email@example.com"');
+                return;
+            }
+            
+            console.log(`🔍 Searching for customer: ${searchTerm}`);
+            
+            const cleanPhone = searchTerm.replace(/\D/g, '');
+            let customer = null;
+            
+            if (cleanPhone.length >= 10) {
+                customer = await new Promise((resolve) => {
+                    db.db.get(
+                        `SELECT * FROM customers WHERE phone = ?`,
+                        [cleanPhone],
+                        (err, row) => {
+                            if (err) resolve(null);
+                            else resolve(row);
+                        }
+                    );
+                });
+            }
+            
+            if (!customer && searchTerm.includes('@')) {
+                customer = await new Promise((resolve) => {
+                    db.db.get(
+                        `SELECT * FROM customers WHERE email = ?`,
+                        [searchTerm],
+                        (err, row) => {
+                            if (err) resolve(null);
+                            else resolve(row);
+                        }
+                    );
+                });
+            }
+            
+            if (!customer && searchTerm.includes('@')) {
+                const emailPrefix = searchTerm.split('@')[0];
+                customer = await new Promise((resolve) => {
+                    db.db.get(
+                        `SELECT * FROM customers WHERE email LIKE ?`,
+                        [`%${emailPrefix}%`],
+                        (err, row) => {
+                            if (err) resolve(null);
+                            else resolve(row);
+                        }
+                    );
+                });
+            }
+            
+            if (customer) {
+                let reply = `✅ *Customer Found!*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                reply += `👤 Name: ${customer.name || 'N/A'}\n`;
+                reply += `📞 Phone: ${customer.phone || 'N/A'}\n`;
+                reply += `📧 Email: ${customer.email || 'N/A'}\n`;
+                reply += `🏢 Business: ${customer.business || customer.company_name || 'N/A'}\n`;
+                reply += `📍 City: ${customer.city || customer.district || 'N/A'}\n`;
+                reply += `📌 State: ${customer.state || 'N/A'}\n`;
+                reply += `📋 GST: ${customer.gstin || 'N/A'}\n`;
+                reply += `📊 Status: ${customer.status || 'Active'}\n`;
+                reply += `💰 Credit Limit: ₹${customer.credit_limit || 0}\n`;
+                reply += `📦 Total Purchases: ₹${customer.total_purchases || customer.total_spent || 0}\n`;
+                reply += `🕐 Created: ${customer.created_at || customer.registered_at || 'N/A'}\n`;
+                reply += `🕐 Updated: ${customer.updated_at || 'N/A'}`;
+                await sendWhatsAppMessage(from, reply);
+            } else {
+                await sendWhatsAppMessage(from, 
+                    `❌ *No customer found*\n\n` +
+                    `🔍 Search Term: ${searchTerm}\n\n` +
+                    `💡 Try:\n` +
+                    `   - Full phone number: 9933478238\n` +
+                    `   - Email: sahuja57332@gmail.com`
+                );
+            }
+            return;
+        } catch (error) {
+            console.error('❌ Find customer error:', error.message);
+            await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+            return;
+        }
+    }
+
+    // 📋 Check customers table
+    if (isAdmin(from) && (msgLower === 'check customers' || msgLower === 'customers count')) {
+        try {
+            const count = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT COUNT(*) as count FROM customers`,
+                    [],
+                    (err, row) => {
+                        if (err) resolve({ error: err.message });
+                        else resolve(row);
+                    }
+                );
+            });
+            
+            if (count && count.error) {
+                await sendWhatsAppMessage(from, `❌ Error: ${count.error}`);
+                return;
+            }
+            
+            const total = count?.count || 0;
+            
+            if (total === 0) {
+                await sendWhatsAppMessage(from, 
+                    `👤 *Customers Table*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                    `❌ No customers found.\n\n` +
+                    `📝 Try: "import backup" to import customers`
+                );
+                return;
+            }
+            
+            const sample = await new Promise((resolve) => {
+                db.db.all(
+                    `SELECT phone, name, email, city FROM customers LIMIT 5`,
+                    [],
+                    (err, rows) => {
+                        if (err) resolve([]);
+                        else resolve(rows || []);
+                    }
+                );
+            });
+            
+            let reply = `👤 *Customers*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `📊 Total: ${total} customers\n\n`;
+            
+            if (sample.length > 0) {
+                reply += `📋 *Sample:*\n`;
+                sample.forEach((c, i) => {
+                    reply += `${i + 1}. ${c.name || 'Unknown'} (${c.phone})\n`;
+                    reply += `   📧 ${c.email || 'N/A'}\n`;
+                    reply += `   📍 ${c.city || 'N/A'}\n\n`;
+                });
+            }
+            
+            reply += `📝 Try: "find customer [phone]"`;
+            await sendWhatsAppMessage(from, reply);
+            return;
+        } catch (error) {
+            await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+            return;
+        }
+    }
+
+    // 💰 Check customer payments
+    if (isAdmin(from) && (msgLower === 'check customer payments' || msgLower === 'check payments')) {
+        try {
+            const count = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT COUNT(*) as count FROM customer_payments`,
+                    [],
+                    (err, row) => {
+                        if (err) resolve(0);
+                        else resolve(row?.count || 0);
+                    }
+                );
+            });
+            
+            const payments = await new Promise((resolve) => {
+                db.db.all(
+                    `SELECT * FROM customer_payments ORDER BY payment_date DESC LIMIT 10`,
+                    [],
+                    (err, rows) => {
+                        if (err) resolve([]);
+                        else resolve(rows || []);
+                    }
+                );
+            });
+            
+            let reply = `💰 *Customer Payments*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `📊 Total: ${count} payments\n\n`;
+            
+            if (payments.length === 0) {
+                reply += `❌ No payments found.\n\n`;
+                reply += `📝 To import: "import customer payments"`;
+            } else {
+                let totalAmount = 0;
+                reply += `📋 *Recent Payments:*\n`;
+                payments.forEach((p, i) => {
+                    const amount = parseFloat(p.amount) || 0;
+                    totalAmount += amount;
+                    reply += `${i + 1}. ₹${amount.toFixed(2)} - ${p.customer_phone || 'N/A'}\n`;
+                    reply += `   📋 ${p.receipt_no || 'N/A'}\n`;
+                    reply += `   💳 ${p.payment_mode || 'Cash'}\n\n`;
+                });
+                reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+                reply += `💰 Total: ₹${totalAmount.toFixed(2)}`;
+            }
+            
+            await sendWhatsAppMessage(from, reply);
+            return;
+        } catch (error) {
+            await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+            return;
+        }
+    }
+
+    // 💰 Import customer payments only
+    if (isAdmin(from) && msgLower === 'import customer payments') {
+        try {
+            await sendWhatsAppMessage(from, '🔄 Importing customer payments...');
+            
+            const data = fs.readFileSync(JSON_STORAGE.fullBackup, 'utf8');
+            const backup = JSON.parse(data);
+            
+            let payments = [];
+            try {
+                payments = JSON.parse(backup.customerPayments || '[]');
+            } catch (e) {
+                payments = backup.customerPayments || [];
+            }
+            
+            if (payments.length === 0) {
+                await sendWhatsAppMessage(from, '❌ No customer payments found in backup.');
+                return;
+            }
+            
+            await sendWhatsAppMessage(from, `📊 Found ${payments.length} payments. Importing...`);
+            const result = await importCustomerPaymentsArray(payments);
+            
+            await sendWhatsAppMessage(from,
+                `✅ *Customer Payments Imported!*\n\n` +
+                `💰 ${result} payments imported\n` +
+                `📋 Check with: "customer payments"`
+            );
+            return;
+        } catch (error) {
+            await sendWhatsAppMessage(from, `❌ Import failed: ${error.message}`);
+            return;
+        }
+    }
+
+    // 💰 Import supplier payments only
+    if (isAdmin(from) && msgLower === 'import supplier payments') {
+        try {
+            await sendWhatsAppMessage(from, '🔄 Importing supplier payments...');
+            
+            const data = fs.readFileSync(JSON_STORAGE.fullBackup, 'utf8');
+            const backup = JSON.parse(data);
+            
+            let payments = [];
+            try {
+                payments = JSON.parse(backup.supplierPayments || '[]');
+            } catch (e) {
+                payments = backup.supplierPayments || [];
+            }
+            
+            if (payments.length === 0) {
+                await sendWhatsAppMessage(from, '❌ No supplier payments found in backup.');
+                return;
+            }
+            
+            await sendWhatsAppMessage(from, `📊 Found ${payments.length} payments. Importing...`);
+            const result = await importSupplierPaymentsArray(payments);
+            
+            await sendWhatsAppMessage(from,
+                `✅ *Supplier Payments Imported!*\n\n` +
+                `💰 ${result} payments imported\n` +
+                `📋 Check with: "supplier payments"`
+            );
+            return;
+        } catch (error) {
+            await sendWhatsAppMessage(from, `❌ Import failed: ${error.message}`);
+            return;
+        }
+    }
        // ============================================================
 // 🔧 FIX: Add ALL Missing Columns to Database
 // ============================================================
