@@ -332,7 +332,7 @@ if (customerPayments.length > 0) {
                 console.log(`💰 Found ${embeddedPayments.length} embedded payments in invoices`);
                 results.customerPayments = await importCustomerPaymentsArray(embeddedPayments);
             }
-        }
+        
 
         // Import Supplier Payments
         if (supplierPayments.length > 0) {
