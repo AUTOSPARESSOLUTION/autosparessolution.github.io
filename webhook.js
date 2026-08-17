@@ -861,21 +861,23 @@ async function importPurchaseInvoicesArray(purchaseInvoices) {
 // 7️⃣ IMPORT CUSTOMER PAYMENTS - FIXED FOR JSON STRUCTURE
 // 7️⃣ IMPORT CUSTOMER PAYMENTS - IMPROVED FOR EMAIL & PHONE
 // 7️⃣ IMPORT CUSTOMER PAYMENTS - FIXED FOR YOUR JSON STRUCTURE
-// 7️⃣ IMPORT CUSTOMER PAYMENTS - COMPLETELY FIXED
+// 7️⃣ IMPORT CUSTOMER PAYMENTS - DEBUG VERSION
 async function importCustomerPaymentsArray(payments) {
     let imported = 0;
     let errors = 0;
     let skipped = 0;
 
-    console.log(`💰 Importing ${payments.length} customer payments...`);
+    console.log(`💰💰💰 DEBUG: importCustomerPaymentsArray called with ${payments ? payments.length : 'undefined'} payments`);
     
-    // Log first payment to debug
-    if (payments.length > 0) {
-        console.log(`📋 First payment sample:`, JSON.stringify(payments[0]).substring(0, 200));
-        console.log(`📋 Payment keys:`, Object.keys(payments[0]).join(', '));
+    if (!payments || payments.length === 0) {
+        console.log(`⚠️ No payments to import`);
+        return 0;
     }
-
-    // Ensure customer_payments table exists
+    
+    // Log first 3 payments for debugging
+    console.log(`📋 First 3 payments:`, JSON.stringify(payments.slice(0, 3), null, 2));
+    
+    // Ensure customer_payments table exists with correct columns
     await new Promise((resolve) => {
         db.db.run(`
             CREATE TABLE IF NOT EXISTS customer_payments (
@@ -891,7 +893,11 @@ async function importCustomerPaymentsArray(payments) {
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `, (err) => {
-            if (err) console.error('❌ Error creating customer_payments table:', err.message);
+            if (err) {
+                console.error('❌ Error creating customer_payments table:', err.message);
+            } else {
+                console.log('✅ customer_payments table verified');
+            }
             resolve();
         });
     });
@@ -903,11 +909,11 @@ async function importCustomerPaymentsArray(payments) {
                 console.error('❌ Error getting customers:', err.message);
                 resolve([]);
             } else {
+                console.log(`📋 Found ${rows ? rows.length : 0} customers in database`);
                 resolve(rows || []);
             }
         });
     });
-    console.log(`📋 Found ${allCustomers.length} customers in database`);
 
     // Build lookup maps
     const emailMap = {};
@@ -916,9 +922,11 @@ async function importCustomerPaymentsArray(payments) {
         if (c.email) emailMap[c.email.toLowerCase()] = c.phone;
         if (c.phone) phoneMap[c.phone] = c.phone;
     });
+    console.log(`📋 Email map has ${Object.keys(emailMap).length} entries`);
 
     for (let i = 0; i < payments.length; i++) {
         const payment = payments[i];
+        console.log(`\n🔍 Processing payment ${i + 1}/${payments.length}:`, JSON.stringify(payment).substring(0, 200));
         
         try {
             // ✅ EXACT FIELD NAMES FROM YOUR JSON
@@ -930,7 +938,7 @@ async function importCustomerPaymentsArray(payments) {
             const receiptNo = payment.receiptNo || payment.receipt_no || `PR-${Date.now().toString().slice(-6)}${i}`;
             const paymentDate = payment.date || payment.payment_date || new Date().toISOString();
 
-            console.log(`📋 Payment ${i+1}: email=${customerEmail}, amount=${amount}, mode=${mode}, receipt=${receiptNo}`);
+            console.log(`📋 Extracted: email=${customerEmail}, amount=${amount}, mode=${mode}, receipt=${receiptNo}`);
 
             if (!customerEmail) {
                 console.log(`⚠️ Skipping payment ${i+1} - no email`);
@@ -1034,8 +1042,12 @@ async function importCustomerPaymentsArray(payments) {
                     `SELECT phone FROM customers WHERE phone = ?`,
                     [cleanPhone],
                     (err, row) => {
-                        if (err) resolve(null);
-                        else resolve(row);
+                        if (err) {
+                            console.error(`❌ Error checking customer:`, err.message);
+                            resolve(null);
+                        } else {
+                            resolve(row);
+                        }
                     }
                 );
             });
@@ -1064,7 +1076,9 @@ async function importCustomerPaymentsArray(payments) {
                 continue;
             }
 
-            // ✅ INSERT PAYMENT - USES CORRECT COLUMN NAMES
+            // ✅ INSERT PAYMENT
+            console.log(`💾 Inserting payment: ${receiptNo} - ₹${amount} for ${cleanPhone}`);
+            
             await new Promise((resolve, reject) => {
                 db.db.run(
                     `INSERT INTO customer_payments 
@@ -1092,7 +1106,7 @@ async function importCustomerPaymentsArray(payments) {
                 );
             });
 
-            // Also update customer's total_spent
+            // Update customer's total_spent
             await new Promise((resolve) => {
                 db.db.run(
                     `UPDATE customers SET total_spent = COALESCE(total_spent, 0) + ? WHERE phone = ?`,
