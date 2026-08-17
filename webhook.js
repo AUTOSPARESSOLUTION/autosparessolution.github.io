@@ -302,12 +302,21 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             results.purchaseInvoices = await importPurchaseInvoicesArray(purchaseInvoices);
         }
 
-        // 🔧 FIX: Import Customer Payments with better logging
-        if (customerPayments.length > 0) {
-            console.log(`💰 Importing ${customerPayments.length} customer payments...`);
-            results.customerPayments = await importCustomerPaymentsArray(customerPayments);
-        } else {
-            console.log(`⚠️ No customer payments found in backup`);
+        // Import Customer Payments - DEBUG
+if (customerPayments.length > 0) {
+    console.log(`💰💰💰 Importing ${customerPayments.length} customer payments...`);
+    console.log(`📋 First payment:`, JSON.stringify(customerPayments[0]).substring(0, 300));
+    try {
+        results.customerPayments = await importCustomerPaymentsArray(customerPayments);
+        console.log(`💰💰💰 Import result: ${results.customerPayments} payments imported`);
+    } catch (err) {
+        console.error(`❌❌❌ Customer payments import failed:`, err.message);
+        console.error(err.stack);
+        results.customerPayments = 0;
+    }
+} else {
+    console.log(`⚠️ No customer payments found in backup`);
+}
             // Try to extract from invoices
             console.log(`🔍 Checking if payments are embedded in invoices...`);
             let embeddedPayments = [];
