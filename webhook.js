@@ -173,11 +173,7 @@ if (!fs.existsSync(dataDir)) {
     console.log('📁 Created data directory');
 }
 
-// ============================================================
-// 📥 JSON IMPORT FUNCTIONS
-// ============================================================
-
-// 1️⃣ IMPORT FULL BACKUP JSON
+// 1️⃣ IMPORT FULL BACKUP JSON - UPDATED WITH FIXES
 async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
     try {
         if (!fs.existsSync(filePath)) {
@@ -189,7 +185,7 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
         const data = fs.readFileSync(filePath, 'utf8');
         const backup = JSON.parse(data);
         
-        // Helper function to parse data (handles both stringified and array formats)
+        // 🔧 IMPROVED PARSING FUNCTION
         function parseData(data) {
             if (!data) return [];
             if (Array.isArray(data)) return data;
@@ -199,21 +195,49 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
                     if (Array.isArray(parsed)) {
                         return parsed;
                     }
+                    if (typeof parsed === 'object' && parsed !== null) {
+                        return [parsed];
+                    }
                     return [];
                 } catch (e) {
                     console.log(`⚠️ Failed to parse data: ${data.substring(0, 100)}...`);
                     return [];
                 }
             }
+            if (typeof data === 'object' && data !== null) {
+                return [data];
+            }
             return [];
         }
 
+        // 🔧 FIX: Handle customerPayments specifically
+        let customerPayments = [];
+        if (backup.customerPayments) {
+            if (typeof backup.customerPayments === 'string') {
+                try {
+                    customerPayments = JSON.parse(backup.customerPayments);
+                    console.log(`✅ Parsed customerPayments from string: ${customerPayments.length} payments`);
+                } catch (e) {
+                    console.log(`⚠️ Failed to parse customerPayments string:`, e.message);
+                    customerPayments = [];
+                }
+            } else if (Array.isArray(backup.customerPayments)) {
+                customerPayments = backup.customerPayments;
+                console.log(`✅ customerPayments is array: ${customerPayments.length} payments`);
+            } else {
+                customerPayments = [backup.customerPayments];
+                console.log(`✅ customerPayments is object: 1 payment`);
+            }
+        } else {
+            console.log(`⚠️ No customerPayments key found in backup`);
+        }
+
+        // Parse other data
         const customers = parseData(backup.customers);
         const suppliers = parseData(backup.suppliers);
         const products = parseData(backup.products);
         const invoices = parseData(backup.allInvoices);
         const purchaseInvoices = parseData(backup.purchaseInvoices);
-        const customerPayments = parseData(backup.customerPayments);
         const supplierPayments = parseData(backup.supplierPayments);
         const users = parseData(backup.users);
 
@@ -222,18 +246,15 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             suppliers: suppliers.length,
             products: products.length,
             invoices: invoices.length,
-            purchaseInvoices: purchaseInvoices.length
+            purchaseInvoices: purchaseInvoices.length,
+            customerPayments: customerPayments.length,
+            supplierPayments: supplierPayments.length
         });
 
-        // 🔍 DEBUG: Log first item samples
-        if (customers.length > 0) {
-            console.log(`🔍 First customer:`, JSON.stringify(customers[0]).substring(0, 300));
-        }
-        if (suppliers.length > 0) {
-            console.log(`🔍 First supplier:`, JSON.stringify(suppliers[0]).substring(0, 300));
-        }
-        if (products.length > 0) {
-            console.log(`🔍 First product:`, JSON.stringify(products[0]).substring(0, 300));
+        // 🔍 DEBUG: Log first customerPayment if exists
+        if (customerPayments.length > 0) {
+            console.log(`🔍 First customerPayment:`, JSON.stringify(customerPayments[0]).substring(0, 300));
+            console.log(`🔍 customerPayment keys:`, Object.keys(customerPayments[0]).join(', '));
         }
 
         const results = {
@@ -281,10 +302,27 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             results.purchaseInvoices = await importPurchaseInvoicesArray(purchaseInvoices);
         }
 
-        // Import Customer Payments
+        // 🔧 FIX: Import Customer Payments with better logging
         if (customerPayments.length > 0) {
             console.log(`💰 Importing ${customerPayments.length} customer payments...`);
             results.customerPayments = await importCustomerPaymentsArray(customerPayments);
+        } else {
+            console.log(`⚠️ No customer payments found in backup`);
+            // Try to extract from invoices
+            console.log(`🔍 Checking if payments are embedded in invoices...`);
+            let embeddedPayments = [];
+            for (const inv of invoices) {
+                if (inv.payments && Array.isArray(inv.payments)) {
+                    embeddedPayments = embeddedPayments.concat(inv.payments);
+                }
+                if (inv.payment && typeof inv.payment === 'object') {
+                    embeddedPayments.push(inv.payment);
+                }
+            }
+            if (embeddedPayments.length > 0) {
+                console.log(`💰 Found ${embeddedPayments.length} embedded payments in invoices`);
+                results.customerPayments = await importCustomerPaymentsArray(embeddedPayments);
+            }
         }
 
         // Import Supplier Payments
@@ -313,6 +351,7 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
 
     } catch (error) {
         console.error('❌ Full backup import error:', error.message);
+        console.error(error.stack);
         return { success: false, error: error.message };
     }
 }
