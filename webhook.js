@@ -876,14 +876,17 @@ async function importCustomerPaymentsArray(payments) {
 
     for (const payment of payments) {
         try {
-            // Parse payment data - YOUR JSON STRUCTURE
-            const customerEmail = payment.customerEmail || payment.customer_email || '';
+            // 🔧 FIX: Support BOTH field names - customerEmail AND customer_email
+            const customerEmail = payment.customerEmail || payment.customer_email || payment.email || '';
             const amount = parseFloat(payment.amount) || 0;
             const mode = payment.mode || payment.payment_mode || 'Cash';
             const reference = payment.reference || payment.ref || '';
             const remarks = payment.remarks || payment.note || '';
             const receiptNo = payment.receiptNo || payment.receipt_no || `PR-${Date.now().toString().slice(-6)}`;
             const paymentDate = payment.date || payment.payment_date || new Date().toISOString();
+
+            // 🔧 FIX: Get customer name from payment
+            const customerName = payment.customerName || payment.customer_name || '';
 
             console.log(`🔍 Processing: ${receiptNo} - ${customerEmail} - ₹${amount}`);
 
@@ -933,14 +936,14 @@ async function importCustomerPaymentsArray(payments) {
             }
 
             // METHOD 4: Search by name if available
-            if (!foundPhone && payment.customerName) {
+            if (!foundPhone && customerName) {
                 const match = allCustomers.find(c => 
-                    c.name && c.name.toLowerCase().includes(payment.customerName.toLowerCase())
+                    c.name && c.name.toLowerCase().includes(customerName.toLowerCase())
                 );
                 if (match) {
                     foundPhone = match.phone;
                     foundCustomer = match;
-                    console.log(`✅ Found customer by name: ${payment.customerName} -> ${foundPhone}`);
+                    console.log(`✅ Found customer by name: ${customerName} -> ${foundPhone}`);
                 }
             }
 
@@ -975,7 +978,7 @@ async function importCustomerPaymentsArray(payments) {
                 const cleanNewPhone = newPhone.toString().replace(/\D/g, '');
                 
                 // Use name from payment or from email
-                const newName = payment.customerName || customerEmail.split('@')[0] || `Customer-${cleanNewPhone.slice(-4)}`;
+                const newName = customerName || customerEmail.split('@')[0] || `Customer-${cleanNewPhone.slice(-4)}`;
                 
                 // Insert new customer
                 try {
@@ -1135,7 +1138,7 @@ async function importCustomerPaymentsArray(payments) {
                 continue;
             }
 
-            // Insert payment
+            // Insert payment - ✅ FIXED: Use customer_email column
             await new Promise((resolve, reject) => {
                 db.db.run(
                     `INSERT INTO customer_payments 
@@ -1144,7 +1147,7 @@ async function importCustomerPaymentsArray(payments) {
                     [
                         receiptNo,
                         cleanPhone,
-                        customerEmail,
+                        customerEmail,  // ✅ This matches the column name
                         amount,
                         mode,
                         reference,
