@@ -4583,85 +4583,6 @@ async function handleWhatsAppMessage(message, from) {
                     await sendWhatsAppMessage(from, '⚠️ Error fetching cart.');
                     return;
                 }
-                // ============================================================
-// 🔍 DEBUG: Check payment data structure in backup
-// ============================================================
-if (isAdmin(from) && msgLower === 'debug payments') {
-    try {
-        const filePath = JSON_STORAGE.fullBackup;
-        if (!fs.existsSync(filePath)) {
-            await sendWhatsAppMessage(from, '❌ Backup file not found.');
-            return;
-        }
-        
-        const data = fs.readFileSync(filePath, 'utf8');
-        const backup = JSON.parse(data);
-        
-        let reply = `🔍 *Backup File Analysis*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
-        
-        // Check if customerPayments exists
-        const hasCustomerPayments = 'customerPayments' in backup;
-        reply += `📋 customerPayments key exists: ${hasCustomerPayments ? '✅' : '❌'}\n`;
-        
-        if (hasCustomerPayments) {
-            const raw = backup.customerPayments;
-            reply += `📊 Type: ${typeof raw}\n`;
-            
-            let payments = [];
-            try {
-                if (typeof raw === 'string') {
-                    payments = JSON.parse(raw);
-                } else if (Array.isArray(raw)) {
-                    payments = raw;
-                } else {
-                    payments = [raw];
-                }
-            } catch (e) {
-                reply += `❌ Parse error: ${e.message}\n`;
-            }
-            
-            reply += `📊 Payments found: ${payments.length}\n\n`;
-            
-            if (payments.length > 0) {
-                const first = payments[0];
-                reply += `📋 *First Payment Structure:*\n`;
-                reply += `   ${JSON.stringify(first, null, 2).substring(0, 500)}\n\n`;
-                
-                reply += `📋 *Keys in first payment:*\n`;
-                Object.keys(first).forEach(key => {
-                    const value = first[key];
-                    const type = typeof value;
-                    const displayValue = type === 'string' ? `"${value}"` : String(value).substring(0, 50);
-                    reply += `   • ${key}: ${type} = ${displayValue}\n`;
-                });
-            }
-        } else {
-            // Check if it's nested differently
-            reply += `\n🔍 Checking for nested payment data...\n`;
-            const keys = Object.keys(backup);
-            reply += `📋 Top-level keys: ${keys.join(', ')}\n`;
-            
-            // Try to find payments in any nested structure
-            for (const key of keys) {
-                const val = backup[key];
-                if (typeof val === 'string' && val.includes('customerPayments')) {
-                    reply += `✅ Found "customerPayments" in key: ${key}\n`;
-                }
-                if (typeof val === 'object' && val !== null) {
-                    if (Array.isArray(val) && val.length > 0 && val[0].customerEmail) {
-                        reply += `✅ Found payments in key: ${key} (${val.length} items)\n`;
-                    }
-                }
-            }
-        }
-        
-        await sendWhatsAppMessage(from, reply);
-        return;
-    } catch (error) {
-        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
-        return;
-    }
-}
             }
             
             // 📦 Stock Status
@@ -4868,6 +4789,85 @@ if (isAdmin(from) && msgLower === 'debug payments') {
                 await sendWhatsAppMessage(from, reply);
                 return;
             }
+            // ============================================================
+// 🔍 DEBUG: Check payment data structure in backup
+// ============================================================
+if (isAdmin(from) && msgLower === 'debug payments') {
+    try {
+        const filePath = JSON_STORAGE.fullBackup;
+        if (!fs.existsSync(filePath)) {
+            await sendWhatsAppMessage(from, '❌ Backup file not found.');
+            return;
+        }
+        
+        const data = fs.readFileSync(filePath, 'utf8');
+        const backup = JSON.parse(data);
+        
+        let reply = `🔍 *Backup File Analysis*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        // Check if customerPayments exists
+        const hasCustomerPayments = 'customerPayments' in backup;
+        reply += `📋 customerPayments key exists: ${hasCustomerPayments ? '✅' : '❌'}\n`;
+        
+        if (hasCustomerPayments) {
+            const raw = backup.customerPayments;
+            reply += `📊 Type: ${typeof raw}\n`;
+            
+            let payments = [];
+            try {
+                if (typeof raw === 'string') {
+                    payments = JSON.parse(raw);
+                } else if (Array.isArray(raw)) {
+                    payments = raw;
+                } else {
+                    payments = [raw];
+                }
+            } catch (e) {
+                reply += `❌ Parse error: ${e.message}\n`;
+            }
+            
+            reply += `📊 Payments found: ${payments.length}\n\n`;
+            
+            if (payments.length > 0) {
+                const first = payments[0];
+                reply += `📋 *First Payment Structure:*\n`;
+                reply += `   ${JSON.stringify(first, null, 2).substring(0, 500)}\n\n`;
+                
+                reply += `📋 *Keys in first payment:*\n`;
+                Object.keys(first).forEach(key => {
+                    const value = first[key];
+                    const type = typeof value;
+                    const displayValue = type === 'string' ? `"${value}"` : String(value).substring(0, 50);
+                    reply += `   • ${key}: ${type} = ${displayValue}\n`;
+                });
+            }
+        } else {
+            // Check if it's nested differently
+            reply += `\n🔍 Checking for nested payment data...\n`;
+            const keys = Object.keys(backup);
+            reply += `📋 Top-level keys: ${keys.join(', ')}\n`;
+            
+            // Try to find payments in any nested structure
+            for (const key of keys) {
+                const val = backup[key];
+                if (typeof val === 'string' && val.includes('customerPayments')) {
+                    reply += `✅ Found "customerPayments" in key: ${key}\n`;
+                }
+                if (typeof val === 'object' && val !== null) {
+                    if (Array.isArray(val) && val.length > 0 && val[0].customerEmail) {
+                        reply += `✅ Found payments in key: ${key} (${val.length} items)\n`;
+                    }
+                }
+            }
+        }
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
             // 📊 Check database tables
 if (isAdmin(from) && msgLower === 'check tables') {
     try {
