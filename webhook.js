@@ -366,9 +366,10 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             results.purchaseInvoices = await importPurchaseInvoicesArray(purchaseInvoices);
         }
 
-                    // 🔧 FIXED: Import Customer Payments - FORCE IMPORT
+                            // 🔧 FIXED: Import Customer Payments - FORCE IMPORT
         console.log(`💰💰💰 ABOUT TO IMPORT CUSTOMER PAYMENTS...`);
         console.log(`💰💰💰 customerPayments length: ${customerPayments.length}`);
+        console.log(`💰💰💰 customerPayments type: ${typeof customerPayments}`);
         
         // ✅ FORCE IMPORT - Always try to import if there's data
         if (customerPayments && customerPayments.length > 0) {
@@ -402,6 +403,8 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
                 console.error(`❌ Manual parse failed:`, e.message);
             }
         }
+            
+           
                // Import Supplier Payments - FORCE IMPORT
         console.log(`💰💰💰 ABOUT TO IMPORT SUPPLIER PAYMENTS...`);
         console.log(`💰💰💰 supplierPayments length: ${supplierPayments ? supplierPayments.length : 0}`);
