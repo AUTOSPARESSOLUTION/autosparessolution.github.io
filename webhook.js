@@ -211,42 +211,72 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             return [];
         }
 
-        // Parse customerPayments with proper error handling
-        let customerPayments = [];
-        console.log(`🔍 DEBUG: Checking backup.customerPayments...`);
+        // Parse customerPayments with proper error handling - FIXED
+let customerPayments = [];
+console.log(`🔍 DEBUG: Checking backup.customerPayments...`);
+
+// ✅ DIRECT FIX: Parse customerPayments from the backup
+try {
+    if (backup.customerPayments) {
+        console.log(`📋 backup.customerPayments exists, type: ${typeof backup.customerPayments}`);
         
-        if (backup.customerPayments) {
-            console.log(`📋 backup.customerPayments exists, type: ${typeof backup.customerPayments}`);
+        let rawData = backup.customerPayments;
+        
+        // If it's a string, parse it
+        if (typeof rawData === 'string') {
+            console.log(`📋 customerPayments is a string, length: ${rawData.length}`);
+            console.log(`📋 First 200 chars: ${rawData.substring(0, 200)}`);
             
-            if (typeof backup.customerPayments === 'string') {
-                console.log(`📋 customerPayments is a string, length: ${backup.customerPayments.length}`);
-                try {
-                    const parsed = JSON.parse(backup.customerPayments);
-                    if (Array.isArray(parsed)) {
-                        customerPayments = parsed;
-                        console.log(`✅ Parsed as array: ${customerPayments.length} payments`);
-                    } else if (typeof parsed === 'object' && parsed !== null) {
-                        customerPayments = [parsed];
-                        console.log(`✅ Parsed as object: 1 payment`);
-                    } else {
-                        console.log(`⚠️ Parsed result is not an array or object`);
-                    }
-                } catch (e) {
-                    console.log(`❌ Failed to parse customerPayments string:`, e.message);
+            // Try to parse the string
+            try {
+                const parsed = JSON.parse(rawData);
+                if (Array.isArray(parsed)) {
+                    customerPayments = parsed;
+                    console.log(`✅ Parsed as array: ${customerPayments.length} payments`);
+                } else if (typeof parsed === 'object' && parsed !== null) {
+                    customerPayments = [parsed];
+                    console.log(`✅ Parsed as object: 1 payment`);
+                } else {
+                    console.log(`⚠️ Parsed result is not an array or object`);
                     customerPayments = [];
                 }
-            } else if (Array.isArray(backup.customerPayments)) {
-                customerPayments = backup.customerPayments;
-                console.log(`✅ customerPayments is array: ${customerPayments.length} payments`);
-            } else {
-                customerPayments = [backup.customerPayments];
-                console.log(`✅ customerPayments is object: 1 payment`);
+            } catch (parseError) {
+                console.log(`❌ First parse failed:`, parseError.message);
+                
+                // Try cleaning the string
+                try {
+                    let cleaned = rawData;
+                    // Remove outer quotes if present
+                    if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+                        cleaned = cleaned.slice(1, -1);
+                        cleaned = cleaned.replace(/\\"/g, '"');
+                    }
+                    const parsed = JSON.parse(cleaned);
+                    if (Array.isArray(parsed)) {
+                        customerPayments = parsed;
+                        console.log(`✅ Parsed after cleaning: ${customerPayments.length} payments`);
+                    }
+                } catch (cleanError) {
+                    console.log(`❌ Clean parse failed:`, cleanError.message);
+                    customerPayments = [];
+                }
             }
+        } else if (Array.isArray(rawData)) {
+            customerPayments = rawData;
+            console.log(`✅ customerPayments is array: ${customerPayments.length} payments`);
         } else {
-            console.log(`⚠️ No customerPayments key found in backup`);
+            customerPayments = [rawData];
+            console.log(`✅ customerPayments is object: 1 payment`);
         }
+    } else {
+        console.log(`⚠️ No customerPayments key found in backup`);
+    }
+} catch (err) {
+    console.error(`❌ Error parsing customerPayments:`, err.message);
+    customerPayments = [];
+}
 
-        console.log(`💰💰💰 FINAL: customerPayments has ${customerPayments.length} payments`);
+console.log(`💰💰💰 FINAL: customerPayments has ${customerPayments.length} payments`);
 
         // Parse other data
         const customers = parseData(backup.customers);
