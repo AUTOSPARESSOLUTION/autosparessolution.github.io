@@ -1233,7 +1233,7 @@ async function importSupplierPaymentsArray(payments) {
         return 0;
     }
 
-    // 🔧 FIX: Create table with CORRECT schema
+        // 🔧 FIX: Create table with CORRECT schema (including supplier_email)
     await new Promise((resolve) => {
         db.db.run(`
             CREATE TABLE IF NOT EXISTS supplier_payments (
@@ -1254,8 +1254,22 @@ async function importSupplierPaymentsArray(payments) {
                 FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
             )
         `, (err) => {
-            if (err) console.error('❌ Error creating supplier_payments table:', err.message);
-            resolve();
+            if (err) {
+                // If table already exists with wrong schema, try to add the column
+                if (err.message.includes('already exists')) {
+                    console.log('⚠️ Table exists, trying to add missing columns...');
+                    db.db.run(`ALTER TABLE supplier_payments ADD COLUMN supplier_email TEXT`, (err2) => {
+                        if (err2) console.log('⚠️ supplier_email column may already exist');
+                        resolve();
+                    });
+                } else {
+                    console.error('❌ Error creating supplier_payments table:', err.message);
+                    resolve();
+                }
+            } else {
+                console.log('✅ supplier_payments table created');
+                resolve();
+            }
         });
     });
 
