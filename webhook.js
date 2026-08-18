@@ -174,6 +174,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // 1️⃣ IMPORT FULL BACKUP JSON - UPDATED WITH FIXES
+// 1️⃣ IMPORT FULL BACKUP JSON - COMPLETE DEBUG VERSION
 async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
     try {
         if (!fs.existsSync(filePath)) {
@@ -210,15 +211,28 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             return [];
         }
 
-        // 🔧 FIX: Handle customerPayments specifically
+        // Parse customerPayments with proper error handling
         let customerPayments = [];
+        console.log(`🔍 DEBUG: Checking backup.customerPayments...`);
+        
         if (backup.customerPayments) {
+            console.log(`📋 backup.customerPayments exists, type: ${typeof backup.customerPayments}`);
+            
             if (typeof backup.customerPayments === 'string') {
+                console.log(`📋 customerPayments is a string, length: ${backup.customerPayments.length}`);
                 try {
-                    customerPayments = JSON.parse(backup.customerPayments);
-                    console.log(`✅ Parsed customerPayments from string: ${customerPayments.length} payments`);
+                    const parsed = JSON.parse(backup.customerPayments);
+                    if (Array.isArray(parsed)) {
+                        customerPayments = parsed;
+                        console.log(`✅ Parsed as array: ${customerPayments.length} payments`);
+                    } else if (typeof parsed === 'object' && parsed !== null) {
+                        customerPayments = [parsed];
+                        console.log(`✅ Parsed as object: 1 payment`);
+                    } else {
+                        console.log(`⚠️ Parsed result is not an array or object`);
+                    }
                 } catch (e) {
-                    console.log(`⚠️ Failed to parse customerPayments string:`, e.message);
+                    console.log(`❌ Failed to parse customerPayments string:`, e.message);
                     customerPayments = [];
                 }
             } else if (Array.isArray(backup.customerPayments)) {
@@ -231,6 +245,8 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
         } else {
             console.log(`⚠️ No customerPayments key found in backup`);
         }
+
+        console.log(`💰💰💰 FINAL: customerPayments has ${customerPayments.length} payments`);
 
         // Parse other data
         const customers = parseData(backup.customers);
@@ -251,7 +267,7 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             supplierPayments: supplierPayments.length
         });
 
-        // 🔍 DEBUG: Log first customerPayment if exists
+        // Log first customerPayment if exists
         if (customerPayments.length > 0) {
             console.log(`🔍 First customerPayment:`, JSON.stringify(customerPayments[0]).substring(0, 300));
             console.log(`🔍 customerPayment keys:`, Object.keys(customerPayments[0]).join(', '));
@@ -302,42 +318,23 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             results.purchaseInvoices = await importPurchaseInvoicesArray(purchaseInvoices);
         }
 
-        // Import Customer Payments - DEBUG
-if (customerPayments.length > 0) {
-    console.log(`💰💰💰 Importing ${customerPayments.length} customer payments...`);
-    console.log(`📋 First payment:`, JSON.stringify(customerPayments[0]).substring(0, 300));
-    try {
-        results.customerPayments = await importCustomerPaymentsArray(customerPayments);
-        console.log(`💰💰💰 Import result: ${results.customerPayments} payments imported`);
-    } catch (err) {
-        console.error(`❌❌❌ Customer payments import failed:`, err.message);
-        console.error(err.stack);
-        results.customerPayments = 0;
-    }
-} else {
-    console.log(`⚠️ No customer payments found in backup`);
-    // Try to extract from invoices
-    console.log(`🔍 Checking if payments are embedded in invoices...`);
-    let embeddedPayments = [];
-    for (const inv of invoices) {
-        if (inv.payments && Array.isArray(inv.payments)) {
-            embeddedPayments = embeddedPayments.concat(inv.payments);
-        }
-        if (inv.payment && typeof inv.payment === 'object') {
-            embeddedPayments.push(inv.payment);
-        }
-    }
-    if (embeddedPayments.length > 0) {
-        console.log(`💰 Found ${embeddedPayments.length} embedded payments in invoices`);
-        try {
-            results.customerPayments = await importCustomerPaymentsArray(embeddedPayments);
-        } catch (err) {
-            console.error(`❌❌❌ Embedded payments import failed:`, err.message);
-            results.customerPayments = 0;
-        }
-    }
-}
+        // 🔧 FIXED: Import Customer Payments - THIS MUST EXECUTE
+        console.log(`💰💰💰 ABOUT TO IMPORT CUSTOMER PAYMENTS...`);
+        console.log(`💰💰💰 customerPayments length: ${customerPayments.length}`);
         
+        if (customerPayments.length > 0) {
+            console.log(`💰💰💰 Calling importCustomerPaymentsArray with ${customerPayments.length} payments...`);
+            try {
+                results.customerPayments = await importCustomerPaymentsArray(customerPayments);
+                console.log(`💰💰💰 SUCCESS: ${results.customerPayments} payments imported`);
+            } catch (err) {
+                console.error(`❌❌❌ Customer payments import failed:`, err.message);
+                console.error(err.stack);
+                results.customerPayments = 0;
+            }
+        } else {
+            console.log(`⚠️ No customer payments found in backup - skipping import`);
+        }
 
         // Import Supplier Payments
         if (supplierPayments.length > 0) {
