@@ -366,14 +366,18 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             results.purchaseInvoices = await importPurchaseInvoicesArray(purchaseInvoices);
         }
 
-        // 🔧 FIXED: Import Customer Payments - THIS MUST EXECUTE
+            // 🔧 FIXED: Import Customer Payments - FORCE IMPORT
         console.log(`💰💰💰 ABOUT TO IMPORT CUSTOMER PAYMENTS...`);
         console.log(`💰💰💰 customerPayments length: ${customerPayments.length}`);
+        console.log(`💰💰💰 customerPayments type: ${typeof customerPayments}`);
+        console.log(`💰💰💰 First payment if exists:`, customerPayments.length > 0 ? JSON.stringify(customerPayments[0]).substring(0, 200) : 'NONE');
         
-        if (customerPayments.length > 0) {
+        // ✅ FORCE IMPORT - Always try to import if there's data
+        if (customerPayments && customerPayments.length > 0) {
             console.log(`💰💰💰 Calling importCustomerPaymentsArray with ${customerPayments.length} payments...`);
             try {
-                results.customerPayments = await importCustomerPaymentsArray(customerPayments);
+                const result = await importCustomerPaymentsArray(customerPayments);
+                results.customerPayments = result || 0;
                 console.log(`💰💰💰 SUCCESS: ${results.customerPayments} payments imported`);
             } catch (err) {
                 console.error(`❌❌❌ Customer payments import failed:`, err.message);
@@ -381,7 +385,24 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
                 results.customerPayments = 0;
             }
         } else {
-            console.log(`⚠️ No customer payments found in backup - skipping import`);
+            console.log(`⚠️ No customer payments found in backup - checking alternative locations...`);
+            
+            // 🔍 Try to find payments in the raw backup
+            try {
+                const rawData = backup.customerPayments;
+                if (typeof rawData === 'string' && rawData.includes('receiptNo')) {
+                    console.log(`🔍 Found payment data in raw string, attempting manual parse...`);
+                    const parsed = JSON.parse(rawData);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        console.log(`✅ Manual parse found ${parsed.length} payments`);
+                        const result = await importCustomerPaymentsArray(parsed);
+                        results.customerPayments = result || 0;
+                        console.log(`💰💰💰 Manual import result: ${results.customerPayments} payments`);
+                    }
+                }
+            } catch (e) {
+                console.error(`❌ Manual parse failed:`, e.message);
+            }
         }
 
         // Import Supplier Payments
