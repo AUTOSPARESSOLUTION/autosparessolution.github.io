@@ -946,6 +946,7 @@ async function importPurchaseInvoicesArray(purchaseInvoices) {
 // 7️⃣ IMPORT CUSTOMER PAYMENTS - FIXED FOR YOUR JSON STRUCTURE
 // 7️⃣ IMPORT CUSTOMER PAYMENTS - DEBUG VERSION
 // 7️⃣ IMPORT CUSTOMER PAYMENTS - SIMPLIFIED FORCE IMPORT
+// 7️⃣ IMPORT CUSTOMER PAYMENTS - SIMPLIFIED FORCE IMPORT
 async function importCustomerPaymentsArray(payments) {
     let imported = 0;
     let errors = 0;
@@ -960,6 +961,7 @@ async function importCustomerPaymentsArray(payments) {
     
     // Log first payment
     console.log(`📋 First payment:`, JSON.stringify(payments[0]).substring(0, 200));
+    console.log(`📋 Payment keys:`, Object.keys(payments[0]).join(', '));
     
     // Ensure customer_payments table exists
     await new Promise((resolve) => {
