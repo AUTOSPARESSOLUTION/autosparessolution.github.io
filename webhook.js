@@ -1298,7 +1298,7 @@ async function importSupplierPaymentsArray(payments) {
                         paymentId,
                         supplier.id,
                         supplier.name,
-                        supplier.email,
+                        supplier.email || '',
                         amount,
                         paymentMethod,
                         paymentRef,
