@@ -405,10 +405,22 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             }
         }
 
-        // Import Supplier Payments
-        if (supplierPayments.length > 0) {
+               // Import Supplier Payments - FORCE IMPORT
+        console.log(`💰💰💰 ABOUT TO IMPORT SUPPLIER PAYMENTS...`);
+        console.log(`💰💰💰 supplierPayments length: ${supplierPayments ? supplierPayments.length : 0}`);
+        
+        if (supplierPayments && supplierPayments.length > 0) {
             console.log(`💰 Importing ${supplierPayments.length} supplier payments...`);
-            results.supplierPayments = await importSupplierPaymentsArray(supplierPayments);
+            try {
+                const result = await importSupplierPaymentsArray(supplierPayments);
+                results.supplierPayments = result || 0;
+                console.log(`💰💰💰 Supplier payments imported: ${results.supplierPayments}`);
+            } catch (err) {
+                console.error(`❌ Supplier payments import failed:`, err.message);
+                results.supplierPayments = 0;
+            }
+        } else {
+            console.log(`⚠️ No supplier payments found in backup`);
         }
 
         // Import Users
