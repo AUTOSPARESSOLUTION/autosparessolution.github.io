@@ -211,36 +211,47 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             return [];
         }
 
-               // Parse customerPayments - DIRECT FIX
+                     // Parse customerPayments - HARDCODED FIX
         let customerPayments = [];
         console.log(`🔍 DEBUG: Checking backup.customerPayments...`);
         
         try {
-            // ✅ DIRECT ACCESS: Get the raw data
             const rawData = backup.customerPayments;
             
             if (rawData) {
                 console.log(`📋 rawData type: ${typeof rawData}`);
+                console.log(`📋 rawData length: ${rawData ? rawData.length : 0}`);
                 
-                if (typeof rawData === 'string') {
-                    console.log(`📋 rawData is string, length: ${rawData.length}`);
-                    console.log(`📋 First 100 chars: ${rawData.substring(0, 100)}...`);
-                    
-                    // Try parsing
-                    try {
+                // Try direct parsing
+                try {
+                    // Check if it's already an array
+                    if (Array.isArray(rawData)) {
+                        customerPayments = rawData;
+                        console.log(`✅ rawData is already array: ${customerPayments.length} payments`);
+                    } 
+                    // If it's a string, parse it
+                    else if (typeof rawData === 'string') {
+                        console.log(`📋 rawData is string, first 200 chars: ${rawData.substring(0, 200)}...`);
                         const parsed = JSON.parse(rawData);
                         if (Array.isArray(parsed)) {
                             customerPayments = parsed;
                             console.log(`✅ Parsed ${customerPayments.length} payments from string`);
                         } else {
                             customerPayments = [parsed];
-                            console.log(`✅ Parsed 1 payment from string (object)`);
+                            console.log(`✅ Parsed 1 payment`);
                         }
-                    } catch (e) {
-                        console.log(`❌ Parse error:`, e.message);
-                        // Try with escape handling
-                        try {
-                            let cleaned = rawData;
+                    }
+                    // If it's an object, convert to array
+                    else if (typeof rawData === 'object') {
+                        customerPayments = [rawData];
+                        console.log(`✅ rawData is object: 1 payment`);
+                    }
+                } catch (e) {
+                    console.log(`❌ Parse error:`, e.message);
+                    // Try with cleaning
+                    try {
+                        let cleaned = rawData;
+                        if (typeof cleaned === 'string') {
                             if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
                                 cleaned = cleaned.slice(1, -1);
                                 cleaned = cleaned.replace(/\\"/g, '"');
@@ -250,17 +261,10 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
                                 customerPayments = parsed;
                                 console.log(`✅ Parsed ${customerPayments.length} payments after cleaning`);
                             }
-                        } catch (e2) {
-                            console.log(`❌ Clean parse also failed:`, e2.message);
-                            customerPayments = [];
                         }
+                    } catch (e2) {
+                        console.log(`❌ Clean parse also failed:`, e2.message);
                     }
-                } else if (Array.isArray(rawData)) {
-                    customerPayments = rawData;
-                    console.log(`✅ rawData is array: ${customerPayments.length} payments`);
-                } else if (typeof rawData === 'object') {
-                    customerPayments = [rawData];
-                    console.log(`✅ rawData is object: 1 payment`);
                 }
             } else {
                 console.log(`⚠️ No customerPayments found in backup`);
@@ -272,6 +276,26 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
 
         console.log(`💰💰💰 FINAL: customerPayments has ${customerPayments.length} payments`);
         
+        // ✅ EMERGENCY FIX: If still 0, try manual extraction from the raw backup string
+        if (customerPayments.length === 0 && backup.customerPayments) {
+            console.log(`🔍 EMERGENCY: Trying manual extraction from raw backup...`);
+            try {
+                const rawStr = backup.customerPayments;
+                if (typeof rawStr === 'string' && rawStr.includes('receiptNo')) {
+                    // Find the array pattern
+                    const match = rawStr.match(/\[[\s\S]*\]/);
+                    if (match) {
+                        const parsed = JSON.parse(match[0]);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            customerPayments = parsed;
+                            console.log(`✅ EMERGENCY: Found ${customerPayments.length} payments`);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log(`❌ Emergency extraction failed:`, e.message);
+            }
+        }
         // ✅ EMERGENCY FIX: If still 0, try to find payments in the raw backup data
         if (customerPayments.length === 0) {
             console.log(`🔍 EMERGENCY: Trying to find payments in backup keys...`);
