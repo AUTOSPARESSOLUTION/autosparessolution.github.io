@@ -1307,223 +1307,364 @@ async function importCustomerPaymentsArray(payments) {
 // 8️⃣ IMPORT SUPPLIER PAYMENTS - IMPROVED
 // 8️⃣ IMPORT SUPPLIER PAYMENTS - FIXED
 // 8️⃣ IMPORT SUPPLIER PAYMENTS - COMPLETELY FIXED
+// ============================================================
+// 8️⃣ IMPORT SUPPLIER PAYMENTS - FINAL VERSION
+// ============================================================
 async function importSupplierPaymentsArray(payments) {
     let imported = 0;
     let errors = 0;
     let skipped = 0;
 
-    console.log(`💰 Importing ${payments ? payments.length : 0} supplier payments...`);
+    console.log(
+        `💰 Importing ${Array.isArray(payments) ? payments.length : 0} supplier payments...`
+    );
 
-    if (!payments || payments.length === 0) {
+    if (!Array.isArray(payments) || payments.length === 0) {
         console.log(`⚠️ No supplier payments to import`);
         return 0;
     }
 
-         // 🔧 FIX: Create table with CORRECT schema
-    await new Promise((resolve) => {
-        db.db.run(`
-            CREATE TABLE IF NOT EXISTS supplier_payments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                payment_id TEXT UNIQUE NOT NULL,
-                supplier_id INTEGER NOT NULL,
-                supplier_name TEXT,
-                supplier_email TEXT,
-                amount REAL NOT NULL,
-                payment_method TEXT NOT NULL,
-                payment_reference TEXT,
-                payment_date TEXT DEFAULT CURRENT_TIMESTAMP,
-                invoice_no TEXT,
-                notes TEXT,
-                status TEXT DEFAULT 'completed',
-                created_by TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-            )
-        `, (err) => {
-            if (err) {
-                console.error('❌ Error creating supplier_payments table:', err.message);
-                // Try to add missing columns if table exists
-                db.db.run(`ALTER TABLE supplier_payments ADD COLUMN supplier_email TEXT`, (err2) => {
-                    if (err2) console.log('⚠️ supplier_email column may already exist');
-                    resolve();
-                });
-            } else {
-                console.log('✅ supplier_payments table created');
-                resolve();
-            }
-        });
-    });
-    // Get all suppliers for lookup
-    const allSuppliers = await new Promise((resolve) => {
-        db.db.all(`SELECT id, name, phone, email FROM suppliers`, [], (err, rows) => {
-            if (err) {
-                console.error('❌ Error getting suppliers:', err.message);
-                resolve([]);
-            } else {
-                console.log(`📋 Found ${rows ? rows.length : 0} suppliers in database`);
-                resolve(rows || []);
-            }
-        });
-    });
+    // --------------------------------------------------------
+    // IMPORTANT:
+    // DO NOT ALTER THE EXISTING TABLE.
+    // DO NOT ADD supplier_email.
+    //
+    // We use supplier_id as the relationship.
+    // --------------------------------------------------------
 
-    // Build lookup maps
-    const emailMap = {};
-    const nameMap = {};
-    allSuppliers.forEach(s => {
-        if (s.email) emailMap[s.email.toLowerCase()] = s;
-        if (s.name) nameMap[s.name.toLowerCase()] = s;
-    });
+    const supplierPaymentTable = await dbGet(`
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name = 'supplier_payments'
+        LIMIT 1
+    `);
 
-    for (let i = 0; i < payments.length; i++) {
-        const payment = payments[i];
-        try {
-            const supplierEmail = payment.supplierEmail || payment.supplier_email || '';
-            const supplierName = payment.supplierName || payment.supplier_name || payment.name || '';
-            const amount = parseFloat(payment.amount) || 0;
-            const paymentMethod = payment.payment_method || payment.mode || 'Cash';
-            const paymentRef = payment.payment_reference || payment.reference || payment.ref || '';
-            const paymentDate = payment.payment_date || payment.date || new Date().toISOString();
-            const invoiceNo = payment.invoice_no || payment.invoiceNo || '';
-            const notes = payment.notes || payment.remarks || '';
-            const paymentId = payment.payment_id || payment.id || `SP-${Date.now().toString().slice(-6)}${i}`;
+    if (!supplierPaymentTable) {
+        throw new Error(
+            'supplier_payments table does not exist. ' +
+            'Create it using your database schema before importing payments.'
+        );
+    }
 
-            console.log(`📋 Payment ${i+1}: email=${supplierEmail}, amount=${amount}`);
+    // --------------------------------------------------------
+    // Read actual columns
+    // --------------------------------------------------------
+    const tableInfo = await dbAll(
+        `PRAGMA table_info(supplier_payments)`
+    );
 
-            if (!supplierEmail) {
-                console.log(`⚠️ Skipping - no email`);
-                skipped++;
-                continue;
-            }
+    const columns = tableInfo.map(row => row.name);
 
-            let supplier = null;
+    console.log(
+        `📋 supplier_payments columns: ${columns.join(', ')}`
+    );
 
-            // Find by email
-            if (supplierEmail && emailMap[supplierEmail.toLowerCase()]) {
-                supplier = emailMap[supplierEmail.toLowerCase()];
-                console.log(`✅ Found supplier by email: ${supplierEmail} -> ID ${supplier.id}`);
-            }
+    // supplier_id is required by this import
+    if (!columns.includes('supplier_id')) {
+        throw new Error(
+            'supplier_payments table does not contain supplier_id'
+        );
+    }
 
-            // Find by name
-            if (!supplier && supplierName && nameMap[supplierName.toLowerCase()]) {
-                supplier = nameMap[supplierName.toLowerCase()];
-                console.log(`✅ Found supplier by name: ${supplierName} -> ID ${supplier.id}`);
-            }
+    // --------------------------------------------------------
+    // Get suppliers once
+    // --------------------------------------------------------
+    const allSuppliers = await dbAll(`
+        SELECT id, name, phone, email
+        FROM suppliers
+    `);
 
-            // Create new supplier if not found
-            if (!supplier) {
-                console.log(`⚠️ Supplier NOT found: ${supplierEmail}, creating...`);
-                const newPhone = `99${Date.now().toString().slice(-8)}`;
-                
-                await new Promise((resolve, reject) => {
-                    db.db.run(
-                        `INSERT INTO suppliers (name, phone, email, status, created_at, updated_at) 
-                         VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-                        [supplierName || supplierEmail.split('@')[0] || 'Unknown', newPhone, supplierEmail],
-                        function(err) {
-                            if (err) {
-                                console.error(`❌ Failed to create supplier:`, err.message);
-                                reject(err);
-                            } else {
-                                console.log(`✅ Created new supplier: ${newPhone}`);
-                                resolve();
-                            }
-                        }
-                    );
-                });
+    console.log(
+        `📋 Found ${allSuppliers.length} suppliers for payment lookup`
+    );
 
-                // Fetch the new supplier
-                supplier = await new Promise((resolve) => {
-                    db.db.get(
-                        `SELECT id, name, phone, email FROM suppliers WHERE email = ?`,
-                        [supplierEmail],
-                        (err, row) => {
-                            if (err) resolve(null);
-                            else resolve(row);
-                        }
-                    );
-                });
+    // --------------------------------------------------------
+    // Build supplier lookup maps
+    // --------------------------------------------------------
+    const emailMap = new Map();
+    const nameMap = new Map();
 
-                if (!supplier) {
-                    console.log(`⚠️ Failed to find created supplier`);
-                    skipped++;
-                    continue;
-                }
-                console.log(`✅ Created supplier: ${supplier.name} (ID: ${supplier.id})`);
-            }
+    for (const supplier of allSuppliers) {
 
-            // Check if payment exists
-            const existing = await new Promise((resolve) => {
-                db.db.get(
-                    `SELECT payment_id FROM supplier_payments WHERE payment_id = ?`,
-                    [paymentId],
-                    (err, row) => {
-                        if (err) resolve(null);
-                        else resolve(row);
-                    }
-                );
-            });
+        if (supplier.email) {
+            emailMap.set(
+                supplier.email.toString().trim().toLowerCase(),
+                supplier
+            );
+        }
 
-            if (existing) {
-                console.log(`ℹ️ Payment ${paymentId} already exists`);
-                skipped++;
-                continue;
-            }
-
-            // 🔧 FIX: Use supplier_id (NOT supplier_phone)
-            await new Promise((resolve, reject) => {
-                db.db.run(
-                    `INSERT INTO supplier_payments 
-                     (payment_id, supplier_id, supplier_name, supplier_email, amount, 
-                      payment_method, payment_reference, payment_date, invoice_no, notes, status, created_at)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', CURRENT_TIMESTAMP)`,
-                    [
-                        paymentId,
-                        supplier.id,
-                        supplier.name,
-                        supplier.email || '',
-                        amount,
-                        paymentMethod,
-                        paymentRef,
-                        paymentDate,
-                        invoiceNo,
-                        notes
-                    ],
-                    function(err) {
-                        if (err) {
-                            console.error(`❌ Insert error:`, err.message);
-                            reject(err);
-                        } else {
-                            console.log(`✅ Inserted payment: ${paymentId}`);
-                            resolve();
-                        }
-                    }
-                );
-            });
-
-            // Update outstanding
-            if (amount > 0) {
-                await new Promise((resolve) => {
-                    db.db.run(
-                        `UPDATE suppliers SET outstanding = COALESCE(outstanding, 0) - ? WHERE id = ?`,
-                        [amount, supplier.id],
-                        (err) => {
-                            if (err) console.error(`⚠️ Update error:`, err.message);
-                            resolve();
-                        }
-                    );
-                });
-            }
-
-            imported++;
-            console.log(`✅ Imported supplier payment ${i+1}: ${paymentId} - ₹${amount}`);
-
-        } catch (err) {
-            console.error(`❌ Error importing supplier payment ${i+1}:`, err.message);
-            errors++;
+        if (supplier.name) {
+            nameMap.set(
+                supplier.name.toString().trim().toLowerCase(),
+                supplier
+            );
         }
     }
 
-    console.log(`📊 Supplier Payments: ${imported} imported, ${skipped} skipped, ${errors} errors`);
+    // --------------------------------------------------------
+    // Process sequentially
+    // IMPORTANT:
+    // No Promise.all()
+    // No nested transactions
+    // --------------------------------------------------------
+    for (let i = 0; i < payments.length; i++) {
+        const payment = payments[i];
+
+        try {
+            if (!payment || typeof payment !== 'object') {
+                skipped++;
+                continue;
+            }
+
+            // ------------------------------------------------
+            // Read JSON fields
+            // ------------------------------------------------
+            const supplierEmail = String(
+                payment.supplierEmail ||
+                payment.supplier_email ||
+                payment.email ||
+                ''
+            ).trim();
+
+            const supplierName = String(
+                payment.supplierName ||
+                payment.supplier_name ||
+                payment.name ||
+                ''
+            ).trim();
+
+            const amount = Number.parseFloat(payment.amount);
+
+            const paymentMethod = String(
+                payment.paymentMethod ||
+                payment.payment_method ||
+                payment.mode ||
+                'Cash'
+            ).trim();
+
+            const paymentReference = String(
+                payment.paymentReference ||
+                payment.payment_reference ||
+                payment.reference ||
+                payment.ref ||
+                ''
+            ).trim();
+
+            const paymentDate =
+                payment.paymentDate ||
+                payment.payment_date ||
+                payment.date ||
+                new Date().toISOString();
+
+            const invoiceNo = String(
+                payment.invoiceNo ||
+                payment.invoice_no ||
+                ''
+            ).trim();
+
+            const notes = String(
+                payment.notes ||
+                payment.remarks ||
+                payment.note ||
+                ''
+            ).trim();
+
+            const paymentId = String(
+                payment.paymentId ||
+                payment.payment_id ||
+                payment.id ||
+                `SP-${Date.now()}-${i + 1}`
+            ).trim();
+
+            console.log(
+                `📋 Supplier Payment ${i + 1}/${payments.length}: ` +
+                `email=${supplierEmail}, amount=${amount}`
+            );
+
+            // ------------------------------------------------
+            // Validate amount
+            // ------------------------------------------------
+            if (!Number.isFinite(amount) || amount <= 0) {
+                console.log(
+                    `⚠️ Skipping ${paymentId}: invalid amount`
+                );
+                skipped++;
+                continue;
+            }
+
+            // ------------------------------------------------
+            // Find supplier
+            // Priority:
+            // 1. Email
+            // 2. Name
+            // ------------------------------------------------
+            let supplier = null;
+
+            if (supplierEmail) {
+                supplier =
+                    emailMap.get(
+                        supplierEmail.toLowerCase()
+                    ) || null;
+            }
+
+            if (!supplier && supplierName) {
+                supplier =
+                    nameMap.get(
+                        supplierName.toLowerCase()
+                    ) || null;
+            }
+
+            // ------------------------------------------------
+            // DO NOT silently create fake suppliers.
+            //
+            // This is an accounting import.
+            // If supplier cannot be matched, skip it.
+            // ------------------------------------------------
+            if (!supplier) {
+                console.log(
+                    `⚠️ Supplier not found: ` +
+                    `${supplierEmail || supplierName || 'UNKNOWN'}`
+                );
+
+                skipped++;
+                continue;
+            }
+
+            console.log(
+                `✅ Found supplier: ${supplier.name} -> ID ${supplier.id}`
+            );
+
+            // ------------------------------------------------
+            // Check duplicate
+            // ------------------------------------------------
+            const existing = await dbGet(
+                `SELECT id
+                 FROM supplier_payments
+                 WHERE payment_id = ?
+                 LIMIT 1`,
+                [paymentId]
+            );
+
+            if (existing) {
+                console.log(
+                    `ℹ️ Supplier payment already exists: ${paymentId}`
+                );
+                skipped++;
+                continue;
+            }
+
+            // ------------------------------------------------
+            // Build INSERT dynamically.
+            //
+            // CRITICAL:
+            // supplier_email is NEVER inserted unless the
+            // existing database table actually contains it.
+            // ------------------------------------------------
+            const fields = [];
+            const values = [];
+
+            function addField(field, value) {
+                if (columns.includes(field)) {
+                    fields.push(field);
+                    values.push(value);
+                }
+            }
+
+            addField('payment_id', paymentId);
+            addField('supplier_id', supplier.id);
+            addField('supplier_name', supplier.name || '');
+            
+            // Only include email if the REAL table has it.
+            if (columns.includes('supplier_email')) {
+                addField('supplier_email', supplier.email || supplierEmail || '');
+            }
+
+            addField('amount', amount);
+            addField('payment_method', paymentMethod);
+            addField('payment_reference', paymentReference);
+            addField('payment_date', paymentDate);
+            addField('invoice_no', invoiceNo);
+            addField('notes', notes);
+
+            if (columns.includes('status')) {
+                addField('status', 'completed');
+            }
+
+            if (columns.includes('created_by')) {
+                addField('created_by', 'backup_import');
+            }
+
+            if (columns.includes('created_at')) {
+                addField('created_at', new Date().toISOString());
+            }
+
+            if (!fields.includes('payment_id')) {
+                throw new Error(
+                    'supplier_payments.payment_id column is missing'
+                );
+            }
+
+            if (!fields.includes('supplier_id')) {
+                throw new Error(
+                    'supplier_payments.supplier_id column is missing'
+                );
+            }
+
+            const placeholders = fields
+                .map(() => '?')
+                .join(', ');
+
+            await dbRun(
+                `INSERT INTO supplier_payments
+                 (${fields.join(', ')})
+                 VALUES (${placeholders})`,
+                values
+            );
+
+            // ------------------------------------------------
+            // Update supplier outstanding if column exists
+            // ------------------------------------------------
+            const supplierColumns = await dbAll(
+                `PRAGMA table_info(suppliers)`
+            );
+
+            const supplierColumnNames =
+                supplierColumns.map(row => row.name);
+
+            if (supplierColumnNames.includes('outstanding')) {
+                await dbRun(
+                    `UPDATE suppliers
+                     SET outstanding =
+                         COALESCE(outstanding, 0) - ?
+                     WHERE id = ?`,
+                    [amount, supplier.id]
+                );
+            }
+
+            imported++;
+
+            console.log(
+                `✅ Imported supplier payment ` +
+                `${i + 1}/${payments.length}: ` +
+                `${paymentId} - ₹${amount}`
+            );
+
+        } catch (err) {
+            errors++;
+
+            console.error(
+                `❌ Supplier payment ${i + 1} failed:`,
+                err.message
+            );
+        }
+    }
+
+    console.log(`\n📊 Supplier Payments Summary:`);
+    console.log(`   ✅ Imported: ${imported}`);
+    console.log(`   ⏭️ Skipped: ${skipped}`);
+    console.log(`   ❌ Errors: ${errors}`);
+
     return imported;
 }
 // 9️⃣ IMPORT USERS - FIXED with dynamic column handling
