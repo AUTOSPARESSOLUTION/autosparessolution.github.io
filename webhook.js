@@ -316,22 +316,27 @@ if (customerPayments.length > 0) {
     }
 } else {
     console.log(`⚠️ No customer payments found in backup`);
+    // Try to extract from invoices
+    console.log(`🔍 Checking if payments are embedded in invoices...`);
+    let embeddedPayments = [];
+    for (const inv of invoices) {
+        if (inv.payments && Array.isArray(inv.payments)) {
+            embeddedPayments = embeddedPayments.concat(inv.payments);
+        }
+        if (inv.payment && typeof inv.payment === 'object') {
+            embeddedPayments.push(inv.payment);
+        }
+    }
+    if (embeddedPayments.length > 0) {
+        console.log(`💰 Found ${embeddedPayments.length} embedded payments in invoices`);
+        try {
+            results.customerPayments = await importCustomerPaymentsArray(embeddedPayments);
+        } catch (err) {
+            console.error(`❌❌❌ Embedded payments import failed:`, err.message);
+            results.customerPayments = 0;
+        }
+    }
 }
-            // Try to extract from invoices
-            console.log(`🔍 Checking if payments are embedded in invoices...`);
-            let embeddedPayments = [];
-            for (const inv of invoices) {
-                if (inv.payments && Array.isArray(inv.payments)) {
-                    embeddedPayments = embeddedPayments.concat(inv.payments);
-                }
-                if (inv.payment && typeof inv.payment === 'object') {
-                    embeddedPayments.push(inv.payment);
-                }
-            }
-            if (embeddedPayments.length > 0) {
-                console.log(`💰 Found ${embeddedPayments.length} embedded payments in invoices`);
-                results.customerPayments = await importCustomerPaymentsArray(embeddedPayments);
-            }
         
 
         // Import Supplier Payments
