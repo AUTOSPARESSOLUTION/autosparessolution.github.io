@@ -1187,20 +1187,26 @@ async function importCustomerPaymentsArray(payments) {
 // 8️⃣ IMPORT SUPPLIER PAYMENTS
 // 8️⃣ IMPORT SUPPLIER PAYMENTS - IMPROVED
 // 8️⃣ IMPORT SUPPLIER PAYMENTS - FIXED
+// 8️⃣ IMPORT SUPPLIER PAYMENTS - COMPLETELY FIXED
 async function importSupplierPaymentsArray(payments) {
     let imported = 0;
     let errors = 0;
     let skipped = 0;
 
-    console.log(`💰 Importing ${payments.length} supplier payments...`);
+    console.log(`💰 Importing ${payments ? payments.length : 0} supplier payments...`);
 
-    // Ensure supplier_payments table exists
+    if (!payments || payments.length === 0) {
+        console.log(`⚠️ No supplier payments to import`);
+        return 0;
+    }
+
+    // 🔧 FIX: Create table with CORRECT schema
     await new Promise((resolve) => {
         db.db.run(`
             CREATE TABLE IF NOT EXISTS supplier_payments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 payment_id TEXT UNIQUE NOT NULL,
-                supplier_phone TEXT NOT NULL,
+                supplier_id INTEGER NOT NULL,
                 supplier_name TEXT,
                 supplier_email TEXT,
                 amount REAL NOT NULL,
@@ -1211,7 +1217,8 @@ async function importSupplierPaymentsArray(payments) {
                 notes TEXT,
                 status TEXT DEFAULT 'completed',
                 created_by TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
             )
         `, (err) => {
             if (err) console.error('❌ Error creating supplier_payments table:', err.message);
@@ -1219,164 +1226,106 @@ async function importSupplierPaymentsArray(payments) {
         });
     });
 
-    for (const payment of payments) {
+    // Get all suppliers for lookup
+    const allSuppliers = await new Promise((resolve) => {
+        db.db.all(`SELECT id, name, phone, email FROM suppliers`, [], (err, rows) => {
+            if (err) {
+                console.error('❌ Error getting suppliers:', err.message);
+                resolve([]);
+            } else {
+                console.log(`📋 Found ${rows ? rows.length : 0} suppliers in database`);
+                resolve(rows || []);
+            }
+        });
+    });
+
+    // Build lookup maps
+    const emailMap = {};
+    const nameMap = {};
+    allSuppliers.forEach(s => {
+        if (s.email) emailMap[s.email.toLowerCase()] = s;
+        if (s.name) nameMap[s.name.toLowerCase()] = s;
+    });
+
+    for (let i = 0; i < payments.length; i++) {
+        const payment = payments[i];
         try {
-            // Extract payment data - support multiple field names
             const supplierEmail = payment.supplierEmail || payment.supplier_email || '';
-            const supplierPhone = payment.supplierPhone || payment.supplier_phone || payment.phone || '';
-            const supplierName = payment.supplierName || payment.supplier_name || payment.name || 'Unknown';
+            const supplierName = payment.supplierName || payment.supplier_name || payment.name || '';
             const amount = parseFloat(payment.amount) || 0;
             const paymentMethod = payment.payment_method || payment.mode || 'Cash';
             const paymentRef = payment.payment_reference || payment.reference || payment.ref || '';
             const paymentDate = payment.payment_date || payment.date || new Date().toISOString();
             const invoiceNo = payment.invoice_no || payment.invoiceNo || '';
             const notes = payment.notes || payment.remarks || '';
-            const paymentId = payment.payment_id || payment.id || `SP-${Date.now().toString().slice(-6)}`;
+            const paymentId = payment.payment_id || payment.id || `SP-${Date.now().toString().slice(-6)}${i}`;
 
-            if (!supplierEmail && !supplierPhone) {
-                console.log(`⚠️ Skipping supplier payment - no email or phone`);
+            console.log(`📋 Payment ${i+1}: email=${supplierEmail}, amount=${amount}`);
+
+            if (!supplierEmail) {
+                console.log(`⚠️ Skipping - no email`);
                 skipped++;
                 continue;
             }
 
-            console.log(`🔍 Looking for supplier: Email=${supplierEmail}, Phone=${supplierPhone}`);
+            let supplier = null;
 
-            let foundSupplier = null;
-            let foundPhone = null;
-            let searchMethod = '';
+            // Find by email
+            if (supplierEmail && emailMap[supplierEmail.toLowerCase()]) {
+                supplier = emailMap[supplierEmail.toLowerCase()];
+                console.log(`✅ Found supplier by email: ${supplierEmail} -> ID ${supplier.id}`);
+            }
 
-            // METHOD 1: Search by email
-            if (supplierEmail) {
-                foundSupplier = await new Promise((resolve) => {
+            // Find by name
+            if (!supplier && supplierName && nameMap[supplierName.toLowerCase()]) {
+                supplier = nameMap[supplierName.toLowerCase()];
+                console.log(`✅ Found supplier by name: ${supplierName} -> ID ${supplier.id}`);
+            }
+
+            // Create new supplier if not found
+            if (!supplier) {
+                console.log(`⚠️ Supplier NOT found: ${supplierEmail}, creating...`);
+                const newPhone = `99${Date.now().toString().slice(-8)}`;
+                
+                await new Promise((resolve, reject) => {
+                    db.db.run(
+                        `INSERT INTO suppliers (name, phone, email, status, created_at, updated_at) 
+                         VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                        [supplierName || supplierEmail.split('@')[0] || 'Unknown', newPhone, supplierEmail],
+                        function(err) {
+                            if (err) {
+                                console.error(`❌ Failed to create supplier:`, err.message);
+                                reject(err);
+                            } else {
+                                console.log(`✅ Created new supplier: ${newPhone}`);
+                                resolve();
+                            }
+                        }
+                    );
+                });
+
+                // Fetch the new supplier
+                supplier = await new Promise((resolve) => {
                     db.db.get(
-                        `SELECT phone, name, email FROM suppliers WHERE email = ? OR phone = ?`,
-                        [supplierEmail, supplierEmail],
+                        `SELECT id, name, phone, email FROM suppliers WHERE email = ?`,
+                        [supplierEmail],
                         (err, row) => {
                             if (err) resolve(null);
                             else resolve(row);
                         }
                     );
                 });
-                
-                if (foundSupplier) {
-                    foundPhone = foundSupplier.phone;
-                    searchMethod = 'by email';
-                    console.log(`✅ Found supplier ${searchMethod}: ${foundPhone}`);
-                }
-            }
 
-            // METHOD 2: Search by phone
-            if (!foundSupplier && supplierPhone) {
-                const cleanPhone = supplierPhone.toString().replace(/\D/g, '');
-                if (cleanPhone.length >= 10) {
-                    foundSupplier = await new Promise((resolve) => {
-                        db.db.get(
-                            `SELECT phone, name, email FROM suppliers WHERE phone = ?`,
-                            [cleanPhone],
-                            (err, row) => {
-                                if (err) resolve(null);
-                                else resolve(row);
-                            }
-                        );
-                    });
-                    
-                    if (foundSupplier) {
-                        foundPhone = foundSupplier.phone;
-                        searchMethod = 'by phone';
-                        console.log(`✅ Found supplier ${searchMethod}: ${foundPhone}`);
-                    }
-                }
-            }
-
-            // METHOD 3: Search by name
-            if (!foundSupplier && supplierName && supplierName !== 'Unknown') {
-                foundSupplier = await new Promise((resolve) => {
-                    db.db.get(
-                        `SELECT phone, name, email FROM suppliers WHERE name LIKE ?`,
-                        [`%${supplierName}%`],
-                        (err, row) => {
-                            if (err) resolve(null);
-                            else resolve(row);
-                        }
-                    );
-                });
-                
-                if (foundSupplier) {
-                    foundPhone = foundSupplier.phone;
-                    searchMethod = 'by name';
-                    console.log(`✅ Found supplier ${searchMethod}: ${foundPhone}`);
-                }
-            }
-
-            if (!foundSupplier) {
-                console.log(`⚠️ Supplier NOT found for: ${supplierEmail || supplierPhone}`);
-                console.log(`   Creating new supplier...`);
-                
-                // Create a new supplier
-                const newPhone = supplierPhone || `99${Date.now().toString().slice(-8)}`;
-                const cleanNewPhone = newPhone.toString().replace(/\D/g, '');
-                
-                if (cleanNewPhone.length >= 10) {
-                    await new Promise((resolve, reject) => {
-                        db.db.run(
-                            `INSERT OR IGNORE INTO suppliers (name, phone, email, status, created_at, updated_at) 
-                             VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-                            [supplierName, cleanNewPhone, supplierEmail],
-                            function(err) {
-                                if (err) {
-                                    console.error(`❌ Failed to create supplier:`, err.message);
-                                    reject(err);
-                                } else {
-                                    console.log(`✅ Created new supplier: ${cleanNewPhone} (${supplierName})`);
-                                    resolve();
-                                }
-                            }
-                        );
-                    });
-                    
-                    foundPhone = cleanNewPhone;
-                    foundSupplier = { phone: cleanNewPhone, name: supplierName };
-                    searchMethod = 'by creation';
-                } else {
-                    console.log(`⚠️ Could not create supplier - invalid phone: ${cleanNewPhone}`);
+                if (!supplier) {
+                    console.log(`⚠️ Failed to find created supplier`);
                     skipped++;
                     continue;
                 }
+                console.log(`✅ Created supplier: ${supplier.name} (ID: ${supplier.id})`);
             }
 
-            if (!foundPhone) {
-                console.log(`⚠️ No phone found for supplier`);
-                skipped++;
-                continue;
-            }
-
-            const cleanPhone = foundPhone.toString().replace(/\D/g, '');
-            if (cleanPhone.length < 10) {
-                console.log(`⚠️ Invalid phone: ${cleanPhone}`);
-                skipped++;
-                continue;
-            }
-
-            // Check if supplier exists
-            const supplierExists = await new Promise((resolve) => {
-                db.db.get(
-                    `SELECT phone FROM suppliers WHERE phone = ?`,
-                    [cleanPhone],
-                    (err, row) => {
-                        if (err) resolve(null);
-                        else resolve(row);
-                    }
-                );
-            });
-
-            if (!supplierExists) {
-                console.log(`⚠️ Supplier not found in database: ${cleanPhone}`);
-                skipped++;
-                continue;
-            }
-
-            // Check if payment already exists
-            const existingPayment = await new Promise((resolve) => {
+            // Check if payment exists
+            const existing = await new Promise((resolve) => {
                 db.db.get(
                     `SELECT payment_id FROM supplier_payments WHERE payment_id = ?`,
                     [paymentId],
@@ -1387,66 +1336,62 @@ async function importSupplierPaymentsArray(payments) {
                 );
             });
 
-            if (existingPayment) {
-                console.log(`ℹ️ Supplier payment ${paymentId} already exists, skipping`);
+            if (existing) {
+                console.log(`ℹ️ Payment ${paymentId} already exists`);
                 skipped++;
                 continue;
             }
 
-            // Update supplier outstanding
-            if (amount > 0) {
-                await new Promise((resolve, reject) => {
-                    db.db.run(
-                        `UPDATE suppliers 
-                         SET outstanding = COALESCE(outstanding, 0) - ?,
-                             updated_at = CURRENT_TIMESTAMP
-                         WHERE phone = ?`,
-                        [amount, cleanPhone],
-                        function(err) {
-                            if (err) reject(err);
-                            else resolve();
-                        }
-                    );
-                });
-                console.log(`💰 Updated outstanding for ${cleanPhone}: -₹${amount}`);
-            }
-
-            // Insert payment
+            // 🔧 FIX: Use supplier_id (NOT supplier_phone)
             await new Promise((resolve, reject) => {
                 db.db.run(
                     `INSERT INTO supplier_payments 
-                     (payment_id, supplier_phone, supplier_name, supplier_email, amount, 
+                     (payment_id, supplier_id, supplier_name, supplier_email, amount, 
                       payment_method, payment_reference, payment_date, invoice_no, notes, status, created_at)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', CURRENT_TIMESTAMP)`,
                     [
                         paymentId,
-                        cleanPhone,
-                        foundSupplier?.name || supplierName,
-                        supplierEmail || foundSupplier?.email || '',
+                        supplier.id,
+                        supplier.name,
+                        supplier.email,
                         amount,
                         paymentMethod,
                         paymentRef,
                         paymentDate,
                         invoiceNo,
-                        notes,
-                        'completed'
+                        notes
                     ],
                     function(err) {
                         if (err) {
                             console.error(`❌ Insert error:`, err.message);
                             reject(err);
                         } else {
+                            console.log(`✅ Inserted payment: ${paymentId}`);
                             resolve();
                         }
                     }
                 );
             });
 
+            // Update outstanding
+            if (amount > 0) {
+                await new Promise((resolve) => {
+                    db.db.run(
+                        `UPDATE suppliers SET outstanding = COALESCE(outstanding, 0) - ? WHERE id = ?`,
+                        [amount, supplier.id],
+                        (err) => {
+                            if (err) console.error(`⚠️ Update error:`, err.message);
+                            resolve();
+                        }
+                    );
+                });
+            }
+
             imported++;
-            console.log(`✅ Imported supplier payment: ${paymentId} - ₹${amount} for ${cleanPhone}`);
+            console.log(`✅ Imported supplier payment ${i+1}: ${paymentId} - ₹${amount}`);
 
         } catch (err) {
-            console.error(`❌ Error importing supplier payment:`, err.message);
+            console.error(`❌ Error importing supplier payment ${i+1}:`, err.message);
             errors++;
         }
     }
