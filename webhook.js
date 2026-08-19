@@ -187,30 +187,58 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
         const backup = JSON.parse(data);
         
         // 🔧 IMPROVED PARSING FUNCTION
+                // 🔧 ROBUST PARSING FUNCTION
         function parseData(data) {
             if (!data) return [];
             if (Array.isArray(data)) return data;
             if (typeof data === 'string') {
                 try {
                     const parsed = JSON.parse(data);
-                    if (Array.isArray(parsed)) {
-                        return parsed;
-                    }
+                    if (Array.isArray(parsed)) return parsed;
                     if (typeof parsed === 'object' && parsed !== null) {
+                        const keys = Object.keys(parsed);
+                        const numericKeys = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
+                        if (numericKeys) {
+                            return keys.sort((a, b) => Number(a) - Number(b)).map(k => parsed[k]);
+                        }
                         return [parsed];
                     }
                     return [];
                 } catch (e) {
-                    console.log(`⚠️ Failed to parse data: ${data.substring(0, 100)}...`);
+                    const match = data.match(/\[[\s\S]*\]/);
+                    if (match) {
+                        try {
+                            const parsed = JSON.parse(match[0]);
+                            if (Array.isArray(parsed)) return parsed;
+                            if (typeof parsed === 'object' && parsed !== null) {
+                                const keys = Object.keys(parsed);
+                                const numericKeys = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
+                                if (numericKeys) {
+                                    return keys.sort((a, b) => Number(a) - Number(b)).map(k => parsed[k]);
+                                }
+                                return [parsed];
+                            }
+                        } catch (e2) {}
+                    }
+                    const lines = data.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                    const items = [];
+                    for (const line of lines) {
+                        try { items.push(JSON.parse(line)); } catch (e) {}
+                    }
+                    if (items.length > 0) return items;
                     return [];
                 }
             }
             if (typeof data === 'object' && data !== null) {
+                const keys = Object.keys(data);
+                const numericKeys = keys.length > 0 && keys.every(k => /^\d+$/.test(k));
+                if (numericKeys) {
+                    return keys.sort((a, b) => Number(a) - Number(b)).map(k => data[k]);
+                }
                 return [data];
             }
             return [];
         }
-
                      // Parse customerPayments - SIMPLIFIED DIRECT PARSE
 let customerPayments = [];
 console.log(`🔍 DEBUG: Checking backup.customerPayments...`);
