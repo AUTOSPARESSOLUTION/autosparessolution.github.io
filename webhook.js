@@ -30,6 +30,7 @@ dirs.forEach(dir => {
 // ============================================================
 
 const db = require('./modules/database');
+const { dbRun, dbGet, dbAll, initDatabase, migratePaymentTables } = require('./modules/database');
 const { importCSV } = require('./modules/csv-loader');
 const { parseOrder, extractPartNumber, extractQuantity, parseOrderWithDescription } = require('./modules/order-parser');
 const scheduler = require('./modules/scheduler');
