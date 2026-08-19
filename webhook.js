@@ -240,105 +240,35 @@ async function importFullBackup(filePath = JSON_STORAGE.fullBackup) {
             return [];
         }
                      // Parse customerPayments - SIMPLIFIED DIRECT PARSE
-let customerPayments = [];
-console.log(`🔍 DEBUG: Checking backup.customerPayments...`);
-
-try {
-    const rawData = backup.customerPayments;
-    
-    if (rawData) {
-        console.log(`📋 rawData type: ${typeof rawData}`);
-        console.log(`📋 rawData length: ${rawData ? rawData.length : 0}`);
+        // Parse customerPayments - Using robust parseData
+        let customerPayments = [];
+        console.log(`🔍 DEBUG: Checking backup.customerPayments...`);
         
-        // If it's a string, parse it directly
-        if (typeof rawData === 'string') {
-            console.log(`📋 rawData is string, first 200 chars: ${rawData.substring(0, 200)}...`);
-            // Direct parse - this should work for your data
-            const parsed = JSON.parse(rawData);
-            if (Array.isArray(parsed)) {
-                customerPayments = parsed;
-                console.log(`✅ Parsed ${customerPayments.length} payments from string`);
-            } else {
-                customerPayments = [parsed];
-                console.log(`✅ Parsed 1 payment`);
-            }
-        } else if (Array.isArray(rawData)) {
-            customerPayments = rawData;
-            console.log(`✅ rawData is array: ${customerPayments.length} payments`);
-        } else if (typeof rawData === 'object') {
-            customerPayments = [rawData];
-            console.log(`✅ rawData is object: 1 payment`);
-        }
-    } else {
-        console.log(`⚠️ No customerPayments found in backup`);
-    }
-} catch (err) {
-    console.error(`❌ Error parsing customerPayments:`, err.message);
-    // Try emergency extraction
-    console.log(`🔍 EMERGENCY: Trying to extract from raw string...`);
-    try {
-        const rawStr = backup.customerPayments;
-        if (typeof rawStr === 'string' && rawStr.includes('receiptNo')) {
-            const match = rawStr.match(/\[[\s\S]*\]/);
-            if (match) {
-                const parsed = JSON.parse(match[0]);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    customerPayments = parsed;
-                    console.log(`✅ EMERGENCY: Found ${customerPayments.length} payments`);
-                }
-            }
-        }
-    } catch (e2) {
-        console.log(`❌ Emergency extraction failed:`, e2.message);
-    }
-}
-
-console.log(`💰💰💰 FINAL: customerPayments has ${customerPayments.length} payments`);
-        
-        // ✅ EMERGENCY FIX: If still 0, try manual extraction from the raw backup string
-        if (customerPayments.length === 0 && backup.customerPayments) {
-            console.log(`🔍 EMERGENCY: Trying manual extraction from raw backup...`);
-            try {
-                const rawStr = backup.customerPayments;
-                if (typeof rawStr === 'string' && rawStr.includes('receiptNo')) {
-                    // Find the array pattern
-                    const match = rawStr.match(/\[[\s\S]*\]/);
-                    if (match) {
-                        const parsed = JSON.parse(match[0]);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                            customerPayments = parsed;
-                            console.log(`✅ EMERGENCY: Found ${customerPayments.length} payments`);
-                        }
-                    }
-                }
-            } catch (e) {
-                console.log(`❌ Emergency extraction failed:`, e.message);
-            }
-        }
-        // ✅ EMERGENCY FIX: If still 0, try to find payments in the raw backup data
-        if (customerPayments.length === 0) {
-            console.log(`🔍 EMERGENCY: Trying to find payments in backup keys...`);
-            const keys = Object.keys(backup);
-            console.log(`📋 Available keys: ${keys.join(', ')}`);
+        try {
+            const rawData = backup.customerPayments;
             
-            // Check if payments are in a different key
-            for (const key of keys) {
-                const val = backup[key];
-                if (typeof val === 'string' && val.includes('receiptNo') && val.includes('customerEmail')) {
-                    console.log(`🔍 Found payment data in key: ${key}`);
-                    try {
-                        const parsed = JSON.parse(val);
-                        if (Array.isArray(parsed)) {
-                            customerPayments = parsed;
-                            console.log(`✅ Found ${customerPayments.length} payments in ${key}`);
-                            break;
-                        }
-                    } catch (e) {
-                        console.log(`⚠️ Could not parse ${key}`);
-                    }
+            if (rawData) {
+                console.log(`📋 rawData type: ${typeof rawData}`);
+                console.log(`📋 rawData length: ${rawData ? (typeof rawData === 'string' ? rawData.length : (Array.isArray(rawData) ? rawData.length : Object.keys(rawData).length)) : 0}`);
+                
+                // Use the robust parseData function
+                customerPayments = parseData(rawData);
+                
+                console.log(`✅ parseData returned ${customerPayments.length} payments`);
+                
+                if (customerPayments.length > 0) {
+                    console.log(`🔍 First payment sample:`, JSON.stringify(customerPayments[0]).substring(0, 300));
+                    console.log(`🔍 Payment keys:`, Object.keys(customerPayments[0]).join(', '));
                 }
+            } else {
+                console.log(`⚠️ No customerPayments found in backup`);
             }
+        } catch (err) {
+            console.error(`❌ Error parsing customerPayments:`, err.message);
+            customerPayments = [];
         }
+
+        console.log(`💰💰💰 FINAL: customerPayments has ${customerPayments.length} payments`);
         // Parse other data
         const customers = parseData(backup.customers);
         const suppliers = parseData(backup.suppliers);
