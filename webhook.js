@@ -15,39 +15,64 @@ async function importCustomerPaymentsArray(payments) {
         return 0;
     }
 
+    // ============================================================
+    // HELPER: Promise wrapper for db.db.run()
+    // ============================================================
+    function dbRun(sql, params = []) {
+        return new Promise((resolve, reject) => {
+            db.db.run(sql, params, function(err) {
+                if (err) reject(err);
+                else resolve({ lastID: this.lastID, changes: this.changes });
+            });
+        });
+    }
+
+    // ============================================================
+    // HELPER: Promise wrapper for db.db.get()
+    // ============================================================
+    function dbGet(sql, params = []) {
+        return new Promise((resolve, reject) => {
+            db.db.get(sql, params, (err, row) => {
+                if (err) reject(err);
+                else resolve(row || null);
+            });
+        });
+    }
+
+    // ============================================================
+    // HELPER: Promise wrapper for db.db.all()
+    // ============================================================
+    function dbAll(sql, params = []) {
+        return new Promise((resolve, reject) => {
+            db.db.all(sql, params, (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            });
+        });
+    }
+
     // --------------------------------------------------------
     // Ensure required table exists
     // --------------------------------------------------------
-    await new Promise((resolve, reject) => {
-        db.db.run(`
-            CREATE TABLE IF NOT EXISTS customer_payments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                receipt_no TEXT UNIQUE NOT NULL,
-                customer_phone TEXT NOT NULL,
-                customer_email TEXT,
-                amount REAL NOT NULL,
-                payment_mode TEXT NOT NULL,
-                reference TEXT,
-                remarks TEXT,
-                payment_date TEXT DEFAULT CURRENT_TIMESTAMP,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        `, (err) => {
-            if (err) reject(err);
-            else resolve();
-        });
-    });
+    await dbRun(`
+        CREATE TABLE IF NOT EXISTS customer_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            receipt_no TEXT UNIQUE NOT NULL,
+            customer_phone TEXT NOT NULL,
+            customer_email TEXT,
+            amount REAL NOT NULL,
+            payment_mode TEXT NOT NULL,
+            reference TEXT,
+            remarks TEXT,
+            payment_date TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
 
     // --------------------------------------------------------
     // Check actual table columns
     // --------------------------------------------------------
-    const customerPaymentColumns = await new Promise((resolve) => {
-        db.db.all(`PRAGMA table_info(customer_payments)`, [], (err, rows) => {
-            if (err) resolve([]);
-            else resolve(rows || []);
-        });
-    });
-
+    const customerPaymentColumns = await dbAll(`PRAGMA table_info(customer_payments)`);
     const availableColumns = customerPaymentColumns.map(row => row.name);
 
     console.log(
@@ -57,15 +82,10 @@ async function importCustomerPaymentsArray(payments) {
     // --------------------------------------------------------
     // Get customers once
     // --------------------------------------------------------
-    const allCustomers = await new Promise((resolve) => {
-        db.db.all(`
-            SELECT phone, name, email
-            FROM customers
-        `, [], (err, rows) => {
-            if (err) resolve([]);
-            else resolve(rows || []);
-        });
-    });
+    const allCustomers = await dbAll(`
+        SELECT phone, name, email
+        FROM customers
+    `);
 
     console.log(
         `📋 Found ${allCustomers.length} customers for payment lookup`
@@ -98,9 +118,6 @@ async function importCustomerPaymentsArray(payments) {
 
     // --------------------------------------------------------
     // Process sequentially
-    // IMPORTANT:
-    // No Promise.all()
-    // No nested transactions
     // --------------------------------------------------------
     for (let i = 0; i < payments.length; i++) {
         const payment = payments[i];
@@ -205,8 +222,6 @@ async function importCustomerPaymentsArray(payments) {
 
             // ------------------------------------------------
             // If customer still not found, skip.
-            //
-            // DO NOT create fake phone numbers.
             // ------------------------------------------------
             if (!customerPhone) {
                 console.log(
@@ -230,19 +245,13 @@ async function importCustomerPaymentsArray(payments) {
             // ------------------------------------------------
             // Check duplicate receipt
             // ------------------------------------------------
-            const existing = await new Promise((resolve) => {
-                db.db.get(
-                    `SELECT id
-                     FROM customer_payments
-                     WHERE receipt_no = ?
-                     LIMIT 1`,
-                    [receiptNo],
-                    (err, row) => {
-                        if (err) resolve(null);
-                        else resolve(row);
-                    }
-                );
-            });
+            const existing = await dbGet(
+                `SELECT id
+                 FROM customer_payments
+                 WHERE receipt_no = ?
+                 LIMIT 1`,
+                [receiptNo]
+            );
 
             if (existing) {
                 console.log(
@@ -296,50 +305,31 @@ async function importCustomerPaymentsArray(payments) {
 
             const placeholders = fields.map(() => '?').join(', ');
 
-            await new Promise((resolve, reject) => {
-                db.db.run(
-                    `INSERT INTO customer_payments
-                     (${fields.join(', ')})
-                     VALUES (${placeholders})`,
-                    values,
-                    (err) => {
-                        if (err) reject(err);
-                        else resolve();
-                    }
-                );
-            });
+            await dbRun(
+                `INSERT INTO customer_payments
+                 (${fields.join(', ')})
+                 VALUES (${placeholders})`,
+                values
+            );
 
             // ------------------------------------------------
             // Update customer total_spent ONLY if column exists
             // ------------------------------------------------
-            const customerColumns = await new Promise((resolve) => {
-                db.db.all(
-                    `PRAGMA table_info(customers)`,
-                    [],
-                    (err, rows) => {
-                        if (err) resolve([]);
-                        else resolve(rows || []);
-                    }
-                );
-            });
+            const customerColumns = await dbAll(
+                `PRAGMA table_info(customers)`
+            );
 
             const customerColumnNames =
                 customerColumns.map(row => row.name);
 
             if (customerColumnNames.includes('total_spent')) {
-                await new Promise((resolve) => {
-                    db.db.run(
-                        `UPDATE customers
-                         SET total_spent =
-                             COALESCE(total_spent, 0) + ?
-                         WHERE phone = ?`,
-                        [amount, cleanPhone],
-                        (err) => {
-                            if (err) console.error('❌ Update total_spent error:', err.message);
-                            resolve();
-                        }
-                    );
-                });
+                await dbRun(
+                    `UPDATE customers
+                     SET total_spent =
+                         COALESCE(total_spent, 0) + ?
+                     WHERE phone = ?`,
+                    [amount, cleanPhone]
+                );
             }
 
             imported++;
