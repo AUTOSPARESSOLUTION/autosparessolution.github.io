@@ -4057,30 +4057,63 @@ app.post('/webhook', async (req, res) => {
         
         console.log(`📩 From: ${from} | Type: ${type} | ID: ${messageId}`);
         
-        if (!isDbReady) {
-    // Get actual import progress from the database
+                if (!isDbReady) {
+    // 📊 DYNAMIC PROGRESS CALCULATION
     let actualProgress = 0;
     let totalProducts = 0;
+    let estimatedTime = '';
+    
     try {
         const stats = await db.getStats();
         totalProducts = stats.total_products || 0;
-        // Use actual imported count vs expected total
-        const expectedTotal = 174460; // Total rows in your CSV
-        actualProgress = Math.min(100, Math.round((totalProducts / expectedTotal) * 100));
+        
+        // ✅ Use dynamic expected total from CSV files
+        let expectedTotal = global.expectedTotalProducts || 433708;
+        
+        if (totalProducts > 0 && expectedTotal > 0) {
+            actualProgress = Math.min(99, Math.round((totalProducts / expectedTotal) * 100));
+            
+            // Calculate speed: rows per second
+            const elapsedSeconds = (Date.now() - (global.importStartTime || Date.now())) / 1000;
+            const rowsPerSecond = elapsedSeconds > 0 ? totalProducts / elapsedSeconds : 866;
+            
+            // Calculate remaining time
+            const remainingRows = Math.max(0, expectedTotal - totalProducts);
+            const estimatedSeconds = Math.ceil(remainingRows / (rowsPerSecond || 1));
+            
+            // Format time
+            if (estimatedSeconds > 60) {
+                const minutes = Math.floor(estimatedSeconds / 60);
+                const seconds = estimatedSeconds % 60;
+                estimatedTime = `${minutes}m ${seconds}s`;
+            } else {
+                estimatedTime = `${estimatedSeconds} seconds`;
+            }
+        } else {
+            const estSec = Math.ceil(Math.max(0, 100 - actualProgress) / 1.5);
+            estimatedTime = estSec > 60 ? `${Math.floor(estSec/60)}m ${estSec%60}s` : `${estSec} seconds`;
+        }
     } catch (e) {
-        // Fallback to old calculation
-        actualProgress = Math.round((importProgress / TOTAL_PRODUCTS) * 100);
+        const estSec = Math.ceil(Math.max(0, 100 - actualProgress) / 1.5);
+        estimatedTime = estSec > 60 ? `${Math.floor(estSec/60)}m ${estSec%60}s` : `${estSec} seconds`;
     }
     
-    // Calculate remaining time based on actual progress
-    const remainingPercent = Math.max(0, 100 - actualProgress);
-    const estimatedTime = Math.ceil(remainingPercent / 2); // ~0.5% per second average
+    if (actualProgress >= 100) actualProgress = 99;
+    
+    // Create progress bar
+    const barLength = 20;
+    const filled = Math.floor(actualProgress / 5);
+    const empty = barLength - filled;
+    const progressBar = '█'.repeat(filled) + '░'.repeat(empty);
     
     await sendWhatsAppMessage(from, 
         `⏳ *System is Loading...*\n\n` +
         `📊 Progress: ${actualProgress}%\n` +
         `📦 ${totalProducts.toLocaleString()} products loaded so far\n` +
-        `⏱️ Estimated wait: ${estimatedTime} seconds\n\n` +
+        `⏱️ Estimated wait: ${estimatedTime}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `${progressBar} ${actualProgress}%\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
         `💡 We'll notify you when the system is ready!\n` +
         `📞 Call: ${CONFIG.businessPhone}`
     );
