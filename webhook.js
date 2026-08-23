@@ -144,7 +144,62 @@ try { Tesseract = require('tesseract.js'); } catch(e) {}
 // ============================================================
 // 📁 AUTO SPARES JSON IMPORT SYSTEM
 // ============================================================
+// ============================================================
+// 📁 CSV HELPER FUNCTIONS - DYNAMIC TOTAL CALCULATION
+// ============================================================
 
+async function getCSVFiles() {
+    try {
+        const csvDir = path.join(__dirname);
+        const files = fs.readdirSync(csvDir);
+        return files.filter(f => f.endsWith('.csv') && f.startsWith('prices-'));
+    } catch (e) {
+        console.error('⚠️ Error reading CSV files:', e.message);
+        return [];
+    }
+}
+
+async function calculateTotalRows(csvFiles) {
+    let totalRows = 0;
+    
+    for (const file of csvFiles) {
+        try {
+            const filePath = path.join(__dirname, file);
+            const stats = fs.statSync(filePath);
+            
+            if (stats.size > 1000000) {
+                const estimatedRows = Math.round((stats.size / 1024 / 1024) * 50000);
+                totalRows += estimatedRows;
+            } else {
+                const content = fs.readFileSync(filePath, 'utf8');
+                const lines = content.split('\n').length;
+                totalRows += lines - 1;
+            }
+        } catch (e) {
+            console.log(`⚠️ Could not read ${file}:`, e.message);
+        }
+    }
+    
+    return totalRows;
+}
+
+// Store global variables
+global.expectedTotalProducts = 0;
+global.importStartTime = Date.now();
+global.lastProgress = {};
+
+async function updateExpectedTotal() {
+    try {
+        const csvFiles = await getCSVFiles();
+        const total = await calculateTotalRows(csvFiles);
+        global.expectedTotalProducts = total;
+        console.log(`📊 Expected total: ${total.toLocaleString()} products from ${csvFiles.length} CSV files`);
+        return total;
+    } catch (e) {
+        console.error('⚠️ Error updating expected total:', e.message);
+        return 0;
+    }
+}
 
 
 // ============================================================
