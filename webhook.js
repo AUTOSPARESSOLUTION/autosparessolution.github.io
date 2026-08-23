@@ -2260,14 +2260,43 @@ class AlertSystem {
         await this.sendUserAlert(adminPhone, 'adminNotification', message, { customerPhone, type, messageText });
     }
 
-    async sendImportCompleteAlert(products) {
+        async sendImportCompleteAlert(products) {
         const adminPhone = normalizePhone(ADMIN_PHONE);
-        const message = `✅ *Import Complete!*\n\n` +
-                        `📦 ${products} products loaded\n` +
-                        `⏱️ System ready for requests\n\n` +
-                        `🚀 Bot is now active`;
+        const timestamp = new Date().toLocaleString('en-IN', { 
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            day: '2-digit',
+            month: 'short'
+        });
         
-        await this.sendUserAlert(adminPhone, 'importComplete', message, { products });
+        // Get final stats
+        const stats = await db.getStats();
+        const totalProducts = stats.total_products || products || 0;
+        
+        // Calculate total time taken
+        const elapsedSeconds = (Date.now() - (global.importStartTime || Date.now())) / 1000;
+        let timeTaken = '';
+        if (elapsedSeconds > 60) {
+            const minutes = Math.floor(elapsedSeconds / 60);
+            const seconds = Math.round(elapsedSeconds % 60);
+            timeTaken = `${minutes}m ${seconds}s`;
+        } else {
+            timeTaken = `${Math.round(elapsedSeconds)}s`;
+        }
+        
+        const message = `✅ *Import Complete!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                        `📦 ${totalProducts.toLocaleString()} products loaded\n` +
+                        `⏱️ System ready for requests\n` +
+                        `⏳ Time taken: ${timeTaken}\n\n` +
+                        `🚀 Bot is now active\n\n` +
+                        `🕐 ${timestamp}\n\n` +
+                        `📞 Call: ${CONFIG.businessPhone}`;
+        
+        await this.sendUserAlert(adminPhone, 'importComplete', message, { 
+            products: totalProducts,
+            timeTaken: timeTaken 
+        });
     }
 }
 
