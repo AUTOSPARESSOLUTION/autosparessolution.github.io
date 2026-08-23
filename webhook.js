@@ -7557,13 +7557,16 @@ async function startServer() {
         const stats = await db.getStats();
         if (stats.total_products === 0) {
             console.log('📦 No products found. Starting background import...');
+            // ✅ Update expected total before import
+            await updateExpectedTotal();
             setImmediate(importCSVInBackground);
         } else {
             console.log(`📦 ${stats.total_products} products already in database`);
             importProgress = stats.total_products;
             isDbReady = true;
             dbReadyMessage = 'Database ready';
-            
+            // ✅ Update expected total for future reference
+            await updateExpectedTotal();
             await alertSystem.sendImportCompleteAlert(stats.total_products);
         }
 
