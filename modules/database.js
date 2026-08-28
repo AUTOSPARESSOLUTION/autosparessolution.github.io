@@ -164,7 +164,23 @@ async function initDatabase() {
         `);
 
         console.log('✅ Orders table ready');
-
+// ====================================================
+// 🧾 SALES INVOICES TABLE
+// ====================================================
+await dbRun(`
+    CREATE TABLE IF NOT EXISTS sales_invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_no TEXT UNIQUE NOT NULL,
+        customer_phone TEXT NOT NULL,
+        customer_name TEXT,
+        items TEXT NOT NULL,
+        subtotal REAL DEFAULT 0,
+        grand_total REAL DEFAULT 0,
+        status TEXT DEFAULT 'Pending',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+`);
+console.log('✅ Sales invoices table ready');
 
         // ====================================================
         // 🧾 INVOICES TABLE
