@@ -8098,9 +8098,8 @@ let csvImportCompleted = false;
 async function importCSVInBackground() {
     if (csvImportStarted) return;
     csvImportStarted = true;
-    global.importStartTime = Date.now(); // ✅ Track start time
+    global.importStartTime = Date.now();
     
-    // ✅ Update expected total from all CSV files
     await updateExpectedTotal();
     
     try {
@@ -8151,8 +8150,19 @@ async function importCSVInBackground() {
         csvImportCompleted = true;
         isDbReady = true;
         dbReadyMessage = 'Database ready (with errors)';
-    }
         
+        // ✅ THIS MUST BE INSIDE THE CATCH BLOCK
+        await alertSystem.sendUserAlert(ADMIN_PHONE, 'systemError',
+            `❌ *Import Failed*\n\n` +
+            `Error: ${error.message}\n\n` +
+            `💡 Please check the CSV file and restart.`
+        );
+    }
+}  // ← FUNCTION CLOSES HERE WITH ONE BRACE
+
+// ============================================================
+// 🚀 START SERVER
+// ============================================================
 
             
 
