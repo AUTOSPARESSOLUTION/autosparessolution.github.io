@@ -8151,7 +8151,7 @@ async function importCSVInBackground() {
         csvImportCompleted = true;
         isDbReady = true;
         dbReadyMessage = 'Database ready (with errors)';
-        
+    }
         await alertSystem.sendUserAlert(ADMIN_PHONE, 'systemError',
             `❌ *Import Failed*\n\n` +
             `Error: ${error.message}\n\n` +
