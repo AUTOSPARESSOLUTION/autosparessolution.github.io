@@ -8159,57 +8159,7 @@ async function importCSVInBackground() {
         );
     }
 }
-            console.log(`✅ Background import completed: ${result.imported} products`);
-            importProgress = result.imported;
-            csvImportCompleted = true;
-            isDbReady = true;
-            dbReadyMessage = 'Database ready';
             
-            console.log(`📨 Checking for pending customers to send welcome...`);
-            
-            const allKeys = messageCache.keys ? [...messageCache.keys()] : [];
-            const pendingKeys = allKeys.filter(key => key.startsWith('pending_welcome_'));
-            
-            console.log(`📨 Found ${pendingKeys.length} customers waiting for welcome`);
-            
-            for (const key of pendingKeys) {
-                const phone = key.replace('pending_welcome_', '');
-                const welcomeKey = `welcome_sent_${phone}`;
-                
-                if (!messageCache.has(welcomeKey)) {
-                    console.log(`👋 Auto-sending welcome to ${phone} (system just became ready)`);
-                    
-                    try {
-                        await sendWelcomeWithAllBrands(phone);
-                        messageCache.set(welcomeKey, true);
-                        messageCache.delete(key);
-                    } catch (sendError) {
-                        console.error(`❌ Failed to send welcome to ${phone}:`, sendError.message);
-                    }
-                }
-            }
-            
-            await alertSystem.sendImportCompleteAlert(result.imported);
-            
-        } else {
-            console.log('⚠️ prices.csv not found, skipping import');
-            csvImportCompleted = true;
-            isDbReady = true;
-            dbReadyMessage = 'Database ready (no import needed)';
-        }
-    } catch (error) {
-        console.error('❌ Background import error:', error.message);
-        csvImportCompleted = true;
-        isDbReady = true;
-        dbReadyMessage = 'Database ready (with errors)';
-        
-        await alertSystem.sendUserAlert(ADMIN_PHONE, 'systemError',
-            `❌ *Import Failed*\n\n` +
-            `Error: ${error.message}\n\n` +
-            `💡 Please check the CSV file and restart.`
-        );
-    }
-}
 
 // ============================================================
 // 🚀 START SERVER
