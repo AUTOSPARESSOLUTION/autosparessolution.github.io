@@ -8158,11 +8158,7 @@ async function importCSVInBackground() {
             `💡 Please check the CSV file and restart.`
         );
     }
-}  // ← FUNCTION CLOSES HERE WITH ONE BRACE
-
-// ============================================================
-// 🚀 START SERVER
-// ============================================================
+}  // ← FUNCTION CLOSES HERE WITH ONE 
 
             
 
