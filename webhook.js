@@ -8151,16 +8151,13 @@ async function importCSVInBackground() {
         isDbReady = true;
         dbReadyMessage = 'Database ready (with errors)';
         
-        // ✅ THIS MUST BE INSIDE THE CATCH BLOCK
         await alertSystem.sendUserAlert(ADMIN_PHONE, 'systemError',
             `❌ *Import Failed*\n\n` +
             `Error: ${error.message}\n\n` +
             `💡 Please check the CSV file and restart.`
         );
     }
-}  // ← FUNCTION CLOSES HERE WITH ONE 
-
-            
+}  // ← FUNCTION ENDS HERE
 
 // ============================================================
 // 🚀 START SERVER
@@ -8179,7 +8176,7 @@ async function startServer() {
 
         await initAllTables();
         console.log('✅ All tables ready');
-// ✅ ADD LOGO PRELOAD HERE - EXACT POSITION
+
         console.log('📥 Preloading brand logos...');
         const { preloadAllLogos } = require('./modules/brand-collage');
         await preloadAllLogos();
@@ -8188,18 +8185,15 @@ async function startServer() {
         const stats = await db.getStats();
         if (stats.total_products === 0) {
             console.log('📦 No products found. Starting background import...');
-            
             setImmediate(importCSVInBackground);
         } else {
             console.log(`📦 ${stats.total_products} products already in database`);
             importProgress = stats.total_products;
             isDbReady = true;
             dbReadyMessage = 'Database ready';
-            
             await alertSystem.sendImportCompleteAlert(stats.total_products);
         }
 
-        // Initialize brand manager
         if (brandManager && brandManager.updateBrands) {
             try {
                 await brandManager.updateBrands();
@@ -8215,15 +8209,16 @@ async function startServer() {
 
         scheduler.startScheduler();
         console.log('✅ Scheduler started');
-// ✅ START DYNAMIC FILE WATCHER - ENABLED WITH FIXES
-if (fileWatcher && fileWatcher.startWatching) {
-    console.log('🔄 Starting dynamic file watcher with fixes...');
-    fileWatcher.startWatching({
-        scanInterval: 60000,  // 60 seconds to avoid conflicts
-        importBatchSize: 1000
-    });
-    console.log('✅ Dynamic file watcher started (scan interval: 10s)');
-}
+
+        if (fileWatcher && fileWatcher.startWatching) {
+            console.log('🔄 Starting dynamic file watcher with fixes...');
+            fileWatcher.startWatching({
+                scanInterval: 60000,
+                importBatchSize: 1000
+            });
+            console.log('✅ Dynamic file watcher started');
+        }
+
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server Running On Port ${PORT}`);
             console.log(`🔗 Health Check: /health`);
