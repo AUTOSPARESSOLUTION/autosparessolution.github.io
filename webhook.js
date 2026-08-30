@@ -4710,39 +4710,719 @@ async function handleWhatsAppMessage(message, from) {
         // 🛡️ STEP 1: ADMIN COMMANDS
         // ============================================================
         
-        if (isAdmin(from)) {
+        // ============================================================
+// 👑 COMPLETE ADMIN COMMANDS
+// ============================================================
+
+if (isAdmin(from)) {
+    
+    // ============================================================
+    // 1️⃣ ADMIN ORDERS - View all pending/active orders
+    // ============================================================
+    if (msgLower === 'admin orders' || msgLower === 'pending orders' || msgLower === 'orders') {
+        try {
+            const orders = await new Promise((resolve) => {
+                db.db.all(
+                    `SELECT * FROM orders WHERE status IN ('pending', 'confirmed', 'processing') 
+                     ORDER BY created_at DESC LIMIT 50`,
+                    [],
+                    (err, rows) => {
+                        if (err) {
+                            console.error('❌ Orders query error:', err.message);
+                            resolve([]);
+                        } else {
+                            resolve(rows || []);
+                        }
+                    }
+                );
+            });
             
-            // 📋 Admin: Show admin commands
-            if (msgLower === 'help admin' || msgLower === 'admin help') {
-                await sendWhatsAppMessage(from,
-                    `👑 *Admin Commands*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
-                    `📋 *Admin Orders:*\n` +
-                    `   "Admin orders" - View all pending orders\n\n` +
-                    `✅ *Confirm Customer Order:*\n` +
-                    `   "Confirm order for 919XXXXXXXXX"\n\n` +
-                    `🛒 *View Customer Cart:*\n` +
-                    `   "Customer cart 919XXXXXXXXX"\n\n` +
-                    `📦 *Stock Status:*\n` +
-                    `   "Stock status 0801BA0285N"\n\n` +
-                    `📢 *Admin Alerts:*\n` +
-                    `   "Admin alerts"\n\n` +
-                    `🎨 *Brand Management:*\n` +
-                    `   "Brands" - List all brands\n` +
-                    `   "Update brands" - Force brand update\n` +
-                    `   "Add brand id|name|logo" - Add new brand\n` +
-                    `   "Remove brand id" - Remove brand\n` +
-                    `   "Refresh brochure" - Regenerate brochure\n\n` +
-                           `📁 *File Watcher:*\n` +
-`   "Watcher status" - Check file watcher status\n` +
-`   "Scan files" - Force scan for new files\n` +
-`   "Processed files" - List imported files\n` +
-`   "Start watcher" - Start auto-import\n` +
-`   "Stop watcher" - Stop auto-import\n` +
-`   "Reset watcher" - Reset and restart\n\n` +               
-                    `📞 *Call:* ${CONFIG.businessPhone}`
+            if (!orders || orders.length === 0) {
+                await sendWhatsAppMessage(from, '📋 *No pending orders found.*');
+                return;
+            }
+            
+            let reply = `📋 *Pending Orders (${orders.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            
+            orders.forEach((order, index) => {
+                let itemCount = 0;
+                try {
+                    if (order.items) {
+                        const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+                        itemCount = Array.isArray(items) ? items.length : 0;
+                    }
+                } catch (e) {}
+                
+                const statusEmoji = order.status === 'pending' ? '⏳' : 
+                                   order.status === 'confirmed' ? '✅' : '🔄';
+                
+                reply += `${index + 1}. ${statusEmoji} *${order.order_id || order.id}*\n`;
+                reply += `   👤 ${order.phone || 'N/A'}\n`;
+                reply += `   💰 ₹${(order.total || 0).toFixed(2)}\n`;
+                reply += `   📝 ${itemCount} items\n`;
+                reply += `   📊 ${order.status || 'pending'}\n`;
+                reply += `   🕐 ${order.created_at ? new Date(order.created_at).toLocaleString() : 'N/A'}\n\n`;
+            });
+            
+            reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+            reply += `📝 *Commands:*\n`;
+            reply += `   "Confirm order for 919830300193" - Confirm order\n`;
+            reply += `   "Customer cart 919830300193" - View cart\n`;
+            reply += `   "Stock status 0801BA0285N" - Check stock\n`;
+            reply += `   "Invoice ORD-958704" - Generate invoice\n`;
+            reply += `   "Ship order ORD-958704" - Mark as shipped\n`;
+            reply += `   "Deliver order ORD-958704" - Mark as delivered\n`;
+            reply += `   "Cancel order ORD-958704" - Cancel order`;
+            
+            await sendWhatsAppMessage(from, reply);
+            return;
+        } catch (error) {
+            console.error('❌ Admin orders error:', error.message);
+            await sendWhatsAppMessage(from, `⚠️ Error: ${error.message}`);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 2️⃣ CONFIRM ORDER FOR CUSTOMER
+    // ============================================================
+    const confirmMatch = msgLower.match(/confirm order for (\d+)/);
+    if (confirmMatch) {
+        const customerPhone = confirmMatch[1];
+        console.log(`👑 Admin confirming order for ${customerPhone}`);
+        
+        try {
+            // Get customer's cart
+            const cart = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT * FROM carts WHERE phone = ?`,
+                    [customerPhone],
+                    (err, row) => {
+                        if (err) {
+                            console.error('❌ Cart query error:', err.message);
+                            resolve(null);
+                        } else {
+                            resolve(row || null);
+                        }
+                    }
+                );
+            });
+            
+            if (!cart || !cart.items) {
+                await sendWhatsAppMessage(from, 
+                    `❌ *No cart found for ${customerPhone}*\n\n` +
+                    `Customer hasn't added any items to cart.`
                 );
                 return;
             }
+            
+            let items = [];
+            try {
+                items = typeof cart.items === 'string' ? JSON.parse(cart.items) : cart.items;
+            } catch (e) {
+                items = [];
+            }
+            
+            if (!items || items.length === 0) {
+                await sendWhatsAppMessage(from, `❌ *Cart is empty for ${customerPhone}*`);
+                return;
+            }
+            
+            // Create order
+            const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+            const total = cart.total || 0;
+            
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `INSERT INTO orders (order_id, phone, items, total, status, created_at)
+                     VALUES (?, ?, ?, ?, 'confirmed', CURRENT_TIMESTAMP)`,
+                    [orderId, customerPhone, JSON.stringify(items), total],
+                    (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+            
+            // Clear cart
+            await new Promise((resolve) => {
+                db.db.run(
+                    `DELETE FROM carts WHERE phone = ?`,
+                    [customerPhone],
+                    () => resolve()
+                );
+            });
+            
+            // Notify customer
+            await sendWhatsAppMessage(customerPhone,
+                `✅ *ORDER CONFIRMED!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `📦 Order ID: ${orderId}\n` +
+                `📝 Items: ${items.length}\n` +
+                `💰 Total: ₹${total.toFixed(2)}\n\n` +
+                `📦 We'll process your order shortly.\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            
+            // Notify admin
+            await sendWhatsAppMessage(from,
+                `✅ *ORDER CONFIRMED ON BEHALF OF CUSTOMER!*\n\n` +
+                `📦 Order ID: ${orderId}\n` +
+                `👤 Customer: ${customerPhone}\n` +
+                `📝 Items: ${items.length}\n` +
+                `💰 Total: ₹${total.toFixed(2)}\n\n` +
+                `✅ Customer has been notified.`
+            );
+            
+            return;
+        } catch (error) {
+            console.error('❌ Confirm order error:', error.message);
+            await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 3️⃣ CUSTOMER CART - View customer's cart
+    // ============================================================
+    const cartMatch = msgLower.match(/customer cart (\d+)/);
+    if (cartMatch) {
+        const customerPhone = cartMatch[1];
+        console.log(`👑 Admin viewing cart for ${customerPhone}`);
+        
+        try {
+            const cart = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT * FROM carts WHERE phone = ?`,
+                    [customerPhone],
+                    (err, row) => {
+                        if (err) {
+                            console.error('❌ Cart query error:', err.message);
+                            resolve(null);
+                        } else {
+                            resolve(row || null);
+                        }
+                    }
+                );
+            });
+            
+            if (!cart || !cart.items) {
+                await sendWhatsAppMessage(from, `🛒 *Cart is empty for ${customerPhone}*`);
+                return;
+            }
+            
+            let items = [];
+            try {
+                items = typeof cart.items === 'string' ? JSON.parse(cart.items) : cart.items;
+            } catch (e) {
+                items = [];
+            }
+            
+            if (!items || items.length === 0) {
+                await sendWhatsAppMessage(from, `🛒 *Cart is empty for ${customerPhone}*`);
+                return;
+            }
+            
+            let reply = `🛒 *Cart for ${customerPhone}*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            
+            items.forEach((item, index) => {
+                const itemTotal = (item.price || 0) * (item.qty || 0);
+                reply += `${index + 1}. ${item.part} x${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
+                if (item.description) reply += `   📝 ${item.description}\n`;
+                if (item.stock !== undefined) {
+                    reply += `   📦 ${item.stock > 0 ? `✅ ${item.stock} available` : '❌ Out of Stock'}\n`;
+                }
+                reply += `\n`;
+            });
+            
+            reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+            reply += `💰 *Total: ₹${(cart.total || 0).toFixed(2)}*\n`;
+            reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `✅ *To confirm:* "Confirm order for ${customerPhone}"`;
+            
+            await sendWhatsAppMessage(from, reply);
+            return;
+        } catch (error) {
+            console.error('❌ Customer cart error:', error.message);
+            await sendWhatsAppMessage(from, `⚠️ Error: ${error.message}`);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 4️⃣ STOCK STATUS - Check stock availability
+    // ============================================================
+    const stockStatusMatch = msgLower.match(/stock status ([a-z0-9]{5,20})/);
+    if (stockStatusMatch) {
+        const partNumber = stockStatusMatch[1].toUpperCase();
+        console.log(`👑 Admin checking stock for: ${partNumber}`);
+        
+        try {
+            const product = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT * FROM products WHERE part = ?`,
+                    [partNumber],
+                    (err, row) => {
+                        if (err) {
+                            console.error('❌ Product query error:', err.message);
+                            resolve(null);
+                        } else {
+                            resolve(row || null);
+                        }
+                    }
+                );
+            });
+            
+            if (!product) {
+                await sendWhatsAppMessage(from, `❌ *Part not found:* ${partNumber}`);
+                return;
+            }
+            
+            let reply = `📦 *Stock Status*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `🔧 Part: ${product.part}\n`;
+            reply += `📝 ${product.description || 'N/A'}\n`;
+            if (product.brand) reply += `🏷️ Brand: ${product.brand}\n`;
+            if (product.make) reply += `🚗 Make: ${product.make}\n`;
+            if (product.model) reply += `🎯 Model: ${product.model}\n`;
+            reply += `\n📦 Stock: ${product.stock > 0 ? `✅ ${product.stock} pcs available` : '❌ Out of Stock'}\n`;
+            reply += `💰 Price: ₹${((product.billing_price || 0) * 1.18).toFixed(2)} (incl. GST)\n`;
+            
+            if (product.stock > 0 && product.stock < 10) {
+                reply += `\n⚠️ *Low Stock Alert!* Only ${product.stock} pcs left.`;
+            }
+            
+            await sendWhatsAppMessage(from, reply);
+            return;
+        } catch (error) {
+            console.error('❌ Stock status error:', error.message);
+            await sendWhatsAppMessage(from, `⚠️ Error: ${error.message}`);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 5️⃣ GENERATE INVOICE
+    // ============================================================
+    const invoiceMatch = msgLower.match(/invoice ([a-z0-9-]+)/);
+    if (invoiceMatch) {
+        const orderId = invoiceMatch[1].toUpperCase();
+        console.log(`👑 Generating invoice for: ${orderId}`);
+        
+        try {
+            const order = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT * FROM orders WHERE order_id = ? OR id = ?`,
+                    [orderId, orderId],
+                    (err, row) => {
+                        if (err) {
+                            console.error('❌ Order query error:', err.message);
+                            resolve(null);
+                        } else {
+                            resolve(row || null);
+                        }
+                    }
+                );
+            });
+            
+            if (!order) {
+                await sendWhatsAppMessage(from, `❌ *Order not found:* ${orderId}`);
+                return;
+            }
+            
+            let items = [];
+            try {
+                items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+            } catch (e) {
+                items = [];
+            }
+            
+            const customerPhone = order.phone;
+            const invoiceNo = `INV-${Date.now().toString().slice(-6)}`;
+            
+            // Save to sales_invoices table
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `INSERT INTO sales_invoices 
+                     (invoice_no, customer_phone, customer_name, items, subtotal, grand_total, status, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        invoiceNo,
+                        customerPhone,
+                        'Customer',
+                        JSON.stringify(items),
+                        order.total || 0,
+                        order.total || 0,
+                        'Generated',
+                        new Date().toISOString()
+                    ],
+                    (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+            
+            let reply = `📄 *Invoice Generated*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `🧾 Invoice: ${invoiceNo}\n`;
+            reply += `🆔 Order: ${orderId}\n`;
+            reply += `👤 Customer: ${customerPhone}\n`;
+            reply += `📊 Status: ${order.status || 'pending'}\n`;
+            reply += `💰 Total: ₹${(order.total || 0).toFixed(2)}\n\n`;
+            
+            if (items.length > 0) {
+                reply += `📝 *Items:*\n`;
+                items.forEach((item, i) => {
+                    const itemTotal = (item.price || 0) * (item.qty || 0);
+                    reply += `${i + 1}. ${item.part} x${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
+                });
+                reply += `\n`;
+            }
+            
+            reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+            reply += `💡 *Send to customer:* "Send invoice ${invoiceNo} to ${customerPhone}"`;
+            
+            await sendWhatsAppMessage(from, reply);
+            
+            // Try to send PDF
+            try {
+                const pdfBuffer = await generatePDFSummary(orderId, items, order.total || 0, customerPhone);
+                if (pdfBuffer) {
+                    await sendDocumentMessage(from, pdfBuffer, `Invoice_${invoiceNo}.pdf`,
+                        `📄 Invoice ${invoiceNo} - Order ${orderId}`);
+                }
+            } catch (pdfError) {
+                console.error('❌ PDF generation error:', pdfError.message);
+            }
+            
+            return;
+        } catch (error) {
+            console.error('❌ Invoice generation error:', error.message);
+            await sendWhatsAppMessage(from, `⚠️ Error: ${error.message}`);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 6️⃣ SHIP ORDER - Mark order as shipped
+    // ============================================================
+    const shipMatch = msgLower.match(/ship order ([a-z0-9-]+)/);
+    if (shipMatch) {
+        const orderId = shipMatch[1].toUpperCase();
+        console.log(`👑 Shipping order: ${orderId}`);
+        
+        try {
+            const order = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT * FROM orders WHERE order_id = ? OR id = ?`,
+                    [orderId, orderId],
+                    (err, row) => {
+                        if (err) {
+                            console.error('❌ Order query error:', err.message);
+                            resolve(null);
+                        } else {
+                            resolve(row || null);
+                        }
+                    }
+                );
+            });
+            
+            if (!order) {
+                await sendWhatsAppMessage(from, `❌ *Order not found:* ${orderId}`);
+                return;
+            }
+            
+            if (order.status === 'shipped') {
+                await sendWhatsAppMessage(from, `🚚 *Order ${orderId} is already shipped.*`);
+                return;
+            }
+            
+            if (order.status === 'delivered') {
+                await sendWhatsAppMessage(from, `📦 *Order ${orderId} is already delivered.*`);
+                return;
+            }
+            
+            if (order.status === 'cancelled') {
+                await sendWhatsAppMessage(from, `❌ *Order ${orderId} is cancelled.* Cannot ship.`);
+                return;
+            }
+            
+            // Update order status
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `UPDATE orders SET status = 'shipped', updated_at = CURRENT_TIMESTAMP WHERE order_id = ? OR id = ?`,
+                    [orderId, orderId],
+                    (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+            
+            // Notify customer
+            const customerPhone = order.phone;
+            await sendWhatsAppMessage(customerPhone,
+                `🚚 *Order Shipped!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `📦 Order: ${orderId}\n` +
+                `✅ Your order has been shipped!\n\n` +
+                `📦 You'll receive delivery updates.\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            
+            await sendWhatsAppMessage(from,
+                `✅ *Order Shipped!*\n\n` +
+                `📦 Order: ${orderId}\n` +
+                `👤 Customer: ${customerPhone}\n` +
+                `🕐 ${new Date().toLocaleString()}\n\n` +
+                `✅ Customer has been notified.`
+            );
+            return;
+        } catch (error) {
+            console.error('❌ Ship order error:', error.message);
+            await sendWhatsAppMessage(from, `⚠️ Error: ${error.message}`);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 7️⃣ DELIVER ORDER - Mark order as delivered
+    // ============================================================
+    const deliverMatch = msgLower.match(/deliver order ([a-z0-9-]+)/);
+    if (deliverMatch) {
+        const orderId = deliverMatch[1].toUpperCase();
+        console.log(`👑 Delivering order: ${orderId}`);
+        
+        try {
+            const order = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT * FROM orders WHERE order_id = ? OR id = ?`,
+                    [orderId, orderId],
+                    (err, row) => {
+                        if (err) {
+                            console.error('❌ Order query error:', err.message);
+                            resolve(null);
+                        } else {
+                            resolve(row || null);
+                        }
+                    }
+                );
+            });
+            
+            if (!order) {
+                await sendWhatsAppMessage(from, `❌ *Order not found:* ${orderId}`);
+                return;
+            }
+            
+            if (order.status === 'delivered') {
+                await sendWhatsAppMessage(from, `📦 *Order ${orderId} is already delivered.*`);
+                return;
+            }
+            
+            if (order.status === 'cancelled') {
+                await sendWhatsAppMessage(from, `❌ *Order ${orderId} is cancelled.* Cannot deliver.`);
+                return;
+            }
+            
+            // Update order status
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `UPDATE orders SET status = 'delivered', updated_at = CURRENT_TIMESTAMP WHERE order_id = ? OR id = ?`,
+                    [orderId, orderId],
+                    (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+            
+            // Notify customer
+            const customerPhone = order.phone;
+            await sendWhatsAppMessage(customerPhone,
+                `📦 *Order Delivered!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `📦 Order: ${orderId}\n` +
+                `✅ Your order has been delivered!\n\n` +
+                `📝 We hope you enjoy your purchase!\n\n` +
+                `⭐ Please rate your experience.\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            
+            await sendWhatsAppMessage(from,
+                `✅ *Order Delivered!*\n\n` +
+                `📦 Order: ${orderId}\n` +
+                `👤 Customer: ${customerPhone}\n` +
+                `🕐 ${new Date().toLocaleString()}\n\n` +
+                `✅ Customer has been notified.`
+            );
+            return;
+        } catch (error) {
+            console.error('❌ Deliver order error:', error.message);
+            await sendWhatsAppMessage(from, `⚠️ Error: ${error.message}`);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 8️⃣ CANCEL ORDER - Cancel the order
+    // ============================================================
+    const cancelMatch = msgLower.match(/cancel order ([a-z0-9-]+)/);
+    if (cancelMatch) {
+        const orderId = cancelMatch[1].toUpperCase();
+        console.log(`👑 Cancelling order: ${orderId}`);
+        
+        try {
+            const order = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT * FROM orders WHERE order_id = ? OR id = ?`,
+                    [orderId, orderId],
+                    (err, row) => {
+                        if (err) {
+                            console.error('❌ Order query error:', err.message);
+                            resolve(null);
+                        } else {
+                            resolve(row || null);
+                        }
+                    }
+                );
+            });
+            
+            if (!order) {
+                await sendWhatsAppMessage(from, `❌ *Order not found:* ${orderId}`);
+                return;
+            }
+            
+            if (order.status === 'cancelled') {
+                await sendWhatsAppMessage(from, `❌ *Order ${orderId} is already cancelled.*`);
+                return;
+            }
+            
+            if (order.status === 'delivered') {
+                await sendWhatsAppMessage(from, `❌ *Order ${orderId} is already delivered.* Cannot cancel.`);
+                return;
+            }
+            
+            // Update order status
+            await new Promise((resolve, reject) => {
+                db.db.run(
+                    `UPDATE orders SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE order_id = ? OR id = ?`,
+                    [orderId, orderId],
+                    (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+            
+            // Notify customer
+            const customerPhone = order.phone;
+            await sendWhatsAppMessage(customerPhone,
+                `❌ *Order Cancelled*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `📦 Order: ${orderId}\n` +
+                `❌ Your order has been cancelled.\n\n` +
+                `📝 Reason: Admin cancelled the order.\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            
+            await sendWhatsAppMessage(from,
+                `✅ *Order Cancelled!*\n\n` +
+                `📦 Order: ${orderId}\n` +
+                `👤 Customer: ${customerPhone}\n` +
+                `🕐 ${new Date().toLocaleString()}\n\n` +
+                `✅ Customer has been notified.`
+            );
+            return;
+        } catch (error) {
+            console.error('❌ Cancel order error:', error.message);
+            await sendWhatsAppMessage(from, `⚠️ Error: ${error.message}`);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 9️⃣ SEND INVOICE TO CUSTOMER
+    // ============================================================
+    const sendInvoiceMatch = msgLower.match(/send invoice ([a-z0-9-]+) to (\d+)/);
+    if (sendInvoiceMatch) {
+        const invoiceNo = sendInvoiceMatch[1].toUpperCase();
+        const customerPhone = sendInvoiceMatch[2];
+        console.log(`👑 Sending invoice ${invoiceNo} to ${customerPhone}`);
+        
+        try {
+            const invoice = await new Promise((resolve) => {
+                db.db.get(
+                    `SELECT * FROM sales_invoices WHERE invoice_no = ?`,
+                    [invoiceNo],
+                    (err, row) => {
+                        if (err) {
+                            console.error('❌ Invoice query error:', err.message);
+                            resolve(null);
+                        } else {
+                            resolve(row || null);
+                        }
+                    }
+                );
+            });
+            
+            if (!invoice) {
+                await sendWhatsAppMessage(from, `❌ *Invoice not found:* ${invoiceNo}`);
+                return;
+            }
+            
+            let items = [];
+            try {
+                items = typeof invoice.items === 'string' ? JSON.parse(invoice.items) : (invoice.items || []);
+            } catch (e) {}
+            
+            let reply = `📄 *Your Invoice*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `🧾 Invoice: ${invoiceNo}\n`;
+            reply += `💰 Total: ₹${(invoice.grand_total || 0).toFixed(2)}\n\n`;
+            
+            if (items.length > 0) {
+                reply += `📝 *Items:*\n`;
+                items.forEach((item, i) => {
+                    const itemTotal = (item.price || 0) * (item.qty || 0);
+                    reply += `${i + 1}. ${item.part} x${item.qty} = ₹${itemTotal.toFixed(2)}\n`;
+                });
+                reply += `\n`;
+            }
+            
+            reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+            reply += `📞 Call: ${CONFIG.businessPhone}`;
+            
+            await sendWhatsAppMessage(customerPhone, reply);
+            
+            await sendWhatsAppMessage(from,
+                `✅ *Invoice sent to customer!*\n\n` +
+                `🧾 Invoice: ${invoiceNo}\n` +
+                `👤 Customer: ${customerPhone}`
+            );
+            return;
+        } catch (error) {
+            console.error('❌ Send invoice error:', error.message);
+            await sendWhatsAppMessage(from, `⚠️ Error: ${error.message}`);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 🔟 ADMIN HELP
+    // ============================================================
+    if (msgLower === 'admin help' || msgLower === 'help admin') {
+        await sendWhatsAppMessage(from,
+            `👑 *Admin Commands*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `📋 *Order Management:*\n` +
+            `   "Admin orders" - View pending orders\n` +
+            `   "Confirm order for 919830300193" - Confirm order\n` +
+            `   "Customer cart 919830300193" - View cart\n` +
+            `   "Stock status 0801BA0285N" - Check stock\n` +
+            `   "Invoice ORD-958704" - Generate invoice\n` +
+            `   "Ship order ORD-958704" - Mark as shipped\n` +
+            `   "Deliver order ORD-958704" - Mark as delivered\n` +
+            `   "Cancel order ORD-958704" - Cancel order\n\n` +
+            `📤 *Invoice:*\n` +
+            `   "Send invoice INV-123456 to 919830300193" - Send invoice\n\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
+        return;
+    }
+}
             
             // 📋 Admin: View all pending orders
             if (msgLower === 'admin orders' || msgLower === 'pending orders') {
@@ -5204,7 +5884,7 @@ if (isAdmin(from) && msgLower === 'check customers') {
         return;
     }
 }
-        }
+        
             // 🔍 Find customer by phone or email
     if (msgLower.startsWith('find customer')) {
         try {
@@ -7418,9 +8098,8 @@ let csvImportCompleted = false;
 async function importCSVInBackground() {
     if (csvImportStarted) return;
     csvImportStarted = true;
-    global.importStartTime = Date.now(); // ✅ Track start time
+    global.importStartTime = Date.now();
     
-    // ✅ Update expected total from all CSV files
     await updateExpectedTotal();
     
     try {
@@ -7478,58 +8157,7 @@ async function importCSVInBackground() {
             `💡 Please check the CSV file and restart.`
         );
     }
-}
-            console.log(`✅ Background import completed: ${result.imported} products`);
-            importProgress = result.imported;
-            csvImportCompleted = true;
-            isDbReady = true;
-            dbReadyMessage = 'Database ready';
-            
-            console.log(`📨 Checking for pending customers to send welcome...`);
-            
-            const allKeys = messageCache.keys ? [...messageCache.keys()] : [];
-            const pendingKeys = allKeys.filter(key => key.startsWith('pending_welcome_'));
-            
-            console.log(`📨 Found ${pendingKeys.length} customers waiting for welcome`);
-            
-            for (const key of pendingKeys) {
-                const phone = key.replace('pending_welcome_', '');
-                const welcomeKey = `welcome_sent_${phone}`;
-                
-                if (!messageCache.has(welcomeKey)) {
-                    console.log(`👋 Auto-sending welcome to ${phone} (system just became ready)`);
-                    
-                    try {
-                        await sendWelcomeWithAllBrands(phone);
-                        messageCache.set(welcomeKey, true);
-                        messageCache.delete(key);
-                    } catch (sendError) {
-                        console.error(`❌ Failed to send welcome to ${phone}:`, sendError.message);
-                    }
-                }
-            }
-            
-            await alertSystem.sendImportCompleteAlert(result.imported);
-            
-        } else {
-            console.log('⚠️ prices.csv not found, skipping import');
-            csvImportCompleted = true;
-            isDbReady = true;
-            dbReadyMessage = 'Database ready (no import needed)';
-        }
-    } catch (error) {
-        console.error('❌ Background import error:', error.message);
-        csvImportCompleted = true;
-        isDbReady = true;
-        dbReadyMessage = 'Database ready (with errors)';
-        
-        await alertSystem.sendUserAlert(ADMIN_PHONE, 'systemError',
-            `❌ *Import Failed*\n\n` +
-            `Error: ${error.message}\n\n` +
-            `💡 Please check the CSV file and restart.`
-        );
-    }
-}
+}  // ← FUNCTION ENDS HERE
 
 // ============================================================
 // 🚀 START SERVER
@@ -7548,7 +8176,7 @@ async function startServer() {
 
         await initAllTables();
         console.log('✅ All tables ready');
-// ✅ ADD LOGO PRELOAD HERE - EXACT POSITION
+
         console.log('📥 Preloading brand logos...');
         const { preloadAllLogos } = require('./modules/brand-collage');
         await preloadAllLogos();
@@ -7557,18 +8185,15 @@ async function startServer() {
         const stats = await db.getStats();
         if (stats.total_products === 0) {
             console.log('📦 No products found. Starting background import...');
-            
             setImmediate(importCSVInBackground);
         } else {
             console.log(`📦 ${stats.total_products} products already in database`);
             importProgress = stats.total_products;
             isDbReady = true;
             dbReadyMessage = 'Database ready';
-            
             await alertSystem.sendImportCompleteAlert(stats.total_products);
         }
 
-        // Initialize brand manager
         if (brandManager && brandManager.updateBrands) {
             try {
                 await brandManager.updateBrands();
@@ -7584,15 +8209,16 @@ async function startServer() {
 
         scheduler.startScheduler();
         console.log('✅ Scheduler started');
-// ✅ START DYNAMIC FILE WATCHER - ENABLED WITH FIXES
-if (fileWatcher && fileWatcher.startWatching) {
-    console.log('🔄 Starting dynamic file watcher with fixes...');
-    fileWatcher.startWatching({
-        scanInterval: 60000,  // 60 seconds to avoid conflicts
-        importBatchSize: 1000
-    });
-    console.log('✅ Dynamic file watcher started (scan interval: 10s)');
-}
+
+        if (fileWatcher && fileWatcher.startWatching) {
+            console.log('🔄 Starting dynamic file watcher with fixes...');
+            fileWatcher.startWatching({
+                scanInterval: 60000,
+                importBatchSize: 1000
+            });
+            console.log('✅ Dynamic file watcher started');
+        }
+
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server Running On Port ${PORT}`);
             console.log(`🔗 Health Check: /health`);
