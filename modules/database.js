@@ -247,7 +247,358 @@ console.log('✅ Sales invoices table ready');
 
         await migratePaymentTables();
 
+// ============================================================
+// 🆕 NEW TABLES FOR ENHANCED SYSTEM
+// ============================================================
 
+async function createNewTables() {
+    try {
+        console.log('🆕 Creating enhanced system tables...');
+
+        // 1. PRODUCT-SUPPLIER MAPPING
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS product_supplier_mapping (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                part TEXT NOT NULL,
+                supplier_id INTEGER,
+                mapping_type TEXT DEFAULT 'primary',
+                priority INTEGER DEFAULT 1,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+                UNIQUE(part, supplier_id)
+            )
+        `);
+        console.log('✅ product_supplier_mapping table ready');
+
+        // 2. SUPPLIER INVENTORY
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS supplier_inventory (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                supplier_id INTEGER NOT NULL,
+                part TEXT NOT NULL,
+                quantity INTEGER DEFAULT 0,
+                price REAL DEFAULT 0,
+                last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT 1,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+                UNIQUE(supplier_id, part)
+            )
+        `);
+        console.log('✅ supplier_inventory table ready');
+
+        // 3. SUPPLIER SERVICE AREAS
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS supplier_service_areas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                supplier_id INTEGER,
+                pincode TEXT NOT NULL,
+                city TEXT,
+                state TEXT,
+                delivery_time_hours INTEGER DEFAULT 24,
+                delivery_charge REAL DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+                UNIQUE(supplier_id, pincode)
+            )
+        `);
+        console.log('✅ supplier_service_areas table ready');
+
+        // 4. SUPPLIER ACCESS
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS supplier_access (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT NOT NULL UNIQUE,
+                supplier_id INTEGER,
+                access_level TEXT DEFAULT 'basic',
+                can_upload_stock BOOLEAN DEFAULT 0,
+                can_view_stock BOOLEAN DEFAULT 1,
+                can_update_prices BOOLEAN DEFAULT 0,
+                last_upload_at TEXT,
+                total_uploads INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'active',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            )
+        `);
+        console.log('✅ supplier_access table ready');
+
+        // 5. SUPPLIER ORDER NOTIFICATIONS
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS supplier_order_notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id TEXT NOT NULL,
+                supplier_id INTEGER,
+                product_part TEXT NOT NULL,
+                quantity INTEGER DEFAULT 1,
+                customer_phone TEXT,
+                customer_name TEXT,
+                status TEXT DEFAULT 'pending',
+                notification_sent TEXT DEFAULT CURRENT_TIMESTAMP,
+                response_received TEXT,
+                response_status TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            )
+        `);
+        console.log('✅ supplier_order_notifications table ready');
+
+        // 6. CUSTOMER OCCASIONS
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS customer_occasions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT NOT NULL,
+                name TEXT,
+                occasion_type TEXT NOT NULL,
+                occasion_date TEXT NOT NULL,
+                year INTEGER,
+                is_active BOOLEAN DEFAULT 1,
+                last_wished TEXT,
+                wish_count INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (phone) REFERENCES customers(phone)
+            )
+        `);
+        console.log('✅ customer_occasions table ready');
+
+        // 7. FESTIVALS
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS festivals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                year INTEGER NOT NULL,
+                description TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(name, year)
+            )
+        `);
+        console.log('✅ festivals table ready');
+
+        // 8. AUTOMATED WISHES
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS automated_wishes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT NOT NULL,
+                wish_type TEXT NOT NULL,
+                message TEXT,
+                sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                delivered BOOLEAN DEFAULT 1,
+                read BOOLEAN DEFAULT 0,
+                reply_received TEXT,
+                engagement_score INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ automated_wishes table ready');
+
+        // 9. WISH TEMPLATES
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS wish_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                template_type TEXT NOT NULL,
+                template_text TEXT NOT NULL,
+                dynamic_fields TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                priority INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ wish_templates table ready');
+
+        // 10. CAMPAIGN ANALYTICS
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS campaign_analytics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                campaign_type TEXT NOT NULL,
+                total_sent INTEGER DEFAULT 0,
+                total_delivered INTEGER DEFAULT 0,
+                total_read INTEGER DEFAULT 0,
+                total_replied INTEGER DEFAULT 0,
+                engagement_rate REAL DEFAULT 0,
+                campaign_date TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ campaign_analytics table ready');
+
+        // 11. BROCHURE HISTORY
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS brochure_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT NOT NULL,
+                brochure_type TEXT NOT NULL,
+                file_path TEXT,
+                file_size INTEGER,
+                sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                delivered BOOLEAN DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ brochure_history table ready');
+
+        // 12. QUEUED MESSAGES
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS queued_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT NOT NULL,
+                message TEXT NOT NULL,
+                status TEXT DEFAULT 'pending',
+                attempts INTEGER DEFAULT 0,
+                error_message TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                processed_at TEXT
+            )
+        `);
+        console.log('✅ queued_messages table ready');
+
+        // 13. PRODUCT COVERAGE
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS product_coverage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                part TEXT NOT NULL,
+                description TEXT,
+                supplier_count INTEGER DEFAULT 0,
+                distributor_count INTEGER DEFAULT 0,
+                total_stock INTEGER DEFAULT 0,
+                supplier_stock INTEGER DEFAULT 0,
+                distributor_stock INTEGER DEFAULT 0,
+                coverage_status TEXT DEFAULT 'uncovered',
+                last_checked TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(part)
+            )
+        `);
+        console.log('✅ product_coverage table ready');
+
+        // 14. COVERAGE ALERTS
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS coverage_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                part TEXT NOT NULL,
+                alert_type TEXT NOT NULL,
+                severity TEXT DEFAULT 'high',
+                message TEXT,
+                resolved BOOLEAN DEFAULT 0,
+                resolved_at TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ coverage_alerts table ready');
+
+        // 15. CUSTOMER LOCATIONS (GPS)
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS customer_locations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT NOT NULL,
+                latitude REAL,
+                longitude REAL,
+                address TEXT,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(phone)
+            )
+        `);
+        console.log('✅ customer_locations table ready');
+
+        // 16. SUPPLIER PICKUP LOCATIONS
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS supplier_pickup_locations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                supplier_id INTEGER NOT NULL,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                address TEXT,
+                pincode TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            )
+        `);
+        console.log('✅ supplier_pickup_locations table ready');
+
+        // 17. DELIVERY ROUTE HISTORY
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS delivery_route_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                delivery_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                lat REAL,
+                lng REAL,
+                location_text TEXT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (delivery_id) REFERENCES deliveries(delivery_id)
+            )
+        `);
+        console.log('✅ delivery_route_history table ready');
+
+        // 18. BULK IMPORT HISTORY
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS bulk_import_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                user_type TEXT NOT NULL,
+                rows_processed INTEGER DEFAULT 0,
+                rows_imported INTEGER DEFAULT 0,
+                rows_failed INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pending',
+                error_message TEXT,
+                uploaded_by TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                completed_at TEXT
+            )
+        `);
+        console.log('✅ bulk_import_history table ready');
+
+        // 19. PURCHASE INVOICE ITEMS (Enhanced)
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS purchase_invoice_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                purchase_invoice_id INTEGER NOT NULL,
+                part TEXT NOT NULL,
+                description TEXT,
+                quantity INTEGER DEFAULT 0,
+                unit_price REAL DEFAULT 0,
+                total_price REAL DEFAULT 0,
+                gst_rate REAL DEFAULT 18,
+                gst_amount REAL DEFAULT 0,
+                received_quantity INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pending',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (purchase_invoice_id) REFERENCES purchase_invoices(id)
+            )
+        `);
+        console.log('✅ purchase_invoice_items table ready');
+
+        // 20. PURCHASE INVOICE UPLOADS
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS purchase_invoice_uploads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                supplier_id INTEGER,
+                invoice_no TEXT,
+                rows_processed INTEGER DEFAULT 0,
+                rows_imported INTEGER DEFAULT 0,
+                rows_failed INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pending',
+                error_message TEXT,
+                uploaded_by TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                completed_at TEXT,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            )
+        `);
+        console.log('✅ purchase_invoice_uploads table ready');
+
+        console.log('✅ All enhanced tables created!');
+        return true;
+
+    } catch (error) {
+        console.error('❌ Create enhanced tables error:', error.message);
+        return false;
+    }
+            }
         // ====================================================
         // 📊 CREATE INDEXES
         // ====================================================
