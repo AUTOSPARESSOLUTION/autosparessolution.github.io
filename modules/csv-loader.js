@@ -1,17 +1,213 @@
 // ============================================================
-// 📥 CSV LOADER - FIXED VERSION (Preserves all functionality)
+// 📥 CSV LOADER - CONCURRENCY SAFE VERSION
 // modules/csv-loader.js
 // ============================================================
 
 const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
+const { LRUCache } = require('lru-cache');
 
 // ============================================================
-// 🔧 SQLITE OPTIMIZATION PRAGMAS
+// 🔒 TRANSACTION QUEUE MANAGER
+// ============================================================
+
+class TransactionQueue {
+    constructor() {
+        this.queue = [];
+        this.isProcessing = false;
+        this.currentOperation = null;
+        this.transactionActive = false;
+        this.savepointCounter = 0;
+        this.processingLock = false;
+    }
+
+    /**
+     * Add operation to queue and process sequentially
+     */
+    async enqueue(operation, name = 'unknown') {
+        return new Promise((resolve, reject) => {
+            this.queue.push({
+                operation,
+                name,
+                resolve,
+                reject
+            });
+            
+            console.log(`📋 Queued: ${name} (Queue length: ${this.queue.length})`);
+            this.processQueue();
+        });
+    }
+
+    /**
+     * Process queue sequentially - ONE AT A TIME
+     */
+    async processQueue() {
+        // Prevent multiple simultaneous processing
+        if (this.processingLock) {
+            console.log(`⏳ Queue already processing, waiting...`);
+            return;
+        }
+
+        if (this.queue.length === 0) {
+            this.isProcessing = false;
+            return;
+        }
+
+        this.processingLock = true;
+        this.isProcessing = true;
+
+        const task = this.queue[0];
+        this.currentOperation = task.name;
+        
+        console.log(`🔓 Processing: ${task.name} (${this.queue.length - 1} remaining)`);
+
+        try {
+            // Begin transaction
+            await this.beginTransaction(task.name);
+            
+            // Execute operation
+            const result = await task.operation();
+            
+            // Commit transaction
+            await this.commitTransaction(task.name);
+            
+            // Resolve with result
+            task.resolve(result);
+            
+        } catch (error) {
+            console.error(`❌ Operation failed: ${task.name}`, error.message);
+            
+            try {
+                await this.rollbackTransaction(task.name);
+            } catch (rollbackError) {
+                console.error(`⚠️ Rollback failed:`, rollbackError.message);
+            }
+            
+            task.reject(error);
+        } finally {
+            // Remove completed task
+            this.queue.shift();
+            this.currentOperation = null;
+            this.processingLock = false;
+            
+            // Process next in queue
+            setImmediate(() => this.processQueue());
+        }
+    }
+
+    async beginTransaction(name) {
+        if (this.transactionActive) {
+            // Use savepoint for nested operations
+            const spName = `sp_${this.savepointCounter++}`;
+            await new Promise((resolve, reject) => {
+                const db = require('./database');
+                db.db.run(`SAVEPOINT ${spName}`, (err) => {
+                    if (err) reject(err);
+                    else {
+                        console.log(`📌 SAVEPOINT created: ${spName} for ${name}`);
+                        resolve();
+                    }
+                });
+            });
+            return spName;
+        }
+        
+        // Start main transaction
+        this.transactionActive = true;
+        await new Promise((resolve, reject) => {
+            const db = require('./database');
+            db.db.run('BEGIN TRANSACTION', (err) => {
+                if (err) reject(err);
+                else {
+                    console.log(`🔓 BEGIN TRANSACTION: ${name}`);
+                    resolve();
+                }
+            });
+        });
+        return null;
+    }
+
+    async commitTransaction(name, savepoint = null) {
+        if (savepoint) {
+            await new Promise((resolve, reject) => {
+                const db = require('./database');
+                db.db.run(`RELEASE SAVEPOINT ${savepoint}`, (err) => {
+                    if (err) reject(err);
+                    else {
+                        console.log(`📌 RELEASE SAVEPOINT: ${savepoint}`);
+                        resolve();
+                    }
+                });
+            });
+            return;
+        }
+
+        if (this.transactionActive) {
+            await new Promise((resolve, reject) => {
+                const db = require('./database');
+                db.db.run('COMMIT', (err) => {
+                    if (err) reject(err);
+                    else {
+                        console.log(`✅ COMMIT: ${name}`);
+                        resolve();
+                    }
+                });
+            });
+            this.transactionActive = false;
+        }
+    }
+
+    async rollbackTransaction(name, savepoint = null) {
+        if (savepoint) {
+            await new Promise((resolve, reject) => {
+                const db = require('./database');
+                db.db.run(`ROLLBACK TO SAVEPOINT ${savepoint}`, (err) => {
+                    if (err) reject(err);
+                    else {
+                        console.log(`↩️ ROLLBACK SAVEPOINT: ${savepoint}`);
+                        resolve();
+                    }
+                });
+            });
+            return;
+        }
+
+        if (this.transactionActive) {
+            await new Promise((resolve, reject) => {
+                const db = require('./database');
+                db.db.run('ROLLBACK', (err) => {
+                    if (err) reject(err);
+                    else {
+                        console.log(`↩️ ROLLBACK: ${name}`);
+                        resolve();
+                    }
+                });
+            });
+            this.transactionActive = false;
+        }
+    }
+
+    getStatus() {
+        return {
+            queueLength: this.queue.length,
+            isProcessing: this.isProcessing,
+            currentOperation: this.currentOperation,
+            transactionActive: this.transactionActive,
+            processingLock: this.processingLock
+        };
+    }
+}
+
+// Create singleton
+const transactionQueue = new TransactionQueue();
+
+// ============================================================
+// 🔧 SQLITE OPTIMIZATION (FIXED - No transaction issues)
 // ============================================================
 
 async function optimizeSQLite(db) {
+    // Run PRAGMAs outside any transaction
     const pragmas = [
         'PRAGMA journal_mode=WAL;',
         'PRAGMA synchronous=OFF;',
@@ -22,23 +218,41 @@ async function optimizeSQLite(db) {
     ];
     
     for (const pragma of pragmas) {
-        await new Promise((resolve, reject) => {
-            db.db.run(pragma, (err) => {
-                if (err) reject(err);
-                else resolve();
+        try {
+            await new Promise((resolve, reject) => {
+                db.db.run(pragma, (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
             });
-        });
+        } catch (err) {
+            // Only log if it's not a transaction error
+            if (!err.message.includes('inside a transaction')) {
+                console.warn(`⚠️ PRAGMA warning: ${err.message}`);
+            }
+        }
     }
     console.log('✅ SQLite optimized for import');
 }
 
 // ============================================================
-// 📦 INSERT BATCH - FIXED (Single transaction per batch)
+// 📦 INSERT BATCH - CONCURRENCY SAFE
 // ============================================================
 
-async function insertBatch(db, batch) {
-    if (!batch || batch.length === 0) return;
-    
+async function insertBatch(db, batch, useQueue = true) {
+    if (!batch || batch.length === 0) return 0;
+
+    // If useQueue is true, run through queue to prevent concurrency issues
+    if (useQueue) {
+        return transactionQueue.enqueue(async () => {
+            return await insertBatchInternal(db, batch);
+        }, `Batch-${Date.now()}`);
+    }
+
+    return await insertBatchInternal(db, batch);
+}
+
+async function insertBatchInternal(db, batch) {
     const placeholders = batch.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').join(',');
     const values = [];
 
@@ -74,47 +288,29 @@ async function insertBatch(db, batch) {
         ) VALUES ${placeholders}
     `;
 
-    // ✅ FIX: Use single transaction, no nesting
-    try {
-        // Start transaction
-        await new Promise((resolve, reject) => {
-            db.db.run('BEGIN TRANSACTION', (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
+    // Use the transaction queue's current transaction
+    // The queue manager handles BEGIN/COMMIT
+    await new Promise((resolve, reject) => {
+        db.db.run(sql, values, (err) => {
+            if (err) reject(err);
+            else resolve();
         });
+    });
 
-        // Execute insert
-        await new Promise((resolve, reject) => {
-            db.db.run(sql, values, (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
-
-        // Commit transaction
-        await new Promise((resolve, reject) => {
-            db.db.run('COMMIT', (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
-        
-    } catch (err) {
-        // Rollback on error
-        await new Promise((resolve) => {
-            db.db.run('ROLLBACK', () => resolve());
-        });
-        console.error(`❌ Batch insert failed: ${err.message}`);
-        throw err;
-    }
+    return batch.length;
 }
 
 // ============================================================
-// 📥 IMPORT CSV - FIXED (No this.pause error)
+// 📥 IMPORT CSV - QUEUE MANAGED
 // ============================================================
 
 async function importCSV(filePath) {
+    return transactionQueue.enqueue(async () => {
+        return await importCSVInternal(filePath);
+    }, `import-${path.basename(filePath)}`);
+}
+
+async function importCSVInternal(filePath) {
     const startTime = Date.now();
     const BATCH_SIZE = 1000;
     
@@ -126,26 +322,22 @@ async function importCSV(filePath) {
         
         const seenParts = new Set();
         const batch = [];
-        let isPaused = false;
         let streamPaused = false;
         
-        console.log(`📥 Starting optimized CSV import from: ${filePath}`);
+        console.log(`📥 Starting CSV import: ${path.basename(filePath)}`);
 
         const db = require('./database');
         
-        // Optimize SQLite
-        optimizeSQLite(db).then(() => {
-            console.log('✅ SQLite optimized');
-        }).catch(err => {
+        // Optimize SQLite (outside transaction)
+        optimizeSQLite(db).catch(err => {
             console.warn('⚠️ SQLite optimization warning:', err.message);
         });
 
         let lastLogTime = Date.now();
         
-        // ✅ FIX: Use function declaration (not arrow) to preserve `this`
         const stream = fs.createReadStream(filePath)
             .pipe(csv())
-            .on('data', function(row) {  // ✅ Regular function, not arrow
+            .on('data', function(row) {
                 totalRows++;
                 
                 try {
@@ -188,19 +380,17 @@ async function importCSV(filePath) {
 
                     batch.push(product);
 
-                    // ✅ FIX: Check if we need to process batch
                     if (batch.length >= BATCH_SIZE && !streamPaused) {
                         streamPaused = true;
-                        this.pause();  // ✅ this works now
-                        
-                        // Copy batch and clear it
+                        this.pause();
+
                         const currentBatch = [...batch];
                         batch.length = 0;
-                        
-                        // ✅ FIX: Insert batch with proper error handling
-                        insertBatch(db, currentBatch)
-                            .then(() => {
-                                inserted += currentBatch.length;
+
+                        // Insert batch using the current transaction
+                        insertBatchInternal(db, currentBatch)
+                            .then(count => {
+                                inserted += count;
                                 
                                 const now = Date.now();
                                 if (now - lastLogTime > 5000) {
@@ -209,7 +399,7 @@ async function importCSV(filePath) {
                                 }
                                 
                                 streamPaused = false;
-                                this.resume();  // ✅ this works now
+                                this.resume();
                             })
                             .catch((err) => {
                                 console.error(`❌ Batch insert error: ${err.message}`);
@@ -225,12 +415,11 @@ async function importCSV(filePath) {
                 }
             })
             .on('end', async () => {
-                // Insert remaining products
                 if (batch.length > 0) {
                     try {
-                        await insertBatch(db, batch);
-                        inserted += batch.length;
-                        console.log(`📦 Final batch: ${batch.length} products`);
+                        const count = await insertBatchInternal(db, batch);
+                        inserted += count;
+                        console.log(`📦 Final batch: ${count} products`);
                     } catch (err) {
                         console.error(`❌ Final batch insert error: ${err.message}`);
                         errors++;
@@ -254,19 +443,25 @@ async function importCSV(filePath) {
 }
 
 // ============================================================
-// 📥 STREAMING IMPORT - ALTERNATIVE (Even faster)
+// 📥 STREAMING IMPORT - QUEUE MANAGED
 // ============================================================
 
 async function importCSVStreaming(filePath) {
+    return transactionQueue.enqueue(async () => {
+        return await importCSVStreamingInternal(filePath);
+    }, `stream-${path.basename(filePath)}`);
+}
+
+async function importCSVStreamingInternal(filePath) {
     const startTime = Date.now();
     const BATCH_SIZE = 2000;
     
-    console.log(`📥 Starting streaming CSV import from: ${filePath}`);
+    console.log(`📥 Starting streaming import: ${path.basename(filePath)}`);
     
     const db = require('./database');
     await optimizeSQLite(db);
     
-    // Clear existing products
+    // Clear existing products (within transaction)
     await new Promise((resolve, reject) => {
         db.db.run('DELETE FROM products', (err) => {
             if (err) reject(err);
@@ -285,7 +480,6 @@ async function importCSVStreaming(filePath) {
     const stream = fs.createReadStream(filePath)
         .pipe(csv());
     
-    // Process stream in chunks
     for await (const row of stream) {
         totalRows++;
         
@@ -321,8 +515,8 @@ async function importCSVStreaming(filePath) {
             });
             
             if (batch.length >= BATCH_SIZE) {
-                await insertBatch(db, batch);
-                inserted += batch.length;
+                const count = await insertBatchInternal(db, batch);
+                inserted += count;
                 batch = [];
                 console.log(`📦 Imported ${inserted} products`);
             }
@@ -333,10 +527,9 @@ async function importCSVStreaming(filePath) {
         }
     }
     
-    // Final batch
     if (batch.length > 0) {
-        await insertBatch(db, batch);
-        inserted += batch.length;
+        const count = await insertBatchInternal(db, batch);
+        inserted += count;
     }
     
     console.log(`📊 Import Summary:`);
@@ -349,4 +542,31 @@ async function importCSVStreaming(filePath) {
     return { imported: inserted, duplicates, errors };
 }
 
-module.exports = { importCSV, importCSVStreaming, optimizeSQLite };
+// ============================================================
+// 📊 QUEUE STATUS
+// ============================================================
+
+function getQueueStatus() {
+    return transactionQueue.getStatus();
+}
+
+function resetQueue() {
+    // Clear queue
+    transactionQueue.queue = [];
+    transactionQueue.isProcessing = false;
+    transactionQueue.processingLock = false;
+    console.log('🔄 Transaction queue reset');
+}
+
+// ============================================================
+// 📤 EXPORTS
+// ============================================================
+
+module.exports = { 
+    importCSV, 
+    importCSVStreaming, 
+    optimizeSQLite,
+    getQueueStatus,
+    resetQueue,
+    transactionQueue
+};
