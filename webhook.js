@@ -84,6 +84,16 @@ try {
         getProcessedFiles: () => []
     };
 }
+// 🖼️ SHARP FOR IMAGE PROCESSING - PASTE HERE ⬇️⬇️⬇️
+let sharp = null;
+try {
+    sharp = require('sharp');
+    console.log('✅ Sharp loaded for image processing');
+} catch(e) {
+    console.log('⚠️ Sharp not available, image enhancement disabled');
+}
+// 🖼️ SHARP FOR IMAGE PROCESSING - PASTE HERE ⬆️⬆️⬆️
+
 // Optional modules with fallbacks
 let customerLog = null;
 try { customerLog = require('./modules/customer-log'); } catch(e) { 
