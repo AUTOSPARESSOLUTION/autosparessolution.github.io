@@ -1,5 +1,5 @@
 // ============================================================
-// 📥 CSV LOADER - FIXED VERSION (No this.pause error)
+// 📥 CSV LOADER - FIXED VERSION (Preserves all functionality)
 // modules/csv-loader.js
 // ============================================================
 
@@ -33,7 +33,7 @@ async function optimizeSQLite(db) {
 }
 
 // ============================================================
-// 📦 INSERT BATCH - WITH TRANSACTION
+// 📦 INSERT BATCH - FIXED (Single transaction per batch)
 // ============================================================
 
 async function insertBatch(db, batch) {
@@ -74,15 +74,17 @@ async function insertBatch(db, batch) {
         ) VALUES ${placeholders}
     `;
 
-    // Use transaction per batch
-    await new Promise((resolve, reject) => {
-        db.db.run('BEGIN TRANSACTION', (err) => {
-            if (err) reject(err);
-            else resolve();
-        });
-    });
-
+    // ✅ FIX: Use single transaction, no nesting
     try {
+        // Start transaction
+        await new Promise((resolve, reject) => {
+            db.db.run('BEGIN TRANSACTION', (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        // Execute insert
         await new Promise((resolve, reject) => {
             db.db.run(sql, values, (err) => {
                 if (err) reject(err);
@@ -90,22 +92,26 @@ async function insertBatch(db, batch) {
             });
         });
 
+        // Commit transaction
         await new Promise((resolve, reject) => {
             db.db.run('COMMIT', (err) => {
                 if (err) reject(err);
                 else resolve();
             });
         });
+        
     } catch (err) {
+        // Rollback on error
         await new Promise((resolve) => {
             db.db.run('ROLLBACK', () => resolve());
         });
+        console.error(`❌ Batch insert failed: ${err.message}`);
         throw err;
     }
 }
 
 // ============================================================
-// 📥 IMPORT CSV - FIXED VERSION
+// 📥 IMPORT CSV - FIXED (No this.pause error)
 // ============================================================
 
 async function importCSV(filePath) {
@@ -137,7 +143,7 @@ async function importCSV(filePath) {
         let lastLogTime = Date.now();
         
         // ✅ FIX: Use function declaration (not arrow) to preserve `this`
-        const parser = fs.createReadStream(filePath)
+        const stream = fs.createReadStream(filePath)
             .pipe(csv())
             .on('data', function(row) {  // ✅ Regular function, not arrow
                 totalRows++;
@@ -182,16 +188,19 @@ async function importCSV(filePath) {
 
                     batch.push(product);
 
-                    // ✅ FIX: Use proper this reference for pause/resume
+                    // ✅ FIX: Check if we need to process batch
                     if (batch.length >= BATCH_SIZE && !streamPaused) {
                         streamPaused = true;
                         this.pause();  // ✅ this works now
                         
-                        // Insert batch
-                        insertBatch(db, [...batch])
+                        // Copy batch and clear it
+                        const currentBatch = [...batch];
+                        batch.length = 0;
+                        
+                        // ✅ FIX: Insert batch with proper error handling
+                        insertBatch(db, currentBatch)
                             .then(() => {
-                                inserted += batch.length;
-                                batch.length = 0;
+                                inserted += currentBatch.length;
                                 
                                 const now = Date.now();
                                 if (now - lastLogTime > 5000) {
@@ -221,6 +230,7 @@ async function importCSV(filePath) {
                     try {
                         await insertBatch(db, batch);
                         inserted += batch.length;
+                        console.log(`📦 Final batch: ${batch.length} products`);
                     } catch (err) {
                         console.error(`❌ Final batch insert error: ${err.message}`);
                         errors++;
