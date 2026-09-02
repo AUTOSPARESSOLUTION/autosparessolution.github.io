@@ -8224,7 +8224,20 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
             if (!searchWords) searchWords = cleaned;
 
             console.log(`🔍 Searching for: "${searchWords}"`);
-
+            // ============================================================
+            // 🆕 ENHANCED SEARCH (NEW) - PASTE THIS ENTIRE BLOCK ⬇️
+            // ============================================================
+            if (cleaned.length >= 2) {
+                try {
+                    await searchProducts(cleaned, from);
+                    return;
+                } catch (error) {
+                    console.log('⚠️ Enhanced search failed, falling back to old search:', error.message);
+                }
+            }
+            // ============================================================
+            // 🆕 ENHANCED SEARCH ENDS HERE ⬆️
+            // ============================================================
             let results = await optimizedSearch(searchWords, 10);
 
             if (results.length === 0) {
