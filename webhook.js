@@ -7486,7 +7486,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
         if (supplierInfo) {
             console.log(`🏢 SUPPLIER DETECTED: ${supplierInfo.supplier_name}`);
             
-            const acceptMatch = msg.match(/^accept\s+([A-Z0-9-]+)/i);
+                        const acceptMatch = msg.match(/^accept\s+([A-Z0-9-]+)/i);
             if (acceptMatch) {
                 const orderId = acceptMatch[1];
                 await db.db.run(
@@ -7494,9 +7494,25 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
                      WHERE order_id = ? AND supplier_id = ?`,
                     [orderId, supplierInfo.supplier_id]
                 );
+                
+                const status = await getOrderStatusSummary(orderId);
+                
                 await sendWhatsAppMessage(from,
-                    `✅ *Order Accepted!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n📞 Call: ${CONFIG.businessPhone}`
+                    `✅ *Order Accepted!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n📊 ${status.accepted}/${status.total_suppliers} suppliers accepted\n📞 Call: ${CONFIG.businessPhone}`
                 );
+                
+                await notifyAllParties(orderId, 'supplier_accepted', {
+                    supplier_name: supplierInfo.supplier_name,
+                    trigger_phone: from,
+                    accepted_count: status.accepted,
+                    total_suppliers: status.total_suppliers
+                });
+                
+                if (status.isComplete) {
+                    await notifyAllParties(orderId, 'all_suppliers_accepted', {
+                        total_suppliers: status.total_suppliers
+                    });
+                }
                 return;
             }
             
