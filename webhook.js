@@ -7558,7 +7558,87 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
             await sendWelcomeWithAllBrands(from);
             return;
         }
-
+        // ============================================================
+        // 🆕 CUSTOMER: BIRTHDAY & OCCASIONS
+        // ============================================================
+        
+        const setBirthdayMatch = msg.match(/^set\s+birthday\s+(\d{1,2})-(\d{1,2})/i);
+        if (setBirthdayMatch) {
+            const day = setBirthdayMatch[1].padStart(2, '0');
+            const month = setBirthdayMatch[2].padStart(2, '0');
+            const date = `${day}-${month}`;
+            const result = await customerEngagement.addCustomerOccasion(from, 'birthday', date);
+            await sendWhatsAppMessage(from,
+                result.success ? `🎂 *Birthday Set!*\n\nWe'll wish you on ${date} every year!` : `❌ ${result.message}`
+            );
+            return;
+        }
+        
+        if (msgLower === 'my occasions') {
+            const occasions = await customerEngagement.getCustomerOccasions(from);
+            if (occasions.length === 0) {
+                await sendWhatsAppMessage(from,
+                    `📋 *No Occasions Found*\n\n💡 Set your birthday: "set birthday 15-08"`
+                );
+                return;
+            }
+            let reply = `📋 *Your Occasions*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            occasions.forEach(o => { reply += `📌 ${o.occasion_type.toUpperCase()}: ${o.occasion_date}\n`; });
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+        
+        if (msgLower === 'nearby stores' || msgLower === 'nearby suppliers') {
+            const loc = await db.db.get(
+                `SELECT * FROM customer_locations WHERE phone = ? ORDER BY updated_at DESC LIMIT 1`,
+                [from]
+            );
+            if (!loc) {
+                await sendWhatsAppMessage(from,
+                    `📍 *Please share your location first!*\n\nSend your location using the 📍 pin attachment.`
+                );
+                return;
+            }
+            const suppliers = await db.db.all(`SELECT name, phone, address FROM suppliers WHERE status = 'active' LIMIT 10`);
+            if (suppliers.length === 0) {
+                await sendWhatsAppMessage(from, '📋 *No nearby suppliers found.*');
+                return;
+            }
+            let reply = `📍 *Nearby Suppliers*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            suppliers.forEach((s, i) => {
+                reply += `${i + 1}. *${s.name}*\n   📞 ${s.phone}\n\n`;
+            });
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+        
+        if (msgLower === 'track order' || msgLower === 'track delivery') {
+            const order = await db.db.get(
+                `SELECT * FROM orders WHERE phone = ? AND status IN ('pending', 'processing', 'shipped') ORDER BY created_at DESC LIMIT 1`,
+                [from]
+            );
+            if (!order) {
+                await sendWhatsAppMessage(from, '📋 *No active orders to track.*');
+                return;
+            }
+            const delivery = await db.db.get(
+                `SELECT * FROM deliveries WHERE order_id = ? ORDER BY assigned_at DESC LIMIT 1`,
+                [order.order_id]
+            );
+            if (!delivery) {
+                await sendWhatsAppMessage(from,
+                    `📦 *Order ${order.order_id}*\n📊 Status: ${order.status.toUpperCase()}\n\n⏳ Waiting for delivery assignment.`
+                );
+                return;
+            }
+            let reply = `🚚 *Tracking: ${order.order_id}*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `📊 Status: ${delivery.status.replace('_', ' ').toUpperCase()}\n`;
+            reply += `👤 Boy: ${delivery.delivery_boy_name}\n`;
+            reply += `📞 ${delivery.delivery_boy_phone}\n`;
+            if (delivery.otp) reply += `🔐 OTP: ${delivery.otp}\n`;
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
         // ============================================================
         // 2️⃣ CONFIRM ORDER
         // ============================================================
