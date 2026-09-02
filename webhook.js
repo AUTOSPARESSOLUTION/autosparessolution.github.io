@@ -7369,6 +7369,188 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
         return;
     }
 }
+                // ============================================================
+        // 🆕 SUPPLIER COMMANDS
+        // ============================================================
+        
+        const supplierInfo = await db.db.get(
+            `SELECT sa.*, s.id as supplier_id, s.name as supplier_name, s.phone
+             FROM supplier_access sa
+             JOIN suppliers s ON sa.supplier_id = s.id
+             WHERE sa.phone = ? AND sa.status = 'active'`,
+            [from]
+        );
+        
+        if (supplierInfo) {
+            console.log(`🏢 SUPPLIER DETECTED: ${supplierInfo.supplier_name}`);
+            
+            const acceptMatch = msg.match(/^accept\s+([A-Z0-9-]+)/i);
+            if (acceptMatch) {
+                const orderId = acceptMatch[1];
+                await db.db.run(
+                    `UPDATE supplier_order_notifications SET status = 'accepted', response_received = CURRENT_TIMESTAMP
+                     WHERE order_id = ? AND supplier_id = ?`,
+                    [orderId, supplierInfo.supplier_id]
+                );
+                await sendWhatsAppMessage(from,
+                    `✅ *Order Accepted!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n📞 Call: ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+            
+            const rejectMatch = msg.match(/^reject\s+([A-Z0-9-]+)(?:\s+(.+))?/i);
+            if (rejectMatch) {
+                const orderId = rejectMatch[1];
+                const reason = rejectMatch[2] || 'No reason provided';
+                await db.db.run(
+                    `UPDATE supplier_order_notifications SET status = 'rejected', response_received = CURRENT_TIMESTAMP
+                     WHERE order_id = ? AND supplier_id = ?`,
+                    [orderId, supplierInfo.supplier_id]
+                );
+                await sendWhatsAppMessage(from,
+                    `❌ *Order Rejected*\n━━━━━━━━━━━━━━━━━━━━\n\n💡 Reason: ${reason}\n📞 Call: ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+            
+            if (msgLower === 'my orders' || msgLower === 'pending orders') {
+                const orders = await db.db.all(
+                    `SELECT son.*, o.phone as customer_phone, o.total
+                     FROM supplier_order_notifications son
+                     JOIN orders o ON son.order_id = o.order_id
+                     WHERE son.supplier_id = ? AND son.status IN ('pending', 'sent')
+                     ORDER BY son.notification_sent DESC`,
+                    [supplierInfo.supplier_id]
+                );
+                if (orders.length === 0) { await sendWhatsAppMessage(from, '📋 *No pending orders.*'); return; }
+                let reply = `📋 *My Pending Orders (${orders.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                orders.forEach((n, i) => {
+                    reply += `${i + 1}. 📦 *${n.order_id}*\n   📦 ${n.product_part} x${n.quantity}\n   👤 Customer: ${n.customer_phone}\n\n`;
+                });
+                reply += `📝 *Accept:* "Accept [order_id]"\n📝 *Reject:* "Reject [order_id]"\n📞 Call: ${CONFIG.businessPhone}`;
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+            
+            if (msgLower === 'supplier help') {
+                await sendWhatsAppMessage(from,
+                    `📋 *Supplier Commands*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 *Order Management:*\n   "Accept ORD-123456" - Accept order\n   "Reject ORD-123456" - Reject order\n   "My Orders" - View pending orders\n\n📤 *Stock Management:*\n   "Upload Stock" - Upload Excel file\n\n📞 Call: ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+        }
+        
+        // ============================================================
+        // 🆕 DELIVERY BOY COMMANDS
+        // ============================================================
+        
+        const deliveryBoy = await db.db.get(
+            `SELECT * FROM delivery_boys WHERE phone = ? AND status = 'active'`,
+            [from]
+        );
+        
+        if (deliveryBoy) {
+            console.log(`🚚 DELIVERY BOY DETECTED: ${deliveryBoy.name}`);
+            
+            const acceptDelMatch = msg.match(/^accept\s+([A-Z0-9-]+)/i);
+            if (acceptDelMatch) {
+                const deliveryId = acceptDelMatch[1];
+                await db.db.run(
+                    `UPDATE deliveries SET status = 'accepted', accepted_at = CURRENT_TIMESTAMP
+                     WHERE delivery_id = ? AND delivery_boy_phone = ?`,
+                    [deliveryId, from]
+                );
+                await sendWhatsAppMessage(from,
+                    `✅ *Delivery Accepted!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Delivery: ${deliveryId}\n📞 Call: ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+            
+            const pickedMatch = msg.match(/^picked\s+up\s+([A-Z0-9-]+)/i);
+            if (pickedMatch) {
+                const deliveryId = pickedMatch[1];
+                await db.db.run(
+                    `UPDATE deliveries SET status = 'picked_up', picked_up_at = CURRENT_TIMESTAMP
+                     WHERE delivery_id = ? AND delivery_boy_phone = ?`,
+                    [deliveryId, from]
+                );
+                await sendWhatsAppMessage(from,
+                    `✅ *Picked Up!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Delivery: ${deliveryId}\n📞 Call: ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+            
+            const otpMatch = msg.match(/^otp\s+(\d{6})/i);
+            if (otpMatch) {
+                const otp = otpMatch[1];
+                const delivery = await db.db.get(
+                    `SELECT * FROM deliveries WHERE delivery_boy_phone = ? AND otp = ? AND otp_verified = 0`,
+                    [from, otp]
+                );
+                if (delivery) {
+                    await db.db.run(
+                        `UPDATE deliveries SET otp_verified = 1, otp_verified_by = ?, otp_verified_at = CURRENT_TIMESTAMP
+                         WHERE delivery_id = ?`,
+                        [from, delivery.delivery_id]
+                    );
+                    await sendWhatsAppMessage(from, `✅ *OTP Verified!*`);
+                } else {
+                    await sendWhatsAppMessage(from, `❌ *Invalid OTP*`);
+                }
+                return;
+            }
+            
+            const deliveredMatch = msg.match(/^delivered\s+([A-Z0-9-]+)(?:\s*[-:]\s*(.+))?/i);
+            if (deliveredMatch) {
+                const deliveryId = deliveredMatch[1];
+                const notes = deliveredMatch[2] || 'Delivered successfully';
+                const delivery = await db.db.get(
+                    `SELECT * FROM deliveries WHERE delivery_id = ? AND delivery_boy_phone = ?`,
+                    [deliveryId, from]
+                );
+                if (delivery && delivery.otp_verified) {
+                    await db.db.run(
+                        `UPDATE deliveries SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP, feedback = ?
+                         WHERE delivery_id = ?`,
+                        [notes, deliveryId]
+                    );
+                    await db.db.run(
+                        `UPDATE delivery_boys SET total_deliveries = total_deliveries + 1,
+                             successful_deliveries = successful_deliveries + 1
+                         WHERE phone = ?`,
+                        [from]
+                    );
+                    await sendWhatsAppMessage(from,
+                        `✅ *Delivery Completed!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Delivery: ${deliveryId}\n📝 Notes: ${notes}\n📞 Call: ${CONFIG.businessPhone}`
+                    );
+                } else {
+                    await sendWhatsAppMessage(from, `❌ *OTP Not Verified*`);
+                }
+                return;
+            }
+            
+            if (msgLower === 'my deliveries' || msgLower === 'my orders') {
+                const deliveries = await db.db.all(
+                    `SELECT * FROM deliveries WHERE delivery_boy_phone = ? 
+                     AND status IN ('assigned', 'accepted', 'picked_up', 'out_for_delivery')`,
+                    [from]
+                );
+                if (deliveries.length === 0) { await sendWhatsAppMessage(from, '📋 *No pending deliveries.*'); return; }
+                let reply = `📋 *My Deliveries (${deliveries.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                deliveries.forEach((d, i) => {
+                    reply += `${i + 1}. *${d.delivery_id}*\n   👤 ${d.customer_name}\n   📊 ${d.status.replace('_', ' ').toUpperCase()}\n   🔐 OTP: ${d.otp || 'N/A'}\n\n`;
+                });
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+            
+            if (msgLower === 'delivery help') {
+                await sendWhatsAppMessage(from,
+                    `📋 *Delivery Boy Commands*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 *Order Management:*\n   "Accept DEL-123456" - Accept delivery\n   "Picked Up DEL-123456" - Mark as picked\n   "Delivered DEL-123456" - Complete\n\n🔐 *OTP:*\n   "OTP 123456" - Verify OTP\n\n📊 *View:*\n   "My Deliveries" - View pending\n\n📞 Call: ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+        }
         // ============================================================
         // 1️⃣ WELCOME / HELP
         // ============================================================
