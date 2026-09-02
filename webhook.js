@@ -4716,7 +4716,117 @@ function formatProductForWhatsApp(product, index = 0) {
     reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
     return reply;
 }
+// ============================================================
+// 🆕 REGISTRATION HELPER FUNCTIONS
+// ============================================================
 
+async function startRegistration(phone, role) {
+    pendingRegistration.set(phone, { role, step: 1, data: {} });
+    
+    let message = '';
+    switch(role) {
+        case 'customer':
+            message = `✅ *Customer Registration Started!*\n\n` +
+                      `📝 Please send your *Full Name*:\n` +
+                      `📞 Call: ${CONFIG.businessPhone}`;
+            break;
+        case 'supplier':
+            message = `✅ *Supplier Registration Started!*\n\n` +
+                      `📝 Please send your *Business Name*:\n` +
+                      `📞 Call: ${CONFIG.businessPhone}`;
+            break;
+        case 'delivery':
+        case 'delivery boy':
+            message = `✅ *Delivery Boy Registration Started!*\n\n` +
+                      `📝 Please send your *Full Name*:\n` +
+                      `📞 Call: ${CONFIG.businessPhone}`;
+            break;
+        default:
+            message = `✅ *Registration Started!*\n\n` +
+                      `📝 Please send your *Full Name*:\n` +
+                      `📞 Call: ${CONFIG.businessPhone}`;
+    }
+    
+    await sendWhatsAppMessage(phone, message);
+}
+
+async function continueRegistration(phone, message) {
+    const reg = pendingRegistration.get(phone);
+    if (!reg) return;
+    
+    const { role, step, data } = reg;
+    
+    if (step === 1) {
+        // Name step
+        data.name = message;
+        reg.step = 2;
+        pendingRegistration.set(phone, reg);
+        
+        await sendWhatsAppMessage(phone,
+            `✅ Got it! 📝\n\n` +
+            `📞 Now send your *Phone Number* (10 digits):\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
+        return;
+    }
+    
+    if (step === 2) {
+        // Phone number step - verify
+        const cleanPhone = message.replace(/\D/g, '');
+        if (cleanPhone.length === 10) {
+            data.phone = cleanPhone;
+            reg.step = 3;
+            pendingRegistration.set(phone, reg);
+            
+            // Save to database based on role
+            try {
+                if (role === 'customer') {
+                    await db.db.run(
+                        `INSERT INTO customers (phone, name, registered_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+                        [cleanPhone, data.name]
+                    );
+                } else if (role === 'supplier') {
+                    await db.db.run(
+                        `INSERT INTO suppliers (name, phone, status, created_at) VALUES (?, ?, 'active', CURRENT_TIMESTAMP)`,
+                        [data.name, cleanPhone]
+                    );
+                } else if (role === 'delivery' || role === 'delivery boy') {
+                    await db.db.run(
+                        `INSERT INTO delivery_boys (name, phone, status, created_at) VALUES (?, ?, 'active', CURRENT_TIMESTAMP)`,
+                        [data.name, cleanPhone]
+                    );
+                }
+                
+                pendingRegistration.delete(phone);
+                
+                await sendWhatsAppMessage(phone,
+                    `✅ *Registration Complete!* 🎉\n\n` +
+                    `👤 Name: ${data.name}\n` +
+                    `📞 Phone: ${cleanPhone}\n` +
+                    `📋 Role: ${role.toUpperCase()}\n\n` +
+                    `🚀 You're now registered!\n` +
+                    `🔍 Send a part number to start shopping!\n\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
+            } catch (error) {
+                console.error('❌ Registration save error:', error.message);
+                await sendWhatsAppMessage(phone,
+                    `❌ *Registration Failed*\n\n` +
+                    `Error: ${error.message}\n\n` +
+                    `💡 Please try again later.\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
+            }
+        } else {
+            await sendWhatsAppMessage(phone,
+                `❌ *Invalid Phone Number*\n\n` +
+                `📞 Please send a valid 10-digit phone number.\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+        }
+        return;
+    }
+}
 // ============================================================
 // 📱 HANDLE WHATSAPP TEXT MESSAGE
 // ============================================================
