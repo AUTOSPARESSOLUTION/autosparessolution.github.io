@@ -149,6 +149,20 @@ try { pdfParse = require('pdf-parse'); } catch(e) {}
 
 let Tesseract = null;
 try { Tesseract = require('tesseract.js'); } catch(e) {}
+let Tesseract = null;
+try { Tesseract = require('tesseract.js'); } catch(e) {}
+
+// ============================================================
+// 🆕 NEW MODULES FOR ENHANCED SYSTEM - PASTE HERE ⬇️
+// ============================================================
+
+const orderRouter = require('./modules/order-router-v2');
+const supplierPortal = require('./modules/supplier-portal');
+const customerEngagement = require('./modules/customer-engagement');
+const productCoverage = require('./modules/product-coverage');
+
+// Pending registrations for first-time users
+const pendingRegistration = new Map();
 
 
 // ============================================================
