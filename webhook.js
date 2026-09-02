@@ -3524,6 +3524,25 @@ async function initAllTables() {
             });
         });
         console.log('✅ supplier_payments table ready');
+        await new Promise((resolve, reject) => {
+    db.db.run(`
+        CREATE TABLE IF NOT EXISTS supplier_inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            supplier_id INTEGER NOT NULL,
+            part TEXT NOT NULL,
+            quantity INTEGER DEFAULT 0,
+            price REAL DEFAULT 0,
+            is_active BOOLEAN DEFAULT 1,
+            last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+            UNIQUE(supplier_id, part)
+        )
+    `, (err) => {
+        if (err) reject(err);
+        else resolve();
+    });
+});
+console.log('✅ supplier_inventory table ready');
                 // ============================================================
         // 🔧 FIX: Add missing columns to customers table
         // ============================================================
