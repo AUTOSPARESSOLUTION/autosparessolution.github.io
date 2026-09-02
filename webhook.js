@@ -5914,6 +5914,56 @@ if (isAdmin(from)) {
                 await sendWhatsAppMessage(from, reply);
                 return;
             }
+                    // ============================================================
+            // 🆕 ADMIN: ENGAGEMENT & COVERAGE COMMANDS
+            // ============================================================
+            
+            if (msgLower === 'engagement stats' || msgLower === 'engagement') {
+                const stats = await customerEngagement.getEngagementStats();
+                let reply = '📊 *Engagement Stats*\n━━━━━━━━━━━━━━━━━━━━\n\n';
+                if (stats.length === 0) { reply += 'No engagement data yet.\n'; } else {
+                    stats.forEach(s => {
+                        reply += `📋 ${s.wish_type.toUpperCase()}\n   📤 Sent: ${s.total_sent}\n   ✅ Delivered: ${s.delivered}\n   💬 Replies: ${s.replies}\n   ⭐ Engagement: ${s.avg_engagement || 0}%\n\n`;
+                    });
+                }
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+            
+            if (msgLower === 'send festival wishes') {
+                await sendWhatsAppMessage(from, '🔄 Sending festival wishes...');
+                await customerEngagement.checkUpcomingFestivals();
+                await sendWhatsAppMessage(from, '✅ Festival wishes sent!');
+                return;
+            }
+            
+            if (msgLower === 'send weekly brochure') {
+                await sendWhatsAppMessage(from, '🔄 Sending weekly brochure...');
+                await customerEngagement.sendWeeklyBrochure();
+                await sendWhatsAppMessage(from, '✅ Weekly brochure sent!');
+                return;
+            }
+            
+            if (msgLower === 'uncovered products' || msgLower === 'coverage report') {
+                await sendWhatsAppMessage(from, '🔄 Generating coverage report...');
+                const uncovered = await productCoverage.getUncoveredProducts();
+                if (uncovered.length === 0) { await sendWhatsAppMessage(from, '✅ *All Products Covered!*'); return; }
+                let reply = `📋 *Uncovered Products (${uncovered.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                uncovered.slice(0, 15).forEach((p, i) => {
+                    reply += `${i + 1}. ${p.coverage_status === 'NO_COVERAGE' ? '❌' : '⚠️'} *${p.part}*\n   📝 ${p.description || 'N/A'}\n   📊 ${p.coverage_status.replace('_', ' ')}\n\n`;
+                });
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
+            
+            if (msgLower === 'coverage summary') {
+                const summary = await productCoverage.getCoverageSummary();
+                if (!summary) { await sendWhatsAppMessage(from, '❌ Failed to get coverage summary.'); return; }
+                const coveragePercent = summary.total_products > 0 ? Math.round((summary.fully_covered_products / summary.total_products) * 100) : 0;
+                let reply = `📊 *Coverage Summary*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Total Products: ${summary.total_products}\n✅ Covered: ${summary.fully_covered_products} (${coveragePercent}%)\n❌ Uncovered: ${summary.uncovered_products}\n`;
+                await sendWhatsAppMessage(from, reply);
+                return;
+            }
             // ============================================================
 // 🔍 DEBUG: Check payment data structure in backup
 // ============================================================
