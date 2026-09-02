@@ -5008,7 +5008,7 @@ const isPending = pendingRegistration.has(from);
 if (!isRegistered && !isPending) {
     console.log(`🆕 New user detected: ${from}`);
     
-    const regMatch = msg.match(/^(customer|supplier|delivery|delivery boy)$/i);
+    const regMatch = message.match(/^(customer|supplier|delivery|delivery boy)$/i);
     if (regMatch) {
         const role = regMatch[1].toLowerCase();
         await startRegistration(from, role);
