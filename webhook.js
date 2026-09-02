@@ -4728,7 +4728,55 @@ async function handleWhatsAppMessage(message, from) {
         
         const cleaned = text.replace(/^["']|["']$/g, '').replace(/["']/g, '').replace(/\s+/g, ' ').trim();
         const msgLower = cleaned.toLowerCase().trim();
+// ============================================================
+// 🆕 FIRST-TIME USER DETECTION & REGISTRATION
+// ============================================================
 
+const isCustomer = await db.db.get(
+    `SELECT * FROM customers WHERE phone = ?`,
+    [from]
+);
+
+const isSupplier = await db.db.get(
+    `SELECT * FROM supplier_access WHERE phone = ?`,
+    [from]
+);
+
+const isDeliveryBoy = await db.db.get(
+    `SELECT * FROM delivery_boys WHERE phone = ?`,
+    [from]
+);
+
+const isRegistered = isCustomer || isSupplier || isDeliveryBoy;
+const isPending = pendingRegistration.has(from);
+
+if (!isRegistered && !isPending) {
+    console.log(`🆕 New user detected: ${from}`);
+    
+    const regMatch = msg.match(/^(customer|supplier|delivery|delivery boy)$/i);
+    if (regMatch) {
+        const role = regMatch[1].toLowerCase();
+        await startRegistration(from, role);
+        return;
+    }
+    
+    await sendWhatsAppMessage(from,
+        `👋 *Welcome to Auto Spares Solution!* 🚗\n\n` +
+        `I see you're new here! 🎉\n\n` +
+        `Please tell me who you are:\n\n` +
+        `1️⃣ *Customer* - Buy auto parts\n` +
+        `2️⃣ *Supplier* - Sell auto parts\n` +
+        `3️⃣ *Delivery Boy* - Deliver orders\n\n` +
+        `📝 *Just type:* "Customer", "Supplier", or "Delivery Boy"\n\n` +
+        `📞 Call: ${CONFIG.businessPhone}`
+    );
+    return;
+}
+
+if (isPending && !isRegistered) {
+    await continueRegistration(from, msg);
+    return;
+    }
         // ============================================================
         // 🛡️ STEP 1: ADMIN COMMANDS
         // ============================================================
