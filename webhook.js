@@ -147,8 +147,7 @@ try { PdfPrinter = require('pdfmake'); } catch(e) {}
 let pdfParse = null;
 try { pdfParse = require('pdf-parse'); } catch(e) {}
 
-let Tesseract = null;
-try { Tesseract = require('tesseract.js'); } catch(e) {}
+
 let Tesseract = null;
 try { Tesseract = require('tesseract.js'); } catch(e) {}
 
