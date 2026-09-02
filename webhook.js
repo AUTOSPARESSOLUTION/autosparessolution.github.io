@@ -8216,7 +8216,65 @@ async function startServer() {
             dbReadyMessage = 'Database ready';
             await alertSystem.sendImportCompleteAlert(stats.total_products);
         }
+// ============================================================
+// 🆕 INITIALIZE ENHANCED MODULES
+// ============================================================
 
+// Initialize Customer Engagement
+if (customerEngagement && typeof customerEngagement.initialize === 'function') {
+    try {
+        await customerEngagement.initialize();
+        console.log('✅ Customer Engagement System initialized!');
+    } catch (err) {
+        console.error('❌ Engagement init error:', err.message);
+    }
+} else if (customerEngagement) {
+    console.log('✅ Customer Engagement loaded (no initialization needed)');
+} else {
+    console.log('⚠️ Customer Engagement not available');
+}
+
+// Initialize Order Router
+if (orderRouter && typeof orderRouter.initialize === 'function') {
+    try {
+        await orderRouter.initialize();
+        console.log('✅ Order Router initialized!');
+    } catch (err) {
+        console.error('❌ Order Router init error:', err.message);
+    }
+} else if (orderRouter) {
+    console.log('✅ Order Router loaded (no initialization needed)');
+} else {
+    console.log('⚠️ Order Router not available');
+}
+
+// Initialize Supplier Portal
+if (supplierPortal && typeof supplierPortal.initialize === 'function') {
+    try {
+        await supplierPortal.initialize();
+        console.log('✅ Supplier Portal initialized!');
+    } catch (err) {
+        console.error('❌ Supplier Portal init error:', err.message);
+    }
+} else if (supplierPortal) {
+    console.log('✅ Supplier Portal loaded (no initialization needed)');
+} else {
+    console.log('⚠️ Supplier Portal not available');
+}
+
+// Initialize Product Coverage
+if (productCoverage && typeof productCoverage.initialize === 'function') {
+    try {
+        await productCoverage.initialize();
+        console.log('✅ Product Coverage initialized!');
+    } catch (err) {
+        console.error('❌ Product Coverage init error:', err.message);
+    }
+} else if (productCoverage) {
+    console.log('✅ Product Coverage loaded (no initialization needed)');
+} else {
+    console.log('⚠️ Product Coverage not available');
+}
         if (brandManager && brandManager.updateBrands) {
             try {
                 await brandManager.updateBrands();
