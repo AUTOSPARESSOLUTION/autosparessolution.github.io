@@ -8232,6 +8232,22 @@ async function startServer() {
         }
 
         scheduler.startScheduler();
+        // ============================================================
+// 🆕 START CUSTOMER ENGAGEMENT SYSTEM
+// ============================================================
+if (process.env.ENABLE_ENGAGEMENT !== 'false') {
+    try {
+        await customerEngagement.initialize();
+        console.log('✅ Customer Engagement System initialized!');
+    } catch (err) {
+        console.error('❌ Engagement init error:', err.message);
+    }
+}
+
+// ============================================================
+// 🆕 INITIALIZE ORDER ROUTER
+// ============================================================
+console.log('✅ Order Router initialized');
         console.log('✅ Scheduler started');
 
         if (fileWatcher && fileWatcher.startWatching) {
