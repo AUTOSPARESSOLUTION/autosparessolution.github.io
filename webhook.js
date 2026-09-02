@@ -4063,7 +4063,109 @@ app.get('/api/brands/summary', async (req, res) => {
         });
     }
 });
+// ============================================================
+// 📊 ORDER STATUS TRACKING & NOTIFICATION SYSTEM
+// ============================================================
 
+async function getOrderStatusSummary(orderId) {
+    try {
+        const notifications = await db.db.all(`
+            SELECT son.*, s.name as supplier_name, s.phone as supplier_phone
+            FROM supplier_order_notifications son
+            JOIN suppliers s ON son.supplier_id = s.id
+            WHERE son.order_id = ?
+            ORDER BY son.notification_sent ASC
+        `, [orderId]);
+        
+        const delivery = await db.db.get(
+            `SELECT * FROM deliveries WHERE order_id = ? ORDER BY assigned_at DESC LIMIT 1`,
+            [orderId]
+        );
+        const order = await db.db.get(`SELECT * FROM orders WHERE order_id = ?`, [orderId]);
+        const totalSuppliers = notifications.length;
+        const accepted = notifications.filter(n => n.status === 'accepted').length;
+        const rejected = notifications.filter(n => n.status === 'rejected').length;
+        const pending = notifications.filter(n => n.status === 'pending' || n.status === 'sent').length;
+        
+        let overallStatus = 'pending';
+        if (rejected > 0 && accepted === 0) overallStatus = 'rejected';
+        else if (accepted === totalSuppliers && totalSuppliers > 0) {
+            if (delivery && delivery.status === 'delivered') overallStatus = 'delivered';
+            else if (delivery && delivery.status === 'out_for_delivery') overallStatus = 'out_for_delivery';
+            else if (delivery && delivery.status === 'picked_up') overallStatus = 'picked_up';
+            else if (delivery && delivery.status === 'accepted') overallStatus = 'delivery_accepted';
+            else overallStatus = 'accepted';
+        } else if (accepted > 0 && accepted < totalSuppliers) overallStatus = 'partial';
+        
+        return {
+            order_id: orderId, order, notifications, delivery,
+            total_suppliers: totalSuppliers, accepted, rejected, pending,
+            overallStatus,
+            isComplete: accepted === totalSuppliers && totalSuppliers > 0,
+            isPartial: accepted > 0 && accepted < totalSuppliers,
+            isRejected: rejected > 0 && accepted === 0
+        };
+    } catch (error) {
+        console.error('❌ Get order status error:', error.message);
+        return null;
+    }
+}
+
+async function notifyAllParties(orderId, event, data = {}) {
+    try {
+        const status = await getOrderStatusSummary(orderId);
+        if (!status) return;
+        
+        const order = status.order;
+        const customerPhone = order?.phone;
+        const adminPhone = CONFIG.adminPhone;
+        const supplierPhones = status.notifications.filter(n => n.supplier_phone).map(n => n.supplier_phone);
+        const deliveryBoyPhone = status.delivery?.delivery_boy_phone;
+        
+        let customerMessage = '';
+        let supplierMessage = '';
+        let adminMessage = '';
+        
+        switch (event) {
+            case 'supplier_accepted':
+                customerMessage = `✅ *Order Update*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n✅ ${data.accepted_count || 0}/${data.total_suppliers || 0} items confirmed\n📊 Progress: ${Math.round(((data.accepted_count || 0) / (data.total_suppliers || 1)) * 100)}%\n\n📞 Call: ${CONFIG.businessPhone}`;
+                supplierMessage = `📨 *Order Update*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n✅ ${data.supplier_name || 'A supplier'} accepted\n📊 ${data.accepted_count || 0}/${data.total_suppliers || 0} suppliers accepted\n\n🔄 Waiting for other suppliers...\n📞 Call: ${CONFIG.businessPhone}`;
+                break;
+            case 'supplier_rejected':
+                customerMessage = `ℹ️ *Order Update*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n🔄 Some items are being reassigned.\n📊 Status: Processing\n⏱️ We'll update you shortly.\n📞 Call: ${CONFIG.businessPhone}`;
+                adminMessage = `⚠️ *Supplier Rejected Order*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n🏢 Supplier: ${data.supplier_name || 'N/A'}\n💡 Reason: ${data.reason || 'No reason provided'}\n\n🔄 Please reassign this order.`;
+                break;
+            case 'all_suppliers_accepted':
+                customerMessage = `🎉 *Order Ready!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n✅ All items confirmed!\n📊 Status: Preparing for delivery\n\n🚚 A delivery boy will be assigned shortly.\n📞 Call: ${CONFIG.businessPhone}`;
+                supplierMessage = `🎉 *Order Complete!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n✅ All suppliers accepted!\n📊 Status: Preparing for delivery\n📞 Call: ${CONFIG.businessPhone}`;
+                break;
+            case 'delivery_assigned':
+                customerMessage = `🚚 *Delivery Boy Assigned!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n👤 ${data.boy_name || 'Delivery Boy'}\n📞 ${data.boy_phone || 'N/A'}\n📊 Status: Assigned\n\n⏱️ Delivery boy is on the way.\n📞 Call: ${CONFIG.businessPhone}`;
+                supplierMessage = `🚚 *Delivery Boy Assigned*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n👤 ${data.boy_name || 'N/A'}\n📞 ${data.boy_phone || 'N/A'}\n📞 Call: ${CONFIG.businessPhone}`;
+                break;
+            case 'delivery_picked_up':
+                customerMessage = `📦 *Order Picked Up!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n✅ Order picked up for delivery\n📊 Status: En Route\n\n⏱️ Estimated delivery in 30-60 minutes.\n📞 Call: ${CONFIG.businessPhone}`;
+                supplierMessage = `📦 *Order Picked Up*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n✅ Order picked up\n📞 Call: ${CONFIG.businessPhone}`;
+                break;
+            case 'delivery_completed':
+                customerMessage = `✅ *Order Delivered!*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n✅ Delivered successfully!\n🕐 ${new Date().toLocaleString()}\n\n⭐ *Rate Your Experience:*\n   "Rate 5" - Excellent\n   "Rate 4" - Good\n   "Rate 3" - Average\n\n📞 Call: ${CONFIG.businessPhone}`;
+                supplierMessage = `✅ *Order Delivered*\n━━━━━━━━━━━━━━━━━━━━\n\n📦 Order: ${orderId}\n✅ Order delivered successfully!\n📞 Call: ${CONFIG.businessPhone}`;
+                break;
+        }
+        
+        if (customerMessage && customerPhone) await sendWhatsAppMessage(customerPhone, customerMessage);
+        if (supplierMessage) {
+            for (const phone of supplierPhones) {
+                if (phone !== data.trigger_phone) await sendWhatsAppMessage(phone, supplierMessage);
+            }
+        }
+        if (adminMessage && adminPhone) await sendWhatsAppMessage(adminPhone, adminMessage);
+        return { success: true };
+    } catch (error) {
+        console.error('❌ Notify all parties error:', error.message);
+        return { success: false, error: error.message };
+    }
+}
 // ============================================================
 // 📩 WEBHOOK VERIFICATION
 // ============================================================
