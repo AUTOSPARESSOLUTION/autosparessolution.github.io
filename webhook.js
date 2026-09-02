@@ -3524,6 +3524,30 @@ async function initAllTables() {
             });
         });
         console.log('✅ supplier_payments table ready');
+        
+        // ============================================================
+        // 🆕 SUPPLIER ACCESS TABLE
+        // ============================================================
+        
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS supplier_access (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    supplier_id INTEGER NOT NULL,
+                    phone TEXT NOT NULL,
+                    status TEXT DEFAULT 'active',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ supplier_access table ready');
+         // ============================================================
+        // 🆕 SUPPLIER INVENTORY TABLE
+        // ============================================================
         await new Promise((resolve, reject) => {
     db.db.run(`
         CREATE TABLE IF NOT EXISTS supplier_inventory (
