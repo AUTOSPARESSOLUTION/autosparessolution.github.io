@@ -8319,6 +8319,14 @@ if (productCoverage && typeof productCoverage.initialize === 'function') {
             console.log(`⏱️ Gemini Timeout: ${CONFIG.geminiTimeout}ms`);
             console.log(`📦 Database Status: ${isDbReady ? '✅ Ready' : '⏳ Loading'}`);
             console.log('====================================');
+                // 📦 Log module status
+            console.log('📦 Module Status:');
+            console.log(`   🔄 Order Router: ${orderRouter ? '✅ Loaded' : '❌ Not Loaded'}`);
+            console.log(`   🏢 Supplier Portal: ${supplierPortal ? '✅ Loaded' : '❌ Not Loaded'}`);
+            console.log(`   💬 Customer Engagement: ${customerEngagement ? '✅ Loaded' : '❌ Not Loaded'}`);
+            console.log(`   📊 Product Coverage: ${productCoverage ? '✅ Loaded' : '❌ Not Loaded'}`);
+            console.log(`   👤 Pending Registrations: ${pendingRegistration ? pendingRegistration.size : 0}`);
+            console.log('====================================');
         });
 
     } catch (error) {
