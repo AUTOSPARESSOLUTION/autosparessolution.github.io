@@ -5066,7 +5066,71 @@ if (isPending && !isRegistered) {
 // ============================================================
 
 if (isAdmin(from)) {
+        // ============================================================
+    // 🆕 ADD SUPPLIER COMMAND
+    // ============================================================
     
+    if (msgLower.startsWith('add supplier')) {
+        try {
+            const phoneMatch = text.match(/(\d{10})/);
+            if (!phoneMatch) {
+                await sendWhatsAppMessage(from, 
+                    `❌ *Invalid Phone Number*\n\n` +
+                    `📝 Format: Add supplier 9876543210|Business Name|Address|GSTIN\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
+                return;
+            }
+            
+            const cleanPhone = phoneMatch[1];
+            const parts = text.split('|').map(p => p.trim());
+            const name = parts[1] || 'Unknown Supplier';
+            const address = parts[2] || '';
+            const gstin = parts[3] || '';
+            
+            const existing = await db.db.get(
+                `SELECT id, name FROM suppliers WHERE phone = ?`,
+                [cleanPhone]
+            );
+            
+            let supplierId;
+            
+            if (existing) {
+                await db.db.run(
+                    `UPDATE suppliers SET name = ?, address = ?, gstin = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`,
+                    [name, address, gstin, cleanPhone]
+                );
+                supplierId = existing.id;
+                await sendWhatsAppMessage(from, 
+                    `🔄 *Supplier Updated!*\n\n🏢 ${name}\n📞 ${cleanPhone}\n✅ Supplier details updated!`
+                );
+            } else {
+                const result = await db.db.run(
+                    `INSERT INTO suppliers (name, phone, address, gstin, status, created_at) 
+                     VALUES (?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
+                    [name, cleanPhone, address, gstin]
+                );
+                supplierId = result.lastID;
+                await db.db.run(
+                    `INSERT INTO supplier_access (supplier_id, phone, status, created_at) 
+                     VALUES (?, ?, 'active', CURRENT_TIMESTAMP)`,
+                    [supplierId, cleanPhone]
+                );
+                await sendWhatsAppMessage(from, 
+                    `✅ *Supplier Added!*\n\n🏢 ${name}\n📞 ${cleanPhone}\n📍 ${address || 'N/A'}\n📋 GST: ${gstin || 'N/A'}\n\n✅ Supplier can now receive orders!`
+                );
+            }
+            
+            await sendWhatsAppMessage(cleanPhone,
+                `🏢 *You've been registered as a Supplier!*\n\n🏢 ${name}\n📞 ${cleanPhone}\n📦 You'll receive order notifications.\n📝 Send "My Orders" to see pending orders.`
+            );
+            
+        } catch (error) {
+            console.error('❌ Add supplier error:', error.message);
+            await sendWhatsAppMessage(from, `❌ *Failed to add supplier*\n\nError: ${error.message}`);
+        }
+        return;
+    }
     // ============================================================
     // 1️⃣ ADMIN ORDERS - View all pending/active orders
     // ============================================================
