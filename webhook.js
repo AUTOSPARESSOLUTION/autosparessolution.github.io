@@ -7613,7 +7613,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
         if (deliveryBoy) {
             console.log(`🚚 DELIVERY BOY DETECTED: ${deliveryBoy.name}`);
             
-            const acceptDelMatch = message.match(/^accept\s+([A-Z0-9-]+)/i);
+            const acceptDelMatch = text.match(/^accept\s+([A-Z0-9-]+)/i);
             if (acceptDelMatch) {
                 const deliveryId = acceptDelMatch[1];
                 await db.db.run(
