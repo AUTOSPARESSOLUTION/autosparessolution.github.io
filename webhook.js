@@ -7559,7 +7559,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
                 return;
             }
             
-            const rejectMatch = message.match(/^reject\s+([A-Z0-9-]+)(?:\s+(.+))?/i);
+            const rejectMatch = text.match(/^reject\s+([A-Z0-9-]+)(?:\s+(.+))?/i);
             if (rejectMatch) {
                 const orderId = rejectMatch[1];
                 const reason = rejectMatch[2] || 'No reason provided';
