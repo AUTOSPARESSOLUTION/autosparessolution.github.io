@@ -5132,6 +5132,94 @@ if (isAdmin(from)) {
         return;
     }
     // ============================================================
+// 🆕 ADD DELIVERY BOY COMMAND
+// ============================================================
+
+if (msgLower.startsWith('add delivery')) {
+    try {
+        const phoneMatch = text.match(/(\d{10})/);
+        if (!phoneMatch) {
+            await sendWhatsAppMessage(from, 
+                `❌ *Invalid Phone Number*\n\n` +
+                `📝 Format: Add delivery 9876543210|Name|City|Vehicle|Vehicle Number\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
+        
+        const cleanPhone = phoneMatch[1];
+        const parts = text.split('|').map(p => p.trim());
+        const name = parts[1] || 'Unknown Delivery Boy';
+        const city = parts[2] || '';
+        const vehicleType = parts[3] || 'Bike';
+        const vehicleNumber = parts[4] || '';
+        
+        // Check if delivery boy already exists
+        const existing = await db.db.get(
+            `SELECT id, name FROM delivery_boys WHERE phone = ?`,
+            [cleanPhone]
+        );
+        
+        let deliveryBoyId;
+        
+        if (existing) {
+            await db.db.run(
+                `UPDATE delivery_boys SET name = ?, address = ?, vehicle_type = ?, vehicle_number = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`,
+                [name, city, vehicleType, vehicleNumber, cleanPhone]
+            );
+            deliveryBoyId = existing.id;
+            await sendWhatsAppMessage(from, 
+                `🔄 *Delivery Boy Updated!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `👤 Name: ${name}\n` +
+                `📞 Phone: ${cleanPhone}\n` +
+                `📍 City: ${city || 'N/A'}\n` +
+                `🚗 Vehicle: ${vehicleType}\n` +
+                `📋 Number: ${vehicleNumber || 'N/A'}\n\n` +
+                `✅ Delivery boy details updated!`
+            );
+        } else {
+            const result = await db.db.run(
+                `INSERT INTO delivery_boys (name, phone, address, vehicle_type, vehicle_number, status, created_at) 
+                 VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
+                [name, cleanPhone, city, vehicleType, vehicleNumber]
+            );
+            deliveryBoyId = result.lastID;
+            
+            await sendWhatsAppMessage(from, 
+                `✅ *Delivery Boy Added!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `👤 Name: ${name}\n` +
+                `📞 Phone: ${cleanPhone}\n` +
+                `📍 City: ${city || 'N/A'}\n` +
+                `🚗 Vehicle: ${vehicleType}\n` +
+                `📋 Number: ${vehicleNumber || 'N/A'}\n\n` +
+                `✅ Delivery boy can now accept deliveries!\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+        }
+        
+        // Notify the delivery boy
+        await sendWhatsAppMessage(cleanPhone,
+            `🚚 *You've been registered as a Delivery Boy!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `👤 ${name}\n` +
+            `📞 ${cleanPhone}\n` +
+            `📍 ${city || 'N/A'}\n` +
+            `🚗 ${vehicleType}\n\n` +
+            `📦 You'll receive delivery assignments.\n` +
+            `📝 Send "My Deliveries" to see pending deliveries.\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
+        
+    } catch (error) {
+        console.error('❌ Add delivery boy error:', error.message);
+        await sendWhatsAppMessage(from, 
+            `❌ *Failed to add delivery boy*\n\n` +
+            `Error: ${error.message}\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
+    }
+    return;
+}
+    // ============================================================
     // 1️⃣ ADMIN ORDERS - View all pending/active orders
     // ============================================================
     if (msgLower === 'admin orders' || msgLower === 'pending orders' || msgLower === 'orders') {
