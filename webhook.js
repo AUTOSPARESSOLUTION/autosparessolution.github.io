@@ -7641,7 +7641,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
                 return;
             }
             
-            const otpMatch = message.match(/^otp\s+(\d{6})/i);
+            const otpMatch = text.match(/^otp\s+(\d{6})/i);
             if (otpMatch) {
                 const otp = otpMatch[1];
                 const delivery = await db.db.get(
