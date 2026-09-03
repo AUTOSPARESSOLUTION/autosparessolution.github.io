@@ -4861,6 +4861,31 @@ function formatProductForWhatsApp(product, index = 0) {
     reply += `📦 ${product.stock > 0 ? `✅ ${product.stock} pcs` : '❌ Out of Stock'}`;
     return reply;
 }
+async function searchProducts(query, from) {
+    try {
+        console.log(`🔍 Enhanced search for: "${query}"`);
+        const results = await optimizedSearch(query, 10);
+        
+        if (results.length > 0) {
+            let reply = `🔍 Found ${results.length} result(s) for "${query}"\n\n`;
+            results.slice(0, 5).forEach((p, i) => {
+                reply += formatProductForWhatsApp(p, i);
+                reply += `\n`;
+            });
+            if (results.length > 5) {
+                reply += `... and ${results.length - 5} more\n\n`;
+            }
+            reply += `🛒 To order: Send part number with quantity\n`;
+            reply += `📞 Call: ${CONFIG.businessPhone}`;
+            await sendWhatsAppMessage(from, reply);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.log('⚠️ Search error:', error.message);
+        return false;
+    }
+}
 // ============================================================
 // 🆕 REGISTRATION HELPER FUNCTIONS
 // ============================================================
