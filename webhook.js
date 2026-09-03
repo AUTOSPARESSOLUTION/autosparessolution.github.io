@@ -7529,7 +7529,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
         if (supplierInfo) {
             console.log(`🏢 SUPPLIER DETECTED: ${supplierInfo.supplier_name}`);
             
-                        const acceptMatch = message.match(/^accept\s+([A-Z0-9-]+)/i);
+                        const acceptMatch = text.match(/^accept\s+([A-Z0-9-]+)/i);
             if (acceptMatch) {
                 const orderId = acceptMatch[1];
                 await db.db.run(
