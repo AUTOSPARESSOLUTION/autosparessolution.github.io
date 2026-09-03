@@ -5029,7 +5029,7 @@ if (!isRegistered && !isPending) {
 }
 
 if (isPending && !isRegistered) {
-    await continueRegistration(from, msg);
+    await continueRegistration(from, message);
     return;
     }
         // ============================================================
