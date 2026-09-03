@@ -7627,7 +7627,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
                 return;
             }
             
-            const pickedMatch = message.match(/^picked\s+up\s+([A-Z0-9-]+)/i);
+            const pickedMatch = text.match(/^picked\s+up\s+([A-Z0-9-]+)/i);
             if (pickedMatch) {
                 const deliveryId = pickedMatch[1];
                 await db.db.run(
