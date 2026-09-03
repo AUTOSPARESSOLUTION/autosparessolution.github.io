@@ -7723,7 +7723,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
         // 🆕 CUSTOMER: BIRTHDAY & OCCASIONS
         // ============================================================
         
-        const setBirthdayMatch = message.match(/^set\s+birthday\s+(\d{1,2})-(\d{1,2})/i);
+        const setBirthdayMatch = text.match(/^set\s+birthday\s+(\d{1,2})-(\d{1,2})/i);
         if (setBirthdayMatch) {
             const day = setBirthdayMatch[1].padStart(2, '0');
             const month = setBirthdayMatch[2].padStart(2, '0');
