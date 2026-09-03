@@ -7529,7 +7529,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
         if (supplierInfo) {
             console.log(`🏢 SUPPLIER DETECTED: ${supplierInfo.supplier_name}`);
             
-                        const acceptMatch = msg.match(/^accept\s+([A-Z0-9-]+)/i);
+                        const acceptMatch = message.match(/^accept\s+([A-Z0-9-]+)/i);
             if (acceptMatch) {
                 const orderId = acceptMatch[1];
                 await db.db.run(
@@ -7559,7 +7559,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
                 return;
             }
             
-            const rejectMatch = msg.match(/^reject\s+([A-Z0-9-]+)(?:\s+(.+))?/i);
+            const rejectMatch = message.match(/^reject\s+([A-Z0-9-]+)(?:\s+(.+))?/i);
             if (rejectMatch) {
                 const orderId = rejectMatch[1];
                 const reason = rejectMatch[2] || 'No reason provided';
@@ -7613,7 +7613,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
         if (deliveryBoy) {
             console.log(`🚚 DELIVERY BOY DETECTED: ${deliveryBoy.name}`);
             
-            const acceptDelMatch = msg.match(/^accept\s+([A-Z0-9-]+)/i);
+            const acceptDelMatch = message.match(/^accept\s+([A-Z0-9-]+)/i);
             if (acceptDelMatch) {
                 const deliveryId = acceptDelMatch[1];
                 await db.db.run(
@@ -7627,7 +7627,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
                 return;
             }
             
-            const pickedMatch = msg.match(/^picked\s+up\s+([A-Z0-9-]+)/i);
+            const pickedMatch = message.match(/^picked\s+up\s+([A-Z0-9-]+)/i);
             if (pickedMatch) {
                 const deliveryId = pickedMatch[1];
                 await db.db.run(
@@ -7641,7 +7641,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
                 return;
             }
             
-            const otpMatch = msg.match(/^otp\s+(\d{6})/i);
+            const otpMatch = message.match(/^otp\s+(\d{6})/i);
             if (otpMatch) {
                 const otp = otpMatch[1];
                 const delivery = await db.db.get(
@@ -7661,7 +7661,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
                 return;
             }
             
-            const deliveredMatch = msg.match(/^delivered\s+([A-Z0-9-]+)(?:\s*[-:]\s*(.+))?/i);
+            const deliveredMatch = message.match(/^delivered\s+([A-Z0-9-]+)(?:\s*[-:]\s*(.+))?/i);
             if (deliveredMatch) {
                 const deliveryId = deliveredMatch[1];
                 const notes = deliveredMatch[2] || 'Delivered successfully';
@@ -7723,7 +7723,7 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
         // 🆕 CUSTOMER: BIRTHDAY & OCCASIONS
         // ============================================================
         
-        const setBirthdayMatch = msg.match(/^set\s+birthday\s+(\d{1,2})-(\d{1,2})/i);
+        const setBirthdayMatch = message.match(/^set\s+birthday\s+(\d{1,2})-(\d{1,2})/i);
         if (setBirthdayMatch) {
             const day = setBirthdayMatch[1].padStart(2, '0');
             const month = setBirthdayMatch[2].padStart(2, '0');
