@@ -8490,14 +8490,21 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
             // ============================================================
             // 🆕 ENHANCED SEARCH (NEW) - PASTE THIS ENTIRE BLOCK ⬇️
             // ============================================================
-            if (cleaned.length >= 2) {
-                try {
-                    await searchProducts(cleaned, from);
-                    return;
-                } catch (error) {
-                    console.log('⚠️ Enhanced search failed, falling back to old search:', error.message);
-                }
-            }
+            // Add this check instead of replacing
+if (cleaned.length >= 2) {
+    try {
+        // Try enhanced search first
+        if (enhancedSearch && typeof enhancedSearch.searchProducts === 'function') {
+            await enhancedSearch.searchProducts(cleaned, from);
+            return;
+        }
+        // Fallback to old search
+        await searchProducts(cleaned, from);
+        return;
+    } catch (error) {
+        console.log('⚠️ Enhanced search failed, falling back to old search:', error.message);
+    }
+}
             // ============================================================
             // 🆕 ENHANCED SEARCH ENDS HERE ⬆️
             // ============================================================
