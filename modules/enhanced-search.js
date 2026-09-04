@@ -8,16 +8,14 @@ const db = require('./database');
 // 🛠️ HELPER FUNCTIONS (Self-contained)
 // ============================================================
 
-// Get the CONFIG from environment or use default
 const CONFIG = {
     businessPhone: process.env.PHONE || "9830300193",
-    // Add other config values if needed
+    phoneNumberId: process.env.ID,
+    accessToken: process.env.TOKEN
 };
 
-// Admin phone number
 const ADMIN_PHONE = process.env.ADMIN_PHONE || "9830300193";
 
-// Helper function to check if user is admin
 function isAdmin(phone) {
     if (!phone) return false;
     const normalizedFrom = phone.replace(/\D/g, '');
@@ -25,13 +23,7 @@ function isAdmin(phone) {
     return normalizedFrom === normalizedAdmin;
 }
 
-// Send WhatsApp message
 async function sendWhatsAppMessage(to, message) {
-    const CONFIG = {
-        phoneNumberId: process.env.ID,
-        accessToken: process.env.TOKEN,
-    };
-    
     const maxRetries = 3;
     let retries = 0;
     
@@ -107,10 +99,7 @@ async function searchProducts(text, from) {
         }
         const partNumber = partMatch[1].toUpperCase();
         
-        // Get product from database
         const master = await db.db.get(`SELECT * FROM products WHERE part = ?`, [partNumber]);
-        
-        // Get supplier inventory
         const suppliers = await db.db.all(`
             SELECT s.name as supplier_name, s.phone, si.quantity, si.price, si.last_updated
             FROM supplier_inventory si
@@ -146,7 +135,6 @@ async function searchProducts(text, from) {
         }
         reply += `\n━━━━━━━━━━━━━━━━━━━━\n📦 *STOCK AVAILABILITY*\n\n`;
         
-        // Master Stock
         reply += `🏢 *Company Stock:*\n`;
         if (hasMasterStock) {
             reply += `   ✅ ${master.stock} pcs available\n`;
@@ -158,7 +146,6 @@ async function searchProducts(text, from) {
         }
         reply += `\n`;
         
-        // Supplier Stock - HIDE SUPPLIER NAMES FOR CUSTOMERS
         if (hasSupplierStock) {
             reply += `🏢 *Partner Network:*\n`;
             if (isAdminUser) {
