@@ -162,7 +162,11 @@ const productCoverage = require('./modules/product-coverage');
 
 // Pending registrations for first-time users
 const pendingRegistration = new Map();
+// ============================================================
+// 🆕 ADD THIS ONE LINE ⬇️⬇️⬇️
+// ============================================================
 
+const enhancedSearch = require('./modules/enhanced-search');
 
 // ============================================================
 // 📁 AUTO SPARES JSON IMPORT SYSTEM
