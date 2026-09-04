@@ -5220,6 +5220,88 @@ if (msgLower.startsWith('add delivery')) {
     return;
 }
     // ============================================================
+// 🆕 ADD CUSTOMER COMMAND
+// ============================================================
+
+if (msgLower.startsWith('add customer')) {
+    try {
+        const phoneMatch = text.match(/(\d{10})/);
+        if (!phoneMatch) {
+            await sendWhatsAppMessage(from, 
+                `❌ *Invalid Phone Number*\n\n` +
+                `📝 Format: Add customer 9876543210|Name|City|Email|GSTIN\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
+        
+        const cleanPhone = phoneMatch[1];
+        const parts = text.split('|').map(p => p.trim());
+        const name = parts[1] || 'Unknown Customer';
+        const city = parts[2] || '';
+        const email = parts[3] || '';
+        const gstin = parts[4] || '';
+        
+        // Check if customer already exists
+        const existing = await db.db.get(
+            `SELECT id, name FROM customers WHERE phone = ?`,
+            [cleanPhone]
+        );
+        
+        if (existing) {
+            await db.db.run(
+                `UPDATE customers SET name = ?, city = ?, email = ?, gstin = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`,
+                [name, city, email, gstin, cleanPhone]
+            );
+            await sendWhatsAppMessage(from, 
+                `🔄 *Customer Updated!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `👤 Name: ${name}\n` +
+                `📞 Phone: ${cleanPhone}\n` +
+                `📍 City: ${city || 'N/A'}\n` +
+                `📧 Email: ${email || 'N/A'}\n` +
+                `📋 GST: ${gstin || 'N/A'}\n\n` +
+                `✅ Customer details updated!`
+            );
+        } else {
+            await db.db.run(
+                `INSERT INTO customers (name, phone, city, email, gstin, status, registered_at) 
+                 VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
+                [name, cleanPhone, city, email, gstin]
+            );
+            await sendWhatsAppMessage(from, 
+                `✅ *Customer Added!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `👤 Name: ${name}\n` +
+                `📞 Phone: ${cleanPhone}\n` +
+                `📍 City: ${city || 'N/A'}\n` +
+                `📧 Email: ${email || 'N/A'}\n` +
+                `📋 GST: ${gstin || 'N/A'}\n\n` +
+                `✅ Customer can now place orders!\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+        }
+        
+        // Notify the customer
+        await sendWhatsAppMessage(cleanPhone,
+            `👋 *Welcome to Auto Spares Solution!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `👤 ${name}\n` +
+            `📞 ${cleanPhone}\n` +
+            `📍 ${city || 'N/A'}\n\n` +
+            `🔍 Send a part number to start shopping!\n` +
+            `🛒 Example: "0801BA0285N 2"\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
+        
+    } catch (error) {
+        console.error('❌ Add customer error:', error.message);
+        await sendWhatsAppMessage(from, 
+            `❌ *Failed to add customer*\n\n` +
+            `Error: ${error.message}\n` +
+            `📞 Call: ${CONFIG.businessPhone}`
+        );
+    }
+    return;
+}
+    // ============================================================
     // 1️⃣ ADMIN ORDERS - View all pending/active orders
     // ============================================================
     if (msgLower === 'admin orders' || msgLower === 'pending orders' || msgLower === 'orders') {
