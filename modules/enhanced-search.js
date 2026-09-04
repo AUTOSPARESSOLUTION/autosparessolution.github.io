@@ -3,7 +3,96 @@
 // ============================================================
 
 const db = require('./database');
-const { sendWhatsAppMessage, isAdmin, CONFIG } = require('../webhook');
+
+// ============================================================
+// 🛠️ HELPER FUNCTIONS (Self-contained)
+// ============================================================
+
+// Get the CONFIG from environment or use default
+const CONFIG = {
+    businessPhone: process.env.PHONE || "9830300193",
+    // Add other config values if needed
+};
+
+// Admin phone number
+const ADMIN_PHONE = process.env.ADMIN_PHONE || "9830300193";
+
+// Helper function to check if user is admin
+function isAdmin(phone) {
+    if (!phone) return false;
+    const normalizedFrom = phone.replace(/\D/g, '');
+    const normalizedAdmin = ADMIN_PHONE.replace(/\D/g, '');
+    return normalizedFrom === normalizedAdmin;
+}
+
+// Send WhatsApp message
+async function sendWhatsAppMessage(to, message) {
+    const CONFIG = {
+        phoneNumberId: process.env.ID,
+        accessToken: process.env.TOKEN,
+    };
+    
+    const maxRetries = 3;
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+        try {
+            const normalizedPhone = to.replace(/\D/g, '');
+            const url = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${CONFIG.accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    to: normalizedPhone,
+                    type: 'text',
+                    text: { body: message.slice(0, 4096) }
+                })
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                if (response.status === 429) {
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    retries++;
+                    continue;
+                }
+                throw new Error(`WhatsApp API error ${response.status}: ${errorText}`);
+            }
+            
+            const result = await response.json();
+            if (result.messages?.[0]?.id) {
+                console.log(`✅ Message sent to ${normalizedPhone}`);
+                return result;
+            }
+            throw new Error('No message ID in response');
+            
+        } catch (error) {
+            retries++;
+            console.error(`❌ Send attempt ${retries} failed: ${error.message}`);
+            if (retries < maxRetries) {
+                const delay = retries * 2000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                throw error;
+            }
+        }
+    }
+}
+
+// ============================================================
+// 🔍 ENHANCED SEARCH FUNCTIONS
+// ============================================================
 
 async function searchProducts(text, from) {
     try {
@@ -18,7 +107,10 @@ async function searchProducts(text, from) {
         }
         const partNumber = partMatch[1].toUpperCase();
         
+        // Get product from database
         const master = await db.db.get(`SELECT * FROM products WHERE part = ?`, [partNumber]);
+        
+        // Get supplier inventory
         const suppliers = await db.db.all(`
             SELECT s.name as supplier_name, s.phone, si.quantity, si.price, si.last_updated
             FROM supplier_inventory si
