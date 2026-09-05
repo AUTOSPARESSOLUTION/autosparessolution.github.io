@@ -1,11 +1,11 @@
 // ============================================================
-// 🔍 ENHANCED PRODUCT SEARCH - WITH PARTNER NETWORK
+// 🔍 ENHANCED PRODUCT SEARCH - COMPLETE FIX
 // ============================================================
 
 const db = require('./database');
 
 // ============================================================
-// 🛠️ HELPER FUNCTIONS (Self-contained)
+// 🛠️ HELPER FUNCTIONS
 // ============================================================
 
 const CONFIG = {
@@ -83,7 +83,7 @@ async function sendWhatsAppMessage(to, message) {
 }
 
 // ============================================================
-// 🔍 ENHANCED SEARCH WITH PARTNER NETWORK
+// 🔍 ENHANCED SEARCH - FIXED
 // ============================================================
 
 async function searchProducts(text, from) {
@@ -93,26 +93,30 @@ async function searchProducts(text, from) {
         
         const isAdminUser = isAdmin(from);
         
-        // ✅ Extract part number - case insensitive
+        // ✅ Extract part number
         const partMatch = query.match(/\b([A-Z0-9]{5,20})\b/i);
         if (!partMatch) {
             await searchByDescription(query, from);
             return;
         }
         
-        // ✅ Convert to UPPERCASE for database lookup
         const partNumber = partMatch[1].toUpperCase();
         console.log(`🔍 Looking for part: "${partNumber}"`);
         
-        // ✅ Query products table - SAME as old search
+        // ✅ CRITICAL FIX: Use EXACT same query as old search
+        // The old search uses: db.getProductExact(partNumber)
+        // which does: SELECT * FROM products WHERE part = ?
         let master = await db.db.get(
             `SELECT * FROM products WHERE part = ?`,
             [partNumber]
         );
         
+        // ✅ Debug: Check if query worked
+        console.log(`📊 Master query result:`, master ? `Found ${master.part}` : 'Not found');
+        
         // ✅ If not found, try case-insensitive
         if (!master) {
-            console.log(`🔄 Not found exact, trying COLLATE NOCASE...`);
+            console.log(`🔄 Trying COLLATE NOCASE...`);
             master = await db.db.get(
                 `SELECT * FROM products WHERE part COLLATE NOCASE = ?`,
                 [partNumber]
@@ -121,7 +125,7 @@ async function searchProducts(text, from) {
         
         // ✅ If still not found, try LIKE
         if (!master) {
-            console.log(`🔄 Not found, trying LIKE search...`);
+            console.log(`🔄 Trying LIKE search...`);
             const results = await db.db.all(
                 `SELECT * FROM products WHERE part LIKE ? LIMIT 1`,
                 [`%${partNumber}%`]
@@ -132,20 +136,21 @@ async function searchProducts(text, from) {
             }
         }
         
-        // ✅ If still not found, try description
+        // ✅ If STILL not found, check if product exists
         if (!master) {
-            console.log(`🔄 Not found, trying description search...`);
-            const results = await db.db.all(
-                `SELECT * FROM products WHERE description LIKE ? LIMIT 1`,
-                [`%${partNumber}%`]
+            // Check count to see if product exists
+            const count = await db.db.get(
+                `SELECT COUNT(*) as count FROM products WHERE part = ?`,
+                [partNumber]
             );
-            if (results && results.length > 0) {
-                master = results[0];
-                console.log(`✅ Found via description: ${master.part}`);
-            }
+            console.log(`📊 Product count for ${partNumber}: ${count?.count || 0}`);
+            
+            // Try to get ANY product to verify database connection
+            const sample = await db.db.get(`SELECT part FROM products LIMIT 1`);
+            console.log(`📊 Sample product from DB: ${sample?.part || 'No products'}`);
         }
         
-        // ✅ If product not found at all
+        // ✅ If product not found
         if (!master) {
             console.log(`❌ Product NOT found: ${partNumber}`);
             await handleProductNotFound(from, partNumber, query);
@@ -154,7 +159,7 @@ async function searchProducts(text, from) {
         
         console.log(`✅ Product FOUND: ${master.part} - ${master.description}`);
         
-        // ✅ Get supplier inventory (Partner Network)
+        // ✅ Get supplier inventory
         let suppliers = await db.db.all(`
             SELECT s.id as supplier_id, s.name as supplier_name, s.phone, 
                    si.quantity, si.price, si.last_updated
@@ -182,7 +187,7 @@ async function searchProducts(text, from) {
             bestSupplierName = best.supplier_name || null;
         }
         
-        // ✅ Build response with ALL details + Partner Network
+        // ✅ Build response
         let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
         
         if (master && master.part) {
@@ -192,7 +197,7 @@ async function searchProducts(text, from) {
             if (master.make) reply += `🚗 Make: ${master.make}\n`;
             if (master.model) reply += `🎯 Model: ${master.model}\n`;
             
-            // ✅ Show all pricing
+            // ✅ Show pricing
             const listPrice = parseFloat(master.list_price) || 0;
             const mrpPrice = parseFloat(master.mrp) || 0;
             const billingPrice = parseFloat(master.billing_price) || 0;
@@ -205,17 +210,16 @@ async function searchProducts(text, from) {
                 reply += `💳 Price incl. GST: ₹${priceWithGST.toFixed(2)}\n`;
             }
             
-            // ✅ Show stock
+            // ✅ Stock
             reply += `📦 ${masterStock > 0 ? `✅ ${masterStock} pcs available` : '❌ Out of Stock'}`;
             
-            // ✅ Show Partner Network availability
+            // ✅ Partner Network
             reply += `\n\n━━━━━━━━━━━━━━━━━━━━\n`;
             reply += `🏢 *PARTNER NETWORK AVAILABILITY*\n`;
             reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
             
             if (hasSupplierStock) {
                 if (isAdminUser) {
-                    // ✅ Admin sees all partner details
                     reply += `📋 *Partner Details:*\n\n`;
                     suppliers.forEach((s, i) => {
                         reply += `${i + 1}. *${s.supplier_name || 'Unknown'}*\n`;
@@ -225,7 +229,6 @@ async function searchProducts(text, from) {
                         reply += `   🕐 ${s.last_updated ? new Date(s.last_updated).toLocaleString() : 'N/A'}\n\n`;
                     });
                 } else {
-                    // ✅ Customer sees aggregated partner info (supplier names hidden)
                     reply += `👥 *Multiple Partners Available*\n`;
                     reply += `   📦 Total Stock: ${totalSupplierStock} pcs\n`;
                     if (bestPrice) reply += `   💰 Best Price: ₹${bestPrice.toFixed(2)}\n`;
@@ -277,14 +280,12 @@ async function searchByDescription(query, from) {
     try {
         const isAdminUser = isAdmin(from);
         
-        // ✅ Search using your database
         const results = await db.db.all(`
             SELECT p.part, p.description, p.brand, p.make, p.model, 
                    p.stock, p.list_price, p.mrp, p.billing_price,
                    COALESCE(SUM(si.quantity), 0) as supplier_stock,
                    COUNT(DISTINCT si.supplier_id) as supplier_count,
-                   MIN(si.price) as best_price,
-                   (SELECT name FROM suppliers WHERE id = si.supplier_id LIMIT 1) as best_supplier
+                   MIN(si.price) as best_price
             FROM products p
             LEFT JOIN supplier_inventory si ON p.part = si.part AND si.is_active = 1 AND si.quantity > 0
             WHERE p.description LIKE ? 
@@ -313,14 +314,11 @@ async function searchByDescription(query, from) {
             if (p.make) reply += `🚗 Make: ${p.make}\n`;
             if (p.model) reply += `🎯 Model: ${p.model}\n`;
             
-            // ✅ Show pricing
             const billingPrice = parseFloat(p.billing_price) || 0;
             const priceWithGST = billingPrice * 1.18;
             if (billingPrice > 0) reply += `💳 Price: ₹${priceWithGST.toFixed(2)} (incl. GST)\n`;
             
             reply += `📦 ${total} pcs available`;
-            
-            // ✅ Show Partner Network info
             if (p.supplier_count > 0) {
                 if (!isAdminUser) {
                     reply += ` (Partner Network)`;
@@ -331,9 +329,6 @@ async function searchByDescription(query, from) {
                     reply += ` (${p.supplier_count} partner${p.supplier_count > 1 ? 's' : ''})`;
                     if (p.best_price) {
                         reply += `\n   💰 Best Partner Price: ₹${parseFloat(p.best_price).toFixed(2)}`;
-                    }
-                    if (p.best_supplier) {
-                        reply += `\n   🏢 Best Partner: ${p.best_supplier}`;
                     }
                 }
             }
