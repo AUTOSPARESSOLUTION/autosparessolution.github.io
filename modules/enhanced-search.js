@@ -1,5 +1,5 @@
 // ============================================================
-// 🔍 ENHANCED PRODUCT SEARCH - HIDE SUPPLIER NAMES FROM CUSTOMERS
+// 🔍 ENHANCED PRODUCT SEARCH - FIXED VERSION
 // ============================================================
 
 const db = require('./database');
@@ -99,64 +99,96 @@ async function searchProducts(text, from) {
         }
         const partNumber = partMatch[1].toUpperCase();
         
-        const master = await db.db.get(`SELECT * FROM products WHERE part = ?`, [partNumber]);
-        let suppliers = await db.db.all(`
-    SELECT s.name as supplier_name, s.phone, si.quantity, si.price, si.last_updated
-    FROM supplier_inventory si
-    JOIN suppliers s ON si.supplier_id = s.id
-    WHERE si.part = ? AND si.is_active = 1 AND si.quantity > 0
-    ORDER BY si.price ASC, si.quantity DESC
-`, [partNumber]);
-
-// ✅ FIX: Ensure suppliers is always an array
-if (!suppliers) suppliers = [];
-if (!Array.isArray(suppliers)) suppliers = [suppliers];
+        // ✅ FIX 1: Get product with better search
+        let master = await db.db.get(`SELECT * FROM products WHERE part = ?`, [partNumber]);
         
-        const hasMasterStock = master && master.stock > 0;
-        const hasSupplierStock = suppliers.length > 0;
-        const totalSupplierStock = suppliers.reduce((sum, s) => sum + s.quantity, 0);
-        const masterStock = master?.stock || 0;
-        const totalAvailable = masterStock + totalSupplierStock;
-        let bestPrice = null;
-        if (suppliers.length > 0) {
-            const best = suppliers.reduce((min, s) => (s.price < min.price ? s : min), suppliers[0]);
-            bestPrice = best.price;
+        if (!master) {
+            master = await db.db.get(`SELECT * FROM products WHERE part COLLATE NOCASE = ?`, [partNumber]);
         }
         
-        if (!hasMasterStock && !hasSupplierStock) {
+        if (!master) {
+            const results = await db.db.all(`SELECT * FROM products WHERE part LIKE ? LIMIT 1`, [`%${partNumber.slice(0, 6)}%`]);
+            if (results && results.length > 0) {
+                master = results[0];
+            }
+        }
+        
+        if (!master) {
+            master = {
+                part: partNumber,
+                description: 'Product not found in database',
+                stock: 0,
+                brand: '',
+                make: '',
+                model: '',
+                billing_price: 0
+            };
+        }
+        
+        // ✅ FIX 2: Get suppliers with safe array
+        let suppliers = await db.db.all(`
+            SELECT s.name as supplier_name, s.phone, si.quantity, si.price, si.last_updated
+            FROM supplier_inventory si
+            JOIN suppliers s ON si.supplier_id = s.id
+            WHERE si.part = ? AND si.is_active = 1 AND si.quantity > 0
+            ORDER BY si.price ASC, si.quantity DESC
+        `, [partNumber]);
+        
+        if (!suppliers) suppliers = [];
+        if (!Array.isArray(suppliers)) suppliers = [suppliers];
+        
+        // ✅ FIX 3: Calculate stock safely
+        const totalSupplierStock = suppliers.reduce((sum, s) => sum + (parseInt(s.quantity) || 0), 0);
+        const masterStock = parseInt(master?.stock) || 0;
+        const totalAvailable = masterStock + totalSupplierStock;
+        const hasMasterStock = masterStock > 0;
+        const hasSupplierStock = suppliers.length > 0;
+        
+        let bestPrice = null;
+        if (suppliers.length > 0) {
+            const best = suppliers.reduce((min, s) => ((parseFloat(s.price) || 0) < (parseFloat(min.price) || 0) ? s : min), suppliers[0]);
+            bestPrice = parseFloat(best.price) || null;
+        }
+        
+        if (!hasMasterStock && !hasSupplierStock && !master) {
             await handleProductNotFound(from, partNumber, query);
             return;
         }
         
         let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
-        if (master) {
+        
+        // ✅ FIX 4: Show product details with fallback
+        if (master && master.part) {
             reply += `🏷️ *${master.part}*\n📝 ${master.description || 'N/A'}\n`;
             if (master.brand) reply += `🏷️ Brand: ${master.brand}\n`;
             if (master.make) reply += `🚗 Make: ${master.make}\n`;
             if (master.model) reply += `🎯 Model: ${master.model}\n`;
         } else {
-            reply += `🏷️ *${partNumber}*\n`;
+            reply += `🏷️ *${partNumber}*\n📝 Product not found in database\n`;
         }
         reply += `\n━━━━━━━━━━━━━━━━━━━━\n📦 *STOCK AVAILABILITY*\n\n`;
         
+        // ✅ FIX 5: Master Stock display with safe values
         reply += `🏢 *Company Stock:*\n`;
         if (hasMasterStock) {
-            reply += `   ✅ ${master.stock} pcs available\n`;
-            if (master.billing_price) reply += `   💰 Price: ₹${master.billing_price.toFixed(2)}\n`;
-        } else if (master) {
+            reply += `   ✅ ${masterStock} pcs available\n`;
+            if (master?.billing_price) reply += `   💰 Price: ₹${parseFloat(master.billing_price).toFixed(2)}\n`;
+        } else if (master && master.part) {
             reply += `   ⚠️ Out of Stock (0 pcs)\n`;
         } else {
             reply += `   ❌ Not available in company inventory\n`;
         }
         reply += `\n`;
         
+        // ✅ FIX 6: Supplier Stock display with safe values
         if (hasSupplierStock) {
             reply += `🏢 *Partner Network:*\n`;
             if (isAdminUser) {
                 suppliers.forEach((s, i) => {
-                    reply += `   ${i + 1}. *${s.supplier_name}*\n      📦 ${s.quantity} pcs\n`;
-                    if (s.price > 0) reply += `      💰 ₹${s.price.toFixed(2)}\n`;
-                    reply += `      🕐 ${new Date(s.last_updated).toLocaleString()}\n\n`;
+                    reply += `   ${i + 1}. *${s.supplier_name || 'Unknown'}*\n`;
+                    reply += `      📦 ${parseInt(s.quantity) || 0} pcs\n`;
+                    if (s.price) reply += `      💰 ₹${parseFloat(s.price).toFixed(2)}\n`;
+                    reply += `      🕐 ${s.last_updated ? new Date(s.last_updated).toLocaleString() : 'N/A'}\n\n`;
                 });
             } else {
                 reply += `   ✅ ${totalSupplierStock} pcs available\n`;
@@ -168,19 +200,28 @@ if (!Array.isArray(suppliers)) suppliers = [suppliers];
             reply += `🏢 *Partner Network:*\n   ❌ Not available\n\n`;
         }
         
-        reply += `━━━━━━━━━━━━━━━━━━━━\n📊 *TOTAL AVAILABLE: ${totalAvailable} pcs*\n`;
+        reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+        reply += `📊 *TOTAL AVAILABLE: ${totalAvailable} pcs*\n`;
         if (!isAdminUser && hasSupplierStock && bestPrice) {
             reply += `   💰 Best Price: ₹${bestPrice.toFixed(2)}\n`;
         } else if (isAdminUser) {
-            reply += `   📦 Company Stock: ${masterStock} pcs\n   🏢 Partner Stock: ${totalSupplierStock} pcs\n   🔗 ${suppliers.length} partner(s)\n`;
+            reply += `   📦 Company Stock: ${masterStock} pcs\n`;
+            reply += `   🏢 Partner Stock: ${totalSupplierStock} pcs\n`;
+            reply += `   🔗 ${suppliers.length} partner(s)\n`;
         }
-        reply += `\n━━━━━━━━━━━━━━━━━━━━\n🛒 *To Order:*\n   Send "${partNumber} 2" to add to cart\n`;
-        if (hasSupplierStock && !isAdminUser) reply += `   (Will be fulfilled by our partner network)\n`;
+        reply += `\n━━━━━━━━━━━━━━━━━━━━\n`;
+        reply += `🛒 *To Order:*\n`;
+        reply += `   Send "${partNumber} 2" to add to cart\n`;
+        if (hasSupplierStock && !isAdminUser) {
+            reply += `   (Will be fulfilled by our partner network)\n`;
+        }
         reply += `\n📞 Call: ${CONFIG.businessPhone}`;
+        
         await sendWhatsAppMessage(from, reply);
         
     } catch (error) {
         console.error('❌ Search error:', error.message);
+        console.error('❌ Stack:', error.stack);
         await sendWhatsAppMessage(from, `⚠️ *Search Error*\n\nSomething went wrong. Please try again.\n📞 Call: ${CONFIG.businessPhone}`);
     }
 }
@@ -208,14 +249,14 @@ async function searchByDescription(query, from) {
         
         let reply = `🔍 *Search Results for "${query}"*\n━━━━━━━━━━━━━━━━━━━━\n\nFound ${results.length} result(s)\n\n`;
         results.forEach((p, i) => {
-            const total = (p.master_stock || 0) + (p.supplier_stock || 0);
+            const total = (parseInt(p.master_stock) || 0) + (parseInt(p.supplier_stock) || 0);
             reply += `${i + 1}. *${p.part}*\n   📝 ${p.description || 'N/A'}\n`;
             if (p.brand) reply += `   🏷️ ${p.brand}\n`;
             reply += `   📦 ${total} pcs available`;
             if (!isAdminUser && p.supplier_count > 0) reply += ` (Partner Network)`;
             else if (isAdminUser && p.supplier_count > 0) reply += ` (${p.supplier_count} partner${p.supplier_count > 1 ? 's' : ''})`;
-            if (!isAdminUser && p.best_price) reply += `\n   💰 ₹${p.best_price.toFixed(2)}`;
-            else if (isAdminUser && p.best_price) reply += `\n   💰 Best Partner Price: ₹${p.best_price.toFixed(2)}`;
+            if (!isAdminUser && p.best_price) reply += `\n   💰 ₹${parseFloat(p.best_price).toFixed(2)}`;
+            else if (isAdminUser && p.best_price) reply += `\n   💰 Best Partner Price: ₹${parseFloat(p.best_price).toFixed(2)}`;
             reply += `\n\n`;
         });
         reply += `━━━━━━━━━━━━━━━━━━━━\n🛒 To order: Send part number with quantity\n📞 Call: ${CONFIG.businessPhone}`;
