@@ -98,34 +98,76 @@ async function searchProducts(text, from) {
             return;
         }
         const partNumber = partMatch[1].toUpperCase();
+        console.log(`🔍 Looking for part: "${partNumber}"`);
         
-        // ✅ Get product with better search
+        // ✅ FIX: Use the SAME method as old search to find product
         let master = await db.db.get(`SELECT * FROM products WHERE part = ?`, [partNumber]);
         
+        // ✅ If not found, try case-insensitive (SQLite COLLATE NOCASE)
         if (!master) {
+            console.log(`🔄 Not found, trying case-insensitive...`);
             master = await db.db.get(`SELECT * FROM products WHERE part COLLATE NOCASE = ?`, [partNumber]);
         }
         
+        // ✅ If still not found, try using LIKE with wildcard
         if (!master) {
-            const results = await db.db.all(`SELECT * FROM products WHERE part LIKE ? LIMIT 1`, [`%${partNumber.slice(0, 6)}%`]);
+            console.log(`🔄 Not found, trying LIKE search...`);
+            // Try to find with partial match (first 10 characters)
+            const searchPart = partNumber.slice(0, 10);
+            const results = await db.db.all(`SELECT * FROM products WHERE part LIKE ? LIMIT 1`, [`${searchPart}%`]);
             if (results && results.length > 0) {
                 master = results[0];
+                console.log(`✅ Found via LIKE: ${master.part}`);
             }
         }
         
+        // ✅ If still not found, try removing special characters
         if (!master) {
-            master = {
-                part: partNumber,
-                description: 'Product not found in database',
-                stock: 0,
-                brand: '',
-                make: '',
-                model: '',
-                list_price: 0,
-                mrp: 0,
-                billing_price: 0
-            };
+            console.log(`🔄 Not found, trying clean part search...`);
+            const cleanPart = partNumber.replace(/[^A-Z0-9]/g, '');
+            const results = await db.db.all(`SELECT * FROM products WHERE part LIKE ? LIMIT 1`, [`%${cleanPart}%`]);
+            if (results && results.length > 0) {
+                master = results[0];
+                console.log(`✅ Found via clean search: ${master.part}`);
+            }
         }
+        
+        // ✅ If STILL not found, try searching by description
+        if (!master) {
+            console.log(`🔄 Not found, trying description search...`);
+            const results = await db.db.all(`SELECT * FROM products WHERE description LIKE ? LIMIT 1`, [`%${partNumber}%`]);
+            if (results && results.length > 0) {
+                master = results[0];
+                console.log(`✅ Found via description: ${master.part}`);
+            }
+        }
+        
+        // ✅ If STILL not found, check database to debug
+        if (!master) {
+            // Check if product exists in database
+            const count = await db.db.get(`SELECT COUNT(*) as count FROM products WHERE part = ?`, [partNumber]);
+            console.log(`📊 Product count for ${partNumber}: ${count?.count || 0}`);
+            
+            // Try to get any product with similar pattern
+            const sample = await db.db.all(`SELECT part FROM products LIMIT 5`);
+            console.log(`📊 Sample products in DB:`, sample.map(p => p.part).join(', '));
+        }
+        
+        if (!master) {
+            console.log(`❌ Product NOT found: ${partNumber}`);
+            // Show a friendly message with suggestion
+            let reply = `🔍 *Product Not Found*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+            reply += `❌ *${partNumber}*\n   Not found in our inventory\n\n`;
+            reply += `💡 *Try:*\n`;
+            reply += `   • Check the part number spelling (case doesn't matter)\n`;
+            reply += `   • Try searching by description\n`;
+            reply += `   • Send "Help" for assistance\n\n`;
+            reply += `📞 Call: ${CONFIG.businessPhone}`;
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+        
+        console.log(`✅ Product FOUND: ${master.part} - ${master.description}`);
         
         // ✅ Get suppliers with safe array
         let suppliers = await db.db.all(`
@@ -152,11 +194,6 @@ async function searchProducts(text, from) {
             bestPrice = parseFloat(best.price) || null;
         }
         
-        if (!hasMasterStock && !hasSupplierStock && !master) {
-            await handleProductNotFound(from, partNumber, query);
-            return;
-        }
-        
         let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
         
         // ✅ Show ALL product details like old search
@@ -167,7 +204,6 @@ async function searchProducts(text, from) {
             if (master.make) reply += `🚗 Make: ${master.make}\n`;
             if (master.model) reply += `🎯 Model: ${master.model}\n`;
             
-            // ✅ Show all pricing like old search
             const listPrice = parseFloat(master.list_price) || 0;
             const mrpPrice = parseFloat(master.mrp) || 0;
             const billingPrice = parseFloat(master.billing_price) || 0;
@@ -180,10 +216,8 @@ async function searchProducts(text, from) {
                 reply += `💳 Price incl. GST: ₹${priceWithGST.toFixed(2)}\n`;
             }
             
-            // ✅ Show stock
             reply += `📦 ${masterStock > 0 ? `✅ ${masterStock} pcs available` : '❌ Out of Stock'}`;
             
-            // ✅ Show partner stock if available
             if (hasSupplierStock && !isAdminUser) {
                 reply += `\n🔗 ${totalSupplierStock} pcs available from partners`;
                 if (bestPrice) reply += ` (Best Price: ₹${bestPrice.toFixed(2)})`;
@@ -234,7 +268,6 @@ async function searchByDescription(query, from) {
             reply += `📝 ${p.description || 'N/A'}\n`;
             if (p.brand) reply += `🏷️ Brand: ${p.brand}\n`;
             
-            // ✅ Show pricing
             const billingPrice = parseFloat(p.billing_price) || 0;
             const priceWithGST = billingPrice * 1.18;
             if (billingPrice > 0) reply += `💳 Price: ₹${priceWithGST.toFixed(2)} (incl. GST)\n`;
