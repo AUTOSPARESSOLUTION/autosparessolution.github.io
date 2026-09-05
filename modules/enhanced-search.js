@@ -100,13 +100,17 @@ async function searchProducts(text, from) {
         const partNumber = partMatch[1].toUpperCase();
         
         const master = await db.db.get(`SELECT * FROM products WHERE part = ?`, [partNumber]);
-        const suppliers = await db.db.all(`
-            SELECT s.name as supplier_name, s.phone, si.quantity, si.price, si.last_updated
-            FROM supplier_inventory si
-            JOIN suppliers s ON si.supplier_id = s.id
-            WHERE si.part = ? AND si.is_active = 1 AND si.quantity > 0
-            ORDER BY si.price ASC, si.quantity DESC
-        `, [partNumber]);
+        let suppliers = await db.db.all(`
+    SELECT s.name as supplier_name, s.phone, si.quantity, si.price, si.last_updated
+    FROM supplier_inventory si
+    JOIN suppliers s ON si.supplier_id = s.id
+    WHERE si.part = ? AND si.is_active = 1 AND si.quantity > 0
+    ORDER BY si.price ASC, si.quantity DESC
+`, [partNumber]);
+
+// ✅ FIX: Ensure suppliers is always an array
+if (!suppliers) suppliers = [];
+if (!Array.isArray(suppliers)) suppliers = [suppliers];
         
         const hasMasterStock = master && master.stock > 0;
         const hasSupplierStock = suppliers.length > 0;
