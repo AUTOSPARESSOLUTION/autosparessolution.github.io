@@ -1,5 +1,5 @@
 // ============================================================
-// 🔍 ENHANCED PRODUCT SEARCH - COMPLETE FIX
+// 🔍 ENHANCED PRODUCT SEARCH - COMPLETE FIX V2
 // ============================================================
 
 const db = require('./database');
@@ -83,7 +83,7 @@ async function sendWhatsAppMessage(to, message) {
 }
 
 // ============================================================
-// 🔍 ENHANCED SEARCH - FIXED
+// 🔍 ENHANCED SEARCH - COMPLETE FIX
 // ============================================================
 
 async function searchProducts(text, from) {
@@ -93,7 +93,6 @@ async function searchProducts(text, from) {
         
         const isAdminUser = isAdmin(from);
         
-        // ✅ Extract part number
         const partMatch = query.match(/\b([A-Z0-9]{5,20})\b/i);
         if (!partMatch) {
             await searchByDescription(query, from);
@@ -103,51 +102,60 @@ async function searchProducts(text, from) {
         const partNumber = partMatch[1].toUpperCase();
         console.log(`🔍 Looking for part: "${partNumber}"`);
         
-        // ✅ CRITICAL FIX: Use EXACT same query as old search
-        // The old search uses: db.getProductExact(partNumber)
-        // which does: SELECT * FROM products WHERE part = ?
-        let master = await db.db.get(
-            `SELECT * FROM products WHERE part = ?`,
-            [partNumber]
-        );
+        // ✅ FIX: Use the database's getProductExact method directly
+        // This is what the old search uses and it works
+        let master = null;
         
-        // ✅ Debug: Check if query worked
-        console.log(`📊 Master query result:`, master ? `Found ${master.part}` : 'Not found');
-        
-        // ✅ If not found, try case-insensitive
-        if (!master) {
-            console.log(`🔄 Trying COLLATE NOCASE...`);
-            master = await db.db.get(
-                `SELECT * FROM products WHERE part COLLATE NOCASE = ?`,
-                [partNumber]
-            );
+        try {
+            // Method 1: Use db.getProductExact (same as old search)
+            master = await db.getProductExact(partNumber);
+            console.log(`📊 Method 1 (getProductExact): ${master ? 'Found ' + master.part : 'Not found'}`);
+        } catch (err) {
+            console.log(`⚠️ Method 1 failed: ${err.message}`);
         }
         
-        // ✅ If still not found, try LIKE
+        // Method 2: If not found, try raw query
         if (!master) {
-            console.log(`🔄 Trying LIKE search...`);
-            const results = await db.db.all(
-                `SELECT * FROM products WHERE part LIKE ? LIMIT 1`,
-                [`%${partNumber}%`]
-            );
-            if (results && results.length > 0) {
-                master = results[0];
-                console.log(`✅ Found via LIKE: ${master.part}`);
+            try {
+                master = await db.db.get(
+                    `SELECT * FROM products WHERE part = ?`,
+                    [partNumber]
+                );
+                console.log(`📊 Method 2 (raw query): ${master ? 'Found ' + master.part : 'Not found'}`);
+            } catch (err) {
+                console.log(`⚠️ Method 2 failed: ${err.message}`);
             }
         }
         
-        // ✅ If STILL not found, check if product exists
+        // Method 3: Try case-insensitive
         if (!master) {
-            // Check count to see if product exists
-            const count = await db.db.get(
-                `SELECT COUNT(*) as count FROM products WHERE part = ?`,
-                [partNumber]
-            );
-            console.log(`📊 Product count for ${partNumber}: ${count?.count || 0}`);
-            
-            // Try to get ANY product to verify database connection
-            const sample = await db.db.get(`SELECT part FROM products LIMIT 1`);
-            console.log(`📊 Sample product from DB: ${sample?.part || 'No products'}`);
+            try {
+                master = await db.db.get(
+                    `SELECT * FROM products WHERE part COLLATE NOCASE = ?`,
+                    [partNumber]
+                );
+                console.log(`📊 Method 3 (COLLATE NOCASE): ${master ? 'Found ' + master.part : 'Not found'}`);
+            } catch (err) {
+                console.log(`⚠️ Method 3 failed: ${err.message}`);
+            }
+        }
+        
+        // Method 4: Try LIKE
+        if (!master) {
+            try {
+                const results = await db.db.all(
+                    `SELECT * FROM products WHERE part LIKE ? LIMIT 1`,
+                    [`%${partNumber}%`]
+                );
+                if (results && results.length > 0) {
+                    master = results[0];
+                    console.log(`📊 Method 4 (LIKE): Found ${master.part}`);
+                } else {
+                    console.log(`📊 Method 4 (LIKE): Not found`);
+                }
+            } catch (err) {
+                console.log(`⚠️ Method 4 failed: ${err.message}`);
+            }
         }
         
         // ✅ If product not found
@@ -160,14 +168,20 @@ async function searchProducts(text, from) {
         console.log(`✅ Product FOUND: ${master.part} - ${master.description}`);
         
         // ✅ Get supplier inventory
-        let suppliers = await db.db.all(`
-            SELECT s.id as supplier_id, s.name as supplier_name, s.phone, 
-                   si.quantity, si.price, si.last_updated
-            FROM supplier_inventory si
-            JOIN suppliers s ON si.supplier_id = s.id
-            WHERE si.part = ? AND si.is_active = 1 AND si.quantity > 0
-            ORDER BY si.price ASC, si.quantity DESC
-        `, [partNumber]);
+        let suppliers = [];
+        try {
+            suppliers = await db.db.all(`
+                SELECT s.id as supplier_id, s.name as supplier_name, s.phone, 
+                       si.quantity, si.price, si.last_updated
+                FROM supplier_inventory si
+                JOIN suppliers s ON si.supplier_id = s.id
+                WHERE si.part = ? AND si.is_active = 1 AND si.quantity > 0
+                ORDER BY si.price ASC, si.quantity DESC
+            `, [partNumber]);
+        } catch (err) {
+            console.log(`⚠️ Supplier query failed: ${err.message}`);
+            suppliers = [];
+        }
         
         if (!suppliers) suppliers = [];
         if (!Array.isArray(suppliers)) suppliers = [suppliers];
@@ -197,7 +211,6 @@ async function searchProducts(text, from) {
             if (master.make) reply += `🚗 Make: ${master.make}\n`;
             if (master.model) reply += `🎯 Model: ${master.model}\n`;
             
-            // ✅ Show pricing
             const listPrice = parseFloat(master.list_price) || 0;
             const mrpPrice = parseFloat(master.mrp) || 0;
             const billingPrice = parseFloat(master.billing_price) || 0;
@@ -210,10 +223,9 @@ async function searchProducts(text, from) {
                 reply += `💳 Price incl. GST: ₹${priceWithGST.toFixed(2)}\n`;
             }
             
-            // ✅ Stock
             reply += `📦 ${masterStock > 0 ? `✅ ${masterStock} pcs available` : '❌ Out of Stock'}`;
             
-            // ✅ Partner Network
+            // Partner Network
             reply += `\n\n━━━━━━━━━━━━━━━━━━━━\n`;
             reply += `🏢 *PARTNER NETWORK AVAILABILITY*\n`;
             reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
@@ -248,7 +260,6 @@ async function searchProducts(text, from) {
                 if (!isAdminUser) {
                     reply += `\n💡 *Note:* Order will be fulfilled by our partner network.\n`;
                 }
-                
             } else {
                 reply += `❌ *Not available from partners*\n`;
                 reply += `   💡 Only company stock available\n`;
