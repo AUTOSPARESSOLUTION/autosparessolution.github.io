@@ -83,7 +83,7 @@ async function sendWhatsAppMessage(to, message) {
 }
 
 // ============================================================
-// 🔍 ENHANCED SEARCH FUNCTIONS - WITH PARTNER NETWORK
+// 🔍 ENHANCED SEARCH WITH PARTNER NETWORK
 // ============================================================
 
 async function searchProducts(text, from) {
@@ -104,7 +104,7 @@ async function searchProducts(text, from) {
         const partNumber = partMatch[1].toUpperCase();
         console.log(`🔍 Looking for part: "${partNumber}"`);
         
-        // ✅ Query products table
+        // ✅ Query products table - SAME as old search
         let master = await db.db.get(
             `SELECT * FROM products WHERE part = ?`,
             [partNumber]
@@ -119,7 +119,7 @@ async function searchProducts(text, from) {
             );
         }
         
-        // ✅ If still not found, try LIKE with wildcard
+        // ✅ If still not found, try LIKE
         if (!master) {
             console.log(`🔄 Not found, trying LIKE search...`);
             const results = await db.db.all(
@@ -167,7 +167,7 @@ async function searchProducts(text, from) {
         if (!suppliers) suppliers = [];
         if (!Array.isArray(suppliers)) suppliers = [suppliers];
         
-        // ✅ Calculate stock safely
+        // ✅ Calculate stock
         const totalSupplierStock = suppliers.reduce((sum, s) => sum + (parseInt(s.quantity) || 0), 0);
         const masterStock = parseInt(master?.stock) || 0;
         const totalAvailable = masterStock + totalSupplierStock;
@@ -175,15 +175,16 @@ async function searchProducts(text, from) {
         const hasSupplierStock = suppliers.length > 0;
         
         let bestPrice = null;
+        let bestSupplierName = null;
         if (suppliers.length > 0) {
             const best = suppliers.reduce((min, s) => ((parseFloat(s.price) || 0) < (parseFloat(min.price) || 0) ? s : min), suppliers[0]);
             bestPrice = parseFloat(best.price) || null;
+            bestSupplierName = best.supplier_name || null;
         }
         
         // ✅ Build response with ALL details + Partner Network
         let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
         
-        // ✅ Show ALL product details like old search
         if (master && master.part) {
             reply += `1. *${master.part}*\n`;
             reply += `📝 ${master.description || 'N/A'}\n`;
@@ -207,14 +208,14 @@ async function searchProducts(text, from) {
             // ✅ Show stock
             reply += `📦 ${masterStock > 0 ? `✅ ${masterStock} pcs available` : '❌ Out of Stock'}`;
             
-            // ✅ Show Partner Network stock
+            // ✅ Show Partner Network availability
+            reply += `\n\n━━━━━━━━━━━━━━━━━━━━\n`;
+            reply += `🏢 *PARTNER NETWORK AVAILABILITY*\n`;
+            reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+            
             if (hasSupplierStock) {
-                reply += `\n\n━━━━━━━━━━━━━━━━━━━━\n`;
-                reply += `🏢 *PARTNER NETWORK AVAILABILITY*\n`;
-                reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-                
                 if (isAdminUser) {
-                    // ✅ Admin sees supplier names and details
+                    // ✅ Admin sees all partner details
                     reply += `📋 *Partner Details:*\n\n`;
                     suppliers.forEach((s, i) => {
                         reply += `${i + 1}. *${s.supplier_name || 'Unknown'}*\n`;
@@ -228,22 +229,24 @@ async function searchProducts(text, from) {
                     reply += `👥 *Multiple Partners Available*\n`;
                     reply += `   📦 Total Stock: ${totalSupplierStock} pcs\n`;
                     if (bestPrice) reply += `   💰 Best Price: ₹${bestPrice.toFixed(2)}\n`;
+                    if (bestSupplierName) reply += `   🏢 Best Partner: ${bestSupplierName}\n`;
                     reply += `   🔗 ${suppliers.length} partner(s) can fulfill this order\n`;
                     reply += `   🕐 Stock updated: ${new Date().toLocaleDateString()}\n\n`;
                 }
                 
                 reply += `📊 *TOTAL AVAILABLE: ${totalAvailable} pcs*\n`;
                 if (!isAdminUser && bestPrice) {
-                    reply += `   💰 Best Price: ₹${bestPrice.toFixed(2)}\n`;
+                    reply += `   💰 Best Partner Price: ₹${bestPrice.toFixed(2)}\n`;
                 }
                 reply += `   📦 Company Stock: ${masterStock} pcs\n`;
                 reply += `   🏢 Partner Stock: ${totalSupplierStock} pcs\n`;
                 reply += `   🔗 ${suppliers.length} partner(s)\n`;
                 
+                if (!isAdminUser) {
+                    reply += `\n💡 *Note:* Order will be fulfilled by our partner network.\n`;
+                }
+                
             } else {
-                reply += `\n\n━━━━━━━━━━━━━━━━━━━━\n`;
-                reply += `🏢 *PARTNER NETWORK*\n`;
-                reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
                 reply += `❌ *Not available from partners*\n`;
                 reply += `   💡 Only company stock available\n`;
                 reply += `   📦 Total Stock: ${masterStock} pcs\n`;
@@ -280,7 +283,8 @@ async function searchByDescription(query, from) {
                    p.stock, p.list_price, p.mrp, p.billing_price,
                    COALESCE(SUM(si.quantity), 0) as supplier_stock,
                    COUNT(DISTINCT si.supplier_id) as supplier_count,
-                   MIN(si.price) as best_price
+                   MIN(si.price) as best_price,
+                   (SELECT name FROM suppliers WHERE id = si.supplier_id LIMIT 1) as best_supplier
             FROM products p
             LEFT JOIN supplier_inventory si ON p.part = si.part AND si.is_active = 1 AND si.quantity > 0
             WHERE p.description LIKE ? 
@@ -320,13 +324,18 @@ async function searchByDescription(query, from) {
             if (p.supplier_count > 0) {
                 if (!isAdminUser) {
                     reply += ` (Partner Network)`;
+                    if (p.best_price) {
+                        reply += `\n   💰 Best Partner Price: ₹${parseFloat(p.best_price).toFixed(2)}`;
+                    }
                 } else {
                     reply += ` (${p.supplier_count} partner${p.supplier_count > 1 ? 's' : ''})`;
+                    if (p.best_price) {
+                        reply += `\n   💰 Best Partner Price: ₹${parseFloat(p.best_price).toFixed(2)}`;
+                    }
+                    if (p.best_supplier) {
+                        reply += `\n   🏢 Best Partner: ${p.best_supplier}`;
+                    }
                 }
-            }
-            
-            if (!isAdminUser && p.best_price) {
-                reply += `\n   💰 Best Partner Price: ₹${parseFloat(p.best_price).toFixed(2)}`;
             }
             reply += `\n\n`;
         });
