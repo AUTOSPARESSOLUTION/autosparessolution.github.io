@@ -1,5 +1,5 @@
 // ============================================================
-// 🔍 ENHANCED PRODUCT SEARCH - COMPLETE FIXED VERSION
+// 🔍 ENHANCED PRODUCT SEARCH - WITH PARTNER NETWORK
 // ============================================================
 
 const db = require('./database');
@@ -83,7 +83,7 @@ async function sendWhatsAppMessage(to, message) {
 }
 
 // ============================================================
-// 🔍 ENHANCED SEARCH FUNCTIONS
+// 🔍 ENHANCED SEARCH FUNCTIONS - WITH PARTNER NETWORK
 // ============================================================
 
 async function searchProducts(text, from) {
@@ -92,86 +92,72 @@ async function searchProducts(text, from) {
         console.log(`🔍 Enhanced search: "${query}"`);
         
         const isAdminUser = isAdmin(from);
+        
+        // ✅ Extract part number - case insensitive
         const partMatch = query.match(/\b([A-Z0-9]{5,20})\b/i);
         if (!partMatch) {
             await searchByDescription(query, from);
             return;
         }
+        
+        // ✅ Convert to UPPERCASE for database lookup
         const partNumber = partMatch[1].toUpperCase();
         console.log(`🔍 Looking for part: "${partNumber}"`);
         
-        // ✅ FIX: Use the SAME method as old search to find product
-        let master = await db.db.get(`SELECT * FROM products WHERE part = ?`, [partNumber]);
+        // ✅ Query products table
+        let master = await db.db.get(
+            `SELECT * FROM products WHERE part = ?`,
+            [partNumber]
+        );
         
-        // ✅ If not found, try case-insensitive (SQLite COLLATE NOCASE)
+        // ✅ If not found, try case-insensitive
         if (!master) {
-            console.log(`🔄 Not found, trying case-insensitive...`);
-            master = await db.db.get(`SELECT * FROM products WHERE part COLLATE NOCASE = ?`, [partNumber]);
+            console.log(`🔄 Not found exact, trying COLLATE NOCASE...`);
+            master = await db.db.get(
+                `SELECT * FROM products WHERE part COLLATE NOCASE = ?`,
+                [partNumber]
+            );
         }
         
-        // ✅ If still not found, try using LIKE with wildcard
+        // ✅ If still not found, try LIKE with wildcard
         if (!master) {
             console.log(`🔄 Not found, trying LIKE search...`);
-            // Try to find with partial match (first 10 characters)
-            const searchPart = partNumber.slice(0, 10);
-            const results = await db.db.all(`SELECT * FROM products WHERE part LIKE ? LIMIT 1`, [`${searchPart}%`]);
+            const results = await db.db.all(
+                `SELECT * FROM products WHERE part LIKE ? LIMIT 1`,
+                [`%${partNumber}%`]
+            );
             if (results && results.length > 0) {
                 master = results[0];
                 console.log(`✅ Found via LIKE: ${master.part}`);
             }
         }
         
-        // ✅ If still not found, try removing special characters
-        if (!master) {
-            console.log(`🔄 Not found, trying clean part search...`);
-            const cleanPart = partNumber.replace(/[^A-Z0-9]/g, '');
-            const results = await db.db.all(`SELECT * FROM products WHERE part LIKE ? LIMIT 1`, [`%${cleanPart}%`]);
-            if (results && results.length > 0) {
-                master = results[0];
-                console.log(`✅ Found via clean search: ${master.part}`);
-            }
-        }
-        
-        // ✅ If STILL not found, try searching by description
+        // ✅ If still not found, try description
         if (!master) {
             console.log(`🔄 Not found, trying description search...`);
-            const results = await db.db.all(`SELECT * FROM products WHERE description LIKE ? LIMIT 1`, [`%${partNumber}%`]);
+            const results = await db.db.all(
+                `SELECT * FROM products WHERE description LIKE ? LIMIT 1`,
+                [`%${partNumber}%`]
+            );
             if (results && results.length > 0) {
                 master = results[0];
                 console.log(`✅ Found via description: ${master.part}`);
             }
         }
         
-        // ✅ If STILL not found, check database to debug
-        if (!master) {
-            // Check if product exists in database
-            const count = await db.db.get(`SELECT COUNT(*) as count FROM products WHERE part = ?`, [partNumber]);
-            console.log(`📊 Product count for ${partNumber}: ${count?.count || 0}`);
-            
-            // Try to get any product with similar pattern
-            const sample = await db.db.all(`SELECT part FROM products LIMIT 5`);
-            console.log(`📊 Sample products in DB:`, sample.map(p => p.part).join(', '));
-        }
-        
+        // ✅ If product not found at all
         if (!master) {
             console.log(`❌ Product NOT found: ${partNumber}`);
-            // Show a friendly message with suggestion
-            let reply = `🔍 *Product Not Found*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
-            reply += `❌ *${partNumber}*\n   Not found in our inventory\n\n`;
-            reply += `💡 *Try:*\n`;
-            reply += `   • Check the part number spelling (case doesn't matter)\n`;
-            reply += `   • Try searching by description\n`;
-            reply += `   • Send "Help" for assistance\n\n`;
-            reply += `📞 Call: ${CONFIG.businessPhone}`;
-            await sendWhatsAppMessage(from, reply);
+            await handleProductNotFound(from, partNumber, query);
             return;
         }
         
         console.log(`✅ Product FOUND: ${master.part} - ${master.description}`);
         
-        // ✅ Get suppliers with safe array
+        // ✅ Get supplier inventory (Partner Network)
         let suppliers = await db.db.all(`
-            SELECT s.name as supplier_name, s.phone, si.quantity, si.price, si.last_updated
+            SELECT s.id as supplier_id, s.name as supplier_name, s.phone, 
+                   si.quantity, si.price, si.last_updated
             FROM supplier_inventory si
             JOIN suppliers s ON si.supplier_id = s.id
             WHERE si.part = ? AND si.is_active = 1 AND si.quantity > 0
@@ -194,6 +180,7 @@ async function searchProducts(text, from) {
             bestPrice = parseFloat(best.price) || null;
         }
         
+        // ✅ Build response with ALL details + Partner Network
         let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
         
         // ✅ Show ALL product details like old search
@@ -204,6 +191,7 @@ async function searchProducts(text, from) {
             if (master.make) reply += `🚗 Make: ${master.make}\n`;
             if (master.model) reply += `🎯 Model: ${master.model}\n`;
             
+            // ✅ Show all pricing
             const listPrice = parseFloat(master.list_price) || 0;
             const mrpPrice = parseFloat(master.mrp) || 0;
             const billingPrice = parseFloat(master.billing_price) || 0;
@@ -216,19 +204,62 @@ async function searchProducts(text, from) {
                 reply += `💳 Price incl. GST: ₹${priceWithGST.toFixed(2)}\n`;
             }
             
+            // ✅ Show stock
             reply += `📦 ${masterStock > 0 ? `✅ ${masterStock} pcs available` : '❌ Out of Stock'}`;
             
-            if (hasSupplierStock && !isAdminUser) {
-                reply += `\n🔗 ${totalSupplierStock} pcs available from partners`;
-                if (bestPrice) reply += ` (Best Price: ₹${bestPrice.toFixed(2)})`;
+            // ✅ Show Partner Network stock
+            if (hasSupplierStock) {
+                reply += `\n\n━━━━━━━━━━━━━━━━━━━━\n`;
+                reply += `🏢 *PARTNER NETWORK AVAILABILITY*\n`;
+                reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+                
+                if (isAdminUser) {
+                    // ✅ Admin sees supplier names and details
+                    reply += `📋 *Partner Details:*\n\n`;
+                    suppliers.forEach((s, i) => {
+                        reply += `${i + 1}. *${s.supplier_name || 'Unknown'}*\n`;
+                        reply += `   📞 ${s.phone || 'N/A'}\n`;
+                        reply += `   📦 ${parseInt(s.quantity) || 0} pcs available\n`;
+                        if (s.price > 0) reply += `   💰 Price: ₹${parseFloat(s.price).toFixed(2)}\n`;
+                        reply += `   🕐 ${s.last_updated ? new Date(s.last_updated).toLocaleString() : 'N/A'}\n\n`;
+                    });
+                } else {
+                    // ✅ Customer sees aggregated partner info (supplier names hidden)
+                    reply += `👥 *Multiple Partners Available*\n`;
+                    reply += `   📦 Total Stock: ${totalSupplierStock} pcs\n`;
+                    if (bestPrice) reply += `   💰 Best Price: ₹${bestPrice.toFixed(2)}\n`;
+                    reply += `   🔗 ${suppliers.length} partner(s) can fulfill this order\n`;
+                    reply += `   🕐 Stock updated: ${new Date().toLocaleDateString()}\n\n`;
+                }
+                
+                reply += `📊 *TOTAL AVAILABLE: ${totalAvailable} pcs*\n`;
+                if (!isAdminUser && bestPrice) {
+                    reply += `   💰 Best Price: ₹${bestPrice.toFixed(2)}\n`;
+                }
+                reply += `   📦 Company Stock: ${masterStock} pcs\n`;
+                reply += `   🏢 Partner Stock: ${totalSupplierStock} pcs\n`;
+                reply += `   🔗 ${suppliers.length} partner(s)\n`;
+                
+            } else {
+                reply += `\n\n━━━━━━━━━━━━━━━━━━━━\n`;
+                reply += `🏢 *PARTNER NETWORK*\n`;
+                reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+                reply += `❌ *Not available from partners*\n`;
+                reply += `   💡 Only company stock available\n`;
+                reply += `   📦 Total Stock: ${masterStock} pcs\n`;
             }
             
         } else {
             reply += `❌ *${partNumber}*\n📝 Product not found in database\n`;
         }
         
-        reply += `\n🛒 To order: "${master?.part || partNumber} 2"\n`;
-        reply += `📞 Call: ${CONFIG.businessPhone}`;
+        reply += `\n━━━━━━━━━━━━━━━━━━━━\n`;
+        reply += `🛒 *To Order:*\n`;
+        reply += `   Send "${master?.part || partNumber} 2" to add to cart\n`;
+        if (hasSupplierStock && !isAdminUser) {
+            reply += `   (Will be fulfilled by our partner network)\n`;
+        }
+        reply += `\n📞 Call: ${CONFIG.businessPhone}`;
         
         await sendWhatsAppMessage(from, reply);
         
@@ -242,44 +273,66 @@ async function searchProducts(text, from) {
 async function searchByDescription(query, from) {
     try {
         const isAdminUser = isAdmin(from);
+        
+        // ✅ Search using your database
         const results = await db.db.all(`
-            SELECT p.part, p.description, p.brand, p.stock as master_stock,
-                   p.list_price, p.mrp, p.billing_price,
+            SELECT p.part, p.description, p.brand, p.make, p.model, 
+                   p.stock, p.list_price, p.mrp, p.billing_price,
                    COALESCE(SUM(si.quantity), 0) as supplier_stock,
                    COUNT(DISTINCT si.supplier_id) as supplier_count,
                    MIN(si.price) as best_price
             FROM products p
             LEFT JOIN supplier_inventory si ON p.part = si.part AND si.is_active = 1 AND si.quantity > 0
-            WHERE p.description LIKE ? OR p.brand LIKE ? OR p.make LIKE ? OR p.model LIKE ?
+            WHERE p.description LIKE ? 
+               OR p.brand LIKE ? 
+               OR p.make LIKE ? 
+               OR p.model LIKE ?
+               OR p.part LIKE ?
             GROUP BY p.part
             ORDER BY (p.stock + COALESCE(SUM(si.quantity), 0)) DESC
             LIMIT 10
-        `, [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]);
+        `, [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`, `%${query.toUpperCase()}%`]);
         
         if (results.length === 0) {
-            await sendWhatsAppMessage(from, `🔍 *No Results for "${query}"*\n\n💡 Try:\n   • Part number: "0801BA0285N"\n   • Brand: "RANE"\n   • Vehicle: "Maruti 800"\n\n📞 Call: ${CONFIG.businessPhone}`);
+            await sendWhatsAppMessage(from, 
+                `🔍 *No Results for "${query}"*\n\n💡 Try:\n   • Part number: "0801BA0285N"\n   • Brand: "RANE"\n   • Vehicle: "Maruti 800"\n\n📞 Call: ${CONFIG.businessPhone}`
+            );
             return;
         }
         
         let reply = `🔍 *Search Results for "${query}"*\n━━━━━━━━━━━━━━━━━━━━\n\nFound ${results.length} result(s)\n\n`;
         results.forEach((p, i) => {
-            const total = (parseInt(p.master_stock) || 0) + (parseInt(p.supplier_stock) || 0);
+            const total = (parseInt(p.stock) || 0) + (parseInt(p.supplier_stock) || 0);
             reply += `${i + 1}. *${p.part}*\n`;
             reply += `📝 ${p.description || 'N/A'}\n`;
             if (p.brand) reply += `🏷️ Brand: ${p.brand}\n`;
+            if (p.make) reply += `🚗 Make: ${p.make}\n`;
+            if (p.model) reply += `🎯 Model: ${p.model}\n`;
             
+            // ✅ Show pricing
             const billingPrice = parseFloat(p.billing_price) || 0;
             const priceWithGST = billingPrice * 1.18;
             if (billingPrice > 0) reply += `💳 Price: ₹${priceWithGST.toFixed(2)} (incl. GST)\n`;
             
             reply += `📦 ${total} pcs available`;
-            if (!isAdminUser && p.supplier_count > 0) reply += ` (Partner Network)`;
-            else if (isAdminUser && p.supplier_count > 0) reply += ` (${p.supplier_count} partner${p.supplier_count > 1 ? 's' : ''})`;
-            if (!isAdminUser && p.best_price) reply += `\n   💰 Best Partner Price: ₹${parseFloat(p.best_price).toFixed(2)}`;
+            
+            // ✅ Show Partner Network info
+            if (p.supplier_count > 0) {
+                if (!isAdminUser) {
+                    reply += ` (Partner Network)`;
+                } else {
+                    reply += ` (${p.supplier_count} partner${p.supplier_count > 1 ? 's' : ''})`;
+                }
+            }
+            
+            if (!isAdminUser && p.best_price) {
+                reply += `\n   💰 Best Partner Price: ₹${parseFloat(p.best_price).toFixed(2)}`;
+            }
             reply += `\n\n`;
         });
         reply += `━━━━━━━━━━━━━━━━━━━━\n🛒 To order: Send part number with quantity\n📞 Call: ${CONFIG.businessPhone}`;
         await sendWhatsAppMessage(from, reply);
+        
     } catch (error) {
         console.error('❌ Description search error:', error.message);
         await sendWhatsAppMessage(from, `⚠️ *Search Error*\n\nPlease try again.\n📞 Call: ${CONFIG.businessPhone}`);
