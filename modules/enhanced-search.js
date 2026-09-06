@@ -193,17 +193,28 @@ async function searchProducts(text, from) {
         }
         
         // ✅ Build response with image
-        let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
-        
-        // ✅ Add product image if available
-        let imageUrl = null;
-        try {
-            const productImageManager = require('./product-images');
-            imageUrl = await productImageManager.getProductImage(master.part);
-        } catch (err) {}
-        if (imageUrl) {
-            reply += `📸 *Product Image:*\n${imageUrl}\n\n`;
+let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+// ✅ Add product image if available - SEND AS ACTUAL IMAGE
+let imageUrl = null;
+try {
+    const productImageManager = require('./product-images');
+    imageUrl = await productImageManager.getProductImage(master.part);
+} catch (err) {}
+
+if (imageUrl) {
+    // ✅ Send image separately using the image API
+    try {
+        const imageResult = await sendImageMessage(from, imageUrl, `📸 ${master.part} - ${master.description || 'Product Image'}`);
+        if (imageResult) {
+            console.log(`📸 Product image sent to ${from}`);
         }
+    } catch (imgErr) {
+        console.error('❌ Failed to send image:', imgErr.message);
+        // Fallback: Add URL to text
+        reply += `📸 *Product Image:*\n${imageUrl}\n\n`;
+    }
+}
         
         if (master && master.part) {
             reply += `1. *${master.part}*\n`;
