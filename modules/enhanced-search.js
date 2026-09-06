@@ -1,8 +1,9 @@
 // ============================================================
-// 🔍 ENHANCED PRODUCT SEARCH - COMPLETE FIX V2
+// 🔍 ENHANCED PRODUCT SEARCH - COMPLETE FIX WITH IMAGES
 // ============================================================
 
 const db = require('./database');
+const productImageManager = require('./product-images');
 
 // ============================================================
 // 🛠️ HELPER FUNCTIONS
@@ -83,7 +84,7 @@ async function sendWhatsAppMessage(to, message) {
 }
 
 // ============================================================
-// 🔍 ENHANCED SEARCH - COMPLETE FIX
+// 🔍 ENHANCED SEARCH WITH IMAGES
 // ============================================================
 
 async function searchProducts(text, from) {
@@ -102,8 +103,7 @@ async function searchProducts(text, from) {
         const partNumber = partMatch[1].toUpperCase();
         console.log(`🔍 Looking for part: "${partNumber}"`);
         
-        // ✅ FIX: Use the database's getProductExact method directly
-        // This is what the old search uses and it works
+        // ✅ FIX: Get product from database
         let master = null;
         
         try {
@@ -114,7 +114,7 @@ async function searchProducts(text, from) {
             console.log(`⚠️ Method 1 failed: ${err.message}`);
         }
         
-        // Method 2: If not found, try raw query
+        // Method 2: Raw query
         if (!master) {
             try {
                 master = await db.db.get(
@@ -127,7 +127,7 @@ async function searchProducts(text, from) {
             }
         }
         
-        // Method 3: Try case-insensitive
+        // Method 3: Case-insensitive
         if (!master) {
             try {
                 master = await db.db.get(
@@ -140,7 +140,7 @@ async function searchProducts(text, from) {
             }
         }
         
-        // Method 4: Try LIKE
+        // Method 4: LIKE
         if (!master) {
             try {
                 const results = await db.db.all(
@@ -150,8 +150,6 @@ async function searchProducts(text, from) {
                 if (results && results.length > 0) {
                     master = results[0];
                     console.log(`📊 Method 4 (LIKE): Found ${master.part}`);
-                } else {
-                    console.log(`📊 Method 4 (LIKE): Not found`);
                 }
             } catch (err) {
                 console.log(`⚠️ Method 4 failed: ${err.message}`);
@@ -166,6 +164,17 @@ async function searchProducts(text, from) {
         }
         
         console.log(`✅ Product FOUND: ${master.part} - ${master.description}`);
+        
+        // ✅ Get product image
+        let imageUrl = null;
+        try {
+            imageUrl = await productImageManager.getProductImage(master.part);
+            if (imageUrl) {
+                console.log(`📸 Image found for ${master.part}`);
+            }
+        } catch (err) {
+            console.log(`⚠️ Image check failed: ${err.message}`);
+        }
         
         // ✅ Get supplier inventory
         let suppliers = [];
@@ -201,8 +210,14 @@ async function searchProducts(text, from) {
             bestSupplierName = best.supplier_name || null;
         }
         
-        // ✅ Build response
+        // ✅ Build response with image
         let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        // ✅ Add image if available
+        if (imageUrl) {
+            reply += `📸 *Product Image:*\n`;
+            reply += `${imageUrl}\n\n`;
+        }
         
         if (master && master.part) {
             reply += `1. *${master.part}*\n`;
@@ -225,7 +240,7 @@ async function searchProducts(text, from) {
             
             reply += `📦 ${masterStock > 0 ? `✅ ${masterStock} pcs available` : '❌ Out of Stock'}`;
             
-            // Partner Network
+            // ✅ Partner Network
             reply += `\n\n━━━━━━━━━━━━━━━━━━━━\n`;
             reply += `🏢 *PARTNER NETWORK AVAILABILITY*\n`;
             reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
