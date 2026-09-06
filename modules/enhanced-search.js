@@ -1,5 +1,5 @@
 // ============================================================
-// 🔍 ENHANCED PRODUCT SEARCH - COMPLETE FIX V2
+// 🔍 ENHANCED PRODUCT SEARCH - WITH IMAGES
 // ============================================================
 
 const db = require('./database');
@@ -83,7 +83,7 @@ async function sendWhatsAppMessage(to, message) {
 }
 
 // ============================================================
-// 🔍 ENHANCED SEARCH - COMPLETE FIX
+// 🔍 ENHANCED SEARCH - WITH IMAGES
 // ============================================================
 
 async function searchProducts(text, from) {
@@ -102,19 +102,15 @@ async function searchProducts(text, from) {
         const partNumber = partMatch[1].toUpperCase();
         console.log(`🔍 Looking for part: "${partNumber}"`);
         
-        // ✅ FIX: Use the database's getProductExact method directly
-        // This is what the old search uses and it works
         let master = null;
         
         try {
-            // Method 1: Use db.getProductExact (same as old search)
             master = await db.getProductExact(partNumber);
             console.log(`📊 Method 1 (getProductExact): ${master ? 'Found ' + master.part : 'Not found'}`);
         } catch (err) {
             console.log(`⚠️ Method 1 failed: ${err.message}`);
         }
         
-        // Method 2: If not found, try raw query
         if (!master) {
             try {
                 master = await db.db.get(
@@ -127,7 +123,6 @@ async function searchProducts(text, from) {
             }
         }
         
-        // Method 3: Try case-insensitive
         if (!master) {
             try {
                 master = await db.db.get(
@@ -140,7 +135,6 @@ async function searchProducts(text, from) {
             }
         }
         
-        // Method 4: Try LIKE
         if (!master) {
             try {
                 const results = await db.db.all(
@@ -158,7 +152,6 @@ async function searchProducts(text, from) {
             }
         }
         
-        // ✅ If product not found
         if (!master) {
             console.log(`❌ Product NOT found: ${partNumber}`);
             await handleProductNotFound(from, partNumber, query);
@@ -167,7 +160,6 @@ async function searchProducts(text, from) {
         
         console.log(`✅ Product FOUND: ${master.part} - ${master.description}`);
         
-        // ✅ Get supplier inventory
         let suppliers = [];
         try {
             suppliers = await db.db.all(`
@@ -186,7 +178,6 @@ async function searchProducts(text, from) {
         if (!suppliers) suppliers = [];
         if (!Array.isArray(suppliers)) suppliers = [suppliers];
         
-        // ✅ Calculate stock
         const totalSupplierStock = suppliers.reduce((sum, s) => sum + (parseInt(s.quantity) || 0), 0);
         const masterStock = parseInt(master?.stock) || 0;
         const totalAvailable = masterStock + totalSupplierStock;
@@ -201,8 +192,18 @@ async function searchProducts(text, from) {
             bestSupplierName = best.supplier_name || null;
         }
         
-        // ✅ Build response
+        // ✅ Build response with image
         let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        // ✅ Add product image if available
+        let imageUrl = null;
+        try {
+            const productImageManager = require('./product-images');
+            imageUrl = await productImageManager.getProductImage(master.part);
+        } catch (err) {}
+        if (imageUrl) {
+            reply += `📸 *Product Image:*\n${imageUrl}\n\n`;
+        }
         
         if (master && master.part) {
             reply += `1. *${master.part}*\n`;
@@ -225,7 +226,6 @@ async function searchProducts(text, from) {
             
             reply += `📦 ${masterStock > 0 ? `✅ ${masterStock} pcs available` : '❌ Out of Stock'}`;
             
-            // Partner Network
             reply += `\n\n━━━━━━━━━━━━━━━━━━━━\n`;
             reply += `🏢 *PARTNER NETWORK AVAILABILITY*\n`;
             reply += `━━━━━━━━━━━━━━━━━━━━\n\n`;
