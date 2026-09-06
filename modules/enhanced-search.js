@@ -203,12 +203,7 @@ async function searchProducts(text, from) {
         
         // ✅ Build response
         let reply = `🔍 *Product Details*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
-        // ✅ Add image if available
-const productImageManager = require('./product-images');
-const imageHtml = await productImageManager.getImageHtml(master.part);
-if (imageHtml) {
-    reply += imageHtml;
-}
+        
         if (master && master.part) {
             reply += `1. *${master.part}*\n`;
             reply += `📝 ${master.description || 'N/A'}\n`;
