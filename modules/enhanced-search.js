@@ -81,7 +81,93 @@ async function sendWhatsAppMessage(to, message) {
         }
     }
 }
+// ============================================================
+// 📸 SEND IMAGE AS ACTUAL IMAGE (Not Link)
+// ============================================================
 
+async function sendImageMessage(to, imageUrl, caption) {
+    try {
+        const normalizedPhone = to.replace(/\D/g, '');
+        
+        console.log(`📸 Downloading image from: ${imageUrl}`);
+        
+        // Download the image
+        const response = await fetch(imageUrl);
+        if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        
+        // Determine content type
+        const ext = imageUrl.split('.').pop().toLowerCase();
+        let mimeType = 'image/png';
+        if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
+        else if (ext === 'gif') mimeType = 'image/gif';
+        else if (ext === 'webp') mimeType = 'image/webp';
+        
+        console.log(`📸 Uploading image to WhatsApp (${buffer.length} bytes)`);
+        
+        // Upload to WhatsApp
+        const formData = new FormData();
+        const blob = new Blob([buffer], { type: mimeType });
+        formData.append('file', blob, `product.${ext}`);
+        formData.append('messaging_product', 'whatsapp');
+        formData.append('type', mimeType);
+        
+        const uploadUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/media`;
+        const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.accessToken}`,
+            },
+            body: formData
+        });
+        
+        const uploadResult = await uploadResponse.json();
+        if (!uploadResult.id) {
+            console.error('❌ Upload failed:', uploadResult);
+            throw new Error('Failed to upload image');
+        }
+        
+        console.log(`📸 Image uploaded, ID: ${uploadResult.id}`);
+        
+        // Send the image
+        const sendUrl = `https://graph.facebook.com/v23.0/${CONFIG.phoneNumberId}/messages`;
+        const sendResponse = await fetch(sendUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: normalizedPhone,
+                type: 'image',
+                image: {
+                    id: uploadResult.id,
+                    caption: caption || 'Product Image'
+                }
+            })
+        });
+        
+        if (!sendResponse.ok) {
+            const errorText = await sendResponse.text();
+            throw new Error(`Send failed: ${sendResponse.status} - ${errorText}`);
+        }
+        
+        const result = await sendResponse.json();
+        console.log(`📸 Image sent to ${normalizedPhone}`);
+        return result;
+        
+    } catch (error) {
+        console.error('❌ Image send error:', error.message);
+        
+        // Fallback: Send text with URL
+        await sendWhatsAppMessage(to, 
+            `📸 *Product Image:*\n${imageUrl}\n\n${caption || ''}`
+        );
+        return null;
+    }
+    }
 // ============================================================
 // 🔍 ENHANCED SEARCH - WITH IMAGES
 // ============================================================
