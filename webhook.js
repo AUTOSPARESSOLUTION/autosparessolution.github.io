@@ -8439,7 +8439,22 @@ if (isAdmin(from) && (msgLower === 'all payments' || msgLower === 'payments summ
             
             const exactProduct = await db.getProductExact(partNumber);
             if (exactProduct) {
+                // ✅ Get product image
+                let imageUrl = null;
+                try {
+                    const productImageManager = require('./product-images');
+                    imageUrl = await productImageManager.getProductImage(exactProduct.part);
+                } catch (err) {
+                    // Image not available, continue
+                }
+                
                 let reply = `🔍 *Product Found*\n\n`;
+                
+                // ✅ Add image if available
+                if (imageUrl) {
+                    reply += `📸 *Product Image:*\n${imageUrl}\n\n`;
+                }
+                
                 reply += formatProductForWhatsApp(exactProduct, 0);
                 reply += `\n🛒 To order: "${exactProduct.part} 2"\n`;
                 reply += `📞 Call: ${CONFIG.businessPhone}`;
