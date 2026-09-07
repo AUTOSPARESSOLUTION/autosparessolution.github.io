@@ -5447,7 +5447,107 @@ if (msgLower.startsWith('add customer')) {
             return;
         }
     }
-    
+    // ============================================================
+// 🖼️ IMAGE MANAGEMENT COMMANDS
+// ============================================================
+
+// Check product image
+if (msgLower.startsWith('check image')) {
+    try {
+        const part = text.replace(/check image/i, '').trim().toUpperCase();
+        if (!part) {
+            await sendWhatsAppMessage(from, '📝 Format: "Check image 0801BA0285N"');
+            return;
+        }
+        
+        const productImageManager = require('./product-images');
+        const imageUrl = await productImageManager.getProductImage(part);
+        
+        let reply = `🖼️ *Image Status for ${part}*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        reply += `📸 Image: ${imageUrl ? '✅ Available' : '❌ Not Available'}\n`;
+        
+        if (imageUrl) {
+            reply += `\n🔗 URL: ${imageUrl}`;
+        } else {
+            reply += `\n💡 Try uploading: "Upload image ${part}"`;
+        }
+        
+        await sendWhatsAppMessage(from, reply);
+        
+    } catch (error) {
+        console.error('❌ Check image error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+    }
+    return;
+}
+
+// Upload image (requires image URL)
+if (msgLower.startsWith('upload image')) {
+    try {
+        const parts = text.replace(/upload image/i, '').trim().split(' ');
+        const part = parts[0]?.toUpperCase();
+        const imageUrl = parts[1];
+        
+        if (!part || !imageUrl) {
+            await sendWhatsAppMessage(from, 
+                `📝 Format: "Upload image 0801BA0285N https://example.com/image.png"\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
+        
+        await sendWhatsAppMessage(from, `🔄 Downloading image for ${part}...`);
+        
+        const productImageManager = require('./product-images');
+        const result = await productImageManager.downloadImage(part, imageUrl);
+        
+        if (result) {
+            await sendWhatsAppMessage(from, 
+                `✅ *Image Uploaded!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `📦 Part: ${part}\n` +
+                `🔗 URL: ${result}\n\n` +
+                `🖼️ Check with: "Check image ${part}"`
+            );
+        } else {
+            await sendWhatsAppMessage(from, `❌ Failed to upload image for ${part}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Upload image error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+    }
+    return;
+}
+
+// List available images
+if (msgLower === 'list images') {
+    try {
+        const productImageManager = require('./product-images');
+        const stats = await productImageManager.getImageStats();
+        
+        if (stats.totalImages === 0) {
+            await sendWhatsAppMessage(from, '📋 *No product images found.*\n\n📝 Upload: "Upload image 0801BA0285N [url]"');
+            return;
+        }
+        
+        let reply = `🖼️ *Product Images (${stats.totalImages})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        stats.images.slice(0, 20).forEach((img, i) => {
+            reply += `${i + 1}. ${img.part}\n`;
+        });
+        
+        if (stats.totalImages > 20) {
+            reply += `\n... and ${stats.totalImages - 20} more`;
+        }
+        
+        reply += `\n\n📝 Check: "Check image [part]"`;
+        await sendWhatsAppMessage(from, reply);
+        
+    } catch (error) {
+        console.error('❌ List images error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+    }
+    return;
+            }
     // ============================================================
     // 2️⃣ CONFIRM ORDER FOR CUSTOMER
     // ============================================================
