@@ -6169,7 +6169,36 @@ if (msgLower === 'list images') {
             return;
         }
     }
-    
+    // ============================================================
+// 🗄️ MONGODB SYNC COMMANDS
+// ============================================================
+
+// Sync now - Force sync to MongoDB
+if (msgLower === 'sync now') {
+    await sendWhatsAppMessage(from, '🔄 Syncing data to MongoDB...');
+    try {
+        await mongoSync.manualSync();
+        await sendWhatsAppMessage(from, '✅ Sync complete!');
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Sync failed: ${error.message}`);
+    }
+    return;
+}
+
+// Sync status - Check sync status
+if (msgLower === 'sync status' || msgLower === 'mongo status') {
+    const status = mongoSync.getSyncStatus();
+    await sendWhatsAppMessage(from, 
+        `📊 *MongoDB Sync Status*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `🔗 Connected: ${status.isConnected ? '✅' : '❌'}\n` +
+        `🔄 Running: ${status.isRunning ? '⏳' : '⏸️'}\n` +
+        `📡 Sync: ${status.interval === 'active' ? '✅' : '❌'}\n` +
+        `📦 Enabled: ${status.isEnabled ? '✅' : '❌'}\n\n` +
+        `📝 "Sync now" to force sync\n` +
+        `📞 Call: ${CONFIG.businessPhone}`
+    );
+    return;
+}
     // ============================================================
     // 🔟 ADMIN HELP
     // ============================================================
