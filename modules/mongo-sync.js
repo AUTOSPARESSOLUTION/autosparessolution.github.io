@@ -22,7 +22,7 @@ async function connectMongo() {
     }
     
     try {
-        // ✅ FIXED: Proper connection options without deprecated flags
+        // ✅ FIXED: Correct option names
         mongoClient = new MongoClient(MONGODB_URI, {
             maxPoolSize: 10,
             serverSelectionTimeoutMS: 10000,
@@ -31,9 +31,9 @@ async function connectMongo() {
             // ✅ Force TLS 1.2
             tls: true,
             tlsAllowInvalidCertificates: false,
-            // ✅ Use SSL
+            // ✅ Use SSL with correct option name
             ssl: true,
-            sslValidate: true,
+            sslValidate: true,  // ← CORRECT: capital V
             // ✅ Retry options
             retryWrites: true,
             retryReads: true,
