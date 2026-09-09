@@ -35,7 +35,11 @@ const { importCSV } = require('./modules/csv-loader');
 const { parseOrder, extractPartNumber, extractQuantity, parseOrderWithDescription } = require('./modules/order-parser');
 const scheduler = require('./modules/scheduler');
 const invoice = require('./modules/invoice');
+// ============================================================
+// 🗄️ MONGODB SYNC MODULE
+// ============================================================
 
+const mongoSync = require('./modules/mongo-sync');
 // 🎨 DYNAMIC BRAND MANAGER
 let brandManager = null;
 try {
