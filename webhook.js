@@ -9323,7 +9323,15 @@ async function startServer() {
 
         await initAllTables();
         console.log('✅ All tables ready');
-
+// ✅ Start MongoDB sync (minimal change)
+if (process.env.MONGODB_URI) {
+    console.log('🔄 Starting MongoDB sync service...');
+    await mongoSync.connectMongo();
+    mongoSync.startAutoSync(60000); // Sync every 60 seconds
+    console.log('✅ MongoDB sync service started');
+} else {
+    console.log('⚠️ MONGODB_URI not set, sync disabled');
+}
         console.log('📥 Preloading brand logos...');
         const { preloadAllLogos } = require('./modules/brand-collage');
         await preloadAllLogos();
