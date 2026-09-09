@@ -40,6 +40,11 @@ const invoice = require('./modules/invoice');
 // ============================================================
 
 const mongoSync = require('./modules/mongo-sync');
+// ============================================================
+// 🖼️ PRODUCT IMAGES MODULE
+// ============================================================
+
+const productImages = require('./modules/product-images');
 // 🎨 DYNAMIC BRAND MANAGER
 let brandManager = null;
 try {
