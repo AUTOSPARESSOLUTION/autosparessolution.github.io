@@ -9357,27 +9357,63 @@ async function startServer() {
 
         await initAllTables();
         console.log('✅ All tables ready');
-// ⏳ Delay MongoDB sync until CSV import completes (saves memory)
+// ============================================================
+// ⏰ MONGODB SYNC - STARTS 7 MIN AFTER BOOT, SYNCS EVERY 10 MIN
+// ============================================================
 if (process.env.MONGODB_URI) {
-    console.log('⏳ MongoDB sync will start after CSV import completes');
+    const MONGO_START_DELAY = 7 * 60 * 1000;      // 7 minutes = 420,000 ms
+    const MONGO_SYNC_INTERVAL = 10 * 60 * 1000;   // 10 minutes = 600,000 ms
     
-    let syncStarted = false;
-    const checkImport = setInterval(async () => {
-        // Wait until DB is ready AND products are imported
-        if (isDbReady && importProgress > 0 && !syncStarted) {
-            syncStarted = true;
-            clearInterval(checkImport);
+    const startTimeStr = new Date().toLocaleTimeString('en-IN');
+    const mongoStartTimeStr = new Date(Date.now() + MONGO_START_DELAY).toLocaleTimeString('en-IN');
+    
+    console.log('⏰ ====================================');
+    console.log(`⏰ Server boot: ${startTimeStr}`);
+    console.log(`⏰ MongoDB start: ${mongoStartTimeStr} (7 min)`);
+    console.log(`⏰ Sync interval: every 10 minutes`);
+    console.log('⏰ ====================================');
+    
+    setTimeout(async () => {
+        console.log('🔄 ====================================');
+        console.log('🔄 7 MINUTES ELAPSED - Starting MongoDB sync');
+        console.log(`🔄 Current time: ${new Date().toLocaleTimeString('en-IN')}`);
+        console.log('🔄 ====================================');
+        
+        try {
+            // Connect to MongoDB
+            await mongoSync.connectMongo();
+            console.log('✅ MongoDB connected successfully!');
             
-            console.log('🔄 CSV import complete. Starting MongoDB sync...');
-            try {
-                await mongoSync.connectMongo();
-                mongoSync.startAutoSync(120000); // Every 2 minutes
-                console.log('✅ MongoDB sync service started (after import)');
-            } catch (err) {
-                console.error('❌ MongoDB sync failed:', err.message);
-            }
+            // Start auto-sync every 10 minutes
+            mongoSync.startAutoSync(MONGO_SYNC_INTERVAL);
+            console.log('✅ Auto-sync running every 10 minutes');
+            
+            // Run first sync immediately
+            console.log('🔄 Running first sync now...');
+            await mongoSync.manualSync();
+            console.log('✅ First sync complete!');
+            
+            console.log('✅ ====================================');
+            console.log('✅ MongoDB sync fully operational');
+            console.log('✅ ====================================');
+            
+        } catch (err) {
+            console.error('❌ MongoDB sync failed:', err.message);
+            console.log('💡 WhatsApp bot continues without MongoDB');
+            
+            // Retry in 10 minutes
+            setTimeout(async () => {
+                try {
+                    await mongoSync.connectMongo();
+                    mongoSync.startAutoSync(MONGO_SYNC_INTERVAL);
+                    console.log('✅ MongoDB sync started (retry)');
+                } catch (retryErr) {
+                    console.error('❌ Retry failed:', retryErr.message);
+                }
+            }, MONGO_SYNC_INTERVAL);
         }
-    }, 30000); // Check every 30 seconds
+    }, MONGO_START_DELAY);
+    
 } else {
     console.log('⚠️ MONGODB_URI not set, sync disabled');
 }
