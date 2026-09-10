@@ -9357,12 +9357,27 @@ async function startServer() {
 
         await initAllTables();
         console.log('✅ All tables ready');
-// ✅ Start MongoDB sync (minimal change)
+// ⏳ Delay MongoDB sync until CSV import completes (saves memory)
 if (process.env.MONGODB_URI) {
-    console.log('🔄 Starting MongoDB sync service...');
-    await mongoSync.connectMongo();
-    mongoSync.startAutoSync(60000); // Sync every 60 seconds
-    console.log('✅ MongoDB sync service started');
+    console.log('⏳ MongoDB sync will start after CSV import completes');
+    
+    let syncStarted = false;
+    const checkImport = setInterval(async () => {
+        // Wait until DB is ready AND products are imported
+        if (isDbReady && importProgress > 0 && !syncStarted) {
+            syncStarted = true;
+            clearInterval(checkImport);
+            
+            console.log('🔄 CSV import complete. Starting MongoDB sync...');
+            try {
+                await mongoSync.connectMongo();
+                mongoSync.startAutoSync(120000); // Every 2 minutes
+                console.log('✅ MongoDB sync service started (after import)');
+            } catch (err) {
+                console.error('❌ MongoDB sync failed:', err.message);
+            }
+        }
+    }, 30000); // Check every 30 seconds
 } else {
     console.log('⚠️ MONGODB_URI not set, sync disabled');
 }
