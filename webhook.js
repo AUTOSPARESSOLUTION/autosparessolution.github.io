@@ -5298,13 +5298,26 @@ if (msgLower.startsWith('add delivery')) {
                 `📋 Number: ${vehicleNumber || 'N/A'}\n\n` +
                 `✅ Delivery boy details updated!`
             );
-        } else {
-            const result = await db.db.run(
-                `INSERT INTO delivery_boys (name, phone, address, vehicle_type, vehicle_number, status, created_at) 
-                 VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
-                [name, cleanPhone, city, vehicleType, vehicleNumber]
-            );
-            deliveryBoyId = result.lastID;
+       } else {
+    // ✅ Save to delivery_boys table
+    const result = await db.db.run(
+        `INSERT INTO delivery_boys (name, phone, address, vehicle_type, vehicle_number, status, created_at) 
+         VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
+        [name, cleanPhone, city, vehicleType, vehicleNumber]
+    );
+    deliveryBoyId = result.lastID;
+    
+    // ✅ ALSO save to delivery_boys_access for WhatsApp notifications
+    try {
+        await db.db.run(
+            `INSERT INTO delivery_boys_access (delivery_boy_id, phone, status, created_at) 
+             VALUES (?, ?, 'active', CURRENT_TIMESTAMP)`,
+            [deliveryBoyId, cleanPhone]
+        );
+        console.log(`✅ Added delivery boy ${cleanPhone} to delivery_boys_access`);
+    } catch (accessErr) {
+        console.error('⚠️ Could not add to delivery_boys_access:', accessErr.message);
+    }
             
             await sendWhatsAppMessage(from, 
                 `✅ *Delivery Boy Added!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
