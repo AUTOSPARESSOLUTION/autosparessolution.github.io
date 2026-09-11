@@ -247,7 +247,49 @@ function getSyncStatus() {
         interval: syncInterval ? 'active' : 'stopped'
     };
 }
+// ============================================================
+// 🔍 SEARCH PRODUCTS IN MONGODB
+// ============================================================
 
+async function searchProductsInMongo(query, limit = 10) {
+    try {
+        const db = await connectMongo();
+        if (!db) return [];
+        
+        const collection = db.collection('products');
+        const upperQuery = query.toUpperCase();
+        
+        const results = await collection.find({
+            $or: [
+                { part: { $regex: upperQuery, $options: 'i' } },
+                { description: { $regex: query, $options: 'i' } },
+                { brand: { $regex: query, $options: 'i' } },
+                { make: { $regex: query, $options: 'i' } },
+                { model: { $regex: query, $options: 'i' } }
+            ]
+        })
+        .limit(limit)
+        .toArray();
+        
+        console.log(`✅ MongoDB found ${results.length} products for "${query}"`);
+        return results;
+    } catch (error) {
+        console.error('❌ MongoDB search error:', error.message);
+        return [];
+    }
+}
+
+// Add to exports
+module.exports = {
+    connectMongo,
+    syncAllData,
+    syncTable,
+    startAutoSync,
+    stopAutoSync,
+    manualSync,
+    getSyncStatus,
+    searchProductsInMongo  // ← ADD THIS LINE
+};
 // ============================================================
 // 📤 EXPORTS
 // ============================================================
