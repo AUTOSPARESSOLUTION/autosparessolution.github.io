@@ -5253,6 +5253,125 @@ if (isAdmin(from)) {
         return;
     }
     // ============================================================
+// 🚚 LIST DELIVERY BOYS COMMAND
+// ============================================================
+
+if (msgLower === 'list delivery boys' || msgLower === 'list delivery' || msgLower === 'delivery boys list' || msgLower === 'delivery boys') {
+    try {
+        const deliveryBoys = await new Promise((resolve) => {
+            db.db.all(
+                `SELECT * FROM delivery_boys ORDER BY name`,
+                [],
+                (err, rows) => {
+                    if (err) {
+                        console.error('❌ Delivery boys query error:', err.message);
+                        resolve([]);
+                    } else {
+                        resolve(rows || []);
+                    }
+                }
+            );
+        });
+        
+        if (!deliveryBoys || deliveryBoys.length === 0) {
+            await sendWhatsAppMessage(from, 
+                `🚚 *No Delivery Boys Found*\n\n` +
+                `📝 *To add:*\n` +
+                `Add delivery [phone]|[name]|[city]|[vehicle]|[vehicle no]\n\n` +
+                `*Example:*\n` +
+                `Add delivery 9999999999|Rahul|Mumbai|Bike|MH01AB1234\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
+        
+        let reply = `🚚 *Delivery Boys List (${deliveryBoys.length})*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        deliveryBoys.forEach((boy, i) => {
+            const statusEmoji = boy.status === 'active' ? '✅' : '❌';
+            
+            reply += `${i + 1}. ${statusEmoji} *${boy.name || 'Unknown'}*\n`;
+            reply += `   📞 ${boy.phone || 'N/A'}\n`;
+            if (boy.address || boy.city) reply += `   📍 ${boy.address || boy.city}\n`;
+            if (boy.vehicle_type) reply += `   🚗 ${boy.vehicle_type}`;
+            if (boy.vehicle_number) reply += ` - ${boy.vehicle_number}`;
+            reply += `\n`;
+            if (boy.total_deliveries > 0) reply += `   📦 ${boy.total_deliveries} deliveries\n`;
+            if (boy.rating > 0) reply += `   ⭐ ${boy.rating.toFixed(1)}\n`;
+            reply += `   📊 Status: ${boy.status || 'active'}\n\n`;
+        });
+        
+        reply += `━━━━━━━━━━━━━━━━━━━━\n`;
+        reply += `📝 *Commands:*\n`;
+        reply += `   "Add delivery [phone]|[name]|[city]|[vehicle]|[vehicle no]"\n`;
+        reply += `   "Delete delivery [phone]"\n`;
+        reply += `📞 Call: ${CONFIG.businessPhone}`;
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ List delivery boys error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// ============================================================
+// 🗑️ DELETE DELIVERY BOY COMMAND
+// ============================================================
+
+if (msgLower.startsWith('delete delivery')) {
+    try {
+        const phoneMatch = text.match(/(\d{10})/);
+        if (!phoneMatch) {
+            await sendWhatsAppMessage(from, 
+                `❌ *Invalid Phone Number*\n\n` +
+                `📝 *Format:*\n` +
+                `Delete delivery [10-digit phone]\n\n` +
+                `*Example:*\n` +
+                `Delete delivery 9999999999`
+            );
+            return;
+        }
+        
+        const cleanPhone = phoneMatch[1];
+        
+        const existing = await db.db.get(
+            `SELECT * FROM delivery_boys WHERE phone = ?`,
+            [cleanPhone]
+        );
+        
+        if (!existing) {
+            await sendWhatsAppMessage(from, `❌ No delivery boy found with phone: ${cleanPhone}`);
+            return;
+        }
+        
+        await db.db.run(
+            `UPDATE delivery_boys SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE phone = ?`,
+            [cleanPhone]
+        );
+        
+        await sendWhatsAppMessage(from, 
+            `✅ *Delivery Boy Deactivated!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `👤 Name: ${existing.name}\n` +
+            `📞 Phone: ${cleanPhone}\n` +
+            `📊 Status: ❌ Inactive\n\n` +
+            `💡 To reactivate, add again with same phone number.`
+        );
+        return;
+    } catch (error) {
+        console.error('❌ Delete delivery boy error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
+
+// ============================================================
+// 🆕 ADD DELIVERY BOY COMMAND
+// ============================================================
+
+if (msgLower.startsWith('add delivery')) {
+    // ============================================================
 // 🆕 ADD DELIVERY BOY COMMAND
 // ============================================================
 
