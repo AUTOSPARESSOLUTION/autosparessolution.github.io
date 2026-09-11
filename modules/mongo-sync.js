@@ -1,6 +1,7 @@
-
-// modules/mongo-sync.js
-// This works alongside your existing code - NO CHANGES needed!
+// ============================================================
+// modules/mongo-sync.js - CORRECTED VERSION
+// Matches index.js usage, no memory issues
+// ============================================================
 
 const { MongoClient } = require('mongodb');
 const sqlite3 = require('sqlite3').verbose();
@@ -13,7 +14,9 @@ let mongoClient = null;
 let isSyncRunning = false;
 let syncInterval = null;
 
-// Connect to MongoDB
+// ============================================================
+// 🔗 CONNECT TO MONGODB (Fixed - no deprecated options)
+// ============================================================
 async function connectMongo() {
     if (!MONGODB_URI) {
         console.log('⚠️ MONGODB_URI not set, sync disabled');
@@ -21,27 +24,53 @@ async function connectMongo() {
     }
     
     try {
+        // ✅ Reuse if already connected
+        if (mongoClient) {
+            try {
+                await mongoClient.db('admin').command({ ping: 1 });
+                return mongoClient.db('autospares');
+            } catch (e) {
+                mongoClient = null; // Dead connection, reconnect
+            }
+        }
+        
+        // ✅ Correct options (no deprecated flags)
         mongoClient = new MongoClient(MONGODB_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-            maxPoolSize: 10
+            maxPoolSize: 10,
+            serverSelectionTimeoutMS: 15000,
+            socketTimeoutMS: 60000,
+            connectTimeoutMS: 15000,
+            retryWrites: true,
+            retryReads: true
         });
         
         await mongoClient.connect();
+        await mongoClient.db('admin').command({ ping: 1 });
+        
         console.log('✅ MongoDB connected for sync');
         return mongoClient.db('autospares');
+        
     } catch (error) {
         console.error('❌ MongoDB connection failed:', error.message);
+        mongoClient = null;
         return null;
     }
 }
 
-// Get SQLite data
-function getSQLiteData(table) {
+// ============================================================
+// 📥 GET SQLITE DATA (with optional LIMIT for memory safety)
+// ============================================================
+function getSQLiteData(table, options = {}) {
     return new Promise((resolve, reject) => {
         const db = new sqlite3.Database(DB_PATH);
+        const { limit, offset, where } = options;
         
-        db.all(`SELECT * FROM ${table}`, (err, rows) => {
+        let query = `SELECT * FROM ${table}`;
+        if (where) query += ` WHERE ${where}`;
+        if (limit) query += ` LIMIT ${limit}`;
+        if (offset) query += ` OFFSET ${offset}`;
+        
+        db.all(query, (err, rows) => {
             db.close();
             if (err) reject(err);
             else resolve(rows || []);
@@ -49,7 +78,23 @@ function getSQLiteData(table) {
     });
 }
 
-// Sync a single table
+// ============================================================
+// 📊 GET ROW COUNT
+// ============================================================
+function getRowCount(table) {
+    return new Promise((resolve, reject) => {
+        const db = new sqlite3.Database(DB_PATH);
+        db.get(`SELECT COUNT(*) as count FROM ${table}`, (err, row) => {
+            db.close();
+            if (err) reject(err);
+            else resolve(row?.count || 0);
+        });
+    });
+}
+
+// ============================================================
+// 🔄 SYNC SINGLE TABLE (BATCH PROCESSING - NO MEMORY SPIKE)
+// ============================================================
 async function syncTable(tableName, collectionName) {
     try {
         const db = await connectMongo();
@@ -57,26 +102,59 @@ async function syncTable(tableName, collectionName) {
         
         const collection = db.collection(collectionName || tableName);
         
-        // Get data from SQLite
-        const data = await getSQLiteData(tableName);
+        // ✅ Get row count first
+        const totalRows = await getRowCount(tableName);
+        if (totalRows === 0) {
+            console.log(`⏭️ No data in ${tableName}`);
+            return false;
+        }
         
-        if (data.length === 0) return false;
+        console.log(`📤 Syncing ${totalRows} rows from ${tableName}...`);
         
-        // Clear existing data in MongoDB
+        // ✅ Clear old data
         await collection.deleteMany({});
         
-        // Insert fresh data
-        const result = await collection.insertMany(data);
+        // ✅ BATCH PROCESSING - Load only 500 rows at a time
+        const BATCH_SIZE = 500;
+        let synced = 0;
         
-        console.log(`✅ Synced ${result.insertedCount} records to ${collectionName || tableName}`);
+        for (let offset = 0; offset < totalRows; offset += BATCH_SIZE) {
+            const batch = await getSQLiteData(tableName, { 
+                limit: BATCH_SIZE, 
+                offset: offset 
+            });
+            
+            if (batch.length > 0) {
+                try {
+                    await collection.insertMany(batch, { ordered: false });
+                    synced += batch.length;
+                } catch (err) {
+                    // Handle duplicate keys gracefully
+                    if (err.code === 11000) {
+                        const inserted = err.result?.insertedCount || 0;
+                        synced += inserted;
+                    } else {
+                        console.log(`⚠️ Batch error: ${err.message}`);
+                    }
+                }
+            }
+            
+            // Small delay to prevent memory spike
+            await new Promise(r => setTimeout(r, 50));
+        }
+        
+        console.log(`✅ Synced ${synced}/${totalRows} records to ${collectionName || tableName}`);
         return true;
+        
     } catch (error) {
         console.error(`❌ Sync failed for ${tableName}:`, error.message);
         return false;
     }
 }
 
-// Sync ALL tables
+// ============================================================
+// 🔄 SYNC ALL TABLES
+// ============================================================
 async function syncAllData() {
     if (isSyncRunning) {
         console.log('⏳ Sync already in progress');
@@ -84,24 +162,25 @@ async function syncAllData() {
     }
     
     isSyncRunning = true;
+    const startTime = Date.now();
     
     try {
         console.log('🔄 Starting full data sync to MongoDB...');
         
-        // Tables to sync
+        // Small tables first, then products (biggest)
         const tables = [
             'customers',
-            'suppliers', 
-            'products',
+            'suppliers',
+            'supplier_access',
             'delivery_boys',
-            'orders',
             'carts',
+            'orders',
             'sales_invoices',
             'purchase_invoices',
             'customer_payments',
             'supplier_payments',
-            'supplier_access',
-            'deliveries'
+            'deliveries',
+            'products'  // ← Last (biggest)
         ];
         
         let totalSynced = 0;
@@ -111,10 +190,8 @@ async function syncAllData() {
             if (success) totalSynced++;
         }
         
-        console.log(`✅ Sync complete: ${totalSynced}/${tables.length} tables synced`);
-        
-        // Also sync the JSON backups
-        await syncJSONBackups();
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`✅ Sync complete: ${totalSynced}/${tables.length} tables in ${duration}s`);
         
     } catch (error) {
         console.error('❌ Sync error:', error.message);
@@ -123,53 +200,26 @@ async function syncAllData() {
     }
 }
 
-// Sync JSON backups to MongoDB
-async function syncJSONBackups() {
-    try {
-        const fs = require('fs');
-        const dataDir = path.join(__dirname, '../data');
-        
-        if (!fs.existsSync(dataDir)) return;
-        
-        const files = fs.readdirSync(dataDir).filter(f => f.endsWith('.json'));
-        
-        for (const file of files) {
-            const filePath = path.join(dataDir, file);
-            const content = fs.readFileSync(filePath, 'utf8');
-            const data = JSON.parse(content);
-            
-            if (Array.isArray(data) && data.length > 0) {
-                const collectionName = file.replace('.json', '');
-                const db = await connectMongo();
-                if (!db) continue;
-                
-                const collection = db.collection(`backup_${collectionName}`);
-                await collection.deleteMany({});
-                await collection.insertMany(data);
-                console.log(`✅ Synced ${data.length} records from ${file}`);
-            }
-        }
-    } catch (error) {
-        console.error('❌ JSON sync error:', error.message);
-    }
-}
-
-// Start auto-sync
-function startAutoSync(intervalMs = 60000) { // Every 60 seconds
+// ============================================================
+// ⏰ START AUTO-SYNC
+// ============================================================
+function startAutoSync(intervalMs = 600000) {
     if (syncInterval) {
         clearInterval(syncInterval);
     }
     
-    console.log(`🔄 Auto-sync started (every ${intervalMs/1000} seconds)`);
+    console.log(`🔄 Auto-sync started (every ${intervalMs / 1000 / 60} minutes)`);
     
-    // Initial sync
-    setTimeout(syncAllData, 5000);
+    // First sync after 30 seconds
+    setTimeout(syncAllData, 30000);
     
     // Regular sync
     syncInterval = setInterval(syncAllData, intervalMs);
 }
 
-// Stop auto-sync
+// ============================================================
+// 🛑 STOP AUTO-SYNC
+// ============================================================
 function stopAutoSync() {
     if (syncInterval) {
         clearInterval(syncInterval);
@@ -178,12 +228,17 @@ function stopAutoSync() {
     }
 }
 
-// Manual sync
+// ============================================================
+// 🔄 MANUAL SYNC
+// ============================================================
 async function manualSync() {
     await syncAllData();
+    return true;
 }
 
-// Get sync status
+// ============================================================
+// 📊 GET SYNC STATUS
+// ============================================================
 function getSyncStatus() {
     return {
         isRunning: isSyncRunning,
@@ -193,6 +248,9 @@ function getSyncStatus() {
     };
 }
 
+// ============================================================
+// 📤 EXPORTS
+// ============================================================
 module.exports = {
     connectMongo,
     syncAllData,
@@ -200,6 +258,5 @@ module.exports = {
     startAutoSync,
     stopAutoSync,
     manualSync,
-    getSyncStatus,
-    syncJSONBackups
+    getSyncStatus
 };
