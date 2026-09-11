@@ -3558,6 +3558,25 @@ async function initAllTables() {
             });
         });
         console.log('✅ supplier_access table ready');
+                // ============================================================
+        // 🆕 DELIVERY BOYS ACCESS TABLE
+        // ============================================================
+        await new Promise((resolve, reject) => {
+            db.db.run(`
+                CREATE TABLE IF NOT EXISTS delivery_boys_access (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    delivery_boy_id INTEGER NOT NULL,
+                    phone TEXT NOT NULL,
+                    status TEXT DEFAULT 'active',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (delivery_boy_id) REFERENCES delivery_boys(id)
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('✅ delivery_boys_access table ready');
          // ============================================================
         // 🆕 SUPPLIER INVENTORY TABLE
         // ============================================================
