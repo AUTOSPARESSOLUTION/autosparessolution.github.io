@@ -4644,13 +4644,26 @@ async function optimizedSearch(query, limit = 10) {
                 }
             }
         }
-        return results.slice(0, limit);
+        
+        // ✅ If SQLite has results, return them
+        if (results.length > 0) {
+            return results.slice(0, limit);
+        }
+        
+        // 🆕 FALLBACK: Search MongoDB if SQLite has nothing
+        console.log(`🔍 SQLite empty for "${query}", searching MongoDB...`);
+        const mongoResults = await mongoSync.searchProductsInMongo(query, limit);
+        if (mongoResults && mongoResults.length > 0) {
+            console.log(`✅ Found ${mongoResults.length} products in MongoDB`);
+            return mongoResults;
+        }
+        
+        return [];
     } catch (error) {
         console.error('❌ Optimized search error:', error.message);
         return await db.searchProducts(query, limit);
     }
 }
-
 // ============================================================
 // 🎙️ VOICE MESSAGE HANDLER
 // ============================================================
