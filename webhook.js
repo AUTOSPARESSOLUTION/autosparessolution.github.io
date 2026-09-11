@@ -6737,7 +6737,82 @@ if (isAdmin(from) && msgLower === 'check tables') {
         return;
     }
 }
+// ============================================================
+// 🚚 DEBUG DELIVERY BOYS COMMAND
+// ============================================================
 
+if (isAdmin(from) && (msgLower === 'debug delivery' || msgLower === 'debug delivery boys' || msgLower === 'check delivery boys')) {
+    try {
+        // Check if table exists
+        const tableExists = await new Promise((resolve) => {
+            db.db.get(
+                `SELECT name FROM sqlite_master WHERE type='table' AND name='delivery_boys'`,
+                [],
+                (err, row) => {
+                    if (err) resolve(false);
+                    else resolve(!!row);
+                }
+            );
+        });
+        
+        let reply = `🚚 *DEBUG: Delivery Boys Table*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        reply += `📋 Table exists: ${tableExists ? '✅ Yes' : '❌ No'}\n\n`;
+        
+        if (!tableExists) {
+            reply += `❌ delivery_boys table does not exist!\n`;
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+        
+        // Get count
+        const count = await new Promise((resolve) => {
+            db.db.get(`SELECT COUNT(*) as count FROM delivery_boys`, [], (err, row) => {
+                if (err) resolve({ error: err.message });
+                else resolve(row);
+            });
+        });
+        
+        if (count && count.error) {
+            reply += `❌ Error: ${count.error}\n`;
+            await sendWhatsAppMessage(from, reply);
+            return;
+        }
+        
+        reply += `📊 Total delivery boys: ${count?.count || 0}\n\n`;
+        
+        // Get all data
+        const allData = await new Promise((resolve) => {
+            db.db.all(`SELECT * FROM delivery_boys LIMIT 10`, [], (err, rows) => {
+                if (err) resolve([]);
+                else resolve(rows || []);
+            });
+        });
+        
+        if (allData.length > 0) {
+            reply += `📋 *Delivery Boys Found:*\n\n`;
+            allData.forEach((row, i) => {
+                reply += `${i + 1}. 👤 *${row.name || 'Unknown'}*\n`;
+                reply += `   📞 Phone: ${row.phone || 'N/A'}\n`;
+                reply += `   📍 Address: ${row.address || 'N/A'}\n`;
+                reply += `   🚗 Vehicle: ${row.vehicle_type || 'N/A'} - ${row.vehicle_number || 'N/A'}\n`;
+                reply += `   📊 Status: ${row.status || 'N/A'}\n`;
+                reply += `   📦 Deliveries: ${row.total_deliveries || 0}\n`;
+                reply += `   🕐 Created: ${row.created_at || 'N/A'}\n\n`;
+            });
+        } else {
+            reply += `❌ No delivery boys found in database\n\n`;
+            reply += `💡 To add:\n`;
+            reply += `"Add delivery 9999999999|Name|City|Bike|MH01AB1234"\n`;
+        }
+        
+        await sendWhatsAppMessage(from, reply);
+        return;
+    } catch (error) {
+        console.error('❌ Debug delivery error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+        return;
+    }
+}
 // 📋 Check customers table
 if (isAdmin(from) && msgLower === 'check customers') {
     try {
