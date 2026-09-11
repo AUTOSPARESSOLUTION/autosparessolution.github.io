@@ -5414,13 +5414,17 @@ if (msgLower.startsWith('add delivery')) {
                 `✅ Delivery boy details updated!`
             );
        } else {
-    // ✅ Save to delivery_boys table
+    // ✅ Generate unique boy_id (FIX for NOT NULL constraint)
+    const boyId = `DB-${Date.now().toString().slice(-8)}`;
+    
+    // ✅ Save to delivery_boys table WITH boy_id
     const result = await db.db.run(
-        `INSERT INTO delivery_boys (name, phone, address, vehicle_type, vehicle_number, status, created_at) 
-         VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
-        [name, cleanPhone, city, vehicleType, vehicleNumber]
+        `INSERT INTO delivery_boys (boy_id, name, phone, address, vehicle_type, vehicle_number, status, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
+        [boyId, name, cleanPhone, city, vehicleType, vehicleNumber]
     );
     deliveryBoyId = result.lastID;
+    console.log(`✅ Inserted delivery boy ID: ${deliveryBoyId}, boy_id: ${boyId}`);
     
     // ✅ ALSO save to delivery_boys_access for WhatsApp notifications
     try {
