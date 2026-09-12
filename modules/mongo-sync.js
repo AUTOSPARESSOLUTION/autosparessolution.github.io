@@ -1,6 +1,6 @@
 // ============================================================
-// modules/mongo-sync.js - CORRECTED VERSION
-// Matches index.js usage, no memory issues
+// modules/mongo-sync.js - FINAL CORRECTED VERSION
+// All bugs fixed, bandwidth-optimized
 // ============================================================
 
 const { MongoClient } = require('mongodb');
@@ -15,7 +15,7 @@ let isSyncRunning = false;
 let syncInterval = null;
 
 // ============================================================
-// 🔗 CONNECT TO MONGODB (Fixed - no deprecated options)
+// 🔗 CONNECT TO MONGODB
 // ============================================================
 async function connectMongo() {
     if (!MONGODB_URI) {
@@ -24,17 +24,16 @@ async function connectMongo() {
     }
     
     try {
-        // ✅ Reuse if already connected
+        // Reuse if already connected
         if (mongoClient) {
             try {
                 await mongoClient.db('admin').command({ ping: 1 });
                 return mongoClient.db('autospares');
             } catch (e) {
-                mongoClient = null; // Dead connection, reconnect
+                mongoClient = null;
             }
         }
         
-        // ✅ Correct options (no deprecated flags)
         mongoClient = new MongoClient(MONGODB_URI, {
             maxPoolSize: 10,
             serverSelectionTimeoutMS: 15000,
@@ -58,7 +57,7 @@ async function connectMongo() {
 }
 
 // ============================================================
-// 📥 GET SQLITE DATA (with optional LIMIT for memory safety)
+// 📥 GET SQLITE DATA (with pagination)
 // ============================================================
 function getSQLiteData(table, options = {}) {
     return new Promise((resolve, reject) => {
@@ -93,7 +92,7 @@ function getRowCount(table) {
 }
 
 // ============================================================
-// 🔄 SYNC SINGLE TABLE (BATCH PROCESSING - NO MEMORY SPIKE)
+// 🔄 SYNC SINGLE TABLE (BATCH PROCESSING)
 // ============================================================
 async function syncTable(tableName, collectionName) {
     try {
@@ -102,7 +101,6 @@ async function syncTable(tableName, collectionName) {
         
         const collection = db.collection(collectionName || tableName);
         
-        // ✅ Get row count first
         const totalRows = await getRowCount(tableName);
         if (totalRows === 0) {
             console.log(`⏭️ No data in ${tableName}`);
@@ -111,10 +109,10 @@ async function syncTable(tableName, collectionName) {
         
         console.log(`📤 Syncing ${totalRows} rows from ${tableName}...`);
         
-        // ✅ Clear old data
+        // Clear old data
         await collection.deleteMany({});
         
-        // ✅ BATCH PROCESSING - Load only 500 rows at a time
+        // Batch processing
         const BATCH_SIZE = 500;
         let synced = 0;
         
@@ -129,7 +127,6 @@ async function syncTable(tableName, collectionName) {
                     await collection.insertMany(batch, { ordered: false });
                     synced += batch.length;
                 } catch (err) {
-                    // Handle duplicate keys gracefully
                     if (err.code === 11000) {
                         const inserted = err.result?.insertedCount || 0;
                         synced += inserted;
@@ -139,7 +136,6 @@ async function syncTable(tableName, collectionName) {
                 }
             }
             
-            // Small delay to prevent memory spike
             await new Promise(r => setTimeout(r, 50));
         }
         
@@ -167,37 +163,67 @@ async function syncAllData() {
     try {
         console.log('🔄 Starting full data sync to MongoDB...');
         
-        // Small tables first, then products (biggest)
-        const tables = [
+        // Small tables - sync every time
+        const smallTables = [
             'customers',
             'suppliers',
             'supplier_access',
             'delivery_boys',
+            'delivery_boys_access',
             'carts',
             'orders',
             'sales_invoices',
             'purchase_invoices',
             'customer_payments',
             'supplier_payments',
-            'deliveries',
-            'products'  // ← Last (biggest)
+            'deliveries'
         ];
         
         let totalSynced = 0;
         
-        for (const table of tables) {
+        for (const table of smallTables) {
             const success = await syncTable(table);
             if (success) totalSynced++;
         }
         
+        // Products - sync once per day at 3 AM
+        const now = new Date();
+        const hourOfDay = now.getHours();
+        const minuteOfHour = now.getMinutes();
+        
+        if (hourOfDay === 3 && minuteOfHour < 15) {
+            console.log('📦 Syncing large products table (once daily at 3 AM)...');
+            const success = await syncTable('products');
+            if (success) totalSynced++;
+        } else {
+            console.log(`⏭️ Skipping products sync (only runs at 3 AM, now ${hourOfDay}:${minuteOfHour})`);
+        }
+        
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log(`✅ Sync complete: ${totalSynced}/${tables.length} tables in ${duration}s`);
+        console.log(`✅ Sync complete: ${totalSynced} tables in ${duration}s`);
         
     } catch (error) {
         console.error('❌ Sync error:', error.message);
     } finally {
         isSyncRunning = false;
     }
+}
+
+// ============================================================
+// 📦 FORCE SYNC PRODUCTS NOW (one-time manual trigger)
+// ============================================================
+async function forceSyncProductsNow() {
+    console.log('📦 FORCE syncing products table now...');
+    const startTime = Date.now();
+    const success = await syncTable('products');
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    
+    if (success) {
+        console.log(`✅ Products force sync complete in ${duration}s`);
+    } else {
+        console.log(`❌ Products force sync failed`);
+    }
+    return success;
 }
 
 // ============================================================
@@ -210,10 +236,7 @@ function startAutoSync(intervalMs = 600000) {
     
     console.log(`🔄 Auto-sync started (every ${intervalMs / 1000 / 60} minutes)`);
     
-    // First sync after 30 seconds
     setTimeout(syncAllData, 30000);
-    
-    // Regular sync
     syncInterval = setInterval(syncAllData, intervalMs);
 }
 
@@ -247,10 +270,10 @@ function getSyncStatus() {
         interval: syncInterval ? 'active' : 'stopped'
     };
 }
+
 // ============================================================
 // 🔍 SEARCH PRODUCTS IN MONGODB
 // ============================================================
-
 async function searchProductsInMongo(query, limit = 10) {
     try {
         const db = await connectMongo();
@@ -279,7 +302,9 @@ async function searchProductsInMongo(query, limit = 10) {
     }
 }
 
-// Add to exports
+// ============================================================
+// 📤 EXPORTS (SINGLE - FIXED)
+// ============================================================
 module.exports = {
     connectMongo,
     syncAllData,
@@ -288,17 +313,6 @@ module.exports = {
     stopAutoSync,
     manualSync,
     getSyncStatus,
-    searchProductsInMongo  // ← ADD THIS LINE
-};
-// ============================================================
-// 📤 EXPORTS
-// ============================================================
-module.exports = {
-    connectMongo,
-    syncAllData,
-    syncTable,
-    startAutoSync,
-    stopAutoSync,
-    manualSync,
-    getSyncStatus
+    searchProductsInMongo,
+    forceSyncProductsNow
 };
