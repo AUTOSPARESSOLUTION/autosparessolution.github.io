@@ -6365,7 +6365,32 @@ if (msgLower === 'sync now') {
     }
     return;
 }
-
+// 🆕 Force sync products (one-time manual trigger)
+if (msgLower === 'force sync products' || msgLower === 'sync products now') {
+    await sendWhatsAppMessage(from, 
+        '📦 Force syncing products to MongoDB...\n\n' +
+        '⏳ This may take 5-10 minutes for 6 lakh products.\n\n' +
+        '💡 Do this ONCE. It will use ~50 MB bandwidth.'
+    );
+    
+    try {
+        const success = await mongoSync.forceSyncProductsNow();
+        
+        if (success) {
+            await sendWhatsAppMessage(from, 
+                '✅ *Products synced to MongoDB!*\n\n' +
+                '🔄 Search now works from MongoDB fallback.'
+            );
+        } else {
+            await sendWhatsAppMessage(from, 
+                '❌ Sync failed — check Render logs.'
+            );
+        }
+    } catch (error) {
+        await sendWhatsAppMessage(from, `❌ Sync failed: ${error.message}`);
+    }
+    return;
+}
 // Sync status - Check sync status
 if (msgLower === 'sync status' || msgLower === 'mongo status') {
     const status = mongoSync.getSyncStatus();
