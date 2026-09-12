@@ -179,8 +179,8 @@ async function syncAllData() {
             'purchase_invoices',
             'customer_payments',
             'supplier_payments',
-            'deliveries'
-           // 'products'  // ← Last (biggest)
+            'deliveries',
+            'products'  // ← Last (biggest)
         ];
         
         let totalSynced = 0;
