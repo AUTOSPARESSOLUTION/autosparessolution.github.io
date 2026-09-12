@@ -5367,8 +5367,8 @@ if (msgLower.startsWith('delete delivery')) {
 }
 
 
-    // ============================================================
-// 🆕 ADD DELIVERY BOY COMMAND
+   // ============================================================
+// 🆕 ADD DELIVERY BOY COMMAND (FIXED)
 // ============================================================
 
 if (msgLower.startsWith('add delivery')) {
@@ -5390,6 +5390,8 @@ if (msgLower.startsWith('add delivery')) {
         const vehicleType = parts[3] || 'Bike';
         const vehicleNumber = parts[4] || '';
         
+        console.log(`📝 Adding delivery boy: ${name} (${cleanPhone})`);
+        
         // Check if delivery boy already exists
         const existing = await db.db.get(
             `SELECT id, name FROM delivery_boys WHERE phone = ?`,
@@ -5399,11 +5401,14 @@ if (msgLower.startsWith('add delivery')) {
         let deliveryBoyId;
         
         if (existing) {
+            // UPDATE existing
             await db.db.run(
                 `UPDATE delivery_boys SET name = ?, address = ?, vehicle_type = ?, vehicle_number = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`,
                 [name, city, vehicleType, vehicleNumber, cleanPhone]
             );
             deliveryBoyId = existing.id;
+            console.log(`🔄 Updated delivery boy: ${cleanPhone}`);
+            
             await sendWhatsAppMessage(from, 
                 `🔄 *Delivery Boy Updated!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
                 `👤 Name: ${name}\n` +
@@ -5413,58 +5418,64 @@ if (msgLower.startsWith('add delivery')) {
                 `📋 Number: ${vehicleNumber || 'N/A'}\n\n` +
                 `✅ Delivery boy details updated!`
             );
-          } else {
-// ✅ Generate unique boy_id (FIX for NOT NULL constraint)
-const boyId = `DB-${Date.now().toString().slice(-8)}`;
-
-// ✅ Save to delivery_boys table WITH boy_id
-const result = await db.db.run(
-    `INSERT INTO delivery_boys (boy_id, name, phone, address, vehicle_type, vehicle_number, status, created_at) 
-     VALUES (?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
-    [boyId, name, cleanPhone, city, vehicleType, vehicleNumber]
-);
-deliveryBoyId = result.lastID;
-console.log(`✅ Inserted delivery boy ID: ${deliveryBoyId}, boy_id: ${boyId}`);
-
-// ✅ ALSO save to delivery_boys_access for WhatsApp notifications
-try {
-    await db.db.run(
-        `INSERT INTO delivery_boys_access (delivery_boy_id, phone, status, created_at) 
-         VALUES (?, ?, 'active', CURRENT_TIMESTAMP)`,
-        [deliveryBoyId, cleanPhone]
-    );
-    console.log(`✅ Added delivery boy ${cleanPhone} to delivery_boys_access`);
-} catch (accessErr) {
-    console.error('⚠️ Could not add to delivery_boys_access:', accessErr.message);
-}
+        } else {
+            // INSERT new — with boy_id
+            const boyId = `DB-${Date.now().toString().slice(-8)}`;
+            
+            const result = await db.db.run(
+                `INSERT INTO delivery_boys (boy_id, name, phone, address, vehicle_type, vehicle_number, status, created_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
+                [boyId, name, cleanPhone, city, vehicleType, vehicleNumber]
+            );
+            deliveryBoyId = result.lastID;
+            console.log(`✅ Inserted delivery boy ID: ${deliveryBoyId}, boy_id: ${boyId}`);
+            
+            // Also add to delivery_boys_access
+            try {
+                await db.db.run(
+                    `INSERT INTO delivery_boys_access (delivery_boy_id, phone, status, created_at) 
+                     VALUES (?, ?, 'active', CURRENT_TIMESTAMP)`,
+                    [deliveryBoyId, cleanPhone]
+                );
+                console.log(`✅ Added ${cleanPhone} to delivery_boys_access`);
+            } catch (accessErr) {
+                console.error('⚠️ delivery_boys_access error:', accessErr.message);
+            }
+            
+            await sendWhatsAppMessage(from, 
+                `✅ *Delivery Boy Added!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `🆔 Boy ID: ${boyId}\n` +
+                `👤 Name: ${name}\n` +
+                `📞 Phone: ${cleanPhone}\n` +
+                `📍 City: ${city || 'N/A'}\n` +
+                `🚗 Vehicle: ${vehicleType}\n` +
+                `📋 Number: ${vehicleNumber || 'N/A'}\n\n` +
+                `✅ Delivery boy can now accept deliveries!\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+        }   // ← CLOSES the if/else properly
         
-        await sendWhatsAppMessage(from, 
-            `✅ *Delivery Boy Added!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
-            `🆔 Boy ID: ${boyId}\n` +
-            `👤 Name: ${name}\n` +
-            `📞 Phone: ${cleanPhone}\n` +
-            `📍 City: ${city || 'N/A'}\n` +
-            `🚗 Vehicle: ${vehicleType}\n` +
-            `📋 Number: ${vehicleNumber || 'N/A'}\n\n` +
-            `✅ Delivery boy can now accept deliveries!\n` +
-            `📞 Call: ${CONFIG.businessPhone}`
-        );
-    }
-        
-        // Notify the delivery boy
-        await sendWhatsAppMessage(cleanPhone,
-            `🚚 *You've been registered as a Delivery Boy!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
-            `👤 ${name}\n` +
-            `📞 ${cleanPhone}\n` +
-            `📍 ${city || 'N/A'}\n` +
-            `🚗 ${vehicleType}\n\n` +
-            `📦 You'll receive delivery assignments.\n` +
-            `📝 Send "My Deliveries" to see pending deliveries.\n` +
-            `📞 Call: ${CONFIG.businessPhone}`
-        );
+        // Notify the delivery boy (only if registration succeeded)
+        if (deliveryBoyId) {
+            try {
+                await sendWhatsAppMessage(cleanPhone,
+                    `🚚 *You've been registered as a Delivery Boy!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                    `👤 ${name}\n` +
+                    `📞 ${cleanPhone}\n` +
+                    `📍 ${city || 'N/A'}\n` +
+                    `🚗 ${vehicleType}\n\n` +
+                    `📦 You'll receive delivery assignments.\n` +
+                    `📝 Send "My Deliveries" to see pending deliveries.\n` +
+                    `📞 Call: ${CONFIG.businessPhone}`
+                );
+            } catch (notifyErr) {
+                console.error('⚠️ Notify delivery boy failed:', notifyErr.message);
+            }
+        }
         
     } catch (error) {
         console.error('❌ Add delivery boy error:', error.message);
+        console.error('❌ Stack:', error.stack);
         await sendWhatsAppMessage(from, 
             `❌ *Failed to add delivery boy*\n\n` +
             `Error: ${error.message}\n` +
