@@ -6406,6 +6406,160 @@ if (msgLower === 'sync status' || msgLower === 'mongo status') {
     return;
 }
     // ============================================================
+// 🔄 ADMIN: RESUME FALLBACK SERVER (Render)
+// ============================================================
+if (msgLower === 'resume fallback' || msgLower === 'start fallback') {
+    try {
+        await sendWhatsAppMessage(from, '🔄 Resuming fallback server (Render)...');
+
+        const RENDER_API_KEY = process.env.RENDER_API_KEY;
+        const RENDER_SERVICE_ID = process.env.RENDER_SERVICE_ID;
+
+        if (!RENDER_API_KEY || !RENDER_SERVICE_ID) {
+            await sendWhatsAppMessage(from,
+                `❌ *Missing configuration*\n\n` +
+                `Please set these environment variables:\n` +
+                `   RENDER_API_KEY\n` +
+                `   RENDER_SERVICE_ID\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
+
+        const response = await fetch(
+            `https://api.render.com/v1/services/${RENDER_SERVICE_ID}/resume`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${RENDER_API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (response.ok || response.status === 202) {
+            await sendWhatsAppMessage(from,
+                `✅ *Fallback Server Resumed!*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `🌐 Service ID: ${RENDER_SERVICE_ID}\n` +
+                `⏳ Status: Starting up (~1-2 min)\n\n` +
+                `💡 Check with: "Fallback status"\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+        } else {
+            const errText = await response.text();
+            await sendWhatsAppMessage(from,
+                `❌ *Failed to resume fallback*\n\n` +
+                `Status: ${response.status}\n` +
+                `Error: ${errText}\n\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+        }
+    } catch (error) {
+        console.error('❌ Resume fallback error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+    }
+    return;
+}
+
+// ============================================================
+// 📊 ADMIN: CHECK FALLBACK STATUS (Render)
+// ============================================================
+if (msgLower === 'fallback status' || msgLower === 'render status') {
+    try {
+        await sendWhatsAppMessage(from, '🔍 Checking fallback server status...');
+
+        const RENDER_API_KEY = process.env.RENDER_API_KEY;
+        const RENDER_SERVICE_ID = process.env.RENDER_SERVICE_ID;
+
+        if (!RENDER_API_KEY || !RENDER_SERVICE_ID) {
+            await sendWhatsAppMessage(from,
+                `❌ *Missing configuration*\n\n` +
+                `Set RENDER_API_KEY and RENDER_SERVICE_ID\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+            return;
+        }
+
+        const response = await fetch(
+            `https://api.render.com/v1/services/${RENDER_SERVICE_ID}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${RENDER_API_KEY}`,
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`API returned ${response.status}`);
+        }
+
+        const data = await response.json();
+        const service = data.service || data;
+
+        let reply = `📊 *Fallback Server Status*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        reply += `🆔 Service: ${service.name || 'N/A'}\n`;
+        reply += `🌐 URL: ${service.serviceDetails?.url || 'N/A'}\n`;
+        reply += `📡 Type: ${service.type || 'N/A'}\n`;
+        reply += `⚙️ Suspended: ${service.suspended ? '❌ YES' : '✅ NO'}\n`;
+        reply += `🔄 Auto Deploy: ${service.autoDeploy || 'N/A'}\n`;
+        reply += `📅 Created: ${service.createdAt ? new Date(service.createdAt).toLocaleString() : 'N/A'}\n`;
+        reply += `\n💡 Commands:\n`;
+        reply += `   "Resume fallback" - Start the service\n`;
+        reply += `   "Suspend fallback" - Stop the service\n`;
+        reply += `📞 Call: ${CONFIG.businessPhone}`;
+
+        await sendWhatsAppMessage(from, reply);
+    } catch (error) {
+        console.error('❌ Fallback status error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+    }
+    return;
+}
+
+// ============================================================
+// 🛑 ADMIN: SUSPEND FALLBACK SERVER (Save Bandwidth)
+// ============================================================
+if (msgLower === 'suspend fallback' || msgLower === 'stop fallback') {
+    try {
+        await sendWhatsAppMessage(from, '🛑 Suspending fallback server (saving bandwidth)...');
+
+        const RENDER_API_KEY = process.env.RENDER_API_KEY;
+        const RENDER_SERVICE_ID = process.env.RENDER_SERVICE_ID;
+
+        if (!RENDER_API_KEY || !RENDER_SERVICE_ID) {
+            await sendWhatsAppMessage(from, `❌ Missing RENDER_API_KEY or RENDER_SERVICE_ID`);
+            return;
+        }
+
+        const response = await fetch(
+            `https://api.render.com/v1/services/${RENDER_SERVICE_ID}/suspend`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${RENDER_API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (response.ok || response.status === 202) {
+            await sendWhatsAppMessage(from,
+                `✅ *Fallback Server Suspended!*\n\n` +
+                `💾 Bandwidth saved\n` +
+                `💡 Resume with: "Resume fallback"\n` +
+                `📞 Call: ${CONFIG.businessPhone}`
+            );
+        } else {
+            await sendWhatsAppMessage(from, `❌ Failed to suspend: ${response.status}`);
+        }
+    } catch (error) {
+        console.error('❌ Suspend fallback error:', error.message);
+        await sendWhatsAppMessage(from, `❌ Error: ${error.message}`);
+    }
+    return;
+}
+    // ============================================================
     // 🔟 ADMIN HELP
     // ============================================================
     if (msgLower === 'admin help' || msgLower === 'help admin') {
