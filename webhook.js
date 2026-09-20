@@ -3018,7 +3018,7 @@ function getMimeType(filename) {
 let isDbReady = false;
 let dbReadyMessage = 'Loading database...';
 let importProgress = 0;
-const TOTAL_PRODUCTS = 93098;
+let TOTAL_PRODUCTS = 0;
 
 // ============================================================
 // 🗄️ DATABASE INITIALIZATION
@@ -9853,6 +9853,7 @@ if (process.env.MONGODB_URI) {
         console.log('✅ Brand logos preloaded');
 
         const stats = await db.getStats();
+        TOTAL_PRODUCTS = stats.total_products || 0;
         if (stats.total_products === 0) {
             console.log('📦 No products found. Starting background import...');
             setImmediate(importCSVInBackground);
