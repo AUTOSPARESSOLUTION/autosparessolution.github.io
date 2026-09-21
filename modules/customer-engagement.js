@@ -203,11 +203,52 @@ class CustomerEngagement {
     }
 
     async sendWhatsAppMessage(to, message) {
+    try {
+        const normalizedPhone = String(to).replace(/\D/g, '');
+        const url = `https://graph.facebook.com/v23.0/${process.env.ID}/messages`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: normalizedPhone,
+                type: 'text',
+                text: { body: String(message).slice(0, 4096) }
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            const errMsg = result.error?.message || `HTTP ${response.status}`;
+            console.error(`❌ Wish send failed (${normalizedPhone}): ${errMsg}`);
+            try {
+                await dbRun(
+                    `INSERT INTO queued_messages (phone, message, status) VALUES (?, ?, 'failed')`,
+                    [normalizedPhone, message]
+                );
+            } catch (e) {}
+            return { success: false, error: errMsg };
+        }
+
+        console.log(`✅ Wish sent to ${normalizedPhone}`);
         try {
-            await dbRun(`INSERT INTO queued_messages (phone, message, status) VALUES (?, ?, 'pending')`, [to, message]);
-            return { success: true };
-        } catch (error) { console.error('❌ Queue message error:', error.message); return { success: false }; }
+            await dbRun(
+                `INSERT INTO queued_messages (phone, message, status) VALUES (?, ?, 'sent')`,
+                [normalizedPhone, message]
+            );
+        } catch (e) {}
+
+        return { success: true, id: result.messages?.[0]?.id };
+    } catch (error) {
+        console.error('❌ Send error:', error.message);
+        return { success: false, error: error.message };
     }
+}
 
     async updateAnalytics(campaignType, count) {
         try {
